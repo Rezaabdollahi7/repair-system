@@ -44,7 +44,7 @@ export default function DeviceList() {
           to="/devices/new"
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
         >
-          + ثبت دستگاه جدید
+          ثبت دستگاه جدید
         </Link>
       </div>
 
@@ -81,7 +81,7 @@ export default function DeviceList() {
                   <td className="px-4 py-3 text-sm font-mono">
                     {device.reception_number}
                   </td>
-                  <td className="px-4 py-3 text-sm">{device.device_type}</td>
+                  <td className="px-4 py-3 text-sm">{device.device_name}</td>
                   <td className="px-4 py-3 text-sm">
                     {device.customer_name ?? "—"}
                   </td>

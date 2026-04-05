@@ -31,7 +31,9 @@ function initSchema() {
       phone TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+  `);
 
+  db.run(`
     CREATE TABLE IF NOT EXISTS devices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       reception_number TEXT UNIQUE NOT NULL,
@@ -60,4 +62,3 @@ function saveDb() {
 }
 
 module.exports = { getDb, saveDb };
-    

@@ -96,30 +96,42 @@ exports.create = async (req, res) => {
     } = req.body;
 
     db.run(
-      `
-      INSERT INTO devices (reception_number, customer_id, device_name, brand, model, serial_number, entry_date, status, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
+      `INSERT INTO devices (reception_number, customer_id, device_name, brand, model, serial_number, entry_date, status, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         reception_number,
-        customer_id,
+        customer_id || null,
         device_name,
-        brand,
-        model,
-        serial_number,
+        brand || null,
+        model || null,
+        serial_number || null,
         entry_date,
         status || "در انتظار",
-        description,
+        description || null,
       ],
     );
 
+    // باید قبل از saveDb بخونیم
+    const idResult = db.exec(`SELECT last_insert_rowid() as id`);
+    const newId = idResult[0].values[0][0];
+
     saveDb();
 
-    const result = db.exec(`SELECT * FROM devices WHERE reception_number = ?`, [
-      reception_number,
-    ]);
-    const row = result[0].values[0];
+    const deviceResult = db.exec(
+      `SELECT d.*, c.name as customer_name, c.phone as customer_phone
+       FROM devices d
+       LEFT JOIN customers c ON d.customer_id = c.id
+       WHERE d.id = ?`,
+      [newId],
+    );
 
+    if (!deviceResult[0]) {
+      return res
+        .status(500)
+        .json({ error: "Failed to retrieve created device" });
+    }
+
+    const row = deviceResult[0].values[0];
     res.status(201).json({
       id: row[0],
       reception_number: row[1],
@@ -135,6 +147,8 @@ exports.create = async (req, res) => {
       image_path: row[11],
       created_at: row[12],
       updated_at: row[13],
+      customer_name: row[14],
+      customer_phone: row[15],
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

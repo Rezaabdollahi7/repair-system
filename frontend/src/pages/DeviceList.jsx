@@ -1,33 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { getDevices, deleteDevice } from "../api";
 import toast from "react-hot-toast";
 
+function useDebounce(value, delay = 400) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function DeviceList() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
 
-  const fetchDevices = async () => {
+  const debouncedSearch = useDebounce(searchInput, 400);
+
+  const fetchDevices = useCallback(async (searchTerm) => {
+    setLoading(true);
     try {
-      const res = await getDevices();
+      const params = searchTerm ? { search: searchTerm } : {};
+      const res = await getDevices(params);
       setDevices(res.data);
     } catch {
       toast.error("خطا در دریافت لیست دستگاه‌ها");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchDevices();
-  }, []);
+    fetchDevices(debouncedSearch);
+  }, [debouncedSearch, fetchDevices]);
 
   const handleDelete = async (id) => {
     if (!confirm("آیا مطمئن هستید؟")) return;
     try {
       await deleteDevice(id);
       toast.success("دستگاه حذف شد");
-      fetchDevices();
+      fetchDevices(debouncedSearch);
     } catch {
       toast.error("خطا در حذف دستگاه");
     }
@@ -37,9 +51,6 @@ export default function DeviceList() {
     if (!dateStr) return "—";
     return new Date(dateStr).toLocaleDateString("fa-IR");
   }
-
-  if (loading)
-    return <div className="text-center py-10">در حال بارگذاری...</div>;
 
   return (
     <div dir="rtl">
@@ -53,9 +64,25 @@ export default function DeviceList() {
         </Link>
       </div>
 
-      {devices.length === 0 ? (
-        <div className="text-center py-20 text-gray-500">
-          هیچ دستگاهی ثبت نشده
+      <div className="mb-4">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس..."
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 text-gray-500">
+          در حال بارگذاری...
+        </div>
+      ) : devices.length === 0 ? (
+        <div className="text-center py-20 text-gray-400">
+          {searchInput
+            ? `نتیجه‌ای برای "${searchInput}" یافت نشد`
+            : "هیچ دستگاهی ثبت نشده"}
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -72,6 +99,9 @@ export default function DeviceList() {
                   مشتری
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  شماره تماس
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
                   وضعیت
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
@@ -84,11 +114,14 @@ export default function DeviceList() {
               {devices.map((device) => (
                 <tr key={device.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono">
-                    {device.reception_number}
+                    {device.reception_number ?? device.id}
                   </td>
                   <td className="px-4 py-3 text-sm">{device.device_name}</td>
                   <td className="px-4 py-3 text-sm">
                     {device.customer_name ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {device.customer_phone ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={device.status} />

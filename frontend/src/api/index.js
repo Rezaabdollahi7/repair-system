@@ -9,7 +9,7 @@ const api = axios.create({
 });
 
 // Devices
-export const getDevices = () => api.get("/devices");
+export const getDevices = (params) => api.get("/devices", { params });
 export const getDevice = (id) => api.get(`/devices/${id}`);
 export const createDevice = (data) => api.post("/devices", data);
 export const updateDevice = (id, data) => api.put(`/devices/${id}`, data);

@@ -3,12 +3,35 @@ const { getDb, saveDb } = require("../config/database");
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const result = db.exec(`
+    const { search } = req.query;
+
+    let query = `
       SELECT d.*, c.name as customer_name, c.phone as customer_phone
       FROM devices d
       LEFT JOIN customers c ON d.customer_id = c.id
-      ORDER BY d.created_at DESC
-    `);
+    `;
+
+    const params = [];
+
+    if (search && search.trim() !== "") {
+      const term = `%${search.trim()}%`;
+      query += `
+        WHERE 
+          CAST(d.id AS TEXT) LIKE ? OR
+          d.device_name LIKE ? OR
+          d.brand LIKE ? OR
+          d.model LIKE ? OR
+          d.serial_number LIKE ? OR
+          d.reception_number LIKE ? OR
+          c.name LIKE ? OR
+          c.phone LIKE ?
+      `;
+      params.push(term, term, term, term, term, term, term, term);
+    }
+
+    query += ` ORDER BY d.created_at DESC`;
+
+    const result = db.exec(query, params);
 
     const devices = result[0]
       ? result[0].values.map((row) => ({

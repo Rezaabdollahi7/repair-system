@@ -1,1 +1,41 @@
 @import "tailwindcss";
+
+@import "tailwindcss";
+
+* {
+  font-family: "Peyda", sans-serif;
+}
+
+body {
+  direction: rtl;
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/Peyda-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/Peyda-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/Peyda-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: "Peyda", sans-serif;
+}

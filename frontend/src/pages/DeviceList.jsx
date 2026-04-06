@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDevices, deleteDevice } from "../api/devices";
+import { getDevices, deleteDevice } from "../api";
 import toast from "react-hot-toast";
 
 export default function DeviceList() {
@@ -32,6 +32,11 @@ export default function DeviceList() {
       toast.error("خطا در حذف دستگاه");
     }
   };
+
+  function formatDate(dateStr) {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("fa-IR");
+  }
 
   if (loading)
     return <div className="text-center py-10">در حال بارگذاری...</div>;
@@ -89,7 +94,7 @@ export default function DeviceList() {
                     <StatusBadge status={device.status} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {device.created_at?.slice(0, 10)}
+                    {formatDate(device.created_at)}
                   </td>
                   <td className="px-4 py-3 text-sm flex gap-2 justify-end">
                     <Link

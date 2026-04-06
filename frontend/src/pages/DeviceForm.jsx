@@ -1,33 +1,38 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createDevice, getDevice, updateDevice } from "../api/devices";
-import { getCustomers, createCustomer } from "../api/devices";
-import toast from "react-hot-toast";
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "در انتظار" },
-  { value: "in_progress", label: "در حال تعمیر" },
-  { value: "done", label: "تعمیر شده" },
-  { value: "delivered", label: "تحویل داده شده" },
-];
+import {
+  createDevice,
+  updateDevice,
+  getDevice,
+  getCustomers,
+  createCustomer,
+} from "../api";
+import { toast } from "react-hot-toast";
 
 const INITIAL_FORM = {
-  device_type: "",
+  reception_number: "",
+  customer_id: "",
+  device_name: "",
   brand: "",
   model: "",
   serial_number: "",
-  problem_description: "",
-  status: "pending",
-  estimated_cost: "",
-  final_cost: "",
-  notes: "",
-  customer_id: "",
+  entry_date: new Date().toISOString().split("T")[0],
+  exit_date: "",
+  status: "در انتظار",
+  description: "",
 };
 
 const INITIAL_CUSTOMER = {
   name: "",
   phone: "",
 };
+
+const STATUS_OPTIONS = [
+  { value: "در انتظار", label: "در انتظار" },
+  { value: "در حال تعمیر", label: "در حال تعمیر" },
+  { value: "تعمیر شده", label: "تعمیر شده" },
+  { value: "تحویل داده شده", label: "تحویل داده شده" },
+];
 
 export default function DeviceForm() {
   const { id } = useParams();
@@ -49,29 +54,28 @@ export default function DeviceForm() {
     try {
       const res = await getCustomers();
       setCustomers(res.data);
-    } catch {
-      toast.error("خطا در دریافت مشتریان");
+    } catch (error) {
+      toast.error("خطا در بارگذاری مشتریان");
     }
   };
 
   const loadDevice = async () => {
     try {
       const res = await getDevice(id);
-      const d = res.data;
       setForm({
-        device_type: d.device_type ?? "",
-        brand: d.brand ?? "",
-        model: d.model ?? "",
-        serial_number: d.serial_number ?? "",
-        problem_description: d.problem_description ?? "",
-        status: d.status ?? "pending",
-        estimated_cost: d.estimated_cost ?? "",
-        final_cost: d.final_cost ?? "",
-        notes: d.notes ?? "",
-        customer_id: d.customer_id ?? "",
+        reception_number: res.data.reception_number || "",
+        customer_id: res.data.customer_id || "",
+        device_name: res.data.device_name || "",
+        brand: res.data.brand || "",
+        model: res.data.model || "",
+        serial_number: res.data.serial_number || "",
+        entry_date: res.data.entry_date || "",
+        exit_date: res.data.exit_date || "",
+        status: res.data.status || "در انتظار",
+        description: res.data.description || "",
       });
-    } catch {
-      toast.error("خطا در دریافت اطلاعات دستگاه");
+    } catch (error) {
+      toast.error("خطا در بارگذاری دستگاه");
     }
   };
 
@@ -99,10 +103,16 @@ export default function DeviceForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.device_type) {
-      toast.error("نوع دستگاه الزامی است");
+
+    if (!form.reception_number.trim()) {
+      toast.error("شماره پذیرش الزامی است");
       return;
     }
+    if (!form.device_name.trim()) {
+      toast.error("نام دستگاه الزامی است");
+      return;
+    }
+
     setLoading(true);
     try {
       if (isEdit) {
@@ -113,8 +123,8 @@ export default function DeviceForm() {
         toast.success("دستگاه ثبت شد");
       }
       navigate("/devices");
-    } catch {
-      toast.error("خطا در ذخیره اطلاعات");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "خطا در ثبت دستگاه");
     } finally {
       setLoading(false);
     }
@@ -130,6 +140,21 @@ export default function DeviceForm() {
         onSubmit={handleSubmit}
         className="bg-white shadow rounded-lg p-6 space-y-5"
       >
+        {/* شماره پذیرش */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            شماره پذیرش *
+          </label>
+          <input
+            name="reception_number"
+            value={form.reception_number}
+            onChange={handleChange}
+            placeholder="شماره پذیرش"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+
         {/* مشتری */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -196,18 +221,19 @@ export default function DeviceForm() {
           )}
         </div>
 
-        {/* نوع دستگاه */}
+        {/* نام دستگاه و برند */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              نوع دستگاه *
+              نام دستگاه *
             </label>
             <input
-              name="device_type"
-              value={form.device_type}
+              name="device_name"
+              value={form.device_name}
               onChange={handleChange}
               placeholder="مثال: لپ‌تاپ، موبایل"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
             />
           </div>
           <div>
@@ -224,6 +250,7 @@ export default function DeviceForm() {
           </div>
         </div>
 
+        {/* مدل و سریال */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -250,75 +277,64 @@ export default function DeviceForm() {
           </div>
         </div>
 
-        {/* شرح مشکل */}
+        {/* تاریخ ورود و خروج */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              تاریخ ورود
+            </label>
+            <input
+              name="entry_date"
+              type="date"
+              value={form.entry_date}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              تاریخ خروج
+            </label>
+            <input
+              name="exit_date"
+              type="date"
+              value={form.exit_date}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* وضعیت */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            شرح مشکل
+            وضعیت
+          </label>
+          <select
+            name="status"
+            value={form.status}
+            onChange={handleChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* توضیحات */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            توضیحات
           </label>
           <textarea
-            name="problem_description"
-            value={form.problem_description}
+            name="description"
+            value={form.description}
             onChange={handleChange}
             rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* وضعیت و هزینه */}
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              وضعیت
-            </label>
-            <select
-              name="status"
-              value={form.status}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              هزینه تخمینی
-            </label>
-            <input
-              name="estimated_cost"
-              value={form.estimated_cost}
-              onChange={handleChange}
-              type="number"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              هزینه نهایی
-            </label>
-            <input
-              name="final_cost"
-              value={form.final_cost}
-              onChange={handleChange}
-              type="number"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        {/* یادداشت */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            یادداشت
-          </label>
-          <textarea
-            name="notes"
-            value={form.notes}
-            onChange={handleChange}
-            rows={2}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

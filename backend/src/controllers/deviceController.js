@@ -1,59 +1,104 @@
 const { getDb, saveDb } = require("../config/database");
 
+function rowToDevice(row) {
+  return {
+    id: row[0],
+    customer_id: row[1],
+    device_name: row[2],
+    brand: row[3],
+    model: row[4],
+    serial_number: row[5],
+    entry_date: row[6],
+    exit_date: row[7],
+    status: row[8],
+    description: row[9],
+    image_path: row[10],
+    created_at: row[11],
+    updated_at: row[12],
+    customer_name: row[13],
+    customer_phone: row[14],
+  };
+}
+
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const { search } = req.query;
+    const {
+      search,
+      status,
+      model,
+      customer_id,
+      entry_from,
+      entry_to,
+      exit_from,
+      exit_to,
+    } = req.query;
 
     let query = `
       SELECT d.*, c.name as customer_name, c.phone as customer_phone
       FROM devices d
       LEFT JOIN customers c ON d.customer_id = c.id
+      WHERE 1=1
     `;
-
     const params = [];
 
-    if (search && search.trim() !== "") {
+    if (search && search.trim()) {
       const term = `%${search.trim()}%`;
-      query += `
-        WHERE 
-          CAST(d.id AS TEXT) LIKE ? OR
-          d.device_name LIKE ? OR
-          d.brand LIKE ? OR
-          d.model LIKE ? OR
-          d.serial_number LIKE ? OR
-          d.reception_number LIKE ? OR
-          c.name LIKE ? OR
-          c.phone LIKE ?
-      `;
-      params.push(term, term, term, term, term, term, term, term);
+      query += ` AND (
+        CAST(d.id AS TEXT) LIKE ? OR
+        d.device_name LIKE ? OR
+        d.brand LIKE ? OR
+        d.model LIKE ? OR
+        d.serial_number LIKE ? OR
+        c.name LIKE ? OR
+        c.phone LIKE ?
+      )`;
+      params.push(term, term, term, term, term, term, term);
     }
 
-    query += ` ORDER BY d.created_at DESC`;
+    if (status && status.trim()) {
+      const statuses = status
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statuses.length > 0) {
+        const placeholders = statuses.map(() => "?").join(",");
+        query += ` AND d.status IN (${placeholders})`;
+        params.push(...statuses);
+      }
+    }
+
+    if (model && model.trim()) {
+      query += ` AND d.model LIKE ?`;
+      params.push(`%${model.trim()}%`);
+    }
+
+    if (customer_id && customer_id.trim()) {
+      query += ` AND d.customer_id = ?`;
+      params.push(customer_id.trim());
+    }
+
+    if (entry_from) {
+      query += ` AND d.entry_date >= ?`;
+      params.push(entry_from);
+    }
+    if (entry_to) {
+      query += ` AND d.entry_date <= ?`;
+      params.push(entry_to);
+    }
+    if (exit_from) {
+      query += ` AND d.exit_date >= ?`;
+      params.push(exit_from);
+    }
+    if (exit_to) {
+      query += ` AND d.exit_date <= ?`;
+      params.push(exit_to);
+    }
+
+    query += ` ORDER BY d.id DESC`;
 
     const result = db.exec(query, params);
-
-    const devices = result[0]
-      ? result[0].values.map((row) => ({
-          id: row[0],
-          reception_number: row[1],
-          customer_id: row[2],
-          device_name: row[3],
-          brand: row[4],
-          model: row[5],
-          serial_number: row[6],
-          entry_date: row[7],
-          exit_date: row[8],
-          status: row[9],
-          description: row[10],
-          image_path: row[11],
-          created_at: row[12],
-          updated_at: row[13],
-          customer_name: row[14],
-          customer_phone: row[15],
-        }))
-      : [];
-
+    const devices = result[0] ? result[0].values.map(rowToDevice) : [];
     res.json(devices);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -64,40 +109,18 @@ exports.getOne = async (req, res) => {
   try {
     const db = await getDb();
     const result = db.exec(
-      `
-      SELECT d.*, c.name as customer_name, c.phone as customer_phone
-      FROM devices d
-      LEFT JOIN customers c ON d.customer_id = c.id
-      WHERE d.id = ?
-    `,
+      `SELECT d.*, c.name as customer_name, c.phone as customer_phone
+       FROM devices d
+       LEFT JOIN customers c ON d.customer_id = c.id
+       WHERE d.id = ?`,
       [req.params.id],
     );
 
-    if (!result[0]) {
+    if (!result[0] || result[0].values.length === 0) {
       return res.status(404).json({ error: "Device not found" });
     }
 
-    const row = result[0].values[0];
-    const device = {
-      id: row[0],
-      reception_number: row[1],
-      customer_id: row[2],
-      device_name: row[3],
-      brand: row[4],
-      model: row[5],
-      serial_number: row[6],
-      entry_date: row[7],
-      exit_date: row[8],
-      status: row[9],
-      description: row[10],
-      image_path: row[11],
-      created_at: row[12],
-      updated_at: row[13],
-      customer_name: row[14],
-      customer_phone: row[15],
-    };
-
-    res.json(device);
+    res.json(rowToDevice(result[0].values[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -107,37 +130,35 @@ exports.create = async (req, res) => {
   try {
     const db = await getDb();
     const {
-      reception_number,
       customer_id,
       device_name,
       brand,
       model,
       serial_number,
       entry_date,
+      exit_date,
       status,
       description,
     } = req.body;
 
     db.run(
-      `INSERT INTO devices (reception_number, customer_id, device_name, brand, model, serial_number, entry_date, status, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO devices (customer_id, device_name, brand, model, serial_number, entry_date, exit_date, status, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?)`,
       [
-        reception_number,
         customer_id || null,
         device_name,
         brand || null,
         model || null,
         serial_number || null,
-        entry_date,
-        status || "در انتظار",
+        entry_date || null,
+        exit_date || null,
+        status || "pending",
         description || null,
       ],
     );
 
-    // باید قبل از saveDb بخونیم
     const idResult = db.exec(`SELECT last_insert_rowid() as id`);
     const newId = idResult[0].values[0][0];
-
     saveDb();
 
     const deviceResult = db.exec(
@@ -148,31 +169,13 @@ exports.create = async (req, res) => {
       [newId],
     );
 
-    if (!deviceResult[0]) {
+    if (!deviceResult[0] || deviceResult[0].values.length === 0) {
       return res
         .status(500)
         .json({ error: "Failed to retrieve created device" });
     }
 
-    const row = deviceResult[0].values[0];
-    res.status(201).json({
-      id: row[0],
-      reception_number: row[1],
-      customer_id: row[2],
-      device_name: row[3],
-      brand: row[4],
-      model: row[5],
-      serial_number: row[6],
-      entry_date: row[7],
-      exit_date: row[8],
-      status: row[9],
-      description: row[10],
-      image_path: row[11],
-      created_at: row[12],
-      updated_at: row[13],
-      customer_name: row[14],
-      customer_phone: row[15],
-    });
+    res.status(201).json(rowToDevice(deviceResult[0].values[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -199,12 +202,10 @@ exports.update = async (req, res) => {
     }
 
     db.run(
-      `
-      UPDATE devices 
-      SET device_name = ?, brand = ?, model = ?, serial_number = ?, 
-          exit_date = ?, status = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `,
+      `UPDATE devices 
+       SET device_name = ?, brand = ?, model = ?, serial_number = ?,
+           exit_date = ?, status = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
       [
         device_name,
         brand,
@@ -220,34 +221,14 @@ exports.update = async (req, res) => {
     saveDb();
 
     const result = db.exec(
-      `
-      SELECT d.*, c.name as customer_name, c.phone as customer_phone
-      FROM devices d
-      LEFT JOIN customers c ON d.customer_id = c.id
-      WHERE d.id = ?
-    `,
+      `SELECT d.*, c.name as customer_name, c.phone as customer_phone
+       FROM devices d
+       LEFT JOIN customers c ON d.customer_id = c.id
+       WHERE d.id = ?`,
       [req.params.id],
     );
 
-    const row = result[0].values[0];
-    res.json({
-      id: row[0],
-      reception_number: row[1],
-      customer_id: row[2],
-      device_name: row[3],
-      brand: row[4],
-      model: row[5],
-      serial_number: row[6],
-      entry_date: row[7],
-      exit_date: row[8],
-      status: row[9],
-      description: row[10],
-      image_path: row[11],
-      created_at: row[12],
-      updated_at: row[13],
-      customer_name: row[14],
-      customer_phone: row[15],
-    });
+    res.json(rowToDevice(result[0].values[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

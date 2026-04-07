@@ -36,13 +36,12 @@ function initSchema() {
   db.run(`
     CREATE TABLE IF NOT EXISTS devices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      reception_number TEXT UNIQUE NOT NULL,
       customer_id INTEGER,
       device_name TEXT NOT NULL,
       brand TEXT,
       model TEXT,
       serial_number TEXT,
-      entry_date DATETIME NOT NULL,
+      entry_date DATETIME,
       exit_date DATETIME,
       status TEXT DEFAULT 'در انتظار',
       description TEXT,

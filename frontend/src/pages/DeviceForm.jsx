@@ -10,7 +10,6 @@ import {
 import { toast } from "react-hot-toast";
 
 const INITIAL_FORM = {
-  reception_number: "",
   customer_id: "",
   device_name: "",
   brand: "",
@@ -18,7 +17,7 @@ const INITIAL_FORM = {
   serial_number: "",
   entry_date: new Date().toISOString().split("T")[0],
   exit_date: "",
-  status: "در انتظار",
+  status: "pending",
   description: "",
 };
 
@@ -28,10 +27,10 @@ const INITIAL_CUSTOMER = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "در انتظار", label: "در انتظار" },
-  { value: "در حال تعمیر", label: "در حال تعمیر" },
-  { value: "تعمیر شده", label: "تعمیر شده" },
-  { value: "تحویل داده شده", label: "تحویل داده شده" },
+  { value: "pending", label: "در انتظار" },
+  { value: "repairing", label: "در حال تعمیر" },
+  { value: "done", label: "تعمیر شده" },
+  { value: "delivered", label: "تحویل داده شده" },
 ];
 
 export default function DeviceForm() {
@@ -63,7 +62,6 @@ export default function DeviceForm() {
     try {
       const res = await getDevice(id);
       setForm({
-        reception_number: res.data.reception_number || "",
         customer_id: res.data.customer_id || "",
         device_name: res.data.device_name || "",
         brand: res.data.brand || "",
@@ -71,10 +69,10 @@ export default function DeviceForm() {
         serial_number: res.data.serial_number || "",
         entry_date: res.data.entry_date || "",
         exit_date: res.data.exit_date || "",
-        status: res.data.status || "در انتظار",
+        status: res.data.status || "pending",
         description: res.data.description || "",
       });
-    } catch (error) {
+    } catch {
       toast.error("خطا در بارگذاری دستگاه");
     }
   };
@@ -104,10 +102,6 @@ export default function DeviceForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.reception_number.trim()) {
-      toast.error("شماره پذیرش الزامی است");
-      return;
-    }
     if (!form.device_name.trim()) {
       toast.error("نام دستگاه الزامی است");
       return;

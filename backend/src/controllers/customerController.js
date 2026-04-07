@@ -3,17 +3,16 @@ const { getDb, saveDb } = require("../config/database");
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const result = db.exec(`SELECT * FROM customers ORDER BY created_at DESC`);
-
+    const result = db.exec(
+      `SELECT id, name, phone FROM customers ORDER BY name`,
+    );
     const customers = result[0]
       ? result[0].values.map((row) => ({
           id: row[0],
           name: row[1],
           phone: row[2],
-          created_at: row[3],
         }))
       : [];
-
     res.json(customers);
   } catch (error) {
     res.status(500).json({ error: error.message });

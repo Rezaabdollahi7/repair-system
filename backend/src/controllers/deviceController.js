@@ -32,10 +32,11 @@ exports.getAll = async (req, res) => {
       entry_to,
       exit_from,
       exit_to,
+      page = 1,
+      limit = 10,
     } = req.query;
 
-    let query = `
-      SELECT d.*, c.name as customer_name, c.phone as customer_phone
+    let baseQuery = `
       FROM devices d
       LEFT JOIN customers c ON d.customer_id = c.id
       WHERE 1=1
@@ -44,7 +45,7 @@ exports.getAll = async (req, res) => {
 
     if (search && search.trim()) {
       const term = `%${search.trim()}%`;
-      query += ` AND (
+      baseQuery += ` AND (
         CAST(d.id AS TEXT) LIKE ? OR
         d.device_name LIKE ? OR
         d.brand LIKE ? OR
@@ -63,43 +64,62 @@ exports.getAll = async (req, res) => {
         .filter(Boolean);
       if (statuses.length > 0) {
         const placeholders = statuses.map(() => "?").join(",");
-        query += ` AND d.status IN (${placeholders})`;
+        baseQuery += ` AND d.status IN (${placeholders})`;
         params.push(...statuses);
       }
     }
 
     if (model && model.trim()) {
-      query += ` AND d.model LIKE ?`;
+      baseQuery += ` AND d.model LIKE ?`;
       params.push(`%${model.trim()}%`);
     }
 
     if (customer_id && customer_id.trim()) {
-      query += ` AND d.customer_id = ?`;
+      baseQuery += ` AND d.customer_id = ?`;
       params.push(customer_id.trim());
     }
 
     if (entry_from) {
-      query += ` AND d.entry_date >= ?`;
+      baseQuery += ` AND d.entry_date >= ?`;
       params.push(entry_from);
     }
     if (entry_to) {
-      query += ` AND d.entry_date <= ?`;
+      baseQuery += ` AND d.entry_date <= ?`;
       params.push(entry_to);
     }
     if (exit_from) {
-      query += ` AND d.exit_date >= ?`;
+      baseQuery += ` AND d.exit_date >= ?`;
       params.push(exit_from);
     }
     if (exit_to) {
-      query += ` AND d.exit_date <= ?`;
+      baseQuery += ` AND d.exit_date <= ?`;
       params.push(exit_to);
     }
 
-    query += ` ORDER BY d.id DESC`;
+    // count
+    const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
+    const total = countResult[0]?.values[0][0] ?? 0;
 
-    const result = db.exec(query, params);
-    const devices = result[0] ? result[0].values.map(rowToDevice) : [];
-    res.json(devices);
+    // pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = parseInt(limit) || 10;
+    const offset = (pageNum - 1) * limitNum;
+
+    const dataResult = db.exec(
+      `SELECT d.*, c.name as customer_name, c.phone as customer_phone
+       ${baseQuery} ORDER BY d.id DESC LIMIT ? OFFSET ?`,
+      [...params, limitNum, offset],
+    );
+
+    const devices = dataResult[0] ? dataResult[0].values.map(rowToDevice) : [];
+
+    res.json({
+      data: devices,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

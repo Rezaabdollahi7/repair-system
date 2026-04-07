@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { getDevices, deleteDevice, getCustomers } from "../api";
 import FilterPanel from "../components/FilterPanel";
+import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
 
 function useDebounce(value, delay = 400) {
@@ -13,78 +14,136 @@ function useDebounce(value, delay = 400) {
   return debounced;
 }
 
+function StatusBadge({ status }) {
+  const map = {
+    pending: { label: "در انتظار", color: "bg-yellow-100 text-yellow-800" },
+    repairing: { label: "در حال تعمیر", color: "bg-blue-100 text-blue-800" },
+    done: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
+    delivered: { label: "تحویل داده شده", color: "bg-gray-100 text-gray-800" },
+  };
+  const s = map[status] ?? {
+    label: status,
+    color: "bg-gray-100 text-gray-600",
+  };
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${s.color}`}>
+      {s.label}
+    </span>
+  );
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("fa-IR");
+}
+
+const EMPTY_FILTERS = {
+  status: [],
+  brand: "",
+  customer_id: "",
+  entry_from: "",
+  entry_to: "",
+  exit_from: "",
+  exit_to: "",
+};
+
 export default function DeviceList() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
-
-  const EMPTY_FILTERS = {
-    status: [],
-    brand: "",
-    customer_id: "",
-    entry_from: "",
-    entry_to: "",
-    exit_from: "",
-    exit_to: "",
-  };
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [customers, setCustomers] = useState([]);
 
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  const fetchDevices = useCallback(async (searchTerm, activeFilters) => {
-    setLoading(true);
-    try {
-      const params = {};
-      if (searchTerm) params.search = searchTerm;
-      if (activeFilters.status?.length > 0)
-        params.status = activeFilters.status.join(",");
-      if (activeFilters.brand) params.brand = activeFilters.brand;
-      if (activeFilters.customer_id)
-        params.customer_id = activeFilters.customer_id;
-      if (activeFilters.entry_from)
-        params.entry_from = activeFilters.entry_from;
-      if (activeFilters.entry_to) params.entry_to = activeFilters.entry_to;
-      if (activeFilters.exit_from) params.exit_from = activeFilters.exit_from;
-      if (activeFilters.exit_to) params.exit_to = activeFilters.exit_to;
+  // ─── Fetch ────────────────────────────────────────────────────
+  const fetchDevices = useCallback(
+    async (searchTerm, activeFilters, currentPage, currentLimit) => {
+      setLoading(true);
+      try {
+        const params = { page: currentPage, limit: currentLimit };
 
-      const res = await getDevices(params);
-      setDevices(res.data);
-    } catch {
-      toast.error("خطا در دریافت لیست دستگاه‌ها");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        if (searchTerm) params.search = searchTerm;
+        if (activeFilters.status?.length > 0)
+          params.status = activeFilters.status.join(",");
+        if (activeFilters.brand) params.brand = activeFilters.brand;
+        if (activeFilters.customer_id)
+          params.customer_id = activeFilters.customer_id;
+        if (activeFilters.entry_from)
+          params.entry_from = activeFilters.entry_from;
+        if (activeFilters.entry_to) params.entry_to = activeFilters.entry_to;
+        if (activeFilters.exit_from) params.exit_from = activeFilters.exit_from;
+        if (activeFilters.exit_to) params.exit_to = activeFilters.exit_to;
 
+        const res = await getDevices(params);
+        const api = res.data;
+
+        if (api && typeof api === "object" && !Array.isArray(api)) {
+          setDevices(api.data || []);
+          setTotal(api.total || 0);
+          setTotalPages(api.totalPages || 1);
+        } else if (Array.isArray(api)) {
+          setDevices(api);
+          setTotal(api.length);
+          setTotalPages(1);
+        } else {
+          setDevices([]);
+          setTotal(0);
+          setTotalPages(1);
+        }
+      } catch {
+        toast.error("خطا در دریافت لیست دستگاه‌ها");
+        setDevices([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  // ─── Effects ──────────────────────────────────────────────────
   useEffect(() => {
     getCustomers()
       .then((res) => setCustomers(res.data))
       .catch(() => {});
   }, []);
 
+  // وقتی فیلتر یا صفحه عوض می‌شه
   useEffect(() => {
-    fetchDevices(debouncedSearch, filters);
-  }, [debouncedSearch, filters, fetchDevices]);
+    fetchDevices(debouncedSearch, filters, page, limit);
+  }, [debouncedSearch, filters, page, limit, fetchDevices]);
 
+  // وقتی search عوض می‌شه، برگرد به صفحه ۱
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setPage(1);
+  }, [debouncedSearch, filters]);
+
+  // ─── Handlers ─────────────────────────────────────────────────
   const handleDelete = async (id) => {
     if (!confirm("آیا مطمئن هستید؟")) return;
     try {
       await deleteDevice(id);
       toast.success("دستگاه حذف شد");
-      fetchDevices(debouncedSearch, filters);
+      fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در حذف دستگاه");
     }
   };
 
-  function formatDate(dateStr) {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("fa-IR");
-  }
-
+  // ─── Render ───────────────────────────────────────────────────
   return (
     <div dir="rtl">
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">دستگاه‌ها</h1>
         <Link
@@ -95,6 +154,7 @@ export default function DeviceList() {
         </Link>
       </div>
 
+      {/* Search + Filter */}
       <div className="mb-4">
         <input
           type="text"
@@ -105,12 +165,19 @@ export default function DeviceList() {
         />
         <FilterPanel
           filters={filters}
-          onChange={setFilters}
-          onClear={() => setFilters(EMPTY_FILTERS)}
+          onChange={(newFilters) => {
+            setFilters(newFilters);
+            setPage(1);
+          }}
+          onClear={() => {
+            setFilters(EMPTY_FILTERS);
+            setPage(1);
+          }}
           customers={customers}
         />
       </div>
 
+      {/* Table */}
       {loading ? (
         <div className="text-center py-10 text-gray-500">
           در حال بارگذاری...
@@ -202,24 +269,21 @@ export default function DeviceList() {
           </table>
         </div>
       )}
-    </div>
-  );
-}
 
-function StatusBadge({ status }) {
-  const map = {
-    pending: { label: "در انتظار", color: "bg-yellow-100 text-yellow-800" },
-    repairing: { label: "در حال تعمیر", color: "bg-blue-100 text-blue-800" },
-    done: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
-    delivered: { label: "تحویل داده شده", color: "bg-gray-100 text-gray-800" },
-  };
-  const s = map[status] ?? {
-    label: status,
-    color: "bg-gray-100 text-gray-600",
-  };
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${s.color}`}>
-      {s.label}
-    </span>
+      {/* Pagination */}
+      <div className="mt-4">
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={(newPage) => setPage(newPage)}
+          onLimitChange={(newLimit) => {
+            setLimit(newLimit);
+            setPage(1);
+          }}
+        />
+      </div>
+    </div>
   );
 }

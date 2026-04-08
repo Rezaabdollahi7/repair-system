@@ -216,6 +216,9 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     const db = await getDb();
+    db.run(`UPDATE devices SET customer_id = NULL WHERE customer_id = ?`, [
+      req.params.id,
+    ]);
     db.run(`DELETE FROM customers WHERE id = ?`, [req.params.id]);
     saveDb();
     res.json({ success: true });

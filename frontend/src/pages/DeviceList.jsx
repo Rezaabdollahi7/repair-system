@@ -227,7 +227,7 @@ export default function DeviceList() {
                     {device.reception_number ?? device.id}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {device.customer_name ?? "—"}
+                    {device.customer_name ?? "مشتری حذف شده"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {device.customer_phone ?? "—"}

@@ -8,5 +8,6 @@ router.get("/:id/devices", ctrl.getDevices);
 router.get("/:id/stats", ctrl.getStats);
 router.post("/", ctrl.create);
 router.put("/:id", ctrl.update);
+router.delete("/:id", ctrl.remove);
 
 module.exports = router;

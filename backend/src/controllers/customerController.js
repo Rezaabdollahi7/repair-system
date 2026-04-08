@@ -212,3 +212,14 @@ exports.update = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.remove = async (req, res) => {
+  try {
+    const db = await getDb();
+    db.run(`DELETE FROM customers WHERE id = ?`, [req.params.id]);
+    saveDb();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

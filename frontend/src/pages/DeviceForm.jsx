@@ -52,7 +52,7 @@ export default function DeviceForm() {
   const loadCustomers = async () => {
     try {
       const res = await getCustomers();
-      setCustomers(res.data);
+      setCustomers(res.data.data ?? res.data);
     } catch (error) {
       toast.error("خطا در بارگذاری مشتریان");
     }

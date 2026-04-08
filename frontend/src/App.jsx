@@ -11,7 +11,7 @@ import CustomerDetail from "./pages/CustomerDetail";
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-left" />
+      <Toaster position="top-center" />
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/devices" replace />} />

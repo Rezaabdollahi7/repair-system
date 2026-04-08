@@ -44,6 +44,13 @@ export default function DeviceForm() {
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState(INITIAL_CUSTOMER);
 
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const filteredCustomers = customers.filter(
+    (c) => c.name.includes(customerSearch) || c.phone.includes(customerSearch),
+  );
+
   useEffect(() => {
     loadCustomers();
     if (isEdit) loadDevice();
@@ -72,6 +79,10 @@ export default function DeviceForm() {
         status: res.data.status || "pending",
         description: res.data.description || "",
       });
+      if (res.data.customer_name)
+        setCustomerSearch(
+          `${res.data.customer_name} - ${res.data.customer_phone ?? ""}`,
+        );
     } catch {
       toast.error("خطا در بارگذاری دستگاه");
     }
@@ -94,6 +105,7 @@ export default function DeviceForm() {
       setShowNewCustomer(false);
       setNewCustomer(INITIAL_CUSTOMER);
       toast.success("مشتری اضافه شد");
+      setCustomerSearch(`${created.name} - ${created.phone}`);
     } catch {
       toast.error("خطا در ثبت مشتری");
     }
@@ -155,19 +167,45 @@ export default function DeviceForm() {
             مشتری
           </label>
           <div className="flex gap-2">
-            <select
-              name="customer_id"
-              value={form.customer_id}
-              onChange={handleChange}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">انتخاب مشتری...</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} - {c.phone}
-                </option>
-              ))}
-            </select>
+            <div className="relative flex-1">
+              <input
+                placeholder="جستجو نام یا شماره..."
+                value={customerSearch}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {showDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div
+                    className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer"
+                    onMouseDown={() => {
+                      setForm((p) => ({ ...p, customer_id: "" }));
+                      setCustomerSearch("");
+                    }}
+                  >
+                    بدون مشتری
+                  </div>
+                  {filteredCustomers.map((c) => (
+                    <div
+                      key={c.id}
+                      onMouseDown={() => {
+                        setForm((p) => ({ ...p, customer_id: c.id }));
+                        setCustomerSearch(`${c.name} - ${c.phone}`);
+                        setShowDropdown(false);
+                      }}
+                      className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                    >
+                      {c.name} - {c.phone}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setShowNewCustomer((v) => !v)}
@@ -176,7 +214,6 @@ export default function DeviceForm() {
               + مشتری جدید
             </button>
           </div>
-
           {showNewCustomer && (
             <div className="mt-3 p-4 bg-gray-50 rounded-lg space-y-3 border border-gray-200">
               <input

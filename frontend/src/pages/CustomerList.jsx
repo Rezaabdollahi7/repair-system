@@ -39,7 +39,7 @@ export default function CustomerList() {
           setCustomers(api.data || []);
           setTotal(api.total || 0);
           setTotalPages(api.totalPages || 1);
-        } else if (Array.isArray(api)) {
+        } else {
           setCustomers(api);
           setTotal(api.length);
           setTotalPages(1);

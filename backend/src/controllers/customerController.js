@@ -3,30 +3,36 @@ const { getDb, saveDb } = require("../config/database");
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const search = req.query.search ? `%${req.query.search}%` : null;
+    const { search, page = 1, limit = 10 } = req.query;
 
-    let query = `
-      SELECT 
-        c.id,
-        c.name,
-        c.phone,
-        (SELECT COUNT(*) FROM devices d WHERE d.customer_id = c.id) AS device_count
-      FROM customers c
-    `;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = parseInt(limit) || 10;
+    const offset = (pageNum - 1) * limitNum;
 
+    let where = `WHERE 1=1`;
     let params = [];
 
-    if (search) {
-      query += ` WHERE c.name LIKE ? OR c.phone LIKE ? `;
-      params.push(search, search);
+    if (search?.trim()) {
+      where += ` AND (c.name LIKE ? OR c.phone LIKE ?)`;
+      params.push(`%${search.trim()}%`, `%${search.trim()}%`);
     }
 
-    query += ` ORDER BY c.name ASC`;
+    const countResult = db.exec(
+      `SELECT COUNT(*) FROM customers c ${where}`,
+      params,
+    );
+    const total = countResult[0]?.values[0][0] ?? 0;
 
-    const result = params.length > 0 ? db.exec(query, params) : db.exec(query);
+    const dataResult = db.exec(
+      `SELECT c.id, c.name, c.phone,
+        (SELECT COUNT(*) FROM devices d WHERE d.customer_id = c.id) AS device_count
+       FROM customers c ${where}
+       ORDER BY c.name ASC LIMIT ? OFFSET ?`,
+      [...params, limitNum, offset],
+    );
 
-    const customers = result[0]
-      ? result[0].values.map((row) => ({
+    const customers = dataResult[0]
+      ? dataResult[0].values.map((row) => ({
           id: row[0],
           name: row[1],
           phone: row[2],
@@ -34,7 +40,12 @@ exports.getAll = async (req, res) => {
         }))
       : [];
 
-    res.json(customers);
+    res.json({
+      data: customers,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

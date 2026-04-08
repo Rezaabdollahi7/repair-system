@@ -148,9 +148,9 @@ exports.getStats = async (req, res) => {
     const row = result[0].values[0];
 
     res.json({
-      total: row[0] || 0,
-      success: row[1] || 0,
-      avg_days: row[2] ? Number(row[2]).toFixed(1) : null,
+      total_devices: row[0] || 0,
+      successful_repairs: row[1] || 0,
+      avg_repair_days: row[2] ? Number(row[2]).toFixed(1) : null,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -6,6 +6,7 @@ import DeviceForm from "./pages/DeviceForm";
 import DeviceDetail from "./pages/DeviceDetail";
 import CustomerList from "./pages/CustomerList";
 import CustomerForm from "./pages/CustomerForm";
+import CustomerDetail from "./pages/CustomerDetail";
 
 function App() {
   return (
@@ -18,8 +19,10 @@ function App() {
           <Route path="devices/new" element={<DeviceForm />} />
           <Route path="devices/:id" element={<DeviceDetail />} />
           <Route path="devices/:id/edit" element={<DeviceForm />} />
-          <Route path="customers" element={<CustomerList />} />
-          <Route path="customers/new" element={<CustomerForm />} />
+          <Route path="/customers" element={<CustomerList />} />
+          <Route path="/customers/new" element={<CustomerForm />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
+          <Route path="/customers/:id/edit" element={<CustomerForm />} />
         </Route>
       </Routes>
     </BrowserRouter>

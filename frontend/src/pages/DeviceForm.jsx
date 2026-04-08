@@ -147,19 +147,18 @@ export default function DeviceForm() {
         className="bg-white shadow rounded-lg p-6 space-y-5"
       >
         {/* شماره پذیرش */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            شماره پذیرش *
-          </label>
-          <input
-            name="reception_number"
-            value={form.reception_number}
-            onChange={handleChange}
-            placeholder="شماره پذیرش"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-        </div>
+        {isEdit && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              شماره پذیرش
+            </label>
+            <input
+              value={id}
+              readOnly
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+        )}
 
         {/* مشتری */}
         <div>

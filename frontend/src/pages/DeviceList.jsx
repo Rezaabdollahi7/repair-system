@@ -223,9 +223,7 @@ export default function DeviceList() {
             <tbody className="divide-y divide-gray-200">
               {devices.map((device) => (
                 <tr key={device.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-mono">
-                    {device.reception_number ?? device.id}
-                  </td>
+                  <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
                   <td className="px-4 py-3 text-sm">
                     {device.customer_name ?? "مشتری حذف شده"}
                   </td>

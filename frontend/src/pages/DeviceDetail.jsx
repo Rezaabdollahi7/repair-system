@@ -117,7 +117,7 @@ export default function DeviceDetail() {
           <div>
             <p className="text-sm text-gray-500 mb-1">شماره پذیرش</p>
             <p className="text-2xl font-bold text-blue-600 font-mono tracking-wide">
-              {device.reception_number}
+              {device.id}
             </p>
           </div>
           <div className="text-right">
@@ -208,7 +208,7 @@ export default function DeviceDetail() {
             <p className="text-gray-600 mb-6">
               آیا از حذف دستگاه{" "}
               <span className="font-semibold text-red-600">
-                {device.reception_number}
+                {device.id}
               </span>{" "}
               مطمئن هستید؟ این عمل قابل بازگشت نیست.
             </p>

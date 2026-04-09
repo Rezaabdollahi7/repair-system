@@ -1,4 +1,5 @@
 const { getDb, saveDb } = require("../config/database");
+const { deleteDeviceImages } = require("./imageController");
 
 function rowToDevice(row) {
   return {
@@ -257,10 +258,20 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     const db = await getDb();
-    db.run(`DELETE FROM devices WHERE id = ?`, [req.params.id]);
+    const id = parseInt(req.params.id);
+
+    const check = db.exec(`SELECT id FROM devices WHERE id = ?`, [id]);
+    if (!check[0] || check[0].values.length === 0) {
+      return res.status(404).json({ error: "دستگاه یافت نشد" });
+    }
+
+    await deleteDeviceImages(id);
+
+    db.run(`DELETE FROM devices WHERE id = ?`, [id]);
     saveDb();
-    res.json({ message: "Device deleted" });
+
+    res.json({ message: "دستگاه و عکس‌های آن حذف شد" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "خطا در حذف دستگاه" });
   }
 };

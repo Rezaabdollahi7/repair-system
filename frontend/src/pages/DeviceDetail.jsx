@@ -1,8 +1,9 @@
-// src/pages/DeviceDetail.jsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api";
+import { getDeviceImages } from "../api";
+import ImageSlider from "../components/ImageSlider";
 
 const STATUS_MAP = {
   pending: { label: "در انتظار بررسی", color: "bg-yellow-100 text-yellow-800" },
@@ -22,12 +23,15 @@ export default function DeviceDetail() {
   const navigate = useNavigate();
 
   const [device, setDevice] = useState(null);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sliderIndex, setSliderIndex] = useState(null);
 
   useEffect(() => {
     fetchDevice();
+    fetchImages();
   }, [id]);
 
   async function fetchDevice() {
@@ -35,11 +39,20 @@ export default function DeviceDetail() {
       setLoading(true);
       const res = await api.get(`/devices/${id}`);
       setDevice(res.data);
-    } catch (error) {
+    } catch {
       toast.error("خطا در دریافت اطلاعات دستگاه");
       navigate("/devices");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchImages() {
+    try {
+      const res = await getDeviceImages(id);
+      setImages(res.data);
+    } catch {
+      setImages([]);
     }
   }
 
@@ -49,7 +62,7 @@ export default function DeviceDetail() {
       await api.delete(`/devices/${id}`);
       toast.success("دستگاه با موفقیت حذف شد");
       navigate("/devices");
-    } catch (error) {
+    } catch {
       toast.error("خطا در حذف دستگاه");
     } finally {
       setDeleting(false);
@@ -84,7 +97,6 @@ export default function DeviceDetail() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -111,7 +123,6 @@ export default function DeviceDetail() {
         </div>
       </div>
 
-      {/* Reception Number & Status */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -137,8 +148,26 @@ export default function DeviceDetail() {
         </div>
       </div>
 
+      {images.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2 mb-4">
+            📷 عکس‌های دستگاه ({images.length})
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {images.map((img, i) => (
+              <img
+                key={img.id}
+                src={`http://localhost:5001/uploads/devices/${img.filename}`}
+                alt={img.filename}
+                onClick={() => setSliderIndex(i)}
+                className="w-full h-32 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 hover:scale-[1.02] transition-all"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Device Info */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
             🔧 اطلاعات دستگاه
@@ -149,7 +178,6 @@ export default function DeviceDetail() {
           <InfoRow label="شماره سریال" value={device.serial_number} />
         </div>
 
-        {/* Customer Info */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
             👤 اطلاعات مشتری
@@ -158,7 +186,6 @@ export default function DeviceDetail() {
           <InfoRow label="شماره تماس" value={device.customer_phone} />
         </div>
 
-        {/* Problem Description */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
             📋 شرح مشکل
@@ -168,7 +195,6 @@ export default function DeviceDetail() {
           </p>
         </div>
 
-        {/* Cost Info */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
             💰 هزینه‌ها
@@ -184,7 +210,6 @@ export default function DeviceDetail() {
         </div>
       </div>
 
-      {/* Notes */}
       {device.notes && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-700 border-b pb-2 mb-4">
@@ -194,22 +219,18 @@ export default function DeviceDetail() {
         </div>
       )}
 
-      {/* Timestamps */}
       <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 flex gap-6 text-sm text-gray-500">
         <span>ثبت: {formatDate(device.created_at)}</span>
         <span>آخرین ویرایش: {formatDate(device.updated_at)}</span>
       </div>
 
-      {/* Delete Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
             <h3 className="text-lg font-bold text-gray-800 mb-2">حذف دستگاه</h3>
             <p className="text-gray-600 mb-6">
               آیا از حذف دستگاه{" "}
-              <span className="font-semibold text-red-600">
-                {device.id}
-              </span>{" "}
+              <span className="font-semibold text-red-600">{device.id}</span>{" "}
               مطمئن هستید؟ این عمل قابل بازگشت نیست.
             </p>
             <div className="flex gap-3 justify-end">
@@ -230,18 +251,22 @@ export default function DeviceDetail() {
           </div>
         </div>
       )}
+      {sliderIndex !== null && (
+        <ImageSlider
+          images={images}
+          initialIndex={sliderIndex}
+          onClose={() => setSliderIndex(null)}
+        />
+      )}
     </div>
   );
 }
 
-// Component کمکی برای نمایش ردیف اطلاعات
 function InfoRow({ label, value }) {
   return (
-    <div className="flex justify-between items-start gap-4">
-      <span className="text-sm text-gray-500 shrink-0">{label}</span>
-      <span className="text-gray-800 font-medium text-right">
-        {value || "—"}
-      </span>
+    <div className="flex justify-between border-b pb-2 text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-800 font-medium">{value || "—"}</span>
     </div>
   );
 }

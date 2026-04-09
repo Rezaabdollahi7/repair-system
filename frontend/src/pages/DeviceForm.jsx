@@ -6,8 +6,11 @@ import {
   getDevice,
   getCustomers,
   createCustomer,
+  getDeviceImages,
+  uploadDeviceImages,
 } from "../api";
 import { toast } from "react-hot-toast";
+import ImageUploader from "../components/ImageUploader";
 
 const INITIAL_FORM = {
   customer_id: "",
@@ -43,7 +46,8 @@ export default function DeviceForm() {
   const [loading, setLoading] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState(INITIAL_CUSTOMER);
-
+  const [images, setImages] = useState([]);
+  const [pendingImages, setPendingImages] = useState([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -60,7 +64,7 @@ export default function DeviceForm() {
     try {
       const res = await getCustomers();
       setCustomers(res.data.data ?? res.data);
-    } catch (error) {
+    } catch {
       toast.error("خطا در بارگذاری مشتریان");
     }
   };
@@ -68,6 +72,8 @@ export default function DeviceForm() {
   const loadDevice = async () => {
     try {
       const res = await getDevice(id);
+      const imgRes = await getDeviceImages(id);
+      setImages(imgRes.data);
       setForm({
         customer_id: res.data.customer_id || "",
         device_name: res.data.device_name || "",
@@ -113,19 +119,26 @@ export default function DeviceForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!form.device_name.trim()) {
       toast.error("نام دستگاه الزامی است");
       return;
     }
-
     setLoading(true);
     try {
       if (isEdit) {
         await updateDevice(id, form);
+        if (pendingImages.length > 0) {
+          await uploadDeviceImages(id, pendingImages);
+          setPendingImages([]);
+        }
         toast.success("دستگاه ویرایش شد");
       } else {
-        await createDevice(form);
+        const res = await createDevice(form);
+        const newId = res.data.id;
+        if (pendingImages.length > 0) {
+          await uploadDeviceImages(newId, pendingImages);
+          setPendingImages([]);
+        }
         toast.success("دستگاه ثبت شد");
       }
       navigate("/devices");
@@ -144,9 +157,8 @@ export default function DeviceForm() {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white shadow rounded-lg p-6 space-y-5"
+        className="bg-white shadow rounded-lg p-6 space-y-5 mt-5"
       >
-        {/* شماره پذیرش */}
         {isEdit && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -160,7 +172,6 @@ export default function DeviceForm() {
           </div>
         )}
 
-        {/* مشتری */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             مشتری
@@ -251,7 +262,6 @@ export default function DeviceForm() {
           )}
         </div>
 
-        {/* نام دستگاه و برند */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -280,7 +290,6 @@ export default function DeviceForm() {
           </div>
         </div>
 
-        {/* مدل و سریال */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -307,7 +316,6 @@ export default function DeviceForm() {
           </div>
         </div>
 
-        {/* تاریخ ورود و خروج */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -336,7 +344,6 @@ export default function DeviceForm() {
           </div>
         </div>
 
-        {/* وضعیت */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             وضعیت
@@ -355,7 +362,6 @@ export default function DeviceForm() {
           </select>
         </div>
 
-        {/* توضیحات */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             توضیحات
@@ -369,7 +375,17 @@ export default function DeviceForm() {
           />
         </div>
 
-        {/* دکمه‌ها */}
+        <ImageUploader
+          deviceId={isEdit ? id : null}
+          existingImages={images}
+          pendingFiles={pendingImages}
+          onPendingChange={setPendingImages}
+          onDeleteExisting={(imageId) =>
+            setImages((imgs) => imgs.filter((i) => i.id !== imageId))
+          }
+          onUploadDone={(newImgs) => setImages((prev) => [...prev, ...newImgs])}
+        />
+
         <div className="flex gap-3 pt-2">
           <button
             type="submit"

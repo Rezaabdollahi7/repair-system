@@ -5,6 +5,13 @@ import FilterPanel from "../components/FilterPanel";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
 
+import {
+  PlusIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/solid";
+
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -148,8 +155,9 @@ export default function DeviceList() {
         <h1 className="text-2xl font-bold text-gray-900">دستگاه‌ها</h1>
         <Link
           to="/devices/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
+          <PlusIcon className="w-5 h-5" />
           ثبت دستگاه جدید
         </Link>
       </div>
@@ -244,20 +252,24 @@ export default function DeviceList() {
                   <td className="px-4 py-3 text-sm flex gap-2 justify-end">
                     <Link
                       to={`/devices/${device.id}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
                     >
+                      <EyeIcon className="w-4 h-4" />
                       جزئیات
                     </Link>
                     <Link
                       to={`/devices/${device.id}/edit`}
-                      className="text-yellow-600 hover:underline"
+                      className="text-green-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
                     >
+                      <PencilSquareIcon className="w-4 h-4" />
                       ویرایش
                     </Link>
+
                     <button
                       onClick={() => handleDelete(device.id)}
-                      className="text-red-600 hover:underline"
+                      className="text-red-600 hover:underline hover:underline-offset-8 flex items-center gap-1 cursor-pointer"
                     >
+                      <TrashIcon className="w-4 h-4" />
                       حذف
                     </button>
                   </td>

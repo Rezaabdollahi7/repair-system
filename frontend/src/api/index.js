@@ -24,4 +24,18 @@ export const getCustomerDevices = (id) => api.get(`/customers/${id}/devices`);
 export const getCustomerStats = (id) => api.get(`/customers/${id}/stats`);
 export const deleteCustomer = (id) => api.delete(`/customers/${id}`);
 
+export const getDeviceImages = (deviceId) =>
+  api.get(`/devices/${deviceId}/images`);
+
+export const uploadDeviceImages = (deviceId, files) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("images", file));
+  return api.post(`/devices/${deviceId}/images`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+export const deleteDeviceImage = (deviceId, imageId) =>
+  api.delete(`/devices/${deviceId}/images/${imageId}`);
+
 export default api;

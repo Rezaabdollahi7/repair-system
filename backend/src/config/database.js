@@ -31,6 +31,30 @@ async function getDb() {
 
 function initSchema() {
   db.run(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      username TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      phone TEXT,
+      avatar TEXT,
+      role_id INTEGER NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (role_id) REFERENCES roles(id)
+    )
+  `);
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -43,17 +67,19 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS devices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_id INTEGER,
+      personnel_id INTEGER,
       device_name TEXT NOT NULL,
       brand TEXT,
       model TEXT,
       serial_number TEXT,
       entry_date DATETIME,
       exit_date DATETIME,
-      status TEXT DEFAULT 'pending',
+      status TEXT DEFAULT 'received',
       description TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (customer_id) REFERENCES customers(id)
+      FOREIGN KEY (customer_id) REFERENCES customers(id),
+      FOREIGN KEY (personnel_id) REFERENCES users(id)
     )
   `);
 
@@ -67,6 +93,24 @@ function initSchema() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (device_id) REFERENCES devices(id)
     )
+  `);
+
+  db.run(`
+    INSERT OR IGNORE INTO roles (name, label) VALUES
+      ('super_admin', 'سوپر ادمین'),
+      ('admin', 'ادمین'),
+      ('technician', 'تکنسین')
+  `);
+
+
+  db.run(`
+    INSERT OR IGNORE INTO users (full_name, username, password, role_id)
+    SELECT 
+      'سوپر ادمین',
+      'superadmin',
+      '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+      r.id
+    FROM roles r WHERE r.name = 'super_admin'
   `);
 }
 

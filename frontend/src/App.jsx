@@ -13,6 +13,8 @@ import DeviceDetail from "./pages/DeviceDetail";
 import CustomerList from "./pages/CustomerList";
 import CustomerForm from "./pages/CustomerForm";
 import CustomerDetail from "./pages/CustomerDetail";
+import PersonnelList from "./pages/PersonnelList";
+import PersonnelForm from "./pages/PersonnelForm";
 
 function App() {
   return (
@@ -33,6 +35,9 @@ function App() {
               <Route path="customers/new" element={<CustomerForm />} />
               <Route path="customers/:id" element={<CustomerDetail />} />
               <Route path="customers/:id/edit" element={<CustomerForm />} />
+              <Route path="personnel" element={<PersonnelList />} />
+              <Route path="personnel/new" element={<PersonnelForm />} />
+              <Route path="personnel/:id/edit" element={<PersonnelForm />} />
             </Route>
           </Route>
 

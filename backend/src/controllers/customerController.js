@@ -82,7 +82,7 @@ exports.getDevices = async (req, res) => {
       SELECT 
         id, customer_id, device_name, brand, model, 
         serial_number, entry_date, exit_date, status, 
-        description, image_path, created_at, updated_at
+        description, created_at, updated_at
       FROM devices 
       WHERE customer_id = ? 
       ORDER BY entry_date DESC, created_at DESC
@@ -118,12 +118,13 @@ exports.getStats = async (req, res) => {
   try {
     const db = await getDb();
     const customerId = req.params.id;
-
+    console.log("getDevices called, id:", req.params.id);
     const result = db.exec(
       `
       SELECT 
         COUNT(*) AS total,
-        SUM(CASE WHEN status = 'done' OR status = 'delivered' THEN 1 ELSE 0 END) AS success,
+        SUM(CASE WHEN status IN ('repaired', 'delivered') THEN 1 ELSE 0 END) AS success,
+
         AVG(
           CASE 
             WHEN exit_date IS NOT NULL AND entry_date IS NOT NULL 

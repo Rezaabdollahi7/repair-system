@@ -119,12 +119,14 @@ export default function CustomerList() {
             <tbody className="divide-y divide-gray-200">
               {customers.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
-                  <Link
-                    to={`/customers/${c.id}`}
-                    className="font-medium text-blue-600 hover:underline ms-4"
-                  >
-                    {c.name}
-                  </Link>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    <Link
+                      to={`/customers/${c.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {c.phone ?? "—"}
                   </td>

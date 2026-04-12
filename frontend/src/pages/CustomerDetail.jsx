@@ -1,4 +1,4 @@
-// src/pages/CustomerDetail.jsx
+// src/pages/customers/CustomerDetail.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
@@ -8,6 +8,7 @@ import {
   deleteCustomer,
 } from "../api";
 import { toast } from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 import {
   UserIcon,
   PhoneIcon,
@@ -22,11 +23,21 @@ import {
 
 // ── helper ──────────────────────────────────────────────
 const statusColor = {
-  "تعمیر شد": "bg-green-100 text-green-700",
-  "تحویل داده شد": "bg-blue-100 text-blue-700",
-  "در انتظار": "bg-yellow-100 text-yellow-700",
-  "در حال تعمیر": "bg-orange-100 text-orange-700",
-  "تعمیر نشد": "bg-red-100 text-red-700",
+  pending: "bg-yellow-100 text-yellow-700",
+  diagnosing: "bg-purple-100 text-purple-700",
+  repairing: "bg-orange-100 text-orange-700",
+  repaired: "bg-green-100 text-green-700",
+  delivered: "bg-blue-100 text-blue-700",
+  unrepairable: "bg-red-100 text-red-700",
+};
+
+const statusLabel = {
+  pending: "در انتظار",
+  diagnosing: "در حال بررسی",
+  repairing: "در حال تعمیر",
+  repaired: "تعمیر شد",
+  delivered: "تحویل داده شد",
+  unrepairable: "تعمیر نشد",
 };
 
 function toJalali(dateStr) {
@@ -34,7 +45,7 @@ function toJalali(dateStr) {
   return new Date(dateStr).toLocaleDateString("fa-IR");
 }
 
-// ── sub-components ───────────────────────────────────────
+// ── StatCard ─────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, color }) {
   return (
     <div className="bg-white rounded-lg shadow p-4 flex items-center gap-4">
@@ -49,6 +60,7 @@ function StatCard({ icon: Icon, label, value, color }) {
   );
 }
 
+// ── DeviceTimeline ────────────────────────────────────────
 function DeviceTimeline({ devices }) {
   if (!devices.length) {
     return (
@@ -60,19 +72,14 @@ function DeviceTimeline({ devices }) {
 
   return (
     <div className="relative">
-      {/* خط عمودی */}
       <div className="absolute right-5 top-0 bottom-0 w-0.5 bg-gray-200" />
-
       <div className="space-y-4">
-        {devices.map((device, idx) => (
+        {devices.map((device) => (
           <div
             key={device.id}
             className="relative flex items-start gap-4 pr-12"
           >
-            {/* دایره روی خط */}
             <div className="absolute right-3 mt-1.5 w-5 h-5 rounded-full bg-white border-2 border-blue-400 z-10" />
-
-            {/* کارت دستگاه */}
             <Link
               to={`/devices/${device.id}`}
               className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:border-blue-300 hover:shadow transition-all"
@@ -84,14 +91,17 @@ function DeviceTimeline({ devices }) {
                   </p>
                   {device.brand && (
                     <p className="text-sm text-gray-500 mt-0.5">
-                      {device.brand} {device.model && `· ${device.model}`}
+                      {device.brand}
+                      {device.model && ` · ${device.model}`}
                     </p>
                   )}
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full whitespace-nowrap font-medium ${statusColor[device.status] || "bg-gray-100 text-gray-600"}`}
+                  className={`text-xs px-2 py-1 rounded-full whitespace-nowrap font-medium ${
+                    statusColor[device.status] ?? "bg-gray-100 text-gray-600"
+                  }`}
                 >
-                  {device.status}
+                  {statusLabel[device.status] ?? device.status}
                 </span>
               </div>
 
@@ -121,10 +131,11 @@ function DeviceTimeline({ devices }) {
   );
 }
 
-// ── main component ───────────────────────────────────────
+// ── main component ────────────────────────────────────────
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAtLeast } = useAuth();
 
   const [customer, setCustomer] = useState(null);
   const [stats, setStats] = useState(null);
@@ -150,7 +161,6 @@ export default function CustomerDetail() {
         setLoading(false);
       }
     };
-
     fetchAll();
   }, [id]);
 
@@ -177,7 +187,7 @@ export default function CustomerDetail() {
 
   return (
     <div dir="rtl" className="space-y-6">
-      {/* ── breadcrumb ── */}
+      {/* breadcrumb */}
       <button
         onClick={() => navigate("/customers")}
         className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
@@ -186,11 +196,10 @@ export default function CustomerDetail() {
         بازگشت به مشتریان
       </button>
 
-      {/* ── هدر: اطلاعات مشتری ── */}
+      {/* هدر */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            {/* آواتار */}
             <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
               <UserIcon className="w-8 h-8 text-blue-600" />
             </div>
@@ -218,19 +227,23 @@ export default function CustomerDetail() {
               <PencilIcon className="w-4 h-4" />
               ویرایش
             </Link>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
-            >
-              <TrashIcon className="w-4 h-4" />
-              {deleting ? "..." : "حذف"}
-            </button>
+
+            {/* فقط admin+ */}
+            {isAtLeast("admin") && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
+              >
+                <TrashIcon className="w-4 h-4" />
+                {deleting ? "..." : "حذف"}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── آمار ── */}
+      {/* آمار */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard
@@ -258,7 +271,7 @@ export default function CustomerDetail() {
         </div>
       )}
 
-      {/* ── تاریخچه دستگاه‌ها ── */}
+      {/* تاریخچه دستگاه‌ها */}
       <div className="bg-gray-50 rounded-lg p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-800">

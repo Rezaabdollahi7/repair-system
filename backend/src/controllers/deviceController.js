@@ -20,6 +20,20 @@ function rowToDevice(row) {
   };
 }
 
+function getAssigneesForDevice(db, deviceId) {
+  const result = db.exec(
+    `SELECT u.id, u.full_name AS name, u.username
+     FROM device_assignments da
+     JOIN users u ON da.personnel_id = u.id
+     WHERE da.device_id = ?
+     ORDER BY da.assigned_at ASC`,
+    [deviceId],
+  );
+  return result[0]
+    ? result[0].values.map((r) => ({ id: r[0], name: r[1], username: r[2] }))
+    : [];
+}
+
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
@@ -113,8 +127,13 @@ exports.getAll = async (req, res) => {
 
     const devices = dataResult[0] ? dataResult[0].values.map(rowToDevice) : [];
 
+    const devicesWithAssignees = devices.map((device) => ({
+      ...device,
+      assignees: getAssigneesForDevice(db, device.id),
+    }));
+
     res.json({
-      data: devices,
+      data: devicesWithAssignees,
       total,
       page: pageNum,
       limit: limitNum,
@@ -140,7 +159,9 @@ exports.getOne = async (req, res) => {
       return res.status(404).json({ error: "Device not found" });
     }
 
-    res.json(rowToDevice(result[0].values[0]));
+    const device = rowToDevice(result[0].values[0]);
+    device.assignees = getAssigneesForDevice(db, device.id);
+    res.json(device);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

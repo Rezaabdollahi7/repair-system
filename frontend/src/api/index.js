@@ -75,4 +75,17 @@ export const deletePersonnel = (id) => api.delete(`/personnel/${id}`);
 export const changePersonnelPassword = (id, data) =>
   api.put(`/personnel/${id}/change-password`, data);
 
+// Device Assignments
+export const getDeviceAssignments = (deviceId) =>
+  api.get(`/devices/${deviceId}/assignments`);
+
+export const addDeviceAssignment = (deviceId, personnelId) =>
+  api.post(`/devices/${deviceId}/assignments`, { personnel_id: personnelId });
+
+export const removeDeviceAssignment = (deviceId, personnelId) =>
+  api.delete(`/devices/${deviceId}/assignments/${personnelId}`);
+
+export const setDeviceAssignments = (deviceId, personnelIds) =>
+  api.put(`/devices/${deviceId}/assignments`, { personnel_ids: personnelIds });
+
 export default api;

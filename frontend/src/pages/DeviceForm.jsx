@@ -1,3 +1,4 @@
+// src/pages/DeviceForm.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -8,6 +9,9 @@ import {
   createCustomer,
   getDeviceImages,
   uploadDeviceImages,
+  getPersonnel,
+  getDeviceAssignments,
+  setDeviceAssignments,
 } from "../api";
 import { toast } from "react-hot-toast";
 import ImageUploader from "../components/ImageUploader";
@@ -54,12 +58,31 @@ export default function DeviceForm() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
 
+  // ─── Personnel ─────────────────────────────────────────
+  const [personnelList, setPersonnelList] = useState([]);
+  const [selectedPersonnel, setSelectedPersonnel] = useState([]);
+  const [personnelSearch, setPersonnelSearch] = useState("");
+  const [showPersonnelDropdown, setShowPersonnelDropdown] = useState(false);
+
+  const filteredPersonnel = personnelList.filter((p) => {
+    const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
+
+    const displayName = p.name ?? p.full_name ?? "";
+    const matchSearch =
+      displayName.includes(personnelSearch) ||
+      (p.username && p.username.includes(personnelSearch));
+
+    return !alreadySelected && matchSearch;
+  });
+
   const filteredCustomers = customers.filter(
     (c) => c.name.includes(customerSearch) || c.phone.includes(customerSearch),
   );
 
+  // ─── Load ─────────────────────────────────────────────────────
   useEffect(() => {
     loadCustomers();
+    loadPersonnel();
     if (isEdit) loadDevice();
   }, [id]);
 
@@ -72,26 +95,45 @@ export default function DeviceForm() {
     }
   };
 
+  const loadPersonnel = async () => {
+    try {
+      const res = await getPersonnel({ limit: 200 });
+
+      setPersonnelList(res.data.data ?? res.data);
+    } catch {
+      toast.error("خطا در بارگذاری پرسنل");
+    }
+  };
+
   const loadDevice = async () => {
     try {
-      const res = await getDevice(id);
-      const imgRes = await getDeviceImages(id);
+      const [deviceRes, imgRes, assignRes] = await Promise.all([
+        getDevice(id),
+        getDeviceImages(id),
+        getDeviceAssignments(id),
+      ]);
+
       setImages(imgRes.data);
+
+      setSelectedPersonnel(assignRes.data ?? []);
+
       setForm({
-        customer_id: res.data.customer_id || "",
-        device_name: res.data.device_name || "",
-        brand: res.data.brand || "",
-        model: res.data.model || "",
-        serial_number: res.data.serial_number || "",
-        entry_date: res.data.entry_date || "",
-        exit_date: res.data.exit_date || "",
-        status: res.data.status || "pending",
-        description: res.data.description || "",
+        customer_id: deviceRes.data.customer_id || "",
+        device_name: deviceRes.data.device_name || "",
+        brand: deviceRes.data.brand || "",
+        model: deviceRes.data.model || "",
+        serial_number: deviceRes.data.serial_number || "",
+        entry_date: deviceRes.data.entry_date || "",
+        exit_date: deviceRes.data.exit_date || "",
+        status: deviceRes.data.status || "pending",
+        description: deviceRes.data.description || "",
       });
-      if (res.data.customer_name)
+
+      if (deviceRes.data.customer_name) {
         setCustomerSearch(
-          `${res.data.customer_name} - ${res.data.customer_phone ?? ""}`,
+          `${deviceRes.data.customer_name} - ${deviceRes.data.customer_phone ?? ""}`,
         );
+      }
     } catch {
       toast.error("خطا در بارگذاری دستگاه");
     }
@@ -120,6 +162,21 @@ export default function DeviceForm() {
     }
   };
 
+  const handleSelectPersonnel = (person) => {
+    const normalized = {
+      ...person,
+      name: person.name ?? person.full_name ?? person.username ?? "—",
+    };
+    setSelectedPersonnel((prev) => [...prev, normalized]);
+    setPersonnelSearch("");
+    setShowPersonnelDropdown(false);
+  };
+
+  const handleRemovePersonnel = (personId) => {
+    setSelectedPersonnel((prev) => prev.filter((p) => p.id !== personId));
+  };
+
+  // ─── Submit ───────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.device_name.trim()) {
@@ -128,6 +185,8 @@ export default function DeviceForm() {
     }
     setLoading(true);
     try {
+      let deviceId = id;
+
       if (isEdit) {
         await updateDevice(id, form);
         if (pendingImages.length > 0) {
@@ -137,13 +196,17 @@ export default function DeviceForm() {
         toast.success("دستگاه ویرایش شد");
       } else {
         const res = await createDevice(form);
-        const newId = res.data.id;
+        deviceId = res.data.id;
         if (pendingImages.length > 0) {
-          await uploadDeviceImages(newId, pendingImages);
+          await uploadDeviceImages(deviceId, pendingImages);
           setPendingImages([]);
         }
         toast.success("دستگاه ثبت شد");
       }
+
+      const personnelIds = selectedPersonnel.map((p) => p.id);
+      await setDeviceAssignments(deviceId, personnelIds);
+
       navigate("/devices");
     } catch (error) {
       toast.error(error.response?.data?.error || "خطا در ثبت دستگاه");
@@ -152,6 +215,7 @@ export default function DeviceForm() {
     }
   };
 
+  // ─── Render ───────────────────────────────────────────────────
   return (
     <div dir="rtl" className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
@@ -262,6 +326,80 @@ export default function DeviceForm() {
                 </button>
               </div>
             </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            مسئول(ین) دستگاه
+          </label>
+
+          {selectedPersonnel.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {selectedPersonnel.map((person) => (
+                <span
+                  key={person.id}
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                >
+                  {person.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePersonnel(person.id)}
+                    className="text-blue-500 hover:text-blue-800 font-bold leading-none"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="relative">
+            <input
+              placeholder="جستجو و انتخاب مسئول..."
+              value={personnelSearch}
+              onChange={(e) => {
+                setPersonnelSearch(e.target.value);
+                setShowPersonnelDropdown(true);
+              }}
+              onFocus={() => setShowPersonnelDropdown(true)}
+              onBlur={() =>
+                setTimeout(() => setShowPersonnelDropdown(false), 150)
+              }
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {showPersonnelDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {filteredPersonnel.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-400">
+                    {personnelList.length === 0
+                      ? "پرسنلی ثبت نشده"
+                      : "موردی یافت نشد"}
+                  </div>
+                ) : (
+                  filteredPersonnel.map((person) => (
+                    <div
+                      key={person.id}
+                      onMouseDown={() => handleSelectPersonnel(person)}
+                      className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex items-center justify-between"
+                    >
+                      <span>{person.name}</span>
+                      {person.username && (
+                        <span className="text-xs text-gray-400">
+                          @{person.username}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {selectedPersonnel.length === 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              اختیاری — دستگاه می‌تواند بدون مسئول باشد
+            </p>
           )}
         </div>
 

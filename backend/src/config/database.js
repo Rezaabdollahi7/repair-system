@@ -96,12 +96,25 @@ function initSchema() {
   `);
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS device_assignments (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id    INTEGER NOT NULL,
+      personnel_id INTEGER NOT NULL,
+      assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      assigned_by  INTEGER,
+      FOREIGN KEY (device_id)    REFERENCES devices(id)   ON DELETE CASCADE,
+      FOREIGN KEY (personnel_id) REFERENCES users(id)     ON DELETE CASCADE,
+      FOREIGN KEY (assigned_by)  REFERENCES users(id),
+      UNIQUE(device_id, personnel_id)
+    )
+  `);
+
+  db.run(`
     INSERT OR IGNORE INTO roles (name, label) VALUES
       ('super_admin', 'سوپر ادمین'),
       ('admin', 'ادمین'),
       ('technician', 'تکنسین')
   `);
-
 
   db.run(`
     INSERT OR IGNORE INTO users (full_name, username, password, role_id)

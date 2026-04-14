@@ -58,6 +58,27 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("fa-IR");
 }
 
+function AssigneeBadge({ assignees }) {
+  if (!assignees || assignees.length === 0) {
+    return <span className="text-gray-400 text-xs">—</span>;
+  }
+  if (assignees.length === 1) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">
+        {assignees[0].name}
+      </span>
+    );
+  }
+  return (
+    <span
+      title={assignees.map((a) => a.name).join("، ")}
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-800 cursor-help"
+    >
+      مشترک ({assignees.length} نفر)
+    </span>
+  );
+}
+
 const EMPTY_FILTERS = {
   status: [],
   brand: "",
@@ -236,6 +257,9 @@ export default function DeviceList() {
                   وضعیت
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  مسئول
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
                   تاریخ ثبت
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
@@ -258,6 +282,9 @@ export default function DeviceList() {
                   <td className="px-4 py-3 text-sm">{device.model ?? "—"}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={device.status} />
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <AssigneeBadge assignees={device.assignees} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {formatDate(device.entry_date)}

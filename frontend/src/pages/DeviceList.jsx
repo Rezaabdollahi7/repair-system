@@ -86,8 +86,6 @@ const EMPTY_FILTERS = {
   personnel_ids: [],
   entry_from: "",
   entry_to: "",
-  exit_from: "",
-  exit_to: "",
 };
 
 export default function DeviceList() {
@@ -123,8 +121,6 @@ export default function DeviceList() {
         if (activeFilters.entry_from)
           params.entry_from = activeFilters.entry_from;
         if (activeFilters.entry_to) params.entry_to = activeFilters.entry_to;
-        if (activeFilters.exit_from) params.exit_from = activeFilters.exit_from;
-        if (activeFilters.exit_to) params.exit_to = activeFilters.exit_to;
         if (activeFilters.personnel_ids?.length > 0)
           params.personnel_ids = activeFilters.personnel_ids.join(",");
 

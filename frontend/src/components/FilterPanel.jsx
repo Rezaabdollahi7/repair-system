@@ -15,7 +15,12 @@ export default function FilterPanel({
   personnel,
 }) {
   const [open, setOpen] = useState(false);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [personnelSearch, setPersonnelSearch] = useState("");
+
+  const customerRef = useRef(null);
   const personnelRef = useRef(null);
 
   const activeCount = Object.values(filters).filter((v) =>
@@ -24,8 +29,13 @@ export default function FilterPanel({
 
   useEffect(() => {
     function handleClickOutside(e) {
+      if (customerRef.current && !customerRef.current.contains(e.target)) {
+        setCustomerDropdownOpen(false);
+        setCustomerSearch("");
+      }
       if (personnelRef.current && !personnelRef.current.contains(e.target)) {
         setPersonnelDropdownOpen(false);
+        setPersonnelSearch("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -48,6 +58,14 @@ export default function FilterPanel({
     onChange({ ...filters, personnel_ids: updated });
   }
 
+  function getCustomerLabel() {
+    if (!filters.customer_id) return "همه مشتریان";
+    const c = customers.find(
+      (c) => String(c.id) === String(filters.customer_id),
+    );
+    return c ? `${c.name} - ${c.phone}` : "همه مشتریان";
+  }
+
   function getPersonnelLabel() {
     const selected = filters.personnel_ids || [];
     if (selected.length === 0) return "همه مسئولان";
@@ -57,6 +75,15 @@ export default function FilterPanel({
     }
     return `${selected.length} مسئول انتخاب شده`;
   }
+
+  const filteredCustomers = (customers || []).filter((c) =>
+    `${c.name} ${c.phone}`.includes(customerSearch),
+  );
+
+  const filteredPersonnel = (personnel || []).filter((p) => {
+    const name = p.name ?? p.full_name ?? p.username ?? "";
+    return name.includes(personnelSearch);
+  });
 
   return (
     <div className="my-4">
@@ -106,24 +133,78 @@ export default function FilterPanel({
             </div>
           </div>
 
-          <div>
+          <div ref={customerRef} className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-2">
               مشتری
             </label>
-            <select
-              value={filters.customer_id}
-              onChange={(e) =>
-                onChange({ ...filters, customer_id: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <button
+              type="button"
+              onClick={() => setCustomerDropdownOpen((p) => !p)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">همه مشتریان</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} - {c.phone}
-                </option>
-              ))}
-            </select>
+              <span
+                className={
+                  filters.customer_id ? "text-gray-800" : "text-gray-400"
+                }
+              >
+                {getCustomerLabel()}
+              </span>
+              <span className="text-gray-400 text-xs">
+                {customerDropdownOpen ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {customerDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    placeholder="جستجو..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {filters.customer_id && (
+                    <button
+                      onClick={() => {
+                        onChange({ ...filters, customer_id: "" });
+                        setCustomerDropdownOpen(false);
+                        setCustomerSearch("");
+                      }}
+                      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100"
+                    >
+                      ✕ پاک کردن انتخاب
+                    </button>
+                  )}
+                  {filteredCustomers.length > 0 ? (
+                    filteredCustomers.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          onChange({ ...filters, customer_id: c.id });
+                          setCustomerDropdownOpen(false);
+                          setCustomerSearch("");
+                        }}
+                        className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                          String(filters.customer_id) === String(c.id)
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        {c.name} - {c.phone}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-2 text-xs text-gray-400">
+                      نتیجه‌ای یافت نشد
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div ref={personnelRef} className="relative">
@@ -150,21 +231,32 @@ export default function FilterPanel({
             </button>
 
             {personnelDropdownOpen && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                {personnel && personnel.length > 0 ? (
-                  <>
-                    {filters.personnel_ids?.length > 0 && (
-                      <button
-                        onClick={() => {
-                          onChange({ ...filters, personnel_ids: [] });
-                          setPersonnelDropdownOpen(false);
-                        }}
-                        className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100"
-                      >
-                        ✕ پاک کردن انتخاب‌ها
-                      </button>
-                    )}
-                    {personnel.map((p) => {
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    placeholder="جستجو..."
+                    value={personnelSearch}
+                    onChange={(e) => setPersonnelSearch(e.target.value)}
+                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {filters.personnel_ids?.length > 0 && (
+                    <button
+                      onClick={() => {
+                        onChange({ ...filters, personnel_ids: [] });
+                        setPersonnelDropdownOpen(false);
+                        setPersonnelSearch("");
+                      }}
+                      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100"
+                    >
+                      ✕ پاک کردن انتخاب‌ها
+                    </button>
+                  )}
+                  {filteredPersonnel.length > 0 ? (
+                    filteredPersonnel.map((p) => {
                       const displayName =
                         p.name ?? p.full_name ?? p.username ?? "—";
                       const isSelected = filters.personnel_ids?.includes(p.id);
@@ -190,13 +282,13 @@ export default function FilterPanel({
                           {displayName}
                         </button>
                       );
-                    })}
-                  </>
-                ) : (
-                  <p className="px-3 py-2 text-xs text-gray-400">
-                    پرسنلی ثبت نشده
-                  </p>
-                )}
+                    })
+                  ) : (
+                    <p className="px-3 py-2 text-xs text-gray-400">
+                      نتیجه‌ای یافت نشد
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -224,34 +316,6 @@ export default function FilterPanel({
               value={filters.entry_to}
               onChange={(e) =>
                 onChange({ ...filters, entry_to: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">
-              تاریخ خروج از
-            </label>
-            <input
-              type="date"
-              value={filters.exit_from}
-              onChange={(e) =>
-                onChange({ ...filters, exit_from: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">
-              تاریخ خروج تا
-            </label>
-            <input
-              type="date"
-              value={filters.exit_to}
-              onChange={(e) =>
-                onChange({ ...filters, exit_to: e.target.value })
               }
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

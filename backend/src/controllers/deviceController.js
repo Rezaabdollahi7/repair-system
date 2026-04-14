@@ -44,8 +44,6 @@ exports.getAll = async (req, res) => {
       customer_id,
       entry_from,
       entry_to,
-      exit_from,
-      exit_to,
       personnel_ids,
       page = 1,
       limit = 10,
@@ -101,14 +99,6 @@ exports.getAll = async (req, res) => {
     if (entry_to) {
       baseQuery += ` AND d.entry_date <= ?`;
       params.push(entry_to);
-    }
-    if (exit_from) {
-      baseQuery += ` AND d.exit_date >= ?`;
-      params.push(exit_from);
-    }
-    if (exit_to) {
-      baseQuery += ` AND d.exit_date <= ?`;
-      params.push(exit_to);
     }
 
     if (personnel_ids && personnel_ids.trim()) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "در انتظار" },
@@ -7,12 +7,30 @@ const STATUS_OPTIONS = [
   { value: "delivered", label: "تحویل داده شده" },
 ];
 
-export default function FilterPanel({ filters, onChange, onClear, customers }) {
+export default function FilterPanel({
+  filters,
+  onChange,
+  onClear,
+  customers,
+  personnel,
+}) {
   const [open, setOpen] = useState(false);
+  const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
+  const personnelRef = useRef(null);
 
   const activeCount = Object.values(filters).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v !== "",
   ).length;
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (personnelRef.current && !personnelRef.current.contains(e.target)) {
+        setPersonnelDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   function toggleStatus(value) {
     const current = filters.status || [];
@@ -22,9 +40,26 @@ export default function FilterPanel({ filters, onChange, onClear, customers }) {
     onChange({ ...filters, status: updated });
   }
 
+  function togglePersonnel(id) {
+    const current = filters.personnel_ids || [];
+    const updated = current.includes(id)
+      ? current.filter((p) => p !== id)
+      : [...current, id];
+    onChange({ ...filters, personnel_ids: updated });
+  }
+
+  function getPersonnelLabel() {
+    const selected = filters.personnel_ids || [];
+    if (selected.length === 0) return "همه مسئولان";
+    if (selected.length === 1) {
+      const p = personnel.find((p) => p.id === selected[0]);
+      return p?.name ?? p?.full_name ?? p?.username ?? "—";
+    }
+    return `${selected.length} مسئول انتخاب شده`;
+  }
+
   return (
     <div className="my-4">
-      {/* دکمه باز/بسته کردن */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => setOpen((p) => !p)}
@@ -48,10 +83,8 @@ export default function FilterPanel({ filters, onChange, onClear, customers }) {
         )}
       </div>
 
-      {/* پانل فیلتر */}
       {open && (
         <div className="mt-3 p-4 border border-gray-200 rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* وضعیت - چند انتخابی */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
               وضعیت
@@ -73,7 +106,6 @@ export default function FilterPanel({ filters, onChange, onClear, customers }) {
             </div>
           </div>
 
-          {/* مشتری */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
               مشتری
@@ -94,7 +126,81 @@ export default function FilterPanel({ filters, onChange, onClear, customers }) {
             </select>
           </div>
 
-          {/* بازه تاریخ ورود */}
+          <div ref={personnelRef} className="relative">
+            <label className="block text-xs font-medium text-gray-600 mb-2">
+              مسئول
+            </label>
+            <button
+              type="button"
+              onClick={() => setPersonnelDropdownOpen((p) => !p)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <span
+                className={
+                  filters.personnel_ids?.length > 0
+                    ? "text-gray-800"
+                    : "text-gray-400"
+                }
+              >
+                {getPersonnelLabel()}
+              </span>
+              <span className="text-gray-400 text-xs">
+                {personnelDropdownOpen ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {personnelDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                {personnel && personnel.length > 0 ? (
+                  <>
+                    {filters.personnel_ids?.length > 0 && (
+                      <button
+                        onClick={() => {
+                          onChange({ ...filters, personnel_ids: [] });
+                          setPersonnelDropdownOpen(false);
+                        }}
+                        className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100"
+                      >
+                        ✕ پاک کردن انتخاب‌ها
+                      </button>
+                    )}
+                    {personnel.map((p) => {
+                      const displayName =
+                        p.name ?? p.full_name ?? p.username ?? "—";
+                      const isSelected = filters.personnel_ids?.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => togglePersonnel(p.id)}
+                          className={`w-full text-right px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors ${
+                            isSelected
+                              ? "bg-purple-50 text-purple-700"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span
+                            className={`w-4 h-4 rounded border flex items-center justify-center text-xs flex-shrink-0 ${
+                              isSelected
+                                ? "bg-purple-600 border-purple-600 text-white"
+                                : "border-gray-300"
+                            }`}
+                          >
+                            {isSelected && "✓"}
+                          </span>
+                          {displayName}
+                        </button>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <p className="px-3 py-2 text-xs text-gray-400">
+                    پرسنلی ثبت نشده
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
               تاریخ ورود از
@@ -123,7 +229,6 @@ export default function FilterPanel({ filters, onChange, onClear, customers }) {
             />
           </div>
 
-          {/* بازه تاریخ خروج */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
               تاریخ خروج از

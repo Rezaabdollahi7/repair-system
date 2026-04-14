@@ -46,6 +46,7 @@ exports.getAll = async (req, res) => {
       entry_to,
       exit_from,
       exit_to,
+      personnel_ids,
       page = 1,
       limit = 10,
     } = req.query;
@@ -108,6 +109,21 @@ exports.getAll = async (req, res) => {
     if (exit_to) {
       baseQuery += ` AND d.exit_date <= ?`;
       params.push(exit_to);
+    }
+
+    if (personnel_ids && personnel_ids.trim()) {
+      const ids = personnel_ids
+        .split(",")
+        .map((id) => parseInt(id))
+        .filter(Boolean);
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => "?").join(",");
+        baseQuery += ` AND d.id IN (
+      SELECT device_id FROM device_assignments
+      WHERE personnel_id IN (${placeholders})
+    )`;
+        params.push(...ids);
+      }
     }
 
     // count

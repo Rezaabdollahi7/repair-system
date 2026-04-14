@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { getDevices, deleteDevice, getCustomers } from "../api";
+import { getDevices, deleteDevice, getCustomers, getPersonnel } from "../api";
 import FilterPanel from "../components/FilterPanel";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
@@ -83,6 +83,7 @@ const EMPTY_FILTERS = {
   status: [],
   brand: "",
   customer_id: "",
+  personnel_ids: [],
   entry_from: "",
   entry_to: "",
   exit_from: "",
@@ -95,6 +96,7 @@ export default function DeviceList() {
   const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [customers, setCustomers] = useState([]);
+  const [personnelList, setPersonnelList] = useState([]);
 
   const { isAtLeast } = useAuth();
 
@@ -123,6 +125,8 @@ export default function DeviceList() {
         if (activeFilters.entry_to) params.entry_to = activeFilters.entry_to;
         if (activeFilters.exit_from) params.exit_from = activeFilters.exit_from;
         if (activeFilters.exit_to) params.exit_to = activeFilters.exit_to;
+        if (activeFilters.personnel_ids?.length > 0)
+          params.personnel_ids = activeFilters.personnel_ids.join(",");
 
         const res = await getDevices(params);
         const api = res.data;
@@ -154,6 +158,19 @@ export default function DeviceList() {
   useEffect(() => {
     getCustomers()
       .then((res) => setCustomers(res.data.data ?? res.data))
+      .catch(() => {});
+
+    getPersonnel({ limit: 200 })
+      .then((res) => {
+        const raw = res.data.data ?? res.data;
+        const normalized = Array.isArray(raw)
+          ? raw.map((p) => ({
+              ...p,
+              name: p.name ?? p.full_name ?? p.username ?? "—",
+            }))
+          : [];
+        setPersonnelList(normalized);
+      })
       .catch(() => {});
   }, []);
 
@@ -219,6 +236,7 @@ export default function DeviceList() {
             setPage(1);
           }}
           customers={customers}
+          personnel={personnelList}
         />
       </div>
 

@@ -77,11 +77,6 @@ export default function DeviceDetail() {
     return new Date(dateStr).toLocaleDateString("fa-IR");
   }
 
-  function formatCurrency(amount) {
-    if (!amount) return "—";
-    return Number(amount).toLocaleString("fa-IR") + " تومان";
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -146,7 +141,13 @@ export default function DeviceDetail() {
           <div className="text-right">
             <p className="text-sm text-gray-500 mb-1">تاریخ پذیرش</p>
             <p className="text-gray-800 font-medium">
-              {formatDate(device.created_at)}
+              {formatDate(device.entry_date)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500 mb-1">تاریخ تحویل</p>
+            <p className="text-gray-800 font-medium">
+              {formatDate(device.exit_date)}
             </p>
           </div>
         </div>
@@ -154,7 +155,7 @@ export default function DeviceDetail() {
 
       {images.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2 mb-4">
+          <h2 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2 mb-4">
             📷 عکس‌های دستگاه ({images.length})
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -173,7 +174,7 @@ export default function DeviceDetail() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
+          <h2 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
             🔧 اطلاعات دستگاه
           </h2>
           <InfoRow label="نوع دستگاه" value={device.device_name} />
@@ -183,7 +184,7 @@ export default function DeviceDetail() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
+          <h2 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
             👤 اطلاعات مشتری
           </h2>
           <InfoRow label="نام مشتری" value={device.customer_name} />
@@ -191,37 +192,34 @@ export default function DeviceDetail() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
-            📋 شرح مشکل
+          <h2 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
+            📋 توضیحات
           </h2>
           <p className="text-gray-700 leading-relaxed">
-            {device.problem_description || "—"}
+            {device.description || "—"}
           </p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
-            💰 هزینه‌ها
+          <h2 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
+            🛠️ مسئولین تعمیر
           </h2>
-          <InfoRow
-            label="هزینه تخمینی"
-            value={formatCurrency(device.estimated_cost)}
-          />
-          <InfoRow
-            label="هزینه نهایی"
-            value={formatCurrency(device.final_cost)}
-          />
+          {device.assignees && device.assignees.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {device.assignees.map((person) => (
+                <span
+                  key={person.id}
+                  className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
+                >
+                  {person.name || person.username}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 text-sm">مسئولی تعیین نشده</p>
+          )}
         </div>
       </div>
-
-      {device.notes && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-700 border-b pb-2 mb-4">
-            📝 یادداشت‌ها
-          </h2>
-          <p className="text-gray-700 leading-relaxed">{device.notes}</p>
-        </div>
-      )}
 
       <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 flex gap-6 text-sm text-gray-500">
         <span>ثبت: {formatDate(device.created_at)}</span>
@@ -255,6 +253,7 @@ export default function DeviceDetail() {
           </div>
         </div>
       )}
+
       {sliderIndex !== null && (
         <ImageSlider
           images={images}
@@ -268,7 +267,7 @@ export default function DeviceDetail() {
 
 function InfoRow({ label, value }) {
   return (
-    <div className="flex justify-between border-b pb-2 text-sm">
+    <div className="flex justify-between border-b border-gray-200 pb-2 text-sm">
       <span className="text-gray-500">{label}</span>
       <span className="text-gray-800 font-medium">{value || "—"}</span>
     </div>

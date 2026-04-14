@@ -9,7 +9,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 export default function PersonnelList() {
-  const { user } = useAuth();
+  const { user, isAtLeast } = useAuth();
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,9 +49,8 @@ export default function PersonnelList() {
     }
   };
 
-  const canManage =
-    user?.role_name === "super_admin" || user?.role_name === "admin";
-  const canDelete = user?.role_name === "super_admin";
+  const canManage = isAtLeast("admin");
+  const canDelete = user?.role === "super_admin";
 
   if (loading) {
     return (
@@ -159,20 +158,33 @@ export default function PersonnelList() {
                   {canManage && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center gap-3">
-                        <Link
-                          to={`/personnel/${person.id}/edit`}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          ویرایش
-                        </Link>
-                        {person.id !== user?.id && (
-                          <button
-                            onClick={() => handleToggleActive(person.id)}
-                            className="text-yellow-600 hover:text-yellow-800 font-medium"
+                        {!(
+                          user?.role === "admin" &&
+                          (person.role_name === "super_admin" ||
+                            person.role_name === "admin")
+                        ) && (
+                          <Link
+                            to={`/personnel/${person.id}/edit`}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
                           >
-                            {person.is_active ? "غیرفعال" : "فعال‌سازی"}
-                          </button>
+                            ویرایش
+                          </Link>
                         )}
+
+                        {person.id !== user?.id &&
+                          !(
+                            user?.role === "admin" &&
+                            (person.role_name === "super_admin" ||
+                              person.role_name === "admin")
+                          ) && (
+                            <button
+                              onClick={() => handleToggleActive(person.id)}
+                              className="text-yellow-600 hover:text-yellow-800 font-medium"
+                            >
+                              {person.is_active ? "غیرفعال" : "فعال‌سازی"}
+                            </button>
+                          )}
+
                         {canDelete && person.id !== user?.id && (
                           <button
                             onClick={() =>

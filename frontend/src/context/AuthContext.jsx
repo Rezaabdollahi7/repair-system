@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
         console.log("getMe response:", res.data);
         setUser(res.data);
       })
-      .catch(() => {
+      .catch((err) => {
         console.log("getMe error:", err.response);
         localStorage.removeItem("token");
         localStorage.removeItem("user");

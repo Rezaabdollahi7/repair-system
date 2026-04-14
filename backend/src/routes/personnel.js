@@ -9,8 +9,8 @@ const { atLeast, authorize } = require("../middleware/authorize");
 router.use(authenticate);
 
 // خواندن - همه نقش‌ها
-router.get("/", personnelController.getAll);
-router.get("/:id", personnelController.getOne);
+router.get("/", atLeast("admin"), personnelController.getAll);
+router.get("/:id", atLeast("admin"), personnelController.getOne);
 
 // ایجاد و ویرایش - فقط admin و بالاتر
 router.post("/", atLeast("admin"), personnelController.create);

@@ -13,10 +13,9 @@ function rowToUser(columns, values) {
 }
 
 function safeUser(user) {
-  const { password, ...rest } = user;
-  return rest;
+  const { password, role_name, ...rest } = user;
+  return { ...rest, role: role_name };
 }
-
 // ── POST /api/auth/login ──────────────────────────────────
 exports.login = async (req, res) => {
   try {

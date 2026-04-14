@@ -30,10 +30,13 @@ const INITIAL_CUSTOMER = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "در انتظار" },
+  { value: "pending", label: "در انتظار بررسی" },
+  { value: "diagnosing", label: "در حال بررسی" },
+  { value: "waiting_for_parts", label: "در انتظار قطعه" },
   { value: "repairing", label: "در حال تعمیر" },
-  { value: "done", label: "تعمیر شده" },
+  { value: "repaired", label: "تعمیر شده" },
   { value: "delivered", label: "تحویل داده شده" },
+  { value: "unrepairable", label: "غیرقابل تعمیر" },
 ];
 
 export default function DeviceForm() {

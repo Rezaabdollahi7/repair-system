@@ -1,9 +1,14 @@
-// src/pages/CustomerList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { getCustomers } from "../api";
+import { getCustomers, deleteCustomer } from "../api";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import {
+  TrashIcon,
+  EyeIcon,
+  PencilSquareIcon,
+} from "@heroicons/react/24/solid";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -24,6 +29,7 @@ export default function CustomerList() {
   const [totalPages, setTotalPages] = useState(1);
 
   const debouncedSearch = useDebounce(searchInput);
+  const { isAtLeast } = useAuth();
 
   const fetchCustomers = useCallback(
     async (search, currentPage, currentLimit) => {
@@ -54,18 +60,30 @@ export default function CustomerList() {
     [],
   );
 
+  // ─── fix double fetch ──────────────────────────────────────────
+  const prevSearchRef = useRef(debouncedSearch);
+
   useEffect(() => {
-    fetchCustomers(debouncedSearch, page, limit);
+    const searchChanged = prevSearchRef.current !== debouncedSearch;
+    prevSearchRef.current = debouncedSearch;
+
+    const currentPage = searchChanged ? 1 : page;
+    if (searchChanged) setPage(1);
+
+    fetchCustomers(debouncedSearch, currentPage, limit);
   }, [debouncedSearch, page, limit, fetchCustomers]);
 
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
+  // ─── Handlers ─────────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    if (!confirm("آیا مطمئن هستید؟")) return;
+    try {
+      await deleteCustomer(id);
+      toast.success("مشتری حذف شد");
+      fetchCustomers(debouncedSearch, page, limit);
+    } catch {
+      toast.error("خطا در حذف مشتری");
     }
-    setPage(1);
-  }, [debouncedSearch]);
+  };
 
   return (
     <div dir="rtl">
@@ -138,16 +156,27 @@ export default function CustomerList() {
                   <td className="px-4 py-3 text-sm flex gap-2 justify-end">
                     <Link
                       to={`/customers/${c.id}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
                     >
+                      <EyeIcon className="w-4 h-4" />
                       جزئیات
                     </Link>
                     <Link
                       to={`/customers/${c.id}/edit`}
-                      className="text-yellow-600 hover:underline"
+                      className="text-green-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
                     >
+                      <PencilSquareIcon className="w-4 h-4" />
                       ویرایش
                     </Link>
+                    {isAtLeast("admin") && (
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        className="text-red-600 hover:underline hover:underline-offset-8 flex items-center gap-1 cursor-pointer"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        حذف
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

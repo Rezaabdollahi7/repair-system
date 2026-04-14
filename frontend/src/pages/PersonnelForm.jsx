@@ -6,8 +6,9 @@ import {
   createPersonnel,
   updatePersonnel,
 } from "../api/index";
+import { useAuth } from "../context/AuthContext";
 
-const ROLES = [
+const ALL_ROLES = [
   { id: 1, name: "super_admin", label: "سوپر ادمین" },
   { id: 2, name: "admin", label: "ادمین" },
   { id: 3, name: "technician", label: "تکنسین" },
@@ -16,7 +17,13 @@ const ROLES = [
 export default function PersonnelForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isEdit = Boolean(id);
+
+  const allowedRoles =
+    user?.role === "super_admin"
+      ? ALL_ROLES
+      : ALL_ROLES.filter((r) => r.name === "technician");
 
   const [form, setForm] = useState({
     full_name: "",
@@ -53,7 +60,6 @@ export default function PersonnelForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const payload = { ...form };
       if (isEdit && !payload.password) delete payload.password;
@@ -91,7 +97,6 @@ export default function PersonnelForm() {
 
       <div className="bg-white rounded-xl shadow p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* نام کامل */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               نام و نام خانوادگی <span className="text-red-500">*</span>
@@ -107,7 +112,6 @@ export default function PersonnelForm() {
             />
           </div>
 
-          {/* نام کاربری */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               نام کاربری <span className="text-red-500">*</span>
@@ -123,7 +127,6 @@ export default function PersonnelForm() {
             />
           </div>
 
-          {/* رمز عبور */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               رمز عبور{" "}
@@ -148,7 +151,6 @@ export default function PersonnelForm() {
             />
           </div>
 
-          {/* تلفن */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               شماره تلفن
@@ -163,7 +165,6 @@ export default function PersonnelForm() {
             />
           </div>
 
-          {/* نقش */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               نقش <span className="text-red-500">*</span>
@@ -174,7 +175,7 @@ export default function PersonnelForm() {
               onChange={handleChange}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {ROLES.map((role) => (
+              {allowedRoles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.label}
                 </option>
@@ -182,7 +183,6 @@ export default function PersonnelForm() {
             </select>
           </div>
 
-          {/* دکمه‌ها */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"

@@ -13,11 +13,10 @@ function rowToDevice(row) {
     exit_date: row[7],
     status: row[8],
     description: row[9],
-    image_path: row[10],
-    created_at: row[11],
-    updated_at: row[12],
-    customer_name: row[13],
-    customer_phone: row[14],
+    created_at: row[10],
+    updated_at: row[11],
+    customer_name: row[12],
+    customer_phone: row[13],
   };
 }
 

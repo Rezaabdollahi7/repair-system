@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import api from "../api";
 import { getDeviceImages } from "../api";
 import ImageSlider from "../components/ImageSlider";
+import { useAuth } from "../context/AuthContext";
 
 const STATUS_MAP = {
   pending: { label: "در انتظار بررسی", color: "bg-yellow-100 text-yellow-800" },
@@ -28,6 +29,7 @@ export default function DeviceDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [sliderIndex, setSliderIndex] = useState(null);
+  const { isAtLeast } = useAuth();
 
   useEffect(() => {
     fetchDevice();
@@ -114,12 +116,14 @@ export default function DeviceDetail() {
           >
             ویرایش
           </Link>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-          >
-            حذف
-          </button>
+          {isAtLeast("admin") && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+            >
+              حذف
+            </button>
+          )}
         </div>
       </div>
 
@@ -172,7 +176,7 @@ export default function DeviceDetail() {
           <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">
             🔧 اطلاعات دستگاه
           </h2>
-          <InfoRow label="نوع دستگاه" value={device.device_type} />
+          <InfoRow label="نوع دستگاه" value={device.device_name} />
           <InfoRow label="برند" value={device.brand} />
           <InfoRow label="مدل" value={device.model} />
           <InfoRow label="شماره سریال" value={device.serial_number} />

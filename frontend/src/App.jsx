@@ -35,9 +35,12 @@ function App() {
               <Route path="customers/new" element={<CustomerForm />} />
               <Route path="customers/:id" element={<CustomerDetail />} />
               <Route path="customers/:id/edit" element={<CustomerForm />} />
-              <Route path="personnel" element={<PersonnelList />} />
-              <Route path="personnel/new" element={<PersonnelForm />} />
-              <Route path="personnel/:id/edit" element={<PersonnelForm />} />
+
+              <Route element={<ProtectedRoute minRole="admin" />}>
+                <Route path="personnel" element={<PersonnelList />} />
+                <Route path="personnel/new" element={<PersonnelForm />} />
+                <Route path="personnel/:id/edit" element={<PersonnelForm />} />
+              </Route>
             </Route>
           </Route>
 

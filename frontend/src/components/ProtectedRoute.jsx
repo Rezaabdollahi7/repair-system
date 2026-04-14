@@ -2,8 +2,8 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute() {
-  const { user, loading } = useAuth();
+export default function ProtectedRoute({ minRole }) {
+  const { user, loading, isAtLeast } = useAuth();
 
   if (loading) {
     return (
@@ -13,5 +13,8 @@ export default function ProtectedRoute() {
     );
   }
 
-  return user ? <Outlet /> : <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (minRole && !isAtLeast(minRole)) return <Navigate to="/devices" replace />;
+
+  return <Outlet />;
 }

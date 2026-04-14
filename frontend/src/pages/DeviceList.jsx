@@ -4,6 +4,7 @@ import { getDevices, deleteDevice, getCustomers } from "../api";
 import FilterPanel from "../components/FilterPanel";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 
 import {
   PlusIcon,
@@ -23,11 +24,24 @@ function useDebounce(value, delay = 400) {
 
 function StatusBadge({ status }) {
   const map = {
-    pending: { label: "در انتظار", color: "bg-yellow-100 text-yellow-800" },
-    repairing: { label: "در حال تعمیر", color: "bg-blue-100 text-blue-800" },
-    done: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
+    pending: {
+      label: "در انتظار بررسی",
+      color: "bg-yellow-100 text-yellow-800",
+    },
+    diagnosing: { label: "در حال بررسی", color: "bg-blue-100 text-blue-800" },
+    waiting_for_parts: {
+      label: "در انتظار قطعه",
+      color: "bg-orange-100 text-orange-800",
+    },
+    repairing: {
+      label: "در حال تعمیر",
+      color: "bg-purple-100 text-purple-800",
+    },
+    repaired: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
     delivered: { label: "تحویل داده شده", color: "bg-gray-100 text-gray-800" },
+    unrepairable: { label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
   };
+
   const s = map[status] ?? {
     label: status,
     color: "bg-gray-100 text-gray-600",
@@ -60,6 +74,8 @@ export default function DeviceList() {
   const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [customers, setCustomers] = useState([]);
+
+  const { isAtLeast } = useAuth();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -116,7 +132,7 @@ export default function DeviceList() {
   // ─── Effects ──────────────────────────────────────────────────
   useEffect(() => {
     getCustomers()
-      .then((res) => setCustomers(res.data))
+      .then((res) => setCustomers(res.data.data ?? res.data))
       .catch(() => {});
   }, []);
 
@@ -265,13 +281,15 @@ export default function DeviceList() {
                       ویرایش
                     </Link>
 
-                    <button
-                      onClick={() => handleDelete(device.id)}
-                      className="text-red-600 hover:underline hover:underline-offset-8 flex items-center gap-1 cursor-pointer"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                      حذف
-                    </button>
+                    {isAtLeast("admin") && (
+                      <button
+                        onClick={() => handleDelete(device.id)}
+                        className="text-red-600 hover:underline hover:underline-offset-8 flex items-center gap-1 cursor-pointer"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        حذف
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -34,9 +34,15 @@ const DAY_NAMES = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 function firstDayOfJalaliMonth(jy, jm) {
   const { gy, gm, gd } = toGregorian(jy, jm, 1);
   const date = new Date(gy, gm - 1, gd);
-
   return (date.getDay() + 1) % 7;
 }
+
+// view modes
+const VIEW_DAYS = "days";
+const VIEW_MONTHS = "months";
+const VIEW_YEARS = "years";
+
+const YEAR_PAGE_SIZE = 12; // تعداد سال در هر صفحه
 
 export default function PersianDatePicker({
   value,
@@ -54,10 +60,17 @@ export default function PersianDatePicker({
   const initMonth = parsed.jm || today.jm;
 
   const [open, setOpen] = useState(false);
+  const [viewMode, setViewMode] = useState(VIEW_DAYS);
   const [viewYear, setViewYear] = useState(initYear);
   const [viewMonth, setViewMonth] = useState(initMonth);
+  // صفحه اول سال‌های نمایش‌داده‌شده
+  const [yearRangeStart, setYearRangeStart] = useState(
+    initYear - (initYear % YEAR_PAGE_SIZE),
+  );
+
   const ref = useRef(null);
 
+  // sync با value بیرونی
   useEffect(() => {
     const p = gregorianToJalali(value);
     if (p.jy) {
@@ -66,21 +79,25 @@ export default function PersianDatePicker({
     }
   }, [value]);
 
+  // بستن با کلیک بیرون
   useEffect(() => {
     function handleOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setViewMode(VIEW_DAYS);
+      }
     }
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
+  // ── navigation ──────────────────────────────────────────
   function prevMonth() {
     if (viewMonth === 1) {
       setViewMonth(12);
       setViewYear((y) => y - 1);
     } else setViewMonth((m) => m - 1);
   }
-
   function nextMonth() {
     if (viewMonth === 12) {
       setViewMonth(1);
@@ -88,21 +105,36 @@ export default function PersianDatePicker({
     } else setViewMonth((m) => m + 1);
   }
 
+  // ── انتخاب روز ─────────────────────────────────────────
   function selectDay(jd) {
-    const gregorian = jalaliToGregorian(viewYear, viewMonth, jd);
-    onChange(gregorian);
+    onChange(jalaliToGregorian(viewYear, viewMonth, jd));
     setOpen(false);
+    setViewMode(VIEW_DAYS);
   }
 
+  // ── انتخاب ماه ─────────────────────────────────────────
+  function selectMonth(mIndex) {
+    setViewMonth(mIndex + 1);
+    setViewMode(VIEW_DAYS);
+  }
+
+  // ── انتخاب سال ─────────────────────────────────────────
+  function selectYear(y) {
+    setViewYear(y);
+    setViewMode(VIEW_MONTHS); // بعد از انتخاب سال، ماه را انتخاب کن
+  }
+
+  // ── پاک کردن ───────────────────────────────────────────
   function clearValue(e) {
     e.stopPropagation();
     onChange("");
   }
 
+  // ── محاسبات روزها ───────────────────────────────────────
   const daysInMonth = jalaaliMonthLength(viewYear, viewMonth);
   const firstDay = firstDayOfJalaliMonth(viewYear, viewMonth);
-
   const selectedJalali = gregorianToJalali(value);
+
   const isSelected = (jd) =>
     selectedJalali.jy === viewYear &&
     selectedJalali.jm === viewMonth &&
@@ -111,16 +143,26 @@ export default function PersianDatePicker({
   const isToday = (jd) =>
     today.jy === viewYear && today.jm === viewMonth && today.jd === jd;
 
+  // ── مقدار نمایشی input ──────────────────────────────────
   const displayValue = value
     ? `${selectedJalali.jy}/${String(selectedJalali.jm).padStart(2, "0")}/${String(selectedJalali.jd).padStart(2, "0")}`
     : "";
 
+  // ── سال‌های صفحه جاری ───────────────────────────────────
+  const yearList = Array.from(
+    { length: YEAR_PAGE_SIZE },
+    (_, i) => yearRangeStart + i,
+  );
+
   return (
     <div ref={ref} className="relative">
-      {/* input نمایشی */}
+      {/* ── Input نمایشی ── */}
       <button
         type="button"
-        onClick={() => setOpen((p) => !p)}
+        onClick={() => {
+          setOpen((p) => !p);
+          setViewMode(VIEW_DAYS);
+        }}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         <span className={displayValue ? "text-gray-800" : "text-gray-400"}>
@@ -150,60 +192,191 @@ export default function PersianDatePicker({
         )}
       </button>
 
-      {/* تقویم */}
+      {/* ── پنجره تقویم ── */}
       {open && (
         <div
           className="absolute z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-72"
           dir="rtl"
         >
-          {/* هدر ماه */}
-          <div className="flex items-center justify-between mb-3">
-            <button
-              onClick={nextMonth}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronRightIcon className="w-4 h-4 text-gray-600" />
-            </button>
-            <span className="text-sm font-semibold text-gray-800">
-              {MONTH_NAMES[viewMonth - 1]} {viewYear}
-            </span>
-            <button
-              onClick={prevMonth}
-              className="p-1 hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronLeftIcon className="w-4 h-4 text-gray-600" />
-            </button>
-          </div>
+          {/* ════════════════ نمایش روزها ════════════════ */}
+          {viewMode === VIEW_DAYS && (
+            <>
+              {/* هدر */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={nextMonth}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+                </button>
 
-          {/* نام روزها */}
-          <div className="grid grid-cols-7 mb-1">
-            {DAY_NAMES.map((d) => (
-              <div key={d} className="text-center text-xs text-gray-400 py-1">
-                {d}
+                {/* کلیک روی ماه/سال → تغییر view */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setViewMode(VIEW_MONTHS)}
+                    className="text-sm font-semibold text-gray-800 hover:text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded-lg transition-colors"
+                  >
+                    {MONTH_NAMES[viewMonth - 1]}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setYearRangeStart(viewYear - (viewYear % YEAR_PAGE_SIZE));
+                      setViewMode(VIEW_YEARS);
+                    }}
+                    className="text-sm font-semibold text-gray-800 hover:text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded-lg transition-colors"
+                  >
+                    {viewYear}
+                  </button>
+                </div>
+
+                <button
+                  onClick={prevMonth}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronLeftIcon className="w-4 h-4 text-gray-600" />
+                </button>
               </div>
-            ))}
-          </div>
 
-          {/* روزها */}
-          <div className="grid grid-cols-7 gap-y-1">
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} />
-            ))}
-            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((jd) => (
-              <button
-                key={jd}
-                onClick={() => selectDay(jd)}
-                className={`
-                  text-center text-sm py-1 rounded-lg transition-colors
-                  ${isSelected(jd) ? "bg-blue-600 text-white font-bold" : ""}
-                  ${isToday(jd) && !isSelected(jd) ? "border border-blue-400 text-blue-600" : ""}
-                  ${!isSelected(jd) ? "hover:bg-blue-50 text-gray-700" : ""}
-                `}
-              >
-                {jd}
-              </button>
-            ))}
-          </div>
+              {/* نام روزها */}
+              <div className="grid grid-cols-7 mb-1">
+                {DAY_NAMES.map((d) => (
+                  <div
+                    key={d}
+                    className="text-center text-xs text-gray-400 py-1"
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* روزها */}
+              <div className="grid grid-cols-7 gap-y-1">
+                {Array.from({ length: firstDay }).map((_, i) => (
+                  <div key={`e-${i}`} />
+                ))}
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(
+                  (jd) => (
+                    <button
+                      key={jd}
+                      onClick={() => selectDay(jd)}
+                      className={`
+                      text-center text-sm py-1 rounded-lg transition-colors
+                      ${isSelected(jd) ? "bg-blue-600 text-white font-bold" : ""}
+                      ${isToday(jd) && !isSelected(jd) ? "border border-blue-400 text-blue-600" : ""}
+                      ${!isSelected(jd) ? "hover:bg-blue-50 text-gray-700" : ""}
+                    `}
+                    >
+                      {jd}
+                    </button>
+                  ),
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ════════════════ انتخاب ماه ════════════════ */}
+          {viewMode === VIEW_MONTHS && (
+            <>
+              {/* هدر */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => {
+                    setYearRangeStart(viewYear - (viewYear % YEAR_PAGE_SIZE));
+                    setViewMode(VIEW_YEARS);
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => {
+                    setYearRangeStart(viewYear - (viewYear % YEAR_PAGE_SIZE));
+                    setViewMode(VIEW_YEARS);
+                  }}
+                  className="text-sm font-semibold text-gray-800 hover:text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded-lg transition-colors"
+                >
+                  {viewYear}
+                </button>
+                <button
+                  onClick={() => setViewMode(VIEW_DAYS)}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronLeftIcon className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+
+              {/* گرید ۱۲ ماه */}
+              <div className="grid grid-cols-3 gap-2">
+                {MONTH_NAMES.map((name, i) => {
+                  const isCurrentMonth =
+                    selectedJalali.jy === viewYear &&
+                    selectedJalali.jm === i + 1;
+                  const isTodayMonth =
+                    today.jy === viewYear && today.jm === i + 1;
+                  return (
+                    <button
+                      key={name}
+                      onClick={() => selectMonth(i)}
+                      className={`
+                        text-sm py-2 rounded-lg transition-colors
+                        ${isCurrentMonth ? "bg-blue-600 text-white font-bold" : ""}
+                        ${isTodayMonth && !isCurrentMonth ? "border border-blue-400 text-blue-600" : ""}
+                        ${!isCurrentMonth ? "hover:bg-blue-50 text-gray-700" : ""}
+                      `}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* ════════════════ انتخاب سال ════════════════ */}
+          {viewMode === VIEW_YEARS && (
+            <>
+              {/* هدر */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => setYearRangeStart((s) => s + YEAR_PAGE_SIZE)}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+                </button>
+                <span className="text-sm font-semibold text-gray-800">
+                  {yearRangeStart} – {yearRangeStart + YEAR_PAGE_SIZE - 1}
+                </span>
+                <button
+                  onClick={() => setYearRangeStart((s) => s - YEAR_PAGE_SIZE)}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronLeftIcon className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+
+              {/* گرید ۱۲ سال */}
+              <div className="grid grid-cols-3 gap-2">
+                {yearList.map((y) => {
+                  const isSelectedYear = selectedJalali.jy === y;
+                  const isTodayYear = today.jy === y;
+                  return (
+                    <button
+                      key={y}
+                      onClick={() => selectYear(y)}
+                      className={`
+                        text-sm py-2 rounded-lg transition-colors
+                        ${isSelectedYear ? "bg-blue-600 text-white font-bold" : ""}
+                        ${isTodayYear && !isSelectedYear ? "border border-blue-400 text-blue-600" : ""}
+                        ${!isSelectedYear ? "hover:bg-blue-50 text-gray-700" : ""}
+                      `}
+                    >
+                      {y}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

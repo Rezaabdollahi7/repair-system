@@ -15,6 +15,7 @@ import {
 } from "../api";
 import { toast } from "react-hot-toast";
 import ImageUploader from "../components/ImageUploader";
+import PersianDatePicker from "../components/PersianDatePicker"; // ← اضافه شد
 
 const INITIAL_FORM = {
   customer_id: "",
@@ -22,7 +23,7 @@ const INITIAL_FORM = {
   brand: "",
   model: "",
   serial_number: "",
-  entry_date: new Date().toISOString().split("T")[0],
+  entry_date: new Date().toISOString().split("T")[0], // میلادی — بک‌اند همین را می‌خواهد
   exit_date: "",
   status: "pending",
   description: "",
@@ -66,12 +67,10 @@ export default function DeviceForm() {
 
   const filteredPersonnel = personnelList.filter((p) => {
     const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
-
     const displayName = p.name ?? p.full_name ?? "";
     const matchSearch =
       displayName.includes(personnelSearch) ||
       (p.username && p.username.includes(personnelSearch));
-
     return !alreadySelected && matchSearch;
   });
 
@@ -98,7 +97,6 @@ export default function DeviceForm() {
   const loadPersonnel = async () => {
     try {
       const res = await getPersonnel({ limit: 200 });
-
       setPersonnelList(res.data.data ?? res.data);
     } catch {
       toast.error("خطا در بارگذاری پرسنل");
@@ -114,7 +112,6 @@ export default function DeviceForm() {
       ]);
 
       setImages(imgRes.data);
-
       setSelectedPersonnel(assignRes.data ?? []);
 
       setForm({
@@ -123,8 +120,8 @@ export default function DeviceForm() {
         brand: deviceRes.data.brand || "",
         model: deviceRes.data.model || "",
         serial_number: deviceRes.data.serial_number || "",
-        entry_date: deviceRes.data.entry_date || "",
-        exit_date: deviceRes.data.exit_date || "",
+        entry_date: deviceRes.data.entry_date || "", // YYYY-MM-DD میلادی از بک‌اند
+        exit_date: deviceRes.data.exit_date || "", // PersianDatePicker این را تبدیل می‌کند
         status: deviceRes.data.status || "pending",
         description: deviceRes.data.description || "",
       });
@@ -141,6 +138,12 @@ export default function DeviceForm() {
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // ─── handler مخصوص PersianDatePicker ──────────────────
+  // value که picker برمی‌گرداند همیشه YYYY-MM-DD میلادی است
+  const handleDateChange = (fieldName) => (gregorianValue) => {
+    setForm((prev) => ({ ...prev, [fieldName]: gregorianValue ?? "" }));
   };
 
   const handleAddCustomer = async () => {
@@ -239,6 +242,7 @@ export default function DeviceForm() {
           </div>
         )}
 
+        {/* ─── مشتری (بدون تغییر) ─── */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             مشتری
@@ -329,11 +333,11 @@ export default function DeviceForm() {
           )}
         </div>
 
+        {/* ─── پرسنل (بدون تغییر) ─── */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             مسئول(ین) دستگاه
           </label>
-
           {selectedPersonnel.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {selectedPersonnel.map((person) => (
@@ -353,7 +357,6 @@ export default function DeviceForm() {
               ))}
             </div>
           )}
-
           <div className="relative">
             <input
               placeholder="جستجو و انتخاب مسئول..."
@@ -395,7 +398,6 @@ export default function DeviceForm() {
               </div>
             )}
           </div>
-
           {selectedPersonnel.length === 0 && (
             <p className="text-xs text-gray-400 mt-1">
               اختیاری — دستگاه می‌تواند بدون مسئول باشد
@@ -403,6 +405,7 @@ export default function DeviceForm() {
           )}
         </div>
 
+        {/* ─── فیلدهای متنی (بدون تغییر) ─── */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -457,17 +460,16 @@ export default function DeviceForm() {
           </div>
         </div>
 
+        {/* ─── تاریخ ورود و خروج — جایگزین شد ─── */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              تاریخ ورود
+              تاریخ ورود *
             </label>
-            <input
-              name="entry_date"
-              type="date"
-              value={form.entry_date}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <PersianDatePicker
+              value={form.entry_date} // YYYY-MM-DD میلادی
+              onChange={handleDateChange("entry_date")}
+              placeholder="انتخاب تاریخ ورود"
               required
             />
           </div>
@@ -475,16 +477,16 @@ export default function DeviceForm() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               تاریخ خروج
             </label>
-            <input
-              name="exit_date"
-              type="date"
-              value={form.exit_date}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <PersianDatePicker
+              value={form.exit_date} // YYYY-MM-DD میلادی یا ""
+              onChange={handleDateChange("exit_date")}
+              placeholder="انتخاب تاریخ خروج"
+              clearable // دکمه پاک‌کردن برای فیلد اختیاری
             />
           </div>
         </div>
 
+        {/* ─── وضعیت (بدون تغییر) ─── */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             وضعیت

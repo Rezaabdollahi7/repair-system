@@ -8,6 +8,8 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 
+import PersianDatePicker from "./PersianDatePicker";
+
 const STATUS_OPTIONS = [
   { value: "pending", label: "در انتظار بررسی" },
   { value: "diagnosing", label: "در حال بررسی" },
@@ -430,13 +432,10 @@ export default function FilterPanel({
             <label className="block text-xs font-medium text-gray-600 mb-2">
               تاریخ ورود از
             </label>
-            <input
-              type="date"
+            <PersianDatePicker
               value={filters.entry_from}
-              onChange={(e) =>
-                onChange({ ...filters, entry_from: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(val) => onChange({ ...filters, entry_from: val })}
+              placeholder="از تاریخ..."
             />
           </div>
 
@@ -445,13 +444,10 @@ export default function FilterPanel({
             <label className="block text-xs font-medium text-gray-600 mb-2">
               تاریخ ورود تا
             </label>
-            <input
-              type="date"
+            <PersianDatePicker
               value={filters.entry_to}
-              onChange={(e) =>
-                onChange({ ...filters, entry_to: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(val) => onChange({ ...filters, entry_to: val })}
+              placeholder="تا تاریخ..."
             />
           </div>
         </div>

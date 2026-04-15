@@ -1,10 +1,21 @@
 import { useState, useRef, useEffect } from "react";
+import {
+  FunnelIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  XCircleIcon,
+} from "@heroicons/react/24/outline";
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "در انتظار" },
+  { value: "pending", label: "در انتظار بررسی" },
+  { value: "diagnosing", label: "در حال بررسی" },
+  { value: "waiting_for_parts", label: "در انتظار قطعه" },
   { value: "repairing", label: "در حال تعمیر" },
-  { value: "done", label: "تعمیر شده" },
+  { value: "repaired", label: "تعمیر شده" },
   { value: "delivered", label: "تحویل داده شده" },
+  { value: "unrepairable", label: "غیرقابل تعمیر" },
 ];
 
 export default function FilterPanel({
@@ -15,11 +26,14 @@ export default function FilterPanel({
   personnel,
 }) {
   const [open, setOpen] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [personnelSearch, setPersonnelSearch] = useState("");
+  const [statusSearch, setStatusSearch] = useState("");
 
+  const statusRef = useRef(null);
   const customerRef = useRef(null);
   const personnelRef = useRef(null);
 
@@ -29,6 +43,10 @@ export default function FilterPanel({
 
   useEffect(() => {
     function handleClickOutside(e) {
+      if (statusRef.current && !statusRef.current.contains(e.target)) {
+        setStatusDropdownOpen(false);
+        setStatusSearch("");
+      }
       if (customerRef.current && !customerRef.current.contains(e.target)) {
         setCustomerDropdownOpen(false);
         setCustomerSearch("");
@@ -58,6 +76,17 @@ export default function FilterPanel({
     onChange({ ...filters, personnel_ids: updated });
   }
 
+  function getStatusLabel() {
+    const selected = filters.status || [];
+    if (selected.length === 0) return "همه وضعیت‌ها";
+    if (selected.length === 1)
+      return (
+        STATUS_OPTIONS.find((o) => o.value === selected[0])?.label ??
+        selected[0]
+      );
+    return `${selected.length} وضعیت انتخاب شده`;
+  }
+
   function getCustomerLabel() {
     if (!filters.customer_id) return "همه مشتریان";
     const c = customers.find(
@@ -76,14 +105,43 @@ export default function FilterPanel({
     return `${selected.length} مسئول انتخاب شده`;
   }
 
+  const filteredStatuses = STATUS_OPTIONS.filter((o) =>
+    o.label.includes(statusSearch),
+  );
   const filteredCustomers = (customers || []).filter((c) =>
     `${c.name} ${c.phone}`.includes(customerSearch),
   );
-
   const filteredPersonnel = (personnel || []).filter((p) => {
     const name = p.name ?? p.full_name ?? p.username ?? "";
     return name.includes(personnelSearch);
   });
+
+  const dropdownBtnClass =
+    "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  const SearchInput = ({ value, onChange: onChangeFn }) => (
+    <div className="p-2 border-b border-gray-100 relative">
+      <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      <input
+        type="text"
+        placeholder="جستجو..."
+        value={value}
+        onChange={onChangeFn}
+        className="w-full text-sm pr-7 pl-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+        autoFocus
+      />
+    </div>
+  );
+
+  const ClearButton = ({ onClick, multi }) => (
+    <button
+      onClick={onClick}
+      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1"
+    >
+      <XCircleIcon className="w-3.5 h-3.5" />
+      {multi ? "پاک کردن انتخاب‌ها" : "پاک کردن انتخاب"}
+    </button>
+  );
 
   return (
     <div className="my-4">
@@ -92,7 +150,13 @@ export default function FilterPanel({
           onClick={() => setOpen((p) => !p)}
           className="flex items-center gap-2 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-50"
         >
-          <span>🔽 فیلترها</span>
+          <FunnelIcon className="w-4 h-4 text-gray-500" />
+          <span>فیلترها</span>
+          {open ? (
+            <ChevronUpIcon className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronDownIcon className="w-4 h-4 text-gray-400" />
+          )}
           {activeCount > 0 && (
             <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5">
               {activeCount}
@@ -103,8 +167,9 @@ export default function FilterPanel({
         {activeCount > 0 && (
           <button
             onClick={onClear}
-            className="text-sm text-red-500 hover:underline"
+            className="flex items-center gap-1 text-sm text-red-500 hover:underline"
           >
+            <XMarkIcon className="w-4 h-4" />
             پاک کردن فیلترها
           </button>
         )}
@@ -112,27 +177,92 @@ export default function FilterPanel({
 
       {open && (
         <div className="mt-3 p-4 border border-gray-200 rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
+          {/* وضعیت */}
+          <div ref={statusRef} className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-2">
               وضعیت
             </label>
-            <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => toggleStatus(opt.value)}
-                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                    filters.status?.includes(opt.value)
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setStatusDropdownOpen((p) => !p)}
+              className={dropdownBtnClass}
+            >
+              <span
+                className={
+                  filters.status?.length > 0 ? "text-gray-800" : "text-gray-400"
+                }
+              >
+                {getStatusLabel()}
+              </span>
+              {statusDropdownOpen ? (
+                <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              )}
+            </button>
+
+            {statusDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                <SearchInput
+                  value={statusSearch}
+                  onChange={(e) => setStatusSearch(e.target.value)}
+                />
+                <div className="max-h-48 overflow-y-auto">
+                  {filters.status?.length > 0 && (
+                    <ClearButton
+                      multi
+                      onClick={() => {
+                        onChange({ ...filters, status: [] });
+                        setStatusDropdownOpen(false);
+                        setStatusSearch("");
+                      }}
+                    />
+                  )}
+                  {filteredStatuses.map((opt) => {
+                    const isSelected = filters.status?.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => toggleStatus(opt.value)}
+                        className={`w-full text-right px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors ${
+                          isSelected
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? "bg-blue-600 border-blue-600"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {isSelected && (
+                            <svg
+                              className="w-3 h-3 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          )}
+                        </span>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* مشتری */}
           <div ref={customerRef} className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-2">
               مشتری
@@ -140,7 +270,7 @@ export default function FilterPanel({
             <button
               type="button"
               onClick={() => setCustomerDropdownOpen((p) => !p)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={dropdownBtnClass}
             >
               <span
                 className={
@@ -149,35 +279,28 @@ export default function FilterPanel({
               >
                 {getCustomerLabel()}
               </span>
-              <span className="text-gray-400 text-xs">
-                {customerDropdownOpen ? "▲" : "▼"}
-              </span>
+              {customerDropdownOpen ? (
+                <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              )}
             </button>
 
             {customerDropdownOpen && (
               <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-                <div className="p-2 border-b border-gray-100">
-                  <input
-                    type="text"
-                    placeholder="جستجو..."
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    autoFocus
-                  />
-                </div>
+                <SearchInput
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                />
                 <div className="max-h-48 overflow-y-auto">
                   {filters.customer_id && (
-                    <button
+                    <ClearButton
                       onClick={() => {
                         onChange({ ...filters, customer_id: "" });
                         setCustomerDropdownOpen(false);
                         setCustomerSearch("");
                       }}
-                      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100"
-                    >
-                      ✕ پاک کردن انتخاب
-                    </button>
+                    />
                   )}
                   {filteredCustomers.length > 0 ? (
                     filteredCustomers.map((c) => (
@@ -207,6 +330,7 @@ export default function FilterPanel({
             )}
           </div>
 
+          {/* مسئول */}
           <div ref={personnelRef} className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-2">
               مسئول
@@ -214,7 +338,7 @@ export default function FilterPanel({
             <button
               type="button"
               onClick={() => setPersonnelDropdownOpen((p) => !p)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={dropdownBtnClass}
             >
               <span
                 className={
@@ -225,35 +349,29 @@ export default function FilterPanel({
               >
                 {getPersonnelLabel()}
               </span>
-              <span className="text-gray-400 text-xs">
-                {personnelDropdownOpen ? "▲" : "▼"}
-              </span>
+              {personnelDropdownOpen ? (
+                <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              )}
             </button>
 
             {personnelDropdownOpen && (
               <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-                <div className="p-2 border-b border-gray-100">
-                  <input
-                    type="text"
-                    placeholder="جستجو..."
-                    value={personnelSearch}
-                    onChange={(e) => setPersonnelSearch(e.target.value)}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    autoFocus
-                  />
-                </div>
+                <SearchInput
+                  value={personnelSearch}
+                  onChange={(e) => setPersonnelSearch(e.target.value)}
+                />
                 <div className="max-h-48 overflow-y-auto">
                   {filters.personnel_ids?.length > 0 && (
-                    <button
+                    <ClearButton
+                      multi
                       onClick={() => {
                         onChange({ ...filters, personnel_ids: [] });
                         setPersonnelDropdownOpen(false);
                         setPersonnelSearch("");
                       }}
-                      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100"
-                    >
-                      ✕ پاک کردن انتخاب‌ها
-                    </button>
+                    />
                   )}
                   {filteredPersonnel.length > 0 ? (
                     filteredPersonnel.map((p) => {
@@ -271,13 +389,27 @@ export default function FilterPanel({
                           }`}
                         >
                           <span
-                            className={`w-4 h-4 rounded border flex items-center justify-center text-xs flex-shrink-0 ${
+                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                               isSelected
-                                ? "bg-purple-600 border-purple-600 text-white"
+                                ? "bg-purple-600 border-purple-600"
                                 : "border-gray-300"
                             }`}
                           >
-                            {isSelected && "✓"}
+                            {isSelected && (
+                              <svg
+                                className="w-3 h-3 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={3}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
                           </span>
                           {displayName}
                         </button>
@@ -293,6 +425,7 @@ export default function FilterPanel({
             )}
           </div>
 
+          {/* تاریخ ورود از */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
               تاریخ ورود از
@@ -307,6 +440,7 @@ export default function FilterPanel({
             />
           </div>
 
+          {/* تاریخ ورود تا */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">
               تاریخ ورود تا

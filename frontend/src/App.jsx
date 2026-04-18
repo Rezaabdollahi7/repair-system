@@ -20,6 +20,9 @@ import ItemForm from "./pages/ItemForm";
 import ItemList from "./pages/ItemList";
 import CategoryManagement from "./pages/CategoryManagement";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
+import PurchaseInvoiceForm from "./pages/PurchaseInvoiceForm";
+import PurchaseInvoiceDetail from "./pages/PurchaseInvoiceDetail";
+
 
 function App() {
   return (

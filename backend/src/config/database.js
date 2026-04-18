@@ -153,7 +153,25 @@ function initSchema() {
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
   )
 `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS inventory_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('purchase', 'sale', 'adjustment')),
+      quantity INTEGER NOT NULL,
+      unit_price REAL DEFAULT 0,
+      reference_id INTEGER,
+      reference_type TEXT,
+      note TEXT,
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )
+  `);
 }
+
 
 function saveDb() {
   if (!db) return;

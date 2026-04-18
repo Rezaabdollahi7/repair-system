@@ -19,6 +19,7 @@ import ItemDetail from "./pages/ItemDetail";
 import ItemForm from "./pages/ItemForm";
 import ItemList from "./pages/ItemList";
 import CategoryManagement from "./pages/CategoryManagement";
+import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 
 function App() {
   return (
@@ -50,6 +51,18 @@ function App() {
                 <Route path="items/:id" element={<ItemDetail />} />
                 <Route path="items/:id/edit" element={<ItemForm />} />
                 <Route path="categories" element={<CategoryManagement />} />
+                <Route
+                  path="purchase-invoices"
+                  element={<PurchaseInvoiceList />}
+                />
+                <Route
+                  path="purchase-invoices/new"
+                  element={<PurchaseInvoiceForm />}
+                />
+                <Route
+                  path="purchase-invoices/:id"
+                  element={<PurchaseInvoiceDetail />}
+                />
               </Route>
             </Route>
           </Route>

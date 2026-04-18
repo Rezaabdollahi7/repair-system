@@ -103,4 +103,15 @@ export const deleteItem = (id) => api.delete(`/items/${id}`);
 export const searchItems = (params) => api.get("/items/search", { params });
 export const getLowStockItems = () => api.get("/items/low-stock");
 
+// Purchase Invoices
+export const getPurchaseInvoices = (params) =>
+  api.get("/purchase-invoices", { params });
+export const getPurchaseInvoice = (id) => api.get(`/purchase-invoices/${id}`);
+export const createPurchaseInvoice = (data) =>
+  api.post("/purchase-invoices", data);
+export const updatePurchaseInvoicePayment = (id, data) =>
+  api.put(`/purchase-invoices/${id}/payment`, data);
+export const deletePurchaseInvoice = (id) =>
+  api.delete(`/purchase-invoices/${id}`);
+
 export default api;

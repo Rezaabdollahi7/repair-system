@@ -12,6 +12,6 @@ router.post("/", itemController.create);
 router.put("/:id", itemController.update);
 router.delete("/:id", itemController.delete);
 
-// TODO: Replace with proper stock management in Sprint 7
-router.put("/:id/stock", itemController.updateStock);
+router.post("/:id/quick-purchase", itemController.quickPurchase);
+router.get("/:id/transactions", itemController.getTransactions);
 module.exports = router;

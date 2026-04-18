@@ -296,36 +296,160 @@ exports.search = async (req, res) => {
   }
 };
 
-// TODO: Remove this temporary endpoint in Sprint 7
-// This is only for development/testing - Real stock update should use inventory_transactions
-
-exports.updateStock = async (req, res) => {
+// دریافت تاریخچه تراکنش‌های یک کالا
+exports.getTransactions = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
-    const { stock } = req.body;
+    const { page = 1, limit = 20 } = req.query;
 
-    if (stock === undefined || stock < 0) {
-      return res.status(400).json({ error: "موجودی باید عدد مثبت باشد" });
-    }
-
-    const check = db.exec(`SELECT id FROM items WHERE id = ?`, [id]);
-    if (!check[0] || check[0].values.length === 0) {
+    // Check if item exists
+    const itemCheck = db.exec(`SELECT id FROM items WHERE id = ?`, [id]);
+    if (!itemCheck[0] || itemCheck[0].values.length === 0) {
       return res.status(404).json({ error: "کالا یافت نشد" });
     }
 
-    db.run(
-      `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [stock, id],
+    let baseQuery = `
+      FROM inventory_transactions it
+      LEFT JOIN purchase_invoices pi ON it.reference_id = pi.id AND it.reference_type = 'purchase_invoice'
+      WHERE it.item_id = ?
+    `;
+    const params = [id];
+
+    // Count total
+    const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
+    const total = countResult[0]?.values[0][0] ?? 0;
+
+    // Pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = parseInt(limit) || 20;
+    const offset = (pageNum - 1) * limitNum;
+
+    // Get data
+    const dataResult = db.exec(
+      `SELECT 
+        it.*,
+        pi.invoice_number as purchase_invoice_number
+       ${baseQuery}
+       ORDER BY it.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limitNum, offset],
     );
 
-    saveDb();
+    const transactions = dataResult[0]
+      ? dataResult[0].values.map((row) => ({
+          id: row[0],
+          item_id: row[1],
+          type: row[2],
+          quantity: row[3],
+          unit_price: row[4],
+          reference_id: row[5],
+          reference_type: row[6],
+          note: row[7],
+          created_by: row[8],
+          created_at: row[9],
+          purchase_invoice_number: row[10],
+        }))
+      : [];
 
-    res.json({ message: "موجودی بروز شد", currentStock: stock });
+    res.json({
+      data: transactions,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.quickPurchase = async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const { quantity, unit_price, note } = req.body;
+
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ error: "تعداد باید بیشتر از صفر باشد" });
+    }
+    if (!unit_price || unit_price < 0) {
+      return res.status(400).json({ error: "قیمت باید مثبت باشد" });
+    }
+
+    // Generate invoice number
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const countResult = db.exec(`
+      SELECT COUNT(*) as count 
+      FROM purchase_invoices 
+      WHERE date(invoice_date) = date('now')
+    `);
+    const count = (countResult[0]?.values[0][0] || 0) + 1;
+    const invoiceNumber = `PUR-${dateStr}-${count.toString().padStart(3, "0")}`;
+
+    // Create invoice
+    const totalAmount = quantity * unit_price;
+    db.run(
+      `INSERT INTO purchase_invoices 
+       (invoice_number, supplier_name, total_amount, paid_amount, payment_status, note)
+       VALUES (?, ?, ?, ?, 'paid', ?)`,
+      [
+        invoiceNumber,
+        "خرید سریع",
+        totalAmount,
+        totalAmount,
+        note || "خرید سریع از صفحه جزئیات کالا",
+      ],
+    );
+
+    const idResult = db.exec("SELECT last_insert_rowid() as id");
+    const invoiceId = idResult[0].values[0][0];
+
+    // Add item
+    db.run(
+      `INSERT INTO purchase_invoice_items (invoice_id, item_id, quantity, unit_price, total_price)
+       VALUES (?, ?, ?, ?, ?)`,
+      [invoiceId, id, quantity, unit_price, totalAmount],
+    );
+
+    // Update stock
+    const itemResult = db.exec(
+      `SELECT current_stock, avg_purchase_price FROM items WHERE id = ?`,
+      [id],
+    );
+    const currentStock = itemResult[0].values[0][0] || 0;
+    const currentAvgPrice = itemResult[0].values[0][1] || 0;
+
+    const totalCurrentValue = currentStock * currentAvgPrice;
+    const newStock = currentStock + quantity;
+    const newAvgPrice = (totalCurrentValue + totalAmount) / newStock;
+
+    db.run(
+      `UPDATE items SET current_stock = ?, avg_purchase_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [newStock, newAvgPrice, id],
+    );
+
+    // Log transaction
+    db.run(
+      `INSERT INTO inventory_transactions 
+       (item_id, type, quantity, unit_price, reference_id, reference_type, note)
+       VALUES (?, 'purchase', ?, ?, ?, 'purchase_invoice', ?)`,
+      [id, quantity, unit_price, invoiceId, "خرید سریع"],
+    );
+
+    saveDb();
+
+    res.json({
+      message: "خرید سریع با موفقیت ثبت شد",
+      invoice_number: invoiceNumber,
+      new_stock: newStock,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // حذف کالا
 exports.delete = async (req, res) => {
   try {

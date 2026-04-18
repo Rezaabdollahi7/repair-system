@@ -102,6 +102,8 @@ export const updateItem = (id, data) => api.put(`/items/${id}`, data);
 export const deleteItem = (id) => api.delete(`/items/${id}`);
 export const searchItems = (params) => api.get("/items/search", { params });
 export const getLowStockItems = () => api.get("/items/low-stock");
+export const getItemTransactions = (id, params) =>
+  api.get(`/items/${id}/transactions`, { params });
 
 // Purchase Invoices
 export const getPurchaseInvoices = (params) =>

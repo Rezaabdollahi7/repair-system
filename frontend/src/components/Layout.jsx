@@ -48,14 +48,14 @@ export default function Layout() {
               {isAtLeast("admin") && (
                 <Link
                   to="/items"
-                  className={`inline-flex items-center px-3 border-b-2 text-sm font-medium ${isActive("/customers") ? "border-blue-500 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
+                  className={`inline-flex items-center px-3 border-b-2 text-sm font-medium ${isActive("/items") ? "border-blue-500 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
                 >
                   انبار و کالاها
                 </Link>
               )}
               <Link
                 to="/purchase-invoices"
-                className={`inline-flex items-center px-3 border-b-2 text-sm font-medium ${isActive("/customers") ? "border-blue-500 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
+                className={`inline-flex items-center px-3 border-b-2 text-sm font-medium ${isActive("/purchase-invoices") ? "border-blue-500 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
               >
                 فاکتورهای خرید
               </Link>

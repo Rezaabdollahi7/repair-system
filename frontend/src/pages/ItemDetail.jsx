@@ -1,7 +1,8 @@
 // src/pages/ItemDetail.jsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getItem, deleteItem } from "../api";
+import { getItem, deleteItem, getItemTransactions } from "../api";
+import api from "../api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -12,12 +13,118 @@ import {
   ArrowTrendingDownIcon,
   ClipboardDocumentListIcon,
   ExclamationTriangleIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/solid";
+
+function QuickPurchaseModal({ isOpen, onClose, onSuccess, item }) {
+  const [quantity, setQuantity] = useState(1);
+  const [price, setPrice] = useState(item?.avgPurchasePrice || 0);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await api.post(`/items/${item.id}/quick-purchase`, {
+        quantity: parseInt(quantity),
+        unit_price: parseInt(price),
+      });
+      toast.success("خرید سریع با موفقیت ثبت شد");
+      onSuccess();
+      onClose();
+    } catch (error) {
+      toast.error(error.response?.data?.error || "خطا در ثبت خرید سریع");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md" dir="rtl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">افزایش سریع موجودی</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">کالا</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                [{item?.code}] {item?.name}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">تعداد</label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                قیمت واحد (ریال)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={price}
+                onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              />
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span>جمع کل:</span>
+                <span className="font-medium">
+                  {(quantity * price).toLocaleString()} ریال
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "در حال ثبت..." : "ثبت خرید"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function StockStatusCard({ current, min, unit }) {
   const isCritical = current === 0;
   const isLow = current > 0 && current <= min;
-  const isGood = current > min;
 
   let bgColor = "bg-green-50 border-green-200";
   let textColor = "text-green-800";
@@ -87,49 +194,45 @@ export default function ItemDetail() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
+  const [showQuickPurchase, setShowQuickPurchase] = useState(false);
 
-  // ─── Fetch Item Data ─────────────────────────────────────────
+  const fetchData = async () => {
+    try {
+      const [itemRes, txRes] = await Promise.all([
+        getItem(id),
+        getItemTransactions(id, { limit: 50 }),
+      ]);
+      setItem(itemRes.data);
+      setTransactions(txRes.data.data || []);
+    } catch {
+      toast.error("خطا در دریافت اطلاعات");
+    } finally {
+      setLoading(false);
+      setLoadingTransactions(false);
+    }
+  };
+
   useEffect(() => {
-    getItem(id)
-      .then((res) => {
-        setItem(res.data);
-      })
-      .catch(() => {
-        toast.error("خطا در دریافت اطلاعات کالا");
-        navigate("/items");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    fetchData();
+  }, [id]);
 
-    // TODO: Replace with real API in Sprint 7
-    // فعلاً تراکنش‌ها رو خالی می‌ذاریم
-    setLoadingTransactions(false);
-  }, [id, navigate]);
-
-  // ─── Handlers ─────────────────────────────────────────────────
   const handleDelete = async () => {
-    if (!confirm(`آیا از حذف کالای "${item.name}" مطمئن هستید؟`)) return;
-
+    if (!confirm(`آیا از حذف کالای "${item?.name}" مطمئن هستید؟`)) return;
     try {
       await deleteItem(id);
       toast.success("کالا با موفقیت حذف شد");
       navigate("/items");
     } catch (error) {
-      if (error.response?.status === 400) {
-        toast.error(error.response.data.error || "این کالا قابل حذف نیست");
-      } else {
-        toast.error("خطا در حذف کالا");
-      }
+      toast.error(error.response?.data?.error || "خطا در حذف کالا");
     }
   };
 
-  const handleQuickStockUpdate = () => {
-    // TODO: Open modal for stock update in Sprint 7
-    toast("این قابلیت در اسپرینت ۷ اضافه خواهد شد", { icon: "🔜" });
+  const handleQuickSale = () => {
+    toast("این قابلیت در اسپرینت ۸ (فاکتور فروش) اضافه خواهد شد", {
+      icon: "🔜",
+    });
   };
 
-  // ─── Render ───────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64" dir="rtl">
@@ -138,12 +241,17 @@ export default function ItemDetail() {
     );
   }
 
-  if (!item) {
-    return null;
-  }
+  if (!item) return null;
 
   return (
     <div dir="rtl" className="max-w-6xl mx-auto">
+      <QuickPurchaseModal
+        isOpen={showQuickPurchase}
+        onClose={() => setShowQuickPurchase(false)}
+        onSuccess={fetchData}
+        item={item}
+      />
+
       {/* Header */}
       <div className="mb-6">
         <Link
@@ -191,43 +299,35 @@ export default function ItemDetail() {
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Info */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Stock Status Card */}
           <StockStatusCard
             current={item.currentStock || 0}
             min={item.minStock || 0}
             unit={item.unit}
           />
 
-          {/* Quick Actions */}
           <div className="bg-white shadow rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               عملیات سریع
             </h3>
             <div className="space-y-3">
               <button
-                onClick={handleQuickStockUpdate}
+                onClick={() => setShowQuickPurchase(true)}
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ArrowTrendingUpIcon className="w-4 h-4" />
-                افزایش موجودی
+                افزایش موجودی (خرید سریع)
               </button>
               <button
-                onClick={handleQuickStockUpdate}
+                onClick={handleQuickSale}
                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ArrowTrendingDownIcon className="w-4 h-4" />
-                کاهش موجودی
+                کاهش موجودی (فروش)
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-4 text-center">
-              * مدیریت دقیق موجودی از طریق فاکتور خرید و فروش در اسپرینت‌های
-              بعدی
-            </p>
           </div>
 
-          {/* Details Card */}
           <div className="bg-white shadow rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               اطلاعات کالا
@@ -267,21 +367,8 @@ export default function ItemDetail() {
               />
             </div>
           </div>
-
-          {/* Description */}
-          {item.description && (
-            <div className="bg-white shadow rounded-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                توضیحات
-              </h3>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                {item.description}
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Right Column - Transactions History */}
         <div className="lg:col-span-2">
           <div className="bg-white shadow rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
@@ -297,9 +384,6 @@ export default function ItemDetail() {
               <div className="text-center py-10 text-gray-400">
                 <ClipboardDocumentListIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                 <p>هنوز تراکنشی برای این کالا ثبت نشده است</p>
-                <p className="text-xs mt-2 text-gray-400">
-                  با ثبت فاکتور خرید یا فروش، تاریخچه اینجا نمایش داده می‌شود
-                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -324,7 +408,51 @@ export default function ItemDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {/* Transactions will be mapped here in Sprint 7 */}
+                    {transactions.map((tx) => (
+                      <tr key={tx.id}>
+                        <td className="px-4 py-2 text-sm">
+                          {new Date(tx.created_at).toLocaleDateString("fa-IR")}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          {tx.type === "purchase" ? (
+                            <span className="text-green-600">خرید</span>
+                          ) : tx.type === "sale" ? (
+                            <span className="text-red-600">فروش</span>
+                          ) : (
+                            <span className="text-gray-600">تنظیم موجودی</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <span
+                            className={
+                              tx.quantity > 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }
+                          >
+                            {tx.quantity > 0 ? "+" : ""}
+                            {tx.quantity}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          {tx.unit_price
+                            ? Number(tx.unit_price).toLocaleString()
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-600">
+                          {tx.purchase_invoice_number ? (
+                            <Link
+                              to={`/purchase-invoices/${tx.reference_id}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {tx.purchase_invoice_number}
+                            </Link>
+                          ) : (
+                            tx.note || "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

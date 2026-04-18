@@ -15,6 +15,10 @@ import CustomerForm from "./pages/CustomerForm";
 import CustomerDetail from "./pages/CustomerDetail";
 import PersonnelList from "./pages/PersonnelList";
 import PersonnelForm from "./pages/PersonnelForm";
+import ItemDetail from "./pages/ItemDetail";
+import ItemForm from "./pages/ItemForm";
+import ItemList from "./pages/ItemList";
+import CategoryManagement from "./pages/CategoryManagement";
 
 function App() {
   return (
@@ -40,6 +44,12 @@ function App() {
                 <Route path="personnel" element={<PersonnelList />} />
                 <Route path="personnel/new" element={<PersonnelForm />} />
                 <Route path="personnel/:id/edit" element={<PersonnelForm />} />
+                //!TODO : check
+                <Route path="items" element={<ItemList />} />
+                <Route path="items/new" element={<ItemForm />} />
+                <Route path="items/:id" element={<ItemDetail />} />
+                <Route path="items/:id/edit" element={<ItemForm />} />
+                <Route path="categories" element={<CategoryManagement />} />
               </Route>
             </Route>
           </Route>

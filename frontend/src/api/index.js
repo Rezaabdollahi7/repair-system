@@ -88,4 +88,19 @@ export const removeDeviceAssignment = (deviceId, personnelId) =>
 export const setDeviceAssignments = (deviceId, personnelIds) =>
   api.put(`/devices/${deviceId}/assignments`, { personnel_ids: personnelIds });
 
+// Categories
+export const getCategories = () => api.get("/categories");
+export const createCategory = (data) => api.post("/categories", data);
+export const updateCategory = (id, data) => api.put(`/categories/${id}`, data);
+export const deleteCategory = (id) => api.delete(`/categories/${id}`);
+
+// Items
+export const getItems = (params) => api.get("/items", { params });
+export const getItem = (id) => api.get(`/items/${id}`);
+export const createItem = (data) => api.post("/items", data);
+export const updateItem = (id, data) => api.put(`/items/${id}`, data);
+export const deleteItem = (id) => api.delete(`/items/${id}`);
+export const searchItems = (params) => api.get("/items/search", { params });
+export const getLowStockItems = () => api.get("/items/low-stock");
+
 export default api;

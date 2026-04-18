@@ -21,23 +21,54 @@ function rowToItem(row) {
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const result = db.exec(`
-      SELECT 
-        i.*,
-        c.name as category_name
+    const { categoryId, page = 1, limit = 10 } = req.query;
+
+    let baseQuery = `
       FROM items i
       LEFT JOIN categories c ON i.category_id = c.id
-      ORDER BY i.code
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
 
-    const items = result[0]
-      ? result[0].values.map((row) => ({
+    if (categoryId) {
+      baseQuery += ` AND i.category_id = ?`;
+      params.push(parseInt(categoryId));
+    }
+
+    // Count total
+    const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
+    const total = countResult[0]?.values[0][0] ?? 0;
+
+    // Pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = parseInt(limit) || 10;
+    const offset = (pageNum - 1) * limitNum;
+
+    // Get paginated data
+    const dataResult = db.exec(
+      `SELECT 
+        i.*,
+        c.name as category_name
+       ${baseQuery} 
+       ORDER BY i.code 
+       LIMIT ? OFFSET ?`,
+      [...params, limitNum, offset],
+    );
+
+    const items = dataResult[0]
+      ? dataResult[0].values.map((row) => ({
           ...rowToItem(row.slice(0, 12)),
           categoryName: row[12],
         }))
       : [];
 
-    res.json(items);
+    res.json({
+      data: items,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -206,49 +237,95 @@ exports.update = async (req, res) => {
 exports.search = async (req, res) => {
   try {
     const db = await getDb();
-    const { q, categoryId } = req.query;
+    const { q, categoryId, page = 1, limit = 10 } = req.query;
 
-    let query = `
-      SELECT i.*, c.name as category_name
+    let baseQuery = `
       FROM items i
       LEFT JOIN categories c ON i.category_id = c.id
       WHERE 1=1
     `;
-
     const params = [];
 
-    if (q) {
+    if (q && q.trim()) {
       const searchTerm = q.trim().replace(/\s+/g, " ");
-      query += ` AND (i.code LIKE ? OR i.name LIKE ?)`;
+      baseQuery += ` AND (i.code LIKE ? OR i.name LIKE ?)`;
       params.push(`%${searchTerm}%`, `%${searchTerm}%`);
     }
 
     if (categoryId) {
-      query += ` AND i.category_id = ?`;
+      baseQuery += ` AND i.category_id = ?`;
       params.push(parseInt(categoryId));
     }
 
-    query += ` ORDER BY i.code`;
+    // Count total
+    const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
+    const total = countResult[0]?.values[0][0] ?? 0;
 
-    const stmt = db.prepare(query);
-    stmt.bind(params);
+    // Pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = parseInt(limit) || 10;
+    const offset = (pageNum - 1) * limitNum;
 
-    const items = [];
-    while (stmt.step()) {
-      const row = stmt.get();
-      items.push({
-        ...rowToItem(Object.values(row).slice(0, 12)),
-        categoryName: row[12],
-      });
-    }
-    stmt.free();
+    // Get paginated data
+    const dataResult = db.exec(
+      `SELECT 
+        i.*,
+        c.name as category_name
+       ${baseQuery} 
+       ORDER BY i.code 
+       LIMIT ? OFFSET ?`,
+      [...params, limitNum, offset],
+    );
 
-    res.json(items);
+    const items = dataResult[0]
+      ? dataResult[0].values.map((row) => ({
+          ...rowToItem(row.slice(0, 12)),
+          categoryName: row[12],
+        }))
+      : [];
+
+    res.json({
+      data: items,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
+// TODO: Remove this temporary endpoint in Sprint 7
+// This is only for development/testing - Real stock update should use inventory_transactions
+
+exports.updateStock = async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const { stock } = req.body;
+
+    if (stock === undefined || stock < 0) {
+      return res.status(400).json({ error: "موجودی باید عدد مثبت باشد" });
+    }
+
+    const check = db.exec(`SELECT id FROM items WHERE id = ?`, [id]);
+    if (!check[0] || check[0].values.length === 0) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    db.run(
+      `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [stock, id],
+    );
+
+    saveDb();
+
+    res.json({ message: "موجودی بروز شد", currentStock: stock });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 // حذف کالا
 exports.delete = async (req, res) => {
   try {

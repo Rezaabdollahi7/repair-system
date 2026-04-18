@@ -8,6 +8,7 @@ const authRoutes = require("./auth");
 const personnelRoutes = require("./personnel");
 const categoryRoutes = require("./categories");
 const itemRoutes = require("./items");
+const purchaseInvoiceRoutes = require("./purchaseInvoices");
 
 router.use("/auth", authRoutes);
 router.use("/devices", deviceRoutes);
@@ -15,5 +16,6 @@ router.use("/customers", customerRoutes);
 router.use("/personnel", personnelRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/items", itemRoutes);
+router.use("/purchase-invoices", purchaseInvoiceRoutes);
 
 module.exports = router;

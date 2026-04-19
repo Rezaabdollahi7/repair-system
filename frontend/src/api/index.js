@@ -116,4 +116,16 @@ export const updatePurchaseInvoicePayment = (id, data) =>
 export const deletePurchaseInvoice = (id) =>
   api.delete(`/purchase-invoices/${id}`);
 
+// Sale Invoices
+export const getSaleInvoices = (params) =>
+  api.get("/sale-invoices", { params });
+export const getSaleInvoice = (id) => api.get(`/sale-invoices/${id}`);
+export const createSaleInvoice = (data) => api.post("/sale-invoices", data);
+export const updateSaleInvoicePayment = (id, data) =>
+  api.put(`/sale-invoices/${id}/payment`, data);
+export const deleteSaleInvoice = (id) => api.delete(`/sale-invoices/${id}`);
+
+export const quickSale = (id, data) =>
+  api.post(`/items/${id}/quick-sale`, data);
+
 export default api;

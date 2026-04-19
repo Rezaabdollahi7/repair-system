@@ -14,4 +14,7 @@ router.delete("/:id", itemController.delete);
 
 router.post("/:id/quick-purchase", itemController.quickPurchase);
 router.get("/:id/transactions", itemController.getTransactions);
+
+router.post("/:id/quick-sale", itemController.quickSale);
+
 module.exports = router;

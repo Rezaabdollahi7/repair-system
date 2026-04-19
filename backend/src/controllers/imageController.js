@@ -225,6 +225,100 @@ async function deleteDeviceImages(deviceId) {
   }
 }
 
+
+exports.quickSale = async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const { quantity, unit_price, customer_name } = req.body;
+
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ error: "تعداد باید بیشتر از صفر باشد" });
+    }
+
+    // Check stock
+    const stockCheck = db.exec(
+      `SELECT current_stock, name FROM items WHERE id = ?`,
+      [id],
+    );
+
+    if (!stockCheck[0]?.values[0]) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const currentStock = stockCheck[0].values[0][0] || 0;
+    const itemName = stockCheck[0].values[0][1];
+
+    if (currentStock < quantity) {
+      return res.status(400).json({
+        error: `موجودی کافی نیست. موجودی فعلی: ${currentStock}`,
+      });
+    }
+
+    // Generate invoice number
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const countResult = db.exec(`
+      SELECT COUNT(*) as count 
+      FROM sale_invoices 
+      WHERE date(invoice_date) = date('now')
+    `);
+    const count = (countResult[0]?.values[0][0] || 0) + 1;
+    const invoiceNumber = `SAL-${dateStr}-${count.toString().padStart(3, "0")}`;
+
+    const totalAmount = quantity * (unit_price || 0);
+
+    // Create invoice
+    db.run(
+      `INSERT INTO sale_invoices 
+       (invoice_number, customer_name, total_amount, paid_amount, payment_status, note)
+       VALUES (?, ?, ?, ?, 'paid', ?)`,
+      [
+        invoiceNumber,
+        customer_name || "فروش سریع",
+        totalAmount,
+        totalAmount,
+        "فروش سریع از صفحه جزئیات کالا",
+      ],
+    );
+
+    const idResult = db.exec("SELECT last_insert_rowid() as id");
+    const invoiceId = idResult[0].values[0][0];
+
+    // Add item
+    db.run(
+      `INSERT INTO sale_invoice_items (invoice_id, item_id, quantity, unit_price, total_price)
+       VALUES (?, ?, ?, ?, ?)`,
+      [invoiceId, id, quantity, unit_price || 0, totalAmount],
+    );
+
+    // Update stock
+    const newStock = currentStock - quantity;
+    db.run(
+      `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [newStock, id],
+    );
+
+    // Log transaction
+    db.run(
+      `INSERT INTO inventory_transactions 
+       (item_id, type, quantity, unit_price, reference_id, reference_type, note)
+       VALUES (?, 'sale', ?, ?, ?, 'sale_invoice', ?)`,
+      [id, -quantity, unit_price || 0, invoiceId, "فروش سریع"],
+    );
+
+    saveDb();
+
+    res.json({
+      message: "فروش سریع با موفقیت ثبت شد",
+      invoice_number: invoiceNumber,
+      new_stock: newStock,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   upload,
   uploadImages,

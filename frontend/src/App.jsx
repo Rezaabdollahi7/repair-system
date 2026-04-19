@@ -22,7 +22,9 @@ import CategoryManagement from "./pages/CategoryManagement";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import PurchaseInvoiceForm from "./pages/PurchaseInvoiceForm";
 import PurchaseInvoiceDetail from "./pages/PurchaseInvoiceDetail";
-
+import SaleInvoiceList from "./pages/SaleInvoiceList";
+import SaleInvoiceForm from "./pages/SaleInvoiceForm";
+import SaleInvoiceDetail from "./pages/SaleInvoiceDetail";
 
 function App() {
   return (
@@ -65,6 +67,12 @@ function App() {
                 <Route
                   path="purchase-invoices/:id"
                   element={<PurchaseInvoiceDetail />}
+                />
+                <Route path="sale-invoices" element={<SaleInvoiceList />} />
+                <Route path="sale-invoices/new" element={<SaleInvoiceForm />} />
+                <Route
+                  path="sale-invoices/:id"
+                  element={<SaleInvoiceDetail />}
                 />
               </Route>
             </Route>

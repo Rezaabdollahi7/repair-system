@@ -26,6 +26,9 @@ import SaleInvoiceList from "./pages/SaleInvoiceList";
 import SaleInvoiceForm from "./pages/SaleInvoiceForm";
 import SaleInvoiceDetail from "./pages/SaleInvoiceDetail";
 import Dashboard from "./pages/Dashboard";
+import StockReport from "./pages/StockReport";
+import ProfitReport from "./pages/ProfitReport";
+import TransactionsReport from "./pages/TransactionsReport";
 
 function App() {
   return (
@@ -79,8 +82,12 @@ function App() {
 
               {/* <Route index element={<Dashboard />} /> */}
               <Route path="dashboard" element={<Dashboard />} />
-              {/* <Route path="reports/stock" element={<StockReport />} /> */}
-              {/* <Route path="reports/profit" element={<ProfitReport />} /> */}
+              <Route path="reports/stock" element={<StockReport />} />
+              <Route path="reports/profit" element={<ProfitReport />} />
+              <Route
+                path="reports/transactions"
+                element={<TransactionsReport />}
+              />
             </Route>
           </Route>
 

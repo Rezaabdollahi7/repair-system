@@ -206,6 +206,48 @@ function initSchema() {
   CREATE INDEX IF NOT EXISTS idx_purchase_invoices_date ON purchase_invoices(invoice_date);
   CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_invoice ON purchase_invoice_items(invoice_id);
 `);
+
+  // Sale Invoices
+  db.run(`
+  CREATE TABLE IF NOT EXISTS sale_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_number TEXT NOT NULL UNIQUE,
+    customer_id INTEGER,
+    customer_name TEXT,
+    customer_phone TEXT,
+    invoice_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    total_amount REAL DEFAULT 0,
+    paid_amount REAL DEFAULT 0,
+    payment_status TEXT DEFAULT 'pending',
+    note TEXT,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  )
+`);
+
+  // Sale Invoice Items
+  db.run(`
+  CREATE TABLE IF NOT EXISTS sale_invoice_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL,
+    unit_price REAL NOT NULL,
+    total_price REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES sale_invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+  )
+`);
+
+  // Indexes
+  db.run(`
+  CREATE INDEX IF NOT EXISTS idx_sale_invoices_date ON sale_invoices(invoice_date);
+  CREATE INDEX IF NOT EXISTS idx_sale_invoice_items_invoice ON sale_invoice_items(invoice_id);
+`);
 }
 
 function saveDb() {

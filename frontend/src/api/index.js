@@ -128,4 +128,13 @@ export const deleteSaleInvoice = (id) => api.delete(`/sale-invoices/${id}`);
 export const quickSale = (id, data) =>
   api.post(`/items/${id}/quick-sale`, data);
 
+// Reports
+export const getDashboardStats = () => api.get("/reports/dashboard");
+export const getStockReport = (params) => api.get("/reports/stock", { params });
+export const getPurchaseReport = (params) =>
+  api.get("/reports/purchases", { params });
+export const getSaleReport = (params) => api.get("/reports/sales", { params });
+export const getProfitReport = (params) =>
+  api.get("/reports/profit", { params });
+
 export default api;

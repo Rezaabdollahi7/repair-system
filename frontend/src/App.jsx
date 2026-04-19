@@ -25,6 +25,7 @@ import PurchaseInvoiceDetail from "./pages/PurchaseInvoiceDetail";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import SaleInvoiceForm from "./pages/SaleInvoiceForm";
 import SaleInvoiceDetail from "./pages/SaleInvoiceDetail";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   return (
@@ -75,6 +76,11 @@ function App() {
                   element={<SaleInvoiceDetail />}
                 />
               </Route>
+
+              {/* <Route index element={<Dashboard />} /> */}
+              <Route path="dashboard" element={<Dashboard />} />
+              {/* <Route path="reports/stock" element={<StockReport />} /> */}
+              {/* <Route path="reports/profit" element={<ProfitReport />} /> */}
             </Route>
           </Route>
 

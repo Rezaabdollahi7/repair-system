@@ -122,6 +122,138 @@ function QuickPurchaseModal({ isOpen, onClose, onSuccess, item }) {
   );
 }
 
+function QuickSaleModal({ isOpen, onClose, onSuccess, item }) {
+  const [quantity, setQuantity] = useState(1);
+  const [customerName, setCustomerName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const newErrors = {};
+    if (!quantity || quantity <= 0) {
+      newErrors.quantity = "تعداد باید بیشتر از صفر باشد";
+    }
+    if (quantity > (item?.currentStock || 0)) {
+      newErrors.quantity = `موجودی کافی نیست (موجودی: ${item?.currentStock})`;
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setLoading(true);
+    try {
+      await api.post(`/items/${item.id}/quick-sale`, {
+        quantity: parseInt(quantity),
+        customer_name: customerName?.trim() || "مشتری متفرقه",
+      });
+      toast.success("فروش سریع با موفقیت ثبت شد");
+      onSuccess();
+      onClose();
+      setQuantity(1);
+      setCustomerName("");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "خطا در ثبت فروش سریع");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md" dir="rtl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">فروش سریع</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">کالا</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                [{item?.code}] {item?.name}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                موجودی فعلی: {item?.currentStock} {item?.unit}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                تعداد <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={item?.currentStock}
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className={`w-full border rounded-lg px-3 py-2 ${
+                  errors.quantity ? "border-red-500" : "border-gray-300"
+                }`}
+                required
+              />
+              {errors.quantity && (
+                <p className="text-xs text-red-600 mt-1">{errors.quantity}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                نام مشتری
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                placeholder="مشتری متفرقه"
+              />
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span>موجودی بعد از فروش:</span>
+                <span className="font-medium">
+                  {(item?.currentStock || 0) - quantity} {item?.unit}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {loading ? "در حال ثبت..." : "ثبت فروش"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function StockStatusCard({ current, min, unit }) {
   const isCritical = current === 0;
   const isLow = current > 0 && current <= min;
@@ -249,6 +381,13 @@ export default function ItemDetail() {
         isOpen={showQuickPurchase}
         onClose={() => setShowQuickPurchase(false)}
         onSuccess={fetchData}
+        item={item}
+      />
+
+      <QuickSaleModal
+        isOpen={showQuickSale}
+        onClose={() => setShowQuickSale(false)}
+        onSuccess={handleQuickSaleSuccess}
         item={item}
       />
 

@@ -364,6 +364,61 @@ exports.getTransactions = async (req, res) => {
   }
 };
 
+// حذف کالا
+exports.delete = async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+
+    // چک کنیم آیا این کالا در تراکنش‌ها استفاده شده
+    const txCheck = db.exec(
+      "SELECT COUNT(*) as count FROM inventory_transactions WHERE item_id = ?",
+      [id],
+    );
+    const txCount = txCheck[0].values[0][0];
+
+    if (txCount > 0) {
+      return res.status(400).json({
+        error: "این کالا در تراکنش‌ها استفاده شده و قابل حذف نیست",
+      });
+    }
+
+    db.run("DELETE FROM items WHERE id = ?", [id]);
+    saveDb();
+
+    res.json({ message: "کالا با موفقیت حذف شد" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// کالاهای کم‌موجود
+exports.getLowStock = async (req, res) => {
+  try {
+    const db = await getDb();
+    const result = db.exec(`
+      SELECT 
+        i.*,
+        c.name as category_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE i.current_stock <= i.min_stock
+      ORDER BY (i.min_stock - i.current_stock) DESC
+    `);
+
+    const items = result[0]
+      ? result[0].values.map((row) => ({
+          ...rowToItem(row.slice(0, 12)),
+          categoryName: row[12],
+        }))
+      : [];
+
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.quickPurchase = async (req, res) => {
   try {
     const db = await getDb();
@@ -450,57 +505,102 @@ exports.quickPurchase = async (req, res) => {
   }
 };
 
-// حذف کالا
-exports.delete = async (req, res) => {
+exports.quickSale = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
+    const { quantity, customer_name } = req.body;
 
-    // چک کنیم آیا این کالا در تراکنش‌ها استفاده شده
-    const txCheck = db.exec(
-      "SELECT COUNT(*) as count FROM inventory_transactions WHERE item_id = ?",
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ error: "تعداد باید بیشتر از صفر باشد" });
+    }
+
+    // Check stock
+    const stockCheck = db.exec(
+      `SELECT current_stock, name FROM items WHERE id = ?`,
       [id],
     );
-    const txCount = txCheck[0].values[0][0];
 
-    if (txCount > 0) {
+    if (!stockCheck[0]?.values[0]) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const currentStock = stockCheck[0].values[0][0] || 0;
+    const itemName = stockCheck[0].values[0][1];
+
+    if (currentStock < quantity) {
       return res.status(400).json({
-        error: "این کالا در تراکنش‌ها استفاده شده و قابل حذف نیست",
+        error: `موجودی کافی نیست. موجودی فعلی: ${currentStock}`,
       });
     }
 
-    db.run("DELETE FROM items WHERE id = ?", [id]);
+    // Generate invoice number
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const countResult = db.exec(`
+      SELECT COUNT(*) as count 
+      FROM sale_invoices 
+      WHERE date(invoice_date) = date('now')
+    `);
+    const count = (countResult[0]?.values[0][0] || 0) + 1;
+    const invoiceNumber = `SAL-${dateStr}-${count.toString().padStart(3, "0")}`;
+
+    // Use a default unit price (you might want to get this from avg_purchase_price)
+    const itemResult = db.exec(
+      `SELECT avg_purchase_price FROM items WHERE id = ?`,
+      [id],
+    );
+    const unitPrice = itemResult[0]?.values[0][0] || 0;
+    const totalAmount = quantity * unitPrice;
+
+    // Create invoice
+    db.run(
+      `INSERT INTO sale_invoices 
+       (invoice_number, customer_name, total_amount, paid_amount, payment_status, note)
+       VALUES (?, ?, ?, ?, 'paid', ?)`,
+      [
+        invoiceNumber,
+        customer_name || "فروش سریع",
+        totalAmount,
+        totalAmount,
+        "فروش سریع از صفحه جزئیات کالا",
+      ],
+    );
+
+    const idResult = db.exec("SELECT last_insert_rowid() as id");
+    const invoiceId = idResult[0].values[0][0];
+
+    // Add item
+    db.run(
+      `INSERT INTO sale_invoice_items (invoice_id, item_id, quantity, unit_price, total_price)
+       VALUES (?, ?, ?, ?, ?)`,
+      [invoiceId, id, quantity, unitPrice, totalAmount],
+    );
+
+    // Update stock
+    const newStock = currentStock - quantity;
+    db.run(
+      `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [newStock, id],
+    );
+
+    // Log transaction
+    db.run(
+      `INSERT INTO inventory_transactions 
+       (item_id, type, quantity, unit_price, reference_id, reference_type, note)
+       VALUES (?, 'sale', ?, ?, ?, 'sale_invoice', ?)`,
+      [id, -quantity, unitPrice, invoiceId, "فروش سریع"],
+    );
+
     saveDb();
 
-    res.json({ message: "کالا با موفقیت حذف شد" });
+    res.json({
+      message: "فروش سریع با موفقیت ثبت شد",
+      invoice_number: invoiceNumber,
+      new_stock: newStock,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// کالاهای کم‌موجود
-exports.getLowStock = async (req, res) => {
-  try {
-    const db = await getDb();
-    const result = db.exec(`
-      SELECT 
-        i.*,
-        c.name as category_name
-      FROM items i
-      LEFT JOIN categories c ON i.category_id = c.id
-      WHERE i.current_stock <= i.min_stock
-      ORDER BY (i.min_stock - i.current_stock) DESC
-    `);
-
-    const items = result[0]
-      ? result[0].values.map((row) => ({
-          ...rowToItem(row.slice(0, 12)),
-          categoryName: row[12],
-        }))
-      : [];
-
-    res.json(items);
-  } catch (error) {
+    console.error("Quick sale error:", error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -406,6 +406,36 @@ exports.getDashboardStats = async (req, res) => {
         }))
       : [];
 
+    const devicesTotalResult = db.exec(`SELECT COUNT(*) as count FROM devices`);
+    const totalDevices = devicesTotalResult[0]?.values[0][0] || 0;
+
+    const devicesByStatusResult = db.exec(`
+  SELECT status, COUNT(*) as count 
+  FROM devices 
+  GROUP BY status
+  ORDER BY count DESC
+`);
+    const devicesByStatus = devicesByStatusResult[0]
+      ? devicesByStatusResult[0].values.map((row) => ({
+          status: row[0],
+          count: row[1],
+        }))
+      : [];
+
+    const todayDevicesResult = db.exec(
+      `
+  SELECT COUNT(*) as count FROM devices WHERE date(created_at) = date(?)
+`,
+      [today],
+    );
+    const todayDevices = todayDevicesResult[0]?.values[0][0] || 0;
+
+    const repairingDevicesResult = db.exec(`
+  SELECT COUNT(*) as count FROM devices 
+  WHERE status IN ('diagnosing', 'repairing', 'waiting_for_parts')
+`);
+    const repairingDevices = repairingDevicesResult[0]?.values[0][0] || 0;
+
     res.json({
       items: {
         total: totalItems,
@@ -423,6 +453,13 @@ exports.getDashboardStats = async (req, res) => {
       },
       recent_transactions: recentTransactions,
       top_items: topItems,
+
+      devices: {
+        total: totalDevices,
+        today: todayDevices,
+        repairing: repairingDevices,
+        by_status: devicesByStatus,
+      },
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

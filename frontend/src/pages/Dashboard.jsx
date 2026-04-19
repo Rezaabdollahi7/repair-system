@@ -10,6 +10,9 @@ import {
   ArrowTrendingDownIcon,
   CurrencyDollarIcon,
   ClockIcon,
+  WrenchScrewdriverIcon,
+  CalendarIcon,
+  CogIcon,
 } from "@heroicons/react/24/solid";
 
 function StatCard({ title, value, icon: Icon, color, subtitle }) {
@@ -118,6 +121,69 @@ export default function Dashboard() {
   return (
     <div dir="rtl" className="max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">داشبورد مدیریتی</h1>
+
+      {/* Device Stats */}
+      <h2 className="text-lg font-medium text-gray-900 mt-6 mb-4">
+        آمار دستگاه‌ها
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          title="کل دستگاه‌ها"
+          value={stats.devices?.total || 0}
+          icon={WrenchScrewdriverIcon}
+          color="bg-indigo-500"
+        />
+        <StatCard
+          title="دستگاه‌های امروز"
+          value={stats.devices?.today || 0}
+          icon={CalendarIcon}
+          color="bg-cyan-500"
+        />
+        <StatCard
+          title="در حال تعمیر"
+          value={stats.devices?.repairing || 0}
+          icon={CogIcon}
+          color="bg-amber-500"
+        />
+        <Link
+          to="/devices"
+          className="bg-purple-50 hover:bg-purple-100 rounded-lg shadow p-4 border border-purple-200 transition"
+        >
+          <p className="text-sm text-purple-700 mb-1">مشاهده همه دستگاه‌ها</p>
+          <p className="text-lg font-medium text-purple-800">→</p>
+        </Link>
+      </div>
+
+      {/* Status Breakdown */}
+      {stats.devices?.by_status?.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">
+            توزیع وضعیت دستگاه‌ها
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {stats.devices.by_status.map((item) => {
+              const statusMap = {
+                pending: "در انتظار",
+                diagnosing: "در حال بررسی",
+                waiting_for_parts: "منتظر قطعه",
+                repairing: "در حال تعمیر",
+                repaired: "تعمیر شده",
+                delivered: "تحویل شده",
+                unrepairable: "غیرقابل تعمیر",
+              };
+              return (
+                <span
+                  key={item.status}
+                  className="px-3 py-1 bg-gray-100 rounded-full text-sm"
+                >
+                  {statusMap[item.status] || item.status}:{" "}
+                  <strong>{item.count}</strong>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -10,6 +10,7 @@ const categoryRoutes = require("./categories");
 const itemRoutes = require("./items");
 const purchaseInvoiceRoutes = require("./purchaseInvoices");
 const saleInvoiceRoutes = require("./saleInvoices");
+const reportRoutes = require("./reports");
 
 router.use("/auth", authRoutes);
 router.use("/devices", deviceRoutes);
@@ -19,5 +20,6 @@ router.use("/categories", categoryRoutes);
 router.use("/items", itemRoutes);
 router.use("/purchase-invoices", purchaseInvoiceRoutes);
 router.use("/sale-invoices", saleInvoiceRoutes);
+router.use("/reports", reportRoutes);
 
 module.exports = router;

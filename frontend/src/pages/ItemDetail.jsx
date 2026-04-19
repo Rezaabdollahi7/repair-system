@@ -195,6 +195,7 @@ export default function ItemDetail() {
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [showQuickPurchase, setShowQuickPurchase] = useState(false);
+  const [showQuickSale, setShowQuickSale] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -227,10 +228,9 @@ export default function ItemDetail() {
     }
   };
 
-  const handleQuickSale = () => {
-    toast("این قابلیت در اسپرینت ۸ (فاکتور فروش) اضافه خواهد شد", {
-      icon: "🔜",
-    });
+  const handleQuickSaleSuccess = async () => {
+    await fetchData();
+    setShowQuickSale(false);
   };
 
   if (loading) {
@@ -319,7 +319,7 @@ export default function ItemDetail() {
                 افزایش موجودی (خرید سریع)
               </button>
               <button
-                onClick={handleQuickSale}
+                onClick={() => setShowQuickSale(true)}
                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ArrowTrendingDownIcon className="w-4 h-4" />

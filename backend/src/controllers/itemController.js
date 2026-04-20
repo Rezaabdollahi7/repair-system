@@ -15,6 +15,7 @@ function rowToItem(row) {
     isActive: row[9],
     createdAt: row[10],
     updatedAt: row[11],
+    sellPrice: row[12],
   };
 }
 // لیست همه کالاها (با اطلاعات دسته‌بندی)
@@ -97,8 +98,8 @@ exports.getById = async (req, res) => {
 
     const row = result[0].values[0];
     res.json({
-      ...rowToItem(row.slice(0, 12)),
-      categoryName: row[12],
+      ...rowToItem(row.slice(0, 13)),
+      categoryName: row[13],
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -109,7 +110,8 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const db = await getDb();
-    const { code, name, categoryId, unit, minStock, description } = req.body;
+    const { code, name, categoryId, unit, minStock, description, sell_price } =
+      req.body;
 
     // Validation
     if (!code || !code.trim()) {
@@ -124,8 +126,8 @@ exports.create = async (req, res) => {
 
     db.run(
       `INSERT INTO items 
-       (code, name, category_id, unit, min_stock, description) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
+   (code, name, category_id, unit, min_stock, description, sell_price) 
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         code.trim(),
         name.trim(),
@@ -133,6 +135,7 @@ exports.create = async (req, res) => {
         unit.trim(),
         minStock || 0,
         description || null,
+        sell_price || 0,
       ],
     );
 
@@ -155,8 +158,8 @@ exports.create = async (req, res) => {
 
     const row = result[0].values[0];
     res.status(201).json({
-      ...rowToItem(row.slice(0, 12)),
-      categoryName: row[12],
+      ...rowToItem(row.slice(0, 13)),
+      categoryName: row[13],
     });
   } catch (error) {
     if (error.message.includes("UNIQUE constraint failed")) {
@@ -171,7 +174,8 @@ exports.update = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
-    const { code, name, categoryId, unit, minStock, description } = req.body;
+    const { code, name, categoryId, unit, minStock, description, sell_price } =
+      req.body;
 
     // اول کالای فعلی رو بگیر
     const existing = db.exec(
@@ -192,6 +196,7 @@ exports.update = async (req, res) => {
     const newMinStock = minStock !== undefined ? minStock : cur[5];
     const newDesc = description !== undefined ? description : cur[8];
     const newCategoryId = categoryId !== undefined ? categoryId : cur[1];
+    const newSellPrice = sell_price !== undefined ? sell_price : cur[12];
 
     if (!newCode) return res.status(400).json({ error: "کد کالا الزامی است" });
     if (!newName) return res.status(400).json({ error: "نام کالا الزامی است" });
@@ -200,16 +205,17 @@ exports.update = async (req, res) => {
 
     db.run(
       `UPDATE items 
-       SET code = ?, name = ?, category_id = ?, unit = ?, min_stock = ?, description = ?, 
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+   SET code = ?, name = ?, category_id = ?, unit = ?, min_stock = ?, 
+       description = ?, sell_price = ?, updated_at = CURRENT_TIMESTAMP
+   WHERE id = ?`,
       [
         newCode,
         newName,
         newCategoryId,
         newUnit,
-        newMinStock ?? 0,
-        newDesc ?? null,
+        newMinStock,
+        newDesc,
+        newSellPrice,
         id,
       ],
     );
@@ -225,7 +231,7 @@ exports.update = async (req, res) => {
     saveDb();
 
     const row = result[0].values[0];
-    res.json({ ...rowToItem(row.slice(0, 12)), categoryName: row[12] });
+    res.json({ ...rowToItem(row.slice(0, 13)), categoryName: row[13] });
   } catch (error) {
     if (error.message.includes("UNIQUE constraint failed"))
       return res.status(400).json({ error: "این کد کالا قبلاً ثبت شده است" });
@@ -279,8 +285,8 @@ exports.search = async (req, res) => {
 
     const items = dataResult[0]
       ? dataResult[0].values.map((row) => ({
-          ...rowToItem(row.slice(0, 12)),
-          categoryName: row[12],
+          ...rowToItem(row.slice(0, 13)),
+          categoryName: row[13],
         }))
       : [];
 
@@ -601,6 +607,63 @@ exports.quickSale = async (req, res) => {
     });
   } catch (error) {
     console.error("Quick sale error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// جستجوی کالاها برای استفاده در فاکتور (فقط کالاهای با موجودی > 0)
+exports.searchForInvoice = async (req, res) => {
+  try {
+    const db = await getDb();
+    const { q, limit = 20 } = req.query;
+
+    let query = `
+      SELECT 
+        i.id,
+        i.code,
+        i.name,
+        i.unit,
+        i.current_stock,
+        i.avg_purchase_price,
+        i.sell_price,
+        c.name as category_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE i.is_active = 1 AND i.current_stock > 0
+    `;
+
+    const params = [];
+
+    if (q && q.trim()) {
+      const searchTerm = q.trim().replace(/\s+/g, " ");
+      query += ` AND (i.code LIKE ? OR i.name LIKE ?)`;
+      params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+    }
+
+    query += ` ORDER BY i.name LIMIT ?`;
+    params.push(parseInt(limit));
+
+    const stmt = db.prepare(query);
+    stmt.bind(params);
+
+    const items = [];
+    while (stmt.step()) {
+      const row = stmt.get();
+      items.push({
+        id: row[0],
+        code: row[1],
+        name: row[2],
+        unit: row[3],
+        current_stock: row[4],
+        avg_purchase_price: row[5],
+        sell_price: row[6],
+        category_name: row[7],
+      });
+    }
+    stmt.free();
+
+    res.json(items);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };

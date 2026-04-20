@@ -154,6 +154,10 @@ function initSchema() {
   )
 `);
 
+  try {
+    db.run(`ALTER TABLE items ADD COLUMN sell_price REAL DEFAULT 0`);
+  } catch (e) {}
+
   db.run(`
     CREATE TABLE IF NOT EXISTS inventory_transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

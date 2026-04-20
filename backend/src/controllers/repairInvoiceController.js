@@ -400,6 +400,24 @@ exports.create = async (req, res) => {
     // Generate invoice number
     const invoiceNumber = generateInvoiceNumber(db);
 
+    for (const item of items) {
+      if (item.item_type === "inventory" && item.item_id && !item.unit_price) {
+        const itemResult = db.exec(
+          `SELECT sell_price, unit FROM items WHERE id = ?`,
+          [item.item_id],
+        );
+        if (itemResult[0]?.values[0]) {
+          item.unit_price = itemResult[0].values[0][0] || 0;
+          if (!item.unit) {
+            item.unit = itemResult[0].values[0][1];
+          }
+        }
+      }
+
+      item.unit_price = Number(item.unit_price) || 0;
+      item.quantity = Number(item.quantity) || 1;
+    }
+
     // Calculate totals
     const calculations = calculateInvoiceTotals(
       items,
@@ -453,6 +471,20 @@ exports.create = async (req, res) => {
     // Insert items
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+
+      if (item.item_type === "inventory" && item.item_id && !item.unit_price) {
+        const itemResult = db.exec(
+          `SELECT sell_price, unit FROM items WHERE id = ?`,
+          [item.item_id],
+        );
+        if (itemResult[0]?.values[0]) {
+          item.unit_price = itemResult[0].values[0][0] || 0;
+          if (!item.unit) {
+            item.unit = itemResult[0].values[0][1];
+          }
+        }
+      }
+
       const itemTotal = item.quantity * item.unit_price;
       let itemDiscount = 0;
 
@@ -540,6 +572,24 @@ exports.update = async (req, res) => {
       return res.status(400).json({ error: "حداقل یک آیتم باید اضافه شود" });
     }
 
+    for (const item of items) {
+      if (item.item_type === "inventory" && item.item_id && !item.unit_price) {
+        const itemResult = db.exec(
+          `SELECT sell_price, unit FROM items WHERE id = ?`,
+          [item.item_id],
+        );
+        if (itemResult[0]?.values[0]) {
+          item.unit_price = itemResult[0].values[0][0] || 0;
+          if (!item.unit) {
+            item.unit = itemResult[0].values[0][1];
+          }
+        }
+      }
+
+      item.unit_price = Number(item.unit_price) || 0;
+      item.quantity = Number(item.quantity) || 1;
+    }
+    
     // Calculate totals
     const calculations = calculateInvoiceTotals(
       items,
@@ -591,6 +641,20 @@ exports.update = async (req, res) => {
     // Insert new items
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+
+      if (item.item_type === "inventory" && item.item_id && !item.unit_price) {
+        const itemResult = db.exec(
+          `SELECT sell_price, unit FROM items WHERE id = ?`,
+          [item.item_id],
+        );
+        if (itemResult[0]?.values[0]) {
+          item.unit_price = itemResult[0].values[0][0] || 0;
+          if (!item.unit) {
+            item.unit = itemResult[0].values[0][1];
+          }
+        }
+      }
+
       const itemTotal = item.quantity * item.unit_price;
       let itemDiscount = 0;
 

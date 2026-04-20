@@ -17,4 +17,6 @@ router.get("/:id/transactions", itemController.getTransactions);
 
 router.post("/:id/quick-sale", itemController.quickSale);
 
+router.get("/search/for-invoice", itemController.searchForInvoice);
+
 module.exports = router;

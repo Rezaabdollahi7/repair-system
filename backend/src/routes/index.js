@@ -12,6 +12,7 @@ const purchaseInvoiceRoutes = require("./purchaseInvoices");
 const saleInvoiceRoutes = require("./saleInvoices");
 const reportRoutes = require("./reports");
 const settingsRoutes = require("./settings");
+const repairInvoiceRoutes = require("./repairInvoices");
 
 router.use("/auth", authRoutes);
 router.use("/devices", deviceRoutes);
@@ -23,5 +24,6 @@ router.use("/purchase-invoices", purchaseInvoiceRoutes);
 router.use("/sale-invoices", saleInvoiceRoutes);
 router.use("/reports", reportRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/repair-invoices", repairInvoiceRoutes);
 
 module.exports = router;

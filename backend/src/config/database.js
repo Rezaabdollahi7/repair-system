@@ -276,6 +276,88 @@ function initSchema() {
   VALUES (1, 'تعمیرگاه', 0, 3, 'INV-')
 `);
 
+  // Repair Invoices
+  db.run(`
+  CREATE TABLE IF NOT EXISTS repair_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_number TEXT NOT NULL UNIQUE,
+    device_id INTEGER NOT NULL,
+    customer_id INTEGER,
+    customer_name TEXT,
+    customer_phone TEXT,
+    invoice_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    due_date DATETIME,
+    status TEXT DEFAULT 'draft',
+    subtotal REAL DEFAULT 0,
+    discount_type TEXT,
+    discount_value REAL DEFAULT 0,
+    discount_amount REAL DEFAULT 0,
+    tax_rate REAL DEFAULT 0,
+    tax_amount REAL DEFAULT 0,
+    total_amount REAL DEFAULT 0,
+    paid_amount REAL DEFAULT 0,
+    payment_status TEXT DEFAULT 'pending',
+    warranty_months INTEGER DEFAULT 0,
+    warranty_until DATETIME,
+    technician_id INTEGER,
+    notes TEXT,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (device_id) REFERENCES devices(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (technician_id) REFERENCES users(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  )
+`);
+
+  // Repair Invoice Items
+  db.run(`
+  CREATE TABLE IF NOT EXISTS repair_invoice_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    item_type TEXT NOT NULL,
+    item_id INTEGER,
+    name TEXT NOT NULL,
+    description TEXT,
+    quantity REAL DEFAULT 1,
+    unit TEXT,
+    unit_price REAL DEFAULT 0,
+    discount_type TEXT,
+    discount_value REAL DEFAULT 0,
+    discount_amount REAL DEFAULT 0,
+    total_price REAL DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES repair_invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+  )
+`);
+
+  // Repair Invoice Payments
+  db.run(`
+  CREATE TABLE IF NOT EXISTS repair_invoice_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    payment_method TEXT DEFAULT 'cash',
+    reference_number TEXT,
+    note TEXT,
+    payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES repair_invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  )
+`);
+
+  // Indexes
+  db.run(`
+  CREATE INDEX IF NOT EXISTS idx_repair_invoices_device ON repair_invoices(device_id);
+  CREATE INDEX IF NOT EXISTS idx_repair_invoices_status ON repair_invoices(status);
+  CREATE INDEX IF NOT EXISTS idx_repair_invoices_date ON repair_invoices(invoice_date);
+  CREATE INDEX IF NOT EXISTS idx_repair_invoice_items_invoice ON repair_invoice_items(invoice_id);
+`);
 }
 
 function saveDb() {

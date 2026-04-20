@@ -14,6 +14,7 @@ import {
   ChartBarIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  Cog6ToothIcon,
 } from "@heroicons/react/24/solid";
 
 export default function Layout() {
@@ -89,6 +90,16 @@ export default function Layout() {
       path: "/reports/profit",
       icon: ChartBarIcon,
       adminOnly: true,
+    },
+    {
+      divider: true,
+    },
+    {
+      name: "تنظیمات",
+      path: "/settings",
+      icon: Cog6ToothIcon,
+      adminOnly: true,
+      superAdminOnly: true,
     },
   ];
 

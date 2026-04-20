@@ -29,6 +29,7 @@ import Dashboard from "./pages/Dashboard";
 import StockReport from "./pages/StockReport";
 import ProfitReport from "./pages/ProfitReport";
 import TransactionsReport from "./pages/TransactionsReport";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -78,6 +79,7 @@ function App() {
                   path="sale-invoices/:id"
                   element={<SaleInvoiceDetail />}
                 />
+                <Route path="settings" element={<Settings />} />
               </Route>
 
               {/* <Route index element={<Dashboard />} /> */}

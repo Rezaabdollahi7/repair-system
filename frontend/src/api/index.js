@@ -137,4 +137,15 @@ export const getSaleReport = (params) => api.get("/reports/sales", { params });
 export const getProfitReport = (params) =>
   api.get("/reports/profit", { params });
 
+// Settings
+export const getSettings = () => api.get("/settings");
+export const updateSettings = (data) => api.put("/settings", data);
+export const uploadSettingImage = (type, file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+  return api.post(`/settings/upload/${type}`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
 export default api;

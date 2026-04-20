@@ -248,6 +248,34 @@ function initSchema() {
   CREATE INDEX IF NOT EXISTS idx_sale_invoices_date ON sale_invoices(invoice_date);
   CREATE INDEX IF NOT EXISTS idx_sale_invoice_items_invoice ON sale_invoice_items(invoice_id);
 `);
+
+  // Settings table
+  db.run(`
+  CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_name TEXT,
+    company_address TEXT,
+    company_phone TEXT,
+    company_email TEXT,
+    company_website TEXT,
+    company_logo TEXT,
+    stamp_image TEXT,
+    signature_image TEXT,
+    default_tax_rate REAL DEFAULT 0,
+    default_warranty_months INTEGER DEFAULT 3,
+    invoice_prefix TEXT DEFAULT 'INV-',
+    invoice_footer_text TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+  // Insert default settings if not exists
+  db.run(`
+  INSERT OR IGNORE INTO settings (id, company_name, default_tax_rate, default_warranty_months, invoice_prefix)
+  VALUES (1, 'تعمیرگاه', 0, 3, 'INV-')
+`);
+
 }
 
 function saveDb() {

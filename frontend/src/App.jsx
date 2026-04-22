@@ -92,11 +92,10 @@ function App() {
                   path="repair-invoices/:id"
                   element={<RepairInvoiceDetail />}
                 />
-                {/* 
                 <Route
                   path="repair-invoices/:id/edit"
                   element={<RepairInvoiceForm />}
-                /> */}
+                />
               </Route>
 
               {/* <Route index element={<Dashboard />} /> */}

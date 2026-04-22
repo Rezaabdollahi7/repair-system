@@ -10,7 +10,6 @@ import {
   getServices,
   getTechnicians,
   getSettings,
-  searchCustomers,
   createCustomer,
 } from "../api";
 import toast from "react-hot-toast";
@@ -22,7 +21,6 @@ import {
   WrenchScrewdriverIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/solid";
-import { UserPlusIcon } from "@heroicons/react/24/solid";
 import SearchableSelect from "../components/SearchableSelect";
 import PersianDatePicker from "../components/PersianDatePicker";
 
@@ -34,25 +32,6 @@ export default function RepairInvoiceForm() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [settings, setSettings] = useState(null);
-
-  const [customers, setCustomers] = useState([]);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
-
-  const handleCustomerSearch = async (query) => {
-    try {
-      const res = await searchCustomers(query || "");
-      setCustomers(res.data?.data || res.data || []);
-    } catch {
-      toast.error("خطا در جستجوی مشتری");
-    }
-  };
-
-  const customerOptions = customers.map((c) => ({
-    value: c.id,
-    label: `${c.name} ${c.phone ? `- ${c.phone}` : ""}`,
-    phone: c.phone,
-    name: c.name,
-  }));
 
   function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({ name: "", phone: "" });
@@ -85,22 +64,25 @@ export default function RepairInvoiceForm() {
           <h3 className="text-lg font-bold mb-4">ثبت سریع مشتری</h3>
           <form onSubmit={handleSubmit}>
             <div className="space-y-3">
+              <label className="block text-sm font-medium mb-2">
+                نام مشتری
+              </label>
               <input
-                placeholder="نام مشتری *"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="w-full border border-gray-300 rounded px-3 py-2"
-                required
+                type="text"
+                name="customer_name"
+                value={formData.customer_name}
+                readOnly
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 text-gray-700"
               />
+              <label className="block text-sm font-medium mb-2">
+                شماره تماس
+              </label>
               <input
-                placeholder="شماره تماس"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                className="w-full border border-gray-300 rounded px-3 py-2"
+                type="tel"
+                name="customer_phone"
+                value={formData.customer_phone}
+                readOnly
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 text-gray-700"
               />
             </div>
             <div className="flex gap-2 mt-6">
@@ -241,15 +223,6 @@ export default function RepairInvoiceForm() {
     unit: i.unit,
   }));
 
-  // Service options
-  const serviceOptions = services.map((s) => ({
-    value: s.id,
-    label: s.name,
-    subLabel: s.description,
-    default_price: s.default_price,
-    unit: s.unit,
-  }));
-
   // Technician options
   const technicianOptions = technicians.map((t) => ({
     value: t.id,
@@ -319,6 +292,7 @@ export default function RepairInvoiceForm() {
       setFormData((prev) => ({
         ...prev,
         device_id: deviceId,
+        customer_id: device.customer_id || null,
         customer_name: device.customer_name || "",
         customer_phone: device.customer_phone || "",
       }));
@@ -545,44 +519,38 @@ export default function RepairInvoiceForm() {
                     required
                   />
                 </div>
+                {formData.device_id && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        نام مشتری
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.customer_name || "—"}
+                        readOnly
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700"
+                      />
+                      {!formData.customer_name && (
+                        <p className="text-yellow-600 text-xs mt-1">
+                          ⚠️ این دستگاه مشتری ثبت شده ندارد.
+                        </p>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    مشتری
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <SearchableSelect
-                        options={customerOptions}
-                        value={formData.customer_id}
-                        onChange={(customerId) => {
-                          const customer = customers.find(
-                            (c) => c.id === customerId,
-                          );
-                          if (customer) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              customer_id: customerId,
-                              customer_name: customer.name,
-                              customer_phone: customer.phone || "",
-                            }));
-                          }
-                        }}
-                        onSearch={handleCustomerSearch}
-                        onOpen={() => handleCustomerSearch("")}
-                        placeholder="جستجو و انتخاب مشتری..."
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        شماره تماس
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.customer_phone || "—"}
+                        readOnly
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700"
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomerModal(true)}
-                      className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
-                      title="ثبت سریع مشتری"
-                    >
-                      <UserPlusIcon className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             </div>
 

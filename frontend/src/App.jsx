@@ -32,6 +32,7 @@ import TransactionsReport from "./pages/TransactionsReport";
 import Settings from "./pages/Settings";
 import RepairInvoiceList from "./pages/RepairInvoiceList";
 import RepairInvoiceForm from "./pages/RepairInvoiceForm";
+import RepairInvoiceDetail from "./pages/RepairInvoiceDetail";
 
 function App() {
   return (
@@ -87,10 +88,11 @@ function App() {
                   path="repair-invoices/new"
                   element={<RepairInvoiceForm />}
                 />
-                {/* <Route
+                <Route
                   path="repair-invoices/:id"
                   element={<RepairInvoiceDetail />}
                 />
+                {/* 
                 <Route
                   path="repair-invoices/:id/edit"
                   element={<RepairInvoiceForm />}

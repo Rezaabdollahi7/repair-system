@@ -33,79 +33,6 @@ export default function RepairInvoiceForm() {
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [settings, setSettings] = useState(null);
 
-  function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
-    const [formData, setFormData] = useState({ name: "", phone: "" });
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!formData.name.trim()) {
-        toast.error("نام مشتری الزامی است");
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await createCustomer(formData);
-        toast.success("مشتری با موفقیت ثبت شد");
-        onSuccess(res.data);
-        onClose();
-      } catch {
-        toast.error("خطا در ثبت مشتری");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md" dir="rtl">
-          <h3 className="text-lg font-bold mb-4">ثبت سریع مشتری</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-3">
-              <label className="block text-sm font-medium mb-2">
-                نام مشتری
-              </label>
-              <input
-                type="text"
-                name="customer_name"
-                value={formData.customer_name}
-                readOnly
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 text-gray-700"
-              />
-              <label className="block text-sm font-medium mb-2">
-                شماره تماس
-              </label>
-              <input
-                type="tel"
-                name="customer_phone"
-                value={formData.customer_phone}
-                readOnly
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 text-gray-700"
-              />
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-              >
-                انصراف
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                {loading ? "..." : "ثبت"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
   // Form state
   const [formData, setFormData] = useState({
     device_id: "",
@@ -152,6 +79,30 @@ export default function RepairInvoiceForm() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const deviceIdFromUrl = params.get("device_id");
+
+    if (deviceIdFromUrl && !isEditMode) {
+      searchDevicesForInvoice("").then((res) => {
+        const devicesList = res.data?.data || res.data || [];
+        setDevices(devicesList);
+        const device = devicesList.find(
+          (d) => d.id === parseInt(deviceIdFromUrl),
+        );
+        if (device) {
+          setFormData((prev) => ({
+            ...prev,
+            device_id: device.id,
+            customer_id: device.customer_id || null,
+            customer_name: device.customer_name || "",
+            customer_phone: device.customer_phone || "",
+          }));
+        }
+      });
+    }
+  }, [isEditMode]);
 
   // Load invoice data in edit mode
   useEffect(() => {
@@ -212,6 +163,7 @@ export default function RepairInvoiceForm() {
     subLabel: `مشتری: ${d.customer_name || "—"} | مدل: ${d.model || "—"} | تلفن: ${d.customer_phone || "—"}`,
     customer_name: d.customer_name,
     customer_phone: d.customer_phone,
+    customer_id: d.customer_id,
   }));
 
   // Item options
@@ -519,17 +471,19 @@ export default function RepairInvoiceForm() {
                     required
                   />
                 </div>
+                {/* Customer Info - Read Only */}
                 {formData.device_id && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         نام مشتری
                       </label>
                       <input
                         type="text"
                         value={formData.customer_name || "—"}
                         readOnly
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700"
+                        disabled
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed"
                       />
                       {!formData.customer_name && (
                         <p className="text-yellow-600 text-xs mt-1">
@@ -539,14 +493,15 @@ export default function RepairInvoiceForm() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         شماره تماس
                       </label>
                       <input
                         type="tel"
                         value={formData.customer_phone || "—"}
                         readOnly
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700"
+                        disabled
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed"
                       />
                     </div>
                   </>
@@ -888,28 +843,28 @@ export default function RepairInvoiceForm() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Submit Buttons */}
-        <div className="mt-6 flex justify-end gap-3">
-          <Link
-            to="/repair-invoices"
-            className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-          >
-            انصراف
-          </Link>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading
-              ? "در حال ذخیره..."
-              : isEditMode
-                ? "ویرایش فاکتور"
-                : "ثبت فاکتور"}
-          </button>
+            {/* Submit Buttons */}
+            <div className="mt-6 flex justify-end gap-3">
+              <Link
+                to="/repair-invoices"
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                انصراف
+              </Link>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading
+                  ? "در حال ذخیره..."
+                  : isEditMode
+                    ? "ویرایش فاکتور"
+                    : "ثبت فاکتور"}
+              </button>
+            </div>
+          </div>
         </div>
       </form>
     </div>

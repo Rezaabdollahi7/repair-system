@@ -1,3 +1,4 @@
+// src/pages/DeviceList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { getDevices, deleteDevice, getCustomers, getPersonnel } from "../api";
@@ -11,6 +12,7 @@ import {
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
+  DocumentPlusIcon,
 } from "@heroicons/react/24/solid";
 
 function useDebounce(value, delay = 400) {
@@ -170,12 +172,10 @@ export default function DeviceList() {
       .catch(() => {});
   }, []);
 
-  // وقتی فیلتر یا صفحه عوض می‌شه
   useEffect(() => {
     fetchDevices(debouncedSearch, filters, page, limit);
   }, [debouncedSearch, filters, page, limit, fetchDevices]);
 
-  // وقتی search عوض می‌شه، برگرد به صفحه ۱
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -250,41 +250,48 @@ export default function DeviceList() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   شماره پذیرش
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   مشتری
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   شماره تماس
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   نوع دستگاه
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   مدل
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   وضعیت
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   مسئول
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   تاریخ ثبت
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   تاریخ خروج
                 </th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                  عملیات
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {devices.map((device) => (
-                <tr key={device.id} className="hover:bg-gray-50">
+              {devices.map((device, index) => (
+                <tr
+                  key={device.id}
+                  className={`hover:bg-gray-50 transition-colors ${
+                    index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                  }`}
+                >
                   <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
                   <td className="px-4 py-3 text-sm">
                     {device.customer_name ?? "مشتری حذف شده"}
@@ -306,31 +313,39 @@ export default function DeviceList() {
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {formatDate(device.exit_date)}
                   </td>
-                  <td className="px-4 py-3 text-sm flex gap-2 justify-end">
-                    <Link
-                      to={`/devices/${device.id}`}
-                      className="text-blue-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
-                    >
-                      <EyeIcon className="w-4 h-4" />
-                      جزئیات
-                    </Link>
-                    <Link
-                      to={`/devices/${device.id}/edit`}
-                      className="text-green-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
-                    >
-                      <PencilSquareIcon className="w-4 h-4" />
-                      ویرایش
-                    </Link>
-
-                    {isAtLeast("admin") && (
-                      <button
-                        onClick={() => handleDelete(device.id)}
-                        className="text-red-600 hover:underline hover:underline-offset-8 flex items-center gap-1 cursor-pointer"
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex gap-2 justify-center">
+                      <Link
+                        to={`/repair-invoices/new?device_id=${device.id}`}
+                        className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors  "
+                        title="ایجاد فاکتور تعمیر"
                       >
-                        <TrashIcon className="w-4 h-4" />
-                        حذف
-                      </button>
-                    )}
+                        <DocumentPlusIcon className="w-5 h-5" />
+                      </Link>
+                      <Link
+                        to={`/devices/${device.id}`}
+                        className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
+                        title="مشاهده جزئیات"
+                      >
+                        <EyeIcon className="w-5 h-5" />
+                      </Link>
+                      <Link
+                        to={`/devices/${device.id}/edit`}
+                        className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
+                        title="ویرایش"
+                      >
+                        <PencilSquareIcon className="w-5 h-5" />
+                      </Link>
+                      {isAtLeast("admin") && (
+                        <button
+                          onClick={() => handleDelete(device.id)}
+                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer "
+                          title="حذف"
+                        >
+                          <TrashIcon className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

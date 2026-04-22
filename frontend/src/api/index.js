@@ -43,6 +43,8 @@ export const updateCustomer = (id, data) => api.put(`/customers/${id}`, data);
 export const getCustomerDevices = (id) => api.get(`/customers/${id}/devices`);
 export const getCustomerStats = (id) => api.get(`/customers/${id}/stats`);
 export const deleteCustomer = (id) => api.delete(`/customers/${id}`);
+export const searchCustomers = (q) =>
+  api.get("/customers", { params: { search: q, limit: 20 } });
 
 export const getDeviceImages = (deviceId) =>
   api.get(`/devices/${deviceId}/images`);
@@ -147,5 +149,33 @@ export const uploadSettingImage = (type, file) => {
     headers: { "Content-Type": "multipart/form-data" },
   });
 };
+
+// Repair Invoices
+export const getRepairInvoices = (params) =>
+  api.get("/repair-invoices", { params });
+export const getRepairInvoice = (id) => api.get(`/repair-invoices/${id}`);
+export const createRepairInvoice = (data) => api.post("/repair-invoices", data);
+export const updateRepairInvoice = (id, data) =>
+  api.put(`/repair-invoices/${id}`, data);
+export const deleteRepairInvoice = (id) => api.delete(`/repair-invoices/${id}`);
+export const changeRepairInvoiceStatus = (id, status) =>
+  api.put(`/repair-invoices/${id}/status`, { status });
+export const addRepairInvoicePayment = (id, data) =>
+  api.post(`/repair-invoices/${id}/payments`, data);
+
+// Devices - search for invoice
+export const searchDevicesForInvoice = (q) =>
+  api.get("/devices", { params: { search: q, limit: 20 } });
+
+// Items - search for invoice (از قبل داریم)
+export const searchItemsForInvoice = (q) =>
+  api.get("/items/search/for-invoice", { params: { q } });
+
+// Services (از قبل داریم)
+export const getServices = () => api.get("/services");
+
+// Users - technicians only
+export const getTechnicians = () =>
+  api.get("/personnel", { params: { role: "technician" } });
 
 export default api;

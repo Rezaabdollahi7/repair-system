@@ -10,6 +10,7 @@ export default function SearchableSelect({
   options = [],
   value,
   onChange,
+  onSearch,
   placeholder = "انتخاب کنید...",
   disabled = false,
   loading = false,
@@ -27,9 +28,12 @@ export default function SearchableSelect({
         setSearch("");
       }
     }
+    if (search.length >= 2 && onSearch) {
+      onSearch(search);
+    }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [search, onSearch]);
 
   const filteredOptions = options.filter((opt) =>
     opt.label.toLowerCase().includes(search.toLowerCase()),

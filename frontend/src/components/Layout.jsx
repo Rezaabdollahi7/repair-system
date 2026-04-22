@@ -77,6 +77,12 @@ export default function Layout() {
       adminOnly: true,
     },
     {
+      name: "فاکتورهای تعمیر",
+      path: "/repair-invoices",
+      icon: WrenchScrewdriverIcon,
+      adminOnly: false,
+    },
+    {
       divider: true,
     },
     {

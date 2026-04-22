@@ -30,6 +30,8 @@ import StockReport from "./pages/StockReport";
 import ProfitReport from "./pages/ProfitReport";
 import TransactionsReport from "./pages/TransactionsReport";
 import Settings from "./pages/Settings";
+import RepairInvoiceList from "./pages/RepairInvoiceList";
+import RepairInvoiceForm from "./pages/RepairInvoiceForm";
 
 function App() {
   return (
@@ -80,6 +82,19 @@ function App() {
                   element={<SaleInvoiceDetail />}
                 />
                 <Route path="settings" element={<Settings />} />
+                <Route path="repair-invoices" element={<RepairInvoiceList />} />
+                <Route
+                  path="repair-invoices/new"
+                  element={<RepairInvoiceForm />}
+                />
+                {/* <Route
+                  path="repair-invoices/:id"
+                  element={<RepairInvoiceDetail />}
+                />
+                <Route
+                  path="repair-invoices/:id/edit"
+                  element={<RepairInvoiceForm />}
+                /> */}
               </Route>
 
               {/* <Route index element={<Dashboard />} /> */}

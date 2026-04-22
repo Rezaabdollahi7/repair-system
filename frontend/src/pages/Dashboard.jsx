@@ -13,6 +13,9 @@ import {
   WrenchScrewdriverIcon,
   CalendarIcon,
   CogIcon,
+  DocumentTextIcon,
+  CreditCardIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/solid";
 
 function StatCard({ title, value, icon: Icon, color, subtitle }) {
@@ -122,8 +125,9 @@ export default function Dashboard() {
     <div dir="rtl" className="max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">داشبورد مدیریتی</h1>
 
+      <hr className="text-gray-300 " />
       {/* Device Stats */}
-      <h2 className="text-lg font-medium text-gray-900 mt-6 mb-4">
+      <h2 className="text-lg font-medium text-gray-900 my-8">
         آمار دستگاه‌ها
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -156,7 +160,7 @@ export default function Dashboard() {
 
       {/* Status Breakdown */}
       {stats.devices?.by_status?.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-white rounded-lg shadow p-4 mb-12">
           <h3 className="text-sm font-medium text-gray-700 mb-3">
             توزیع وضعیت دستگاه‌ها
           </h3>
@@ -185,6 +189,54 @@ export default function Dashboard() {
         </div>
       )}
 
+      <hr className="text-gray-300 " />
+      {/* Repair Invoice Stats */}
+      <h2 className="text-lg font-medium text-gray-900 my-8 flex items-center gap-2">
+        <DocumentTextIcon className="w-5 h-5 text-gray-600" />
+        آمار فاکتورهای تعمیر
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <StatCard
+          title="فاکتورهای امروز"
+          value={stats.repair_invoices?.today_count || 0}
+          icon={DocumentTextIcon}
+          color="bg-indigo-500"
+        />
+        <StatCard
+          title="درآمد امروز (تعمیرات)"
+          value={
+            formatCurrency(stats.repair_invoices?.today_revenue || 0) + " ریال"
+          }
+          icon={BanknotesIcon}
+          color="bg-emerald-500"
+        />
+        <StatCard
+          title="در انتظار پرداخت"
+          value={stats.repair_invoices?.pending_payment_count || 0}
+          subtitle={
+            stats.repair_invoices?.issued_unpaid_amount
+              ? `${formatCurrency(stats.repair_invoices.issued_unpaid_amount)} ریال`
+              : "—"
+          }
+          icon={ClockIcon}
+          color="bg-amber-500"
+        />
+        <StatCard
+          title="درآمد این ماه (تعمیرات)"
+          value={
+            formatCurrency(stats.repair_invoices?.month_revenue || 0) + " ریال"
+          }
+          icon={CalendarIcon}
+          color="bg-cyan-500"
+        />
+      </div>
+
+      <hr className="text-gray-300" />
+
+      <h2 className="text-lg font-medium text-gray-900 mt-12 mb-4 flex items-center gap-2">
+        <DocumentTextIcon className="w-5 h-5 text-gray-600" />
+        آمار کالا ها
+      </h2>
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
@@ -341,16 +393,16 @@ export default function Dashboard() {
           🛒 فاکتور فروش جدید
         </Link>
         <Link
+          to="/repair-invoices/new"
+          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg p-3 text-center text-sm font-medium transition"
+        >
+          🔧 فاکتور تعمیر جدید
+        </Link>
+        <Link
           to="/items"
           className="bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg p-3 text-center text-sm font-medium transition"
         >
           📦 مدیریت کالاها
-        </Link>
-        <Link
-          to="/reports/stock"
-          className="bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg p-3 text-center text-sm font-medium transition"
-        >
-          📊 گزارش موجودی
         </Link>
       </div>
     </div>

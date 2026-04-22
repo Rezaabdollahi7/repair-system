@@ -305,6 +305,52 @@ exports.getDashboardStats = async (req, res) => {
     // Today's date
     const today = new Date().toISOString().split("T")[0];
 
+    // Today's repair invoices count
+    const todayRepairInvoicesResult = db.exec(
+      `
+  SELECT COUNT(*) as count FROM repair_invoices 
+  WHERE date(invoice_date) = date(?)
+`,
+      [today],
+    );
+    const todayRepairInvoices = todayRepairInvoicesResult[0]?.values[0][0] || 0;
+
+    // Today's repair revenue (from issued and paid invoices)
+    const todayRepairRevenueResult = db.exec(
+      `
+  SELECT COALESCE(SUM(total_amount), 0) as total 
+  FROM repair_invoices 
+  WHERE date(invoice_date) = date(?) AND status IN ('issued', 'paid')
+`,
+      [today],
+    );
+    const todayRepairRevenue = todayRepairRevenueResult[0]?.values[0][0] || 0;
+
+    // Pending payment invoices (issued but not fully paid)
+    const pendingPaymentResult = db.exec(`
+  SELECT COUNT(*) as count 
+  FROM repair_invoices 
+  WHERE status = 'issued' AND payment_status IN ('pending', 'partial')
+`);
+    const pendingPaymentCount = pendingPaymentResult[0]?.values[0][0] || 0;
+
+    // Issued unpaid total amount
+    const issuedUnpaidResult = db.exec(`
+  SELECT COALESCE(SUM(total_amount - paid_amount), 0) as total 
+  FROM repair_invoices 
+  WHERE status = 'issued' AND payment_status IN ('pending', 'partial')
+`);
+    const issuedUnpaidAmount = issuedUnpaidResult[0]?.values[0][0] || 0;
+
+    // Month repair revenue
+    const monthRepairRevenueResult = db.exec(`
+  SELECT COALESCE(SUM(total_amount), 0) as total 
+  FROM repair_invoices 
+  WHERE strftime('%Y-%m', invoice_date) = strftime('%Y-%m', 'now')
+  AND status IN ('issued', 'paid')
+`);
+    const monthRepairRevenue = monthRepairRevenueResult[0]?.values[0][0] || 0;
+
     // Items count
     const itemsResult = db.exec(
       `SELECT COUNT(*) as count FROM items WHERE is_active = 1`,
@@ -459,6 +505,13 @@ exports.getDashboardStats = async (req, res) => {
         today: todayDevices,
         repairing: repairingDevices,
         by_status: devicesByStatus,
+      },
+      repair_invoices: {
+        today_count: todayRepairInvoices,
+        today_revenue: todayRepairRevenue,
+        month_revenue: monthRepairRevenue,
+        pending_payment_count: pendingPaymentCount,
+        issued_unpaid_amount: issuedUnpaidAmount,
       },
     });
   } catch (error) {

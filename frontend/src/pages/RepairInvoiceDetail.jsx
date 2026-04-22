@@ -23,6 +23,8 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/solid";
 
+import InvoicePreview from "../components/InvoicePreview";
+
 function StatusBadge({ status }) {
   const map = {
     draft: {
@@ -113,6 +115,7 @@ export default function RepairInvoiceDetail() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentNote, setPaymentNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetchInvoice();
@@ -261,7 +264,10 @@ export default function RepairInvoiceDetail() {
                 ویرایش
               </Link>
             )}
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2">
+            <button
+              onClick={() => setShowPreview(true)}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+            >
               <PrinterIcon className="w-4 h-4" />
               چاپ
             </button>
@@ -685,6 +691,14 @@ export default function RepairInvoiceDetail() {
             </form>
           </div>
         </div>
+      )}
+
+      {showPreview && (
+        <InvoicePreview
+          invoice={invoice}
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+        />
       )}
     </div>
   );

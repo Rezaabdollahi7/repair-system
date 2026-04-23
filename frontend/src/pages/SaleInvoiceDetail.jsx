@@ -14,7 +14,10 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/solid";
+
+import SaleInvoicePreview from "../components/SaleInvoicePreview";
 
 function PaymentStatusBadge({ status }) {
   const map = {
@@ -67,6 +70,8 @@ export default function SaleInvoiceDetail() {
   const [loading, setLoading] = useState(true);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [updatingPayment, setUpdatingPayment] = useState(false);
+
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetchInvoice();
@@ -156,13 +161,22 @@ export default function SaleInvoiceDetail() {
           </div>
           <div className="flex gap-3">
             {isAtLeast("admin") && (
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-              >
-                <TrashIcon className="w-4 h-4" />
-                حذف فاکتور
-              </button>
+              <>
+                <button
+                  onClick={() => setShowPreview(true)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                >
+                  <PrinterIcon className="w-4 h-4" />
+                  چاپ
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                  حذف فاکتور
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -322,6 +336,13 @@ export default function SaleInvoiceDetail() {
           </div>
         </div>
       </div>
+      {showPreview && (
+        <SaleInvoicePreview
+          invoice={invoice}
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 }

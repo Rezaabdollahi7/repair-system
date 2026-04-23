@@ -116,7 +116,7 @@ exports.updateSettings = async (req, res) => {
     }
 
     fields.push("updated_at = CURRENT_TIMESTAMP");
-    values.push(id); // برای WHERE id = ?
+    values.push(1); // برای WHERE id = ?
 
     const query = `UPDATE settings SET ${fields.join(", ")} WHERE id = ?`;
     db.run(query, values);

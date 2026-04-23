@@ -274,6 +274,35 @@ function initSchema() {
   )
 `);
 
+  const saleInvoiceColumns = [
+    { name: "sale_invoice_paper_size", type: "TEXT DEFAULT 'A5'" },
+    { name: "sale_invoice_show_logo", type: "INTEGER DEFAULT 1" },
+    { name: "sale_invoice_show_company_info", type: "INTEGER DEFAULT 1" },
+    { name: "sale_invoice_show_email", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_website", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_device_info", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_customer_phone", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_discount", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_tax", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_stamp", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_signature", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_warranty", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_show_technician", type: "INTEGER DEFAULT 0" },
+    { name: "sale_invoice_header_text", type: "TEXT" },
+    {
+      name: "sale_invoice_footer_text",
+      type: "TEXT DEFAULT 'با تشکر از اعتماد شما'",
+    },
+  ];
+
+  saleInvoiceColumns.forEach((col) => {
+    try {
+      db.run(`ALTER TABLE settings ADD COLUMN ${col.name} ${col.type}`);
+    } catch (e) {
+      // ستون از قبل وجود داره - بی‌خیال
+    }
+  });
+
   // Insert default settings if not exists
   db.run(`
   INSERT OR IGNORE INTO settings (id, company_name, default_tax_rate, default_warranty_months, invoice_prefix)

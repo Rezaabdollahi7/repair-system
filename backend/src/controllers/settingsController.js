@@ -21,11 +21,15 @@ exports.getSettings = async (req, res) => {
         default_tax_rate: 0,
         default_warranty_months: 3,
         invoice_prefix: "INV-",
+        sale_invoice_paper_size: "A5",
+        sale_invoice_show_logo: 1,
+        sale_invoice_show_company_info: 1,
+        sale_invoice_footer_text: "با تشکر از اعتماد شما",
       });
     }
 
     const row = result[0].values[0];
-    const settings = {
+    res.json({
       id: row[0],
       company_name: row[1],
       company_address: row[2],
@@ -41,9 +45,22 @@ exports.getSettings = async (req, res) => {
       invoice_footer_text: row[12],
       created_at: row[13],
       updated_at: row[14],
-    };
-
-    res.json(settings);
+      sale_invoice_paper_size: row[15] || "A5",
+      sale_invoice_show_logo: row[16] !== undefined ? row[16] : 1,
+      sale_invoice_show_company_info: row[17] !== undefined ? row[17] : 1,
+      sale_invoice_show_email: row[18] || 0,
+      sale_invoice_show_website: row[19] || 0,
+      sale_invoice_show_device_info: row[20] || 0,
+      sale_invoice_show_customer_phone: row[21] || 0,
+      sale_invoice_show_discount: row[22] || 0,
+      sale_invoice_show_tax: row[23] || 0,
+      sale_invoice_show_stamp: row[24] || 0,
+      sale_invoice_show_signature: row[25] || 0,
+      sale_invoice_show_warranty: row[26] || 0,
+      sale_invoice_show_technician: row[27] || 0,
+      sale_invoice_header_text: row[28] || "",
+      sale_invoice_footer_text: row[29] || "با تشکر از اعتماد شما",
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -53,43 +70,56 @@ exports.getSettings = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const db = await getDb();
-    const {
-      company_name,
-      company_address,
-      company_phone,
-      company_email,
-      company_website,
-      default_tax_rate,
-      default_warranty_months,
-      invoice_prefix,
-      invoice_footer_text,
-    } = req.body;
 
-    db.run(
-      `UPDATE settings SET 
-        company_name = ?,
-        company_address = ?,
-        company_phone = ?,
-        company_email = ?,
-        company_website = ?,
-        default_tax_rate = ?,
-        default_warranty_months = ?,
-        invoice_prefix = ?,
-        invoice_footer_text = ?,
-        updated_at = CURRENT_TIMESTAMP
-       WHERE id = 1`,
-      [
-        company_name || null,
-        company_address || null,
-        company_phone || null,
-        company_email || null,
-        company_website || null,
-        default_tax_rate || 0,
-        default_warranty_months || 3,
-        invoice_prefix || "INV-",
-        invoice_footer_text || null,
-      ],
-    );
+    const currentResult = db.exec(`SELECT * FROM settings WHERE id = 1`);
+    const current = currentResult[0]?.values[0] || [];
+
+    const fields = [];
+    const values = [];
+
+    const fieldMap = {
+      company_name: 1,
+      company_address: 2,
+      company_phone: 3,
+      company_email: 4,
+      company_website: 5,
+      default_tax_rate: 9,
+      default_warranty_months: 10,
+      invoice_prefix: 11,
+      invoice_footer_text: 12,
+      sale_invoice_paper_size: 15,
+      sale_invoice_show_logo: 16,
+      sale_invoice_show_company_info: 17,
+      sale_invoice_show_email: 18,
+      sale_invoice_show_website: 19,
+      sale_invoice_show_device_info: 20,
+      sale_invoice_show_customer_phone: 21,
+      sale_invoice_show_discount: 22,
+      sale_invoice_show_tax: 23,
+      sale_invoice_show_stamp: 24,
+      sale_invoice_show_signature: 25,
+      sale_invoice_show_warranty: 26,
+      sale_invoice_show_technician: 27,
+      sale_invoice_header_text: 28,
+      sale_invoice_footer_text: 29,
+    };
+
+    Object.keys(fieldMap).forEach((field) => {
+      if (req.body[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push(req.body[field]);
+      }
+    });
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "هیچ فیلدی برای آپدیت ارسال نشده" });
+    }
+
+    fields.push("updated_at = CURRENT_TIMESTAMP");
+    values.push(id); // برای WHERE id = ?
+
+    const query = `UPDATE settings SET ${fields.join(", ")} WHERE id = ?`;
+    db.run(query, values);
 
     saveDb();
 
@@ -110,6 +140,21 @@ exports.updateSettings = async (req, res) => {
       default_warranty_months: row[10],
       invoice_prefix: row[11],
       invoice_footer_text: row[12],
+      sale_invoice_paper_size: row[15],
+      sale_invoice_show_logo: row[16],
+      sale_invoice_show_company_info: row[17],
+      sale_invoice_show_email: row[18],
+      sale_invoice_show_website: row[19],
+      sale_invoice_show_device_info: row[20],
+      sale_invoice_show_customer_phone: row[21],
+      sale_invoice_show_discount: row[22],
+      sale_invoice_show_tax: row[23],
+      sale_invoice_show_stamp: row[24],
+      sale_invoice_show_signature: row[25],
+      sale_invoice_show_warranty: row[26],
+      sale_invoice_show_technician: row[27],
+      sale_invoice_header_text: row[28],
+      sale_invoice_footer_text: row[29],
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

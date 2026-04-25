@@ -1,61 +1,49 @@
-// src/pages/CustomerForm.jsx
+// src/components/CustomerFormModal.jsx
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, updateCustomer, getCustomer } from "../api";
 import { toast } from "react-hot-toast";
-import { UserIcon, PhoneIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, UserIcon, PhoneIcon } from "@heroicons/react/24/solid";
 
-export default function CustomerForm() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const isEdit = Boolean(id);
-
+export default function CustomerFormModal({
+  customerId,
+  isOpen,
+  onClose,
+  onSuccess,
+}) {
+  const isEdit = Boolean(customerId);
   const [form, setForm] = useState({ name: "", phone: "" });
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(isEdit);
 
   useEffect(() => {
-    if (!isEdit) return;
-    const fetchCustomer = async () => {
-      try {
-        const res = await getCustomer(id);
-        setForm({
-          name: res.data.name || "",
-          phone: res.data.phone || "",
-        });
-      } catch {
-        toast.error("خطا در بارگذاری اطلاعات");
-        navigate("/customers");
-      } finally {
-        setFetching(false);
+    if (isOpen) {
+      if (isEdit) {
+        getCustomer(customerId)
+          .then((res) =>
+            setForm({ name: res.data.name || "", phone: res.data.phone || "" }),
+          )
+          .catch(() => toast.error("خطا در بارگذاری اطلاعات"));
+      } else {
+        setForm({ name: "", phone: "" });
       }
-    };
-    fetchCustomer();
-  }, [id]);
+    }
+  }, [isOpen, customerId, isEdit]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!form.name.trim()) {
-      toast.error("نام الزامی است");
-      return;
-    }
-    if (!form.phone.trim()) {
-      toast.error("شماره تماس الزامی است");
-      return;
-    }
+    if (!form.name.trim()) return toast.error("نام الزامی است");
+    if (!form.phone.trim()) return toast.error("شماره تماس الزامی است");
 
     setLoading(true);
     try {
       if (isEdit) {
-        await updateCustomer(id, form);
+        await updateCustomer(customerId, form);
         toast.success("مشتری ویرایش شد");
-        navigate(`/customers/${id}`);
       } else {
-        const res = await createCustomer(form);
+        await createCustomer(form);
         toast.success("مشتری اضافه شد");
-        navigate(`/customers/${res.data.id}`);
       }
+      onSuccess && onSuccess();
+      onClose();
     } catch (err) {
       toast.error(err.response?.data?.error || "خطا در ذخیره‌سازی");
     } finally {
@@ -63,30 +51,29 @@ export default function CustomerForm() {
     }
   };
 
-  if (fetching) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
-    <div dir="rtl" className="max-w-md mx-auto">
-      <div className="bg-white rounded-lg shadow p-6">
-        {/* هدر */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <UserIcon className="w-6 h-6 text-blue-600" />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" dir="rtl">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <UserIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">
+              {isEdit ? "ویرایش مشتری" : "افزودن مشتری جدید"}
+            </h2>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">
-            {isEdit ? "ویرایش مشتری" : "افزودن مشتری جدید"}
-          </h1>
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* فرم */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* نام */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               نام <span className="text-red-500">*</span>
@@ -103,7 +90,6 @@ export default function CustomerForm() {
             </div>
           </div>
 
-          {/* شماره تماس */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               شماره تماس <span className="text-red-500">*</span>
@@ -121,12 +107,11 @@ export default function CustomerForm() {
             </div>
           </div>
 
-          {/* دکمه‌ها */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="flex-1 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -136,10 +121,8 @@ export default function CustomerForm() {
             </button>
             <button
               type="button"
-              onClick={() =>
-                navigate(isEdit ? `/customers/${id}` : "/customers")
-              }
-              className="flex-1 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              onClick={onClose}
+              className="flex-1 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
             >
               انصراف
             </button>

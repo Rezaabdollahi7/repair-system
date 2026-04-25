@@ -9,7 +9,6 @@ import Login from "./pages/Login";
 
 import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
-import CustomerForm from "./pages/CustomerForm";
 import CustomerDetail from "./pages/CustomerDetail";
 import PersonnelList from "./pages/PersonnelList";
 import PersonnelForm from "./pages/PersonnelForm";
@@ -45,9 +44,7 @@ function App() {
               <Route index element={<Navigate to="/devices" replace />} />
               <Route path="devices" element={<DeviceList />} />
               <Route path="customers" element={<CustomerList />} />
-              <Route path="customers/new" element={<CustomerForm />} />
               <Route path="customers/:id" element={<CustomerDetail />} />
-              <Route path="customers/:id/edit" element={<CustomerForm />} />
 
               <Route element={<ProtectedRoute minRole="admin" />}>
                 <Route path="personnel" element={<PersonnelList />} />

@@ -170,6 +170,8 @@ export default function DeviceList() {
   const [viewDeviceId, setViewDeviceId] = useState(null);
   const [editDeviceId, setEditDeviceId] = useState(null);
 
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
   const debouncedSearch = useDebounce(searchInput, 400);
 
   // ─── Fetch ────────────────────────────────────────────────────
@@ -268,13 +270,13 @@ export default function DeviceList() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">دستگاه‌ها</h1>
-        <Link
-          to="/devices/new"
+        <button
+          onClick={() => setShowCreateModal(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
           ثبت دستگاه جدید
-        </Link>
+        </button>
       </div>
       {/* Search + Filter */}
       <div className="mb-4">
@@ -488,6 +490,18 @@ export default function DeviceList() {
           onSuccess={() => fetchDevices(debouncedSearch, filters, page, limit)}
         />
       )}
+
+      {showCreateModal && (
+        <DeviceFormModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            fetchDevices(debouncedSearch, filters, page, limit);
+          }}
+        />
+      )}
+      
     </div>
   );
 }

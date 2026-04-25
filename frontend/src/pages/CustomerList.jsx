@@ -15,6 +15,7 @@ import {
   PlusIcon,
   UserIcon,
 } from "@heroicons/react/24/solid";
+import CustomerDetailModal from "../components/CustomerDetailModal";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -38,6 +39,8 @@ export default function CustomerList() {
   const [deleting, setDeleting] = useState(false);
   const [editCustomerId, setEditCustomerId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [viewCustomerId, setViewCustomerId] = useState(null);
 
   const debouncedSearch = useDebounce(searchInput);
   const { isAtLeast } = useAuth();
@@ -159,13 +162,13 @@ export default function CustomerList() {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-1 justify-center">
-                      <Link
-                        to={`/customers/${c.id}`}
+                      <button
+                        onClick={() => setViewCustomerId(c.id)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="w-5 h-5" />
-                      </Link>
+                      </button>
                       <button
                         onClick={() => setEditCustomerId(c.id)}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
@@ -250,6 +253,18 @@ export default function CustomerList() {
           onSuccess={() => {
             setEditCustomerId(null);
             fetchCustomers(debouncedSearch, page, limit);
+          }}
+        />
+      )}
+
+      {viewCustomerId && (
+        <CustomerDetailModal
+          customerId={viewCustomerId}
+          isOpen={!!viewCustomerId}
+          onClose={() => setViewCustomerId(null)}
+          onEdit={(id) => {
+            setViewCustomerId(null);
+            setEditCustomerId(id);
           }}
         />
       )}

@@ -231,39 +231,46 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const db = await getDb();
-    const {
-      device_name,
-      brand,
-      model,
-      serial_number,
-      exit_date,
-      status,
-      description,
-    } = req.body;
+    const { id } = req.params;
 
-    const check = db.exec(`SELECT id FROM devices WHERE id = ?`, [
-      req.params.id,
-    ]);
-    if (!check[0] || check[0].values.length === 0) {
-      return res.status(404).json({ error: "Device not found" });
+    const current = db.exec(`SELECT * FROM devices WHERE id = ?`, [id]);
+    if (!current[0] || current[0].values.length === 0) {
+      return res.status(404).json({ error: "دستگاه یافت نشد" });
     }
 
-    db.run(
-      `UPDATE devices 
-       SET device_name = ?, brand = ?, model = ?, serial_number = ?,
-           exit_date = ?, status = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [
-        device_name,
-        brand,
-        model,
-        serial_number,
-        exit_date || null,
-        status,
-        description,
-        req.params.id,
-      ],
-    );
+    const cur = current[0].values[0];
+
+    const fields = [];
+    const values = [];
+
+    const fieldMap = {
+      customer_id: 1,
+      device_name: 2,
+      brand: 3,
+      model: 4,
+      serial_number: 5,
+      entry_date: 6,
+      exit_date: 7,
+      status: 8,
+      description: 9,
+    };
+
+    Object.keys(fieldMap).forEach((field) => {
+      if (req.body[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push(req.body[field]);
+      }
+    });
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "هیچ فیلدی برای آپدیت ارسال نشده" });
+    }
+
+    fields.push("updated_at = CURRENT_TIMESTAMP");
+    values.push(id);
+
+    const query = `UPDATE devices SET ${fields.join(", ")} WHERE id = ?`;
+    db.run(query, values);
 
     saveDb();
 
@@ -272,7 +279,7 @@ exports.update = async (req, res) => {
        FROM devices d
        LEFT JOIN customers c ON d.customer_id = c.id
        WHERE d.id = ?`,
-      [req.params.id],
+      [id],
     );
 
     res.json(rowToDevice(result[0].values[0]));

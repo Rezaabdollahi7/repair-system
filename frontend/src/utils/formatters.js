@@ -3,25 +3,20 @@
  * فرمت شماره تماس فارسی
  * 09330020020 → ۰۹۳۳ ۰۰۲ ۰۰۲۰
  */
+// src/utils/formatters.js
 export function formatPersianPhone(phone) {
   if (!phone) return "—";
 
-  // فقط اعداد
   const digits = phone.replace(/\D/g, "");
 
   if (digits.length === 11) {
-    // موبایل: 09123456789 → ۰۹۱۲ ۳۴۵ ۶۷۸۹
-    return toPersianDigits(
-      `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`,
-    );
+    // 09123456789 → ۰۹۱۲ ۳۴۵ ۶۷۸۹
+    return `${toPersianDigits(digits.slice(7))} - ${toPersianDigits(digits.slice(4, 7))} - ${toPersianDigits(digits.slice(0, 4))} `;
   } else if (digits.length === 10 && digits.startsWith("0")) {
-    // ثابت: 02112345678 → ۰۲۱ ۱۲۳۴ ۵۶۷۸
-    return toPersianDigits(
-      `${digits.slice(0, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`,
-    );
+    // 02112345678 → ۰۲۱ ۱۲۳۴ ۵۶۷۸
+    return `${toPersianDigits(digits.slice(7))} - ${toPersianDigits(digits.slice(3, 7))} -  ${toPersianDigits(digits.slice(0, 3))}`;
   }
 
-  // فرمت پیش‌فرض
   return toPersianDigits(digits);
 }
 

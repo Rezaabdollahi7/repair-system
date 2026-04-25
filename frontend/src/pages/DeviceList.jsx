@@ -6,6 +6,7 @@ import FilterPanel from "../components/FilterPanel";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { updateDevice } from "../api";
 
 import {
   PlusIcon,
@@ -14,6 +15,8 @@ import {
   TrashIcon,
   DocumentPlusIcon,
 } from "@heroicons/react/24/solid";
+import ConfirmModal from "../components/ConfirmModal";
+import { formatPersianPhone } from "../utils/formatters";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -24,7 +27,10 @@ function useDebounce(value, delay = 400) {
   return debounced;
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, onStatusChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
   const map = {
     pending: {
       label: "در انتظار بررسی",
@@ -44,14 +50,65 @@ function StatusBadge({ status }) {
     unrepairable: { label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
   };
 
-  const s = map[status] ?? {
+  const current = map[status] || {
     label: status,
     color: "bg-gray-100 text-gray-600",
   };
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+        setIsOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${s.color}`}>
-      {s.label}
-    </span>
+    <div ref={dropdownRef} className="relative inline-block">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-pointer hover:opacity-80 transition-colors ${current.color}`}
+      >
+        {current.label}
+        <svg
+          className="w-3 h-3"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 z-50 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+          {Object.entries(map)
+            .filter(([key]) => key !== status)
+            .map(([key, val]) => (
+              <button
+                key={key}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(key);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-right px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${val.color}`}
+              >
+                {val.label}
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -104,6 +161,9 @@ export default function DeviceList() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -186,14 +246,14 @@ export default function DeviceList() {
   }, [debouncedSearch, filters]);
 
   // ─── Handlers ─────────────────────────────────────────────────
-  const handleDelete = async (id) => {
-    if (!confirm("آیا مطمئن هستید؟")) return;
+
+  const handleStatusChange = async (deviceId, newStatus) => {
     try {
-      await deleteDevice(id);
-      toast.success("دستگاه حذف شد");
+      await updateDevice(deviceId, { status: newStatus });
+      toast.success("وضعیت دستگاه بروز شد");
       fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
-      toast.error("خطا در حذف دستگاه");
+      toast.error("خطا در تغییر وضعیت");
     }
   };
 
@@ -211,7 +271,6 @@ export default function DeviceList() {
           ثبت دستگاه جدید
         </Link>
       </div>
-
       {/* Search + Filter */}
       <div className="mb-4">
         <input
@@ -235,7 +294,6 @@ export default function DeviceList() {
           personnel={personnelList}
         />
       </div>
-
       {/* Table */}
       {loading ? (
         <div className="text-center py-10 text-gray-500">
@@ -294,15 +352,29 @@ export default function DeviceList() {
                 >
                   <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
                   <td className="px-4 py-3 text-sm">
-                    {device.customer_name ?? "مشتری حذف شده"}
+                    {device.customer_id ? (
+                      <Link
+                        to={`/customers/${device.customer_id}`}
+                        className="text-blue-600 hover:underline font-medium"
+                      >
+                        {device.customer_name ?? "مشتری"}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">مشتری حذف شده</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {device.customer_phone ?? "—"}
+                    {formatPersianPhone(device.customer_phone)}
                   </td>
                   <td className="px-4 py-3 text-sm">{device.device_name}</td>
                   <td className="px-4 py-3 text-sm">{device.model ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={device.status} />
+                    <StatusBadge
+                      status={device.status}
+                      onStatusChange={(newStatus) =>
+                        handleStatusChange(device.id, newStatus)
+                      }
+                    />
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <AssigneeBadge assignees={device.assignees} />
@@ -338,8 +410,8 @@ export default function DeviceList() {
                       </Link>
                       {isAtLeast("admin") && (
                         <button
-                          onClick={() => handleDelete(device.id)}
-                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer "
+                          onClick={() => setDeleteTarget(device)}
+                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           title="حذف"
                         >
                           <TrashIcon className="w-5 h-5" />
@@ -353,7 +425,6 @@ export default function DeviceList() {
           </table>
         </div>
       )}
-
       {/* Pagination */}
       <div className="mt-4">
         <Pagination
@@ -368,6 +439,29 @@ export default function DeviceList() {
           }}
         />
       </div>
+
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          setDeleting(true);
+          try {
+            await deleteDevice(deleteTarget.id);
+            toast.success("دستگاه حذف شد");
+            setDeleteTarget(null);
+            fetchDevices(debouncedSearch, filters, page, limit);
+          } catch {
+            toast.error("خطا در حذف دستگاه");
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        title="حذف دستگاه"
+        message={`آیا از حذف دستگاه "${deleteTarget?.device_name}" مطمئن هستید؟ این عملیات قابل بازگشت نیست.`}
+        confirmText="حذف"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

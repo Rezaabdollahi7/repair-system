@@ -17,6 +17,8 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
+import DeviceDetailModal from "../components/DeviceDetailModal";
+import DeviceFormModal from "../components/DeviceFormModal";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -164,6 +166,9 @@ export default function DeviceList() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [viewDeviceId, setViewDeviceId] = useState(null);
+  const [editDeviceId, setEditDeviceId] = useState(null);
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -394,20 +399,20 @@ export default function DeviceList() {
                       >
                         <DocumentPlusIcon className="w-5 h-5" />
                       </Link>
-                      <Link
-                        to={`/devices/${device.id}`}
+                      <button
+                        onClick={() => setViewDeviceId(device.id)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="w-5 h-5" />
-                      </Link>
-                      <Link
-                        to={`/devices/${device.id}/edit`}
+                      </button>
+                      <button
+                        onClick={() => setEditDeviceId(device.id)}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
                         title="ویرایش"
                       >
                         <PencilSquareIcon className="w-5 h-5" />
-                      </Link>
+                      </button>
                       {isAtLeast("admin") && (
                         <button
                           onClick={() => setDeleteTarget(device)}
@@ -462,6 +467,27 @@ export default function DeviceList() {
         variant="danger"
         loading={deleting}
       />
+
+      {viewDeviceId && (
+        <DeviceDetailModal
+          deviceId={viewDeviceId}
+          isOpen={!!viewDeviceId}
+          onClose={() => setViewDeviceId(null)}
+          onEdit={(id) => {
+            setViewDeviceId(null);
+            setEditDeviceId(id);
+          }}
+        />
+      )}
+
+      {editDeviceId && (
+        <DeviceFormModal
+          deviceId={editDeviceId}
+          isOpen={!!editDeviceId}
+          onClose={() => setEditDeviceId(null)}
+          onSuccess={() => fetchDevices(debouncedSearch, filters, page, limit)}
+        />
+      )}
     </div>
   );
 }

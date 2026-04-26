@@ -11,7 +11,6 @@ import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
 import CustomerDetail from "./pages/CustomerDetail";
 import PersonnelList from "./pages/PersonnelList";
-import ItemDetail from "./pages/ItemDetail";
 import ItemList from "./pages/ItemList";
 import CategoryManagement from "./pages/CategoryManagement";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
@@ -51,7 +50,6 @@ function App() {
                   <Route path="personnel" element={<PersonnelList />} />
                   //!TODO : check
                   <Route path="items" element={<ItemList />} />
-                  <Route path="items/:id" element={<ItemDetail />} />
                   <Route path="categories" element={<CategoryManagement />} />
                   <Route
                     path="purchase-invoices"

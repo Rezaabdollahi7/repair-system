@@ -6,6 +6,7 @@ import CustomerDetailModal from "../components/CustomerDetailModal";
 import CustomerFormModal from "../components/CustomerFormModal";
 import PersonnelFormModal from "../components/PersonnelFormModal";
 import ItemFormModal from "../components/ItemFormModal";
+import ItemDetailModal from "../components/ItemDetailModal";
 
 const ModalContext = createContext();
 
@@ -35,6 +36,7 @@ export function ModalProvider({ children }) {
   const openDeviceEdit = (deviceId) => openModal("deviceEdit", deviceId);
 
   const openItemEdit = (itemId) => openModal("itemEdit", itemId);
+  const openItemDetail = (itemId) => openModal("itemDetail", itemId);
 
   const openCustomerDetail = (customerId) =>
     openModal("customerDetail", customerId, {
@@ -53,6 +55,7 @@ export function ModalProvider({ children }) {
         openCustomerEdit,
         openPersonnelEdit,
         openItemEdit,
+        openItemDetail,
         closeModal,
       }}
     >
@@ -115,6 +118,15 @@ export function ModalProvider({ children }) {
           onSuccess={closeModal}
         />
       )}
+
+      {modalState.type === "itemDetail" && (
+        <ItemDetailModal
+          itemId={modalState.id}
+          isOpen={true}
+          onClose={closeModal}
+        />
+      )}
+      
     </ModalContext.Provider>
   );
 }

@@ -56,7 +56,7 @@ export default function ItemList() {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   const { isAtLeast } = useAuth();
-  const { openItemEdit } = useModal();
+  const { openItemEdit, openItemDetail } = useModal();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -157,7 +157,7 @@ export default function ItemList() {
           onClick={() => openItemEdit(null)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
-          <PlusIcon className="w-5 h-5" />
+          <PlusIcon className="size-5.5" />
           کالای جدید
         </button>
       </div>
@@ -235,28 +235,28 @@ export default function ItemList() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   کد کالا
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   نام کالا
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   دسته‌بندی
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   واحد
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   وضعیت موجودی
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   حداقل موجودی
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   قیمت میانگین (ریال)
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-center font-semibold text-indigo-700">
                   عملیات
                 </th>
               </tr>
@@ -300,19 +300,19 @@ export default function ItemList() {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-1 justify-center">
-                      <Link
-                        to={`/items/${item.id}`}
+                      <button
+                        onClick={() => openItemDetail(item.id)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="مشاهده جزئیات"
                       >
-                        <EyeIcon className="w-5 h-5" />
-                      </Link>
+                        <EyeIcon className="size-5.5" />
+                      </button>
                       <button
                         onClick={() => openItemEdit(item.id)}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                         title="ویرایش"
                       >
-                        <PencilSquareIcon className="w-5 h-5" />
+                        <PencilSquareIcon className="size-5.5" />
                       </button>
                       {isAtLeast("admin") && (
                         <button
@@ -320,7 +320,7 @@ export default function ItemList() {
                           className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           title="حذف"
                         >
-                          <TrashIcon className="w-5 h-5" />
+                          <TrashIcon className="size-5.5" />
                         </button>
                       )}
                     </div>

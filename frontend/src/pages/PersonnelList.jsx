@@ -160,23 +160,23 @@ export default function PersonnelList() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   نام
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   نام کاربری
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   نقش
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   تلفن
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   وضعیت
                 </th>
                 {canManage && (
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
                     عملیات
                   </th>
                 )}
@@ -246,7 +246,7 @@ export default function PersonnelList() {
                             className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                             title="ویرایش"
                           >
-                            <PencilSquareIcon className="w-4 h-4" />
+                            <PencilSquareIcon className="size-5.5" />
                           </button>
                         )}
                         {person.id !== user?.id &&
@@ -263,9 +263,9 @@ export default function PersonnelList() {
                               }
                             >
                               {person.is_active ? (
-                                <XCircleIcon className="w-4 h-4" />
+                                <XCircleIcon className="size-5.5" />
                               ) : (
-                                <CheckCircleIcon className="w-4 h-4" />
+                                <CheckCircleIcon className="size-5.5" />
                               )}
                             </button>
                           )}
@@ -275,7 +275,7 @@ export default function PersonnelList() {
                             className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                             title="حذف"
                           >
-                            <TrashIcon className="w-4 h-4" />
+                            <TrashIcon className="size-5.5" />
                           </button>
                         )}
                       </div>

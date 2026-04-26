@@ -1,13 +1,12 @@
 // src/pages/CustomerList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
 import { getCustomers, deleteCustomer } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
-import CustomerFormModal from "../components/CustomerFormModal";
 import { formatPersianPhone } from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { useModal } from "../context/ModalContext";
 import {
   TrashIcon,
   EyeIcon,
@@ -15,7 +14,6 @@ import {
   PlusIcon,
   UserIcon,
 } from "@heroicons/react/24/solid";
-import CustomerDetailModal from "../components/CustomerDetailModal";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -37,13 +35,10 @@ export default function CustomerList() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [editCustomerId, setEditCustomerId] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const [viewCustomerId, setViewCustomerId] = useState(null);
-
-  const debouncedSearch = useDebounce(searchInput);
+  const { openCustomerDetail, openCustomerEdit } = useModal();
   const { isAtLeast } = useAuth();
+  const debouncedSearch = useDebounce(searchInput);
 
   const fetchCustomers = useCallback(
     async (search, currentPage, currentLimit) => {
@@ -91,7 +86,7 @@ export default function CustomerList() {
           مشتریان
         </h1>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => openCustomerEdit(null)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
@@ -145,12 +140,12 @@ export default function CustomerList() {
                   className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
                 >
                   <td className="px-4 py-3 text-sm font-medium">
-                    <Link
-                      to={`/customers/${c.id}`}
-                      className="text-blue-600 hover:underline"
+                    <button
+                      onClick={() => openCustomerDetail(c.id)}
+                      className="text-blue-600 hover:underline font-medium"
                     >
                       {c.name}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {formatPersianPhone(c.phone)}
@@ -163,14 +158,14 @@ export default function CustomerList() {
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-1 justify-center">
                       <button
-                        onClick={() => setViewCustomerId(c.id)}
+                        onClick={() => openCustomerDetail(c.id)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => setEditCustomerId(c.id)}
+                        onClick={() => openCustomerEdit(c.id)}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                         title="ویرایش"
                       >
@@ -208,7 +203,6 @@ export default function CustomerList() {
         />
       </div>
 
-      {/* Confirm Delete Modal */}
       <ConfirmModal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
@@ -231,43 +225,6 @@ export default function CustomerList() {
         variant="danger"
         loading={deleting}
       />
-
-      {/* Create Modal */}
-      {showCreateModal && (
-        <CustomerFormModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSuccess={() => {
-            setShowCreateModal(false);
-            fetchCustomers(debouncedSearch, page, limit);
-          }}
-        />
-      )}
-
-      {/* Edit Modal */}
-      {editCustomerId && (
-        <CustomerFormModal
-          customerId={editCustomerId}
-          isOpen={!!editCustomerId}
-          onClose={() => setEditCustomerId(null)}
-          onSuccess={() => {
-            setEditCustomerId(null);
-            fetchCustomers(debouncedSearch, page, limit);
-          }}
-        />
-      )}
-
-      {viewCustomerId && (
-        <CustomerDetailModal
-          customerId={viewCustomerId}
-          isOpen={!!viewCustomerId}
-          onClose={() => setViewCustomerId(null)}
-          onEdit={(id) => {
-            setViewCustomerId(null);
-            setEditCustomerId(id);
-          }}
-        />
-      )}
     </div>
   );
 }

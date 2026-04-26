@@ -20,6 +20,8 @@ import { formatPersianPhone } from "../utils/formatters";
 import DeviceDetailModal from "../components/DeviceDetailModal";
 import DeviceFormModal from "../components/DeviceFormModal";
 
+import { useModal } from "../context/ModalContext";
+
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -167,10 +169,7 @@ export default function DeviceList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [viewDeviceId, setViewDeviceId] = useState(null);
-  const [editDeviceId, setEditDeviceId] = useState(null);
-
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { openDeviceDetail, openDeviceEdit, openCustomerDetail } = useModal();
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -271,7 +270,7 @@ export default function DeviceList() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">دستگاه‌ها</h1>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => openDeviceEdit(null)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
@@ -359,16 +358,15 @@ export default function DeviceList() {
                 >
                   <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
                   <td className="px-4 py-3 text-sm">
-                    {device.customer_id ? (
-                      <Link
-                        to={`/customers/${device.customer_id}`}
-                        className="text-blue-600 hover:underline font-medium"
-                      >
-                        {device.customer_name ?? "مشتری"}
-                      </Link>
-                    ) : (
-                      <span className="text-gray-400">مشتری حذف شده</span>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openCustomerDetail(device.customer_id);
+                      }}
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      {device.customer_name ?? "مشتری"}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {formatPersianPhone(device.customer_phone)}
@@ -402,14 +400,14 @@ export default function DeviceList() {
                         <DocumentPlusIcon className="w-5 h-5" />
                       </Link>
                       <button
-                        onClick={() => setViewDeviceId(device.id)}
+                        onClick={() => openDeviceDetail(device.id)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => setEditDeviceId(device.id)}
+                        onClick={() => openDeviceEdit(device.id)}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
                         title="ویرایش"
                       >
@@ -469,39 +467,6 @@ export default function DeviceList() {
         variant="danger"
         loading={deleting}
       />
-
-      {viewDeviceId && (
-        <DeviceDetailModal
-          deviceId={viewDeviceId}
-          isOpen={!!viewDeviceId}
-          onClose={() => setViewDeviceId(null)}
-          onEdit={(id) => {
-            setViewDeviceId(null);
-            setEditDeviceId(id);
-          }}
-        />
-      )}
-
-      {editDeviceId && (
-        <DeviceFormModal
-          deviceId={editDeviceId}
-          isOpen={!!editDeviceId}
-          onClose={() => setEditDeviceId(null)}
-          onSuccess={() => fetchDevices(debouncedSearch, filters, page, limit)}
-        />
-      )}
-
-      {showCreateModal && (
-        <DeviceFormModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSuccess={() => {
-            setShowCreateModal(false);
-            fetchDevices(debouncedSearch, filters, page, limit);
-          }}
-        />
-      )}
-      
     </div>
   );
 }

@@ -1,6 +1,5 @@
 // src/components/CustomerDetailModal.jsx
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import {
   getCustomer,
   getCustomerStats,
@@ -9,6 +8,7 @@ import {
 } from "../api";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { useModal } from "../context/ModalContext";
 import {
   UserIcon,
   PhoneIcon,
@@ -21,7 +21,6 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
-import CustomerFormModal from "./CustomerFormModal";
 
 // ── helper ──────────────────────────────────────────────
 const statusColor = {
@@ -61,7 +60,7 @@ function StatCard({ icon: Icon, label, value, color }) {
   );
 }
 
-function DeviceTimeline({ devices }) {
+function DeviceTimeline({ devices, openDeviceDetail }) {
   if (!devices.length) {
     return (
       <div className="text-center py-10 text-gray-400">
@@ -80,10 +79,9 @@ function DeviceTimeline({ devices }) {
             className="relative flex items-start gap-4 pr-12"
           >
             <div className="absolute right-3 mt-1.5 w-5 h-5 rounded-full bg-white border-2 border-blue-400 z-10" />
-            <Link
-              to={`/devices/${device.id}`}
-              className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:border-blue-300 hover:shadow transition-all"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              onClick={() => openDeviceDetail(device.id)}
+              className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:border-blue-300 hover:shadow transition-all text-right"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -120,7 +118,7 @@ function DeviceTimeline({ devices }) {
                   {device.description}
                 </p>
               )}
-            </Link>
+            </button>
           </div>
         ))}
       </div>
@@ -135,13 +133,13 @@ export default function CustomerDetailModal({
   onEdit,
 }) {
   const { isAtLeast } = useAuth();
+  const { openDeviceDetail, openCustomerEdit } = useModal();
   const [customer, setCustomer] = useState(null);
   const [stats, setStats] = useState(null);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     if (isOpen && customerId) {
@@ -186,7 +184,6 @@ export default function CustomerDetailModal({
         className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8"
         dir="rtl"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
           <h2 className="text-xl font-bold text-gray-800">جزئیات مشتری</h2>
           <button
@@ -204,7 +201,6 @@ export default function CustomerDetailModal({
             </div>
           ) : customer ? (
             <div className="space-y-6">
-              {/* Customer Header */}
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-4">
@@ -249,7 +245,6 @@ export default function CustomerDetailModal({
                 </div>
               </div>
 
-              {/* Stats */}
               {stats && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <StatCard
@@ -277,19 +272,20 @@ export default function CustomerDetailModal({
                 </div>
               )}
 
-              {/* Device Timeline */}
               <div className="bg-gray-50 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-6">
                   تاریخچه دستگاه‌ها
                 </h2>
-                <DeviceTimeline devices={devices} />
+                <DeviceTimeline
+                  devices={devices}
+                  openDeviceDetail={openDeviceDetail}
+                />
               </div>
             </div>
           ) : null}
         </div>
       </div>
 
-      {/* Delete Confirm */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -300,28 +296,6 @@ export default function CustomerDetailModal({
         variant="danger"
         loading={deleting}
       />
-
-      {/* Edit Modal (nested) */}
-      {showEditModal && (
-        <CustomerFormModal
-          customerId={customerId}
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={() => {
-            setShowEditModal(false);
-            // رفرش داده‌ها
-            Promise.all([
-              getCustomer(customerId),
-              getCustomerStats(customerId),
-              getCustomerDevices(customerId),
-            ]).then(([custRes, statsRes, devRes]) => {
-              setCustomer(custRes.data);
-              setStats(statsRes.data);
-              setDevices(devRes.data);
-            });
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -119,16 +119,16 @@ export default function CustomerList() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   نام
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   شماره تماس
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                   تعداد دستگاه
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-indigo-700">
+                <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
                   عملیات
                 </th>
               </tr>

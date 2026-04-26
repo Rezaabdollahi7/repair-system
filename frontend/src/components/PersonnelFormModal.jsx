@@ -1,5 +1,5 @@
+// src/components/PersonnelFormModal.jsx
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   getPersonnelOne,
@@ -7,6 +7,7 @@ import {
   updatePersonnel,
 } from "../api/index";
 import { useAuth } from "../context/AuthContext";
+import { XMarkIcon, UserGroupIcon } from "@heroicons/react/24/solid";
 
 const ALL_ROLES = [
   { id: 1, name: "super_admin", label: "سوپر ادمین" },
@@ -14,11 +15,14 @@ const ALL_ROLES = [
   { id: 3, name: "technician", label: "تکنسین" },
 ];
 
-export default function PersonnelForm() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+export default function PersonnelFormModal({
+  personnelId,
+  isOpen,
+  onClose,
+  onSuccess,
+}) {
   const { user } = useAuth();
-  const isEdit = Boolean(id);
+  const isEdit = Boolean(personnelId);
 
   const allowedRoles =
     user?.role === "super_admin"
@@ -33,24 +37,33 @@ export default function PersonnelForm() {
     role_id: 3,
   });
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(isEdit);
 
   useEffect(() => {
-    if (!isEdit) return;
-    getPersonnelOne(id)
-      .then((res) => {
-        const p = res.data;
+    if (isOpen) {
+      if (isEdit) {
+        getPersonnelOne(personnelId)
+          .then((res) => {
+            const p = res.data;
+            setForm({
+              full_name: p.full_name || "",
+              username: p.username || "",
+              password: "",
+              phone: p.phone || "",
+              role_id: p.role_id || 3,
+            });
+          })
+          .catch(() => toast.error("خطا در دریافت اطلاعات"));
+      } else {
         setForm({
-          full_name: p.full_name || "",
-          username: p.username || "",
+          full_name: "",
+          username: "",
           password: "",
-          phone: p.phone || "",
-          role_id: p.role_id || 3,
+          phone: "",
+          role_id: 3,
         });
-      })
-      .catch(() => toast.error("خطا در دریافت اطلاعات"))
-      .finally(() => setFetching(false));
-  }, [id, isEdit]);
+      }
+    }
+  }, [isOpen, personnelId, isEdit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -65,13 +78,14 @@ export default function PersonnelForm() {
       if (isEdit && !payload.password) delete payload.password;
 
       if (isEdit) {
-        await updatePersonnel(id, payload);
+        await updatePersonnel(personnelId, payload);
         toast.success("اطلاعات بروزرسانی شد");
       } else {
         await createPersonnel(payload);
         toast.success("پرسنل جدید اضافه شد");
       }
-      navigate("/personnel");
+      onSuccess && onSuccess();
+      onClose();
     } catch (err) {
       toast.error(err.response?.data?.error || "خطا در ذخیره اطلاعات");
     } finally {
@@ -79,24 +93,29 @@ export default function PersonnelForm() {
     }
   };
 
-  if (fetching) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <p className="text-gray-500">در حال بارگذاری...</p>
-      </div>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isEdit ? "ویرایش پرسنل" : "افزودن پرسنل جدید"}
-        </h1>
-      </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" dir="rtl">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <UserGroupIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">
+              {isEdit ? "ویرایش پرسنل" : "افزودن پرسنل جدید"}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
 
-      <div className="bg-white rounded-xl shadow p-6">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               نام و نام خانوادگی <span className="text-red-500">*</span>
@@ -197,7 +216,7 @@ export default function PersonnelForm() {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/personnel")}
+              onClick={onClose}
               className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium"
             >
               انصراف

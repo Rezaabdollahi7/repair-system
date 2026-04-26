@@ -13,14 +13,30 @@ function rowToObj(columns, values) {
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const result = db.exec(
-      `SELECT u.id, u.full_name, u.username, u.phone, u.avatar,
-              u.role_id, u.is_active, u.created_at, u.updated_at,
-              r.name AS role_name, r.label AS role_label
-       FROM users u
-       JOIN roles r ON u.role_id = r.id
-       ORDER BY u.created_at DESC`,
-    );
+    const { search } = req.query;
+
+    let query = `
+      SELECT u.id, u.full_name, u.username, u.phone, u.avatar,
+             u.role_id, u.is_active, u.created_at, u.updated_at,
+             r.name AS role_name, r.label AS role_label
+      FROM users u
+      JOIN roles r ON u.role_id = r.id
+    `;
+    const params = [];
+
+    if (search && search.trim()) {
+      query += ` WHERE (
+        u.full_name LIKE ? OR 
+        u.username LIKE ? OR 
+        u.phone LIKE ?
+      )`;
+      const searchPattern = `%${search.trim()}%`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    query += ` ORDER BY u.created_at DESC`;
+
+    const result = db.exec(query, params);
     if (!result[0]) return res.json([]);
     res.json(result[0].values.map((row) => rowToObj(result[0].columns, row)));
   } catch (error) {

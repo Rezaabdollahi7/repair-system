@@ -12,7 +12,6 @@ import CustomerList from "./pages/CustomerList";
 import CustomerDetail from "./pages/CustomerDetail";
 import PersonnelList from "./pages/PersonnelList";
 import ItemDetail from "./pages/ItemDetail";
-import ItemForm from "./pages/ItemForm";
 import ItemList from "./pages/ItemList";
 import CategoryManagement from "./pages/CategoryManagement";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
@@ -52,9 +51,7 @@ function App() {
                   <Route path="personnel" element={<PersonnelList />} />
                   //!TODO : check
                   <Route path="items" element={<ItemList />} />
-                  <Route path="items/new" element={<ItemForm />} />
                   <Route path="items/:id" element={<ItemDetail />} />
-                  <Route path="items/:id/edit" element={<ItemForm />} />
                   <Route path="categories" element={<CategoryManagement />} />
                   <Route
                     path="purchase-invoices"

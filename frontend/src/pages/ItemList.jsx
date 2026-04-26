@@ -3,15 +3,17 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { getItems, deleteItem, getCategories, searchItems } from "../api";
 import Pagination from "../components/Pagination";
+import ConfirmModal from "../components/ConfirmModal";
+import { useModal } from "../context/ModalContext";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-
 import {
   PlusIcon,
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
   MagnifyingGlassIcon,
+  CubeIcon,
 } from "@heroicons/react/24/solid";
 
 function useDebounce(value, delay = 400) {
@@ -54,24 +56,25 @@ export default function ItemList() {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   const { isAtLeast } = useAuth();
+  const { openItemEdit } = useModal();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  // ─── Fetch ────────────────────────────────────────────────────
   const fetchItems = useCallback(
     async (searchTerm, categoryId, lowStock, currentPage, currentLimit) => {
       setLoading(true);
       try {
         let res;
         const params = { page: currentPage, limit: currentLimit };
-
         if (categoryId) params.categoryId = categoryId;
-
         if (searchTerm) {
           params.q = searchTerm;
           res = await searchItems(params);
@@ -80,23 +83,17 @@ export default function ItemList() {
         }
 
         const apiData = res.data;
-
-        // Handle new paginated response structure
         let itemsData = apiData.data || apiData || [];
         const totalItems = apiData.total || itemsData.length;
-
         setTotal(totalItems);
         setTotalPages(
           apiData.totalPages || Math.ceil(totalItems / currentLimit),
         );
-
-        // Filter by low stock if enabled
         if (lowStock) {
           itemsData = itemsData.filter(
             (item) => item.currentStock <= item.minStock,
           );
         }
-
         setItems(itemsData);
       } catch {
         toast.error("خطا در دریافت لیست کالاها");
@@ -108,16 +105,13 @@ export default function ItemList() {
     [],
   );
 
-  // ─── Effects ──────────────────────────────────────────────────
   useEffect(() => {
     getCategories()
       .then((res) => {
         const cats = res.data?.data || res.data || [];
         setCategories(Array.isArray(cats) ? cats : []);
       })
-      .catch(() => {
-        toast.error("خطا در دریافت دسته‌بندی‌ها");
-      });
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -137,7 +131,6 @@ export default function ItemList() {
     fetchItems,
   ]);
 
-  // Reset to page 1 when filters change
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -147,52 +140,29 @@ export default function ItemList() {
     setPage(1);
   }, [debouncedSearch, selectedCategory, showLowStockOnly]);
 
-  // ─── Handlers ─────────────────────────────────────────────────
-  const handleDelete = async (id, name) => {
-    if (!confirm(`آیا از حذف کالای "${name}" مطمئن هستید؟`)) return;
-    try {
-      await deleteItem(id);
-      toast.success("کالا با موفقیت حذف شد");
-      fetchItems(
-        debouncedSearch,
-        selectedCategory,
-        showLowStockOnly,
-        page,
-        limit,
-      );
-    } catch (error) {
-      if (error.response?.status === 400) {
-        toast.error(error.response.data.error || "این کالا قابل حذف نیست");
-      } else {
-        toast.error("خطا در حذف کالا");
-      }
-    }
-  };
-
   const handleClearFilters = () => {
     setSearchInput("");
     setSelectedCategory("");
     setShowLowStockOnly(false);
   };
 
-  // ─── Render ───────────────────────────────────────────────────
   return (
     <div dir="rtl">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">مدیریت کالاها</h1>
-        <Link
-          to="/items/new"
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <CubeIcon className="w-6 h-6 text-gray-600" />
+          مدیریت کالاها
+        </h1>
+        <button
+          onClick={() => openItemEdit(null)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
           کالای جدید
-        </Link>
+        </button>
       </div>
 
-      {/* Search + Filters */}
       <div className="mb-4 space-y-3">
-        {/* Search Bar */}
         <div className="relative">
           <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -204,9 +174,7 @@ export default function ItemList() {
           />
         </div>
 
-        {/* Filters Row */}
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Category Filter */}
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -220,7 +188,6 @@ export default function ItemList() {
             ))}
           </select>
 
-          {/* Low Stock Toggle */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -231,7 +198,6 @@ export default function ItemList() {
             <span className="text-sm text-gray-700">فقط کالاهای کم‌موجود</span>
           </label>
 
-          {/* Clear Filters Button */}
           {(searchInput || selectedCategory || showLowStockOnly) && (
             <button
               onClick={handleClearFilters}
@@ -243,7 +209,6 @@ export default function ItemList() {
         </div>
       </div>
 
-      {/* Stats Summary */}
       {!loading && items.length > 0 && (
         <div className="mb-4 text-sm text-gray-600">
           {total > 0 && <span>تعداد کل کالاها: {total} عدد</span>}
@@ -255,7 +220,6 @@ export default function ItemList() {
         </div>
       )}
 
-      {/* Table */}
       {loading ? (
         <div className="text-center py-10 text-gray-500">
           در حال بارگذاری...
@@ -269,40 +233,50 @@ export default function ItemList() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   کد کالا
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   نام کالا
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   دسته‌بندی
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   واحد
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   وضعیت موجودی
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   حداقل موجودی
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-indigo-700">
                   قیمت میانگین (ریال)
                 </th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-indigo-700">
+                  عملیات
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
+              {items.map((item, index) => (
+                <tr
+                  key={item.id}
+                  className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                >
                   <td className="px-4 py-3 text-sm font-mono">
                     {item.code || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    {item.name}
+                    <Link
+                      to={`/items/${item.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {item.name}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.categoryName || "—"}
@@ -325,31 +299,28 @@ export default function ItemList() {
                       : "—"}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-1 justify-center">
                       <Link
                         to={`/items/${item.id}`}
-                        className="text-blue-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
+                        className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="مشاهده جزئیات"
                       >
-                        <EyeIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">جزئیات</span>
+                        <EyeIcon className="w-5 h-5" />
                       </Link>
-                      <Link
-                        to={`/items/${item.id}/edit`}
-                        className="text-green-600 hover:underline hover:underline-offset-8 flex items-center gap-1"
+                      <button
+                        onClick={() => openItemEdit(item.id)}
+                        className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                         title="ویرایش"
                       >
-                        <PencilSquareIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">ویرایش</span>
-                      </Link>
+                        <PencilSquareIcon className="w-5 h-5" />
+                      </button>
                       {isAtLeast("admin") && (
                         <button
-                          onClick={() => handleDelete(item.id, item.name)}
-                          className="text-red-600 hover:underline hover:underline-offset-8 flex items-center gap-1 cursor-pointer"
+                          onClick={() => setDeleteTarget(item)}
+                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           title="حذف"
                         >
-                          <TrashIcon className="w-4 h-4" />
-                          <span className="hidden sm:inline">حذف</span>
+                          <TrashIcon className="w-5 h-5" />
                         </button>
                       )}
                     </div>
@@ -361,7 +332,6 @@ export default function ItemList() {
         </div>
       )}
 
-      {/* Pagination */}
       {!loading && items.length > 0 && (
         <div className="mt-4">
           <Pagination
@@ -369,7 +339,7 @@ export default function ItemList() {
             totalPages={totalPages}
             total={total}
             limit={limit}
-            onPageChange={(newPage) => setPage(newPage)}
+            onPageChange={setPage}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);
               setPage(1);
@@ -377,6 +347,35 @@ export default function ItemList() {
           />
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          setDeleting(true);
+          try {
+            await deleteItem(deleteTarget.id);
+            toast.success("کالا با موفقیت حذف شد");
+            setDeleteTarget(null);
+            fetchItems(
+              debouncedSearch,
+              selectedCategory,
+              showLowStockOnly,
+              page,
+              limit,
+            );
+          } catch (error) {
+            toast.error(error.response?.data?.error || "خطا در حذف کالا");
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        title="حذف کالا"
+        message={`آیا از حذف کالای "${deleteTarget?.name}" مطمئن هستید؟ این عملیات قابل بازگشت نیست.`}
+        confirmText="حذف"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

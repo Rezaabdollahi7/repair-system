@@ -36,6 +36,10 @@ body {
   font-display: swap;
 }
 
+html {
+  overflow-y: scroll;
+}
+
 body {
   font-family: "Peyda", sans-serif;
 }

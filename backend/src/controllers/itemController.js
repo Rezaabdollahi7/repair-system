@@ -58,8 +58,8 @@ exports.getAll = async (req, res) => {
 
     const items = dataResult[0]
       ? dataResult[0].values.map((row) => ({
-          ...rowToItem(row.slice(0, 12)),
-          categoryName: row[12],
+          ...rowToItem(row.slice(0, 13)),
+          categoryName: row[13],
         }))
       : [];
 
@@ -414,8 +414,8 @@ exports.getLowStock = async (req, res) => {
 
     const items = result[0]
       ? result[0].values.map((row) => ({
-          ...rowToItem(row.slice(0, 12)),
-          categoryName: row[12],
+          ...rowToItem(row.slice(0, 13)),
+          categoryName: row[13],
         }))
       : [];
 

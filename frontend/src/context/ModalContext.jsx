@@ -8,6 +8,7 @@ import PersonnelFormModal from "../components/PersonnelFormModal";
 import ItemFormModal from "../components/ItemFormModal";
 import ItemDetailModal from "../components/ItemDetailModal";
 import SaleInvoiceDetailModal from "../components/SaleInvoiceDetailModal";
+import SaleInvoiceFormModal from "../components/SaleInvoiceFormModal";
 
 const ModalContext = createContext();
 

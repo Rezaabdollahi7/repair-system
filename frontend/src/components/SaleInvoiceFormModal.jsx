@@ -1,0 +1,738 @@
+// src/components/SaleInvoiceFormModal.jsx
+import { useState, useEffect } from "react";
+import {
+  createSaleInvoice,
+  getItems,
+  getCustomers,
+  createCustomer,
+  createItem,
+} from "../api";
+import toast from "react-hot-toast";
+import {
+  XMarkIcon,
+  PlusIcon,
+  TrashIcon,
+  UserPlusIcon,
+  CurrencyDollarIcon,
+} from "@heroicons/react/24/solid";
+import SearchableSelect from "./SearchableSelect";
+import PersianDatePicker from "./PersianDatePicker";
+
+// Modal برای ثبت سریع مشتری
+function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
+  const [formData, setFormData] = useState({ name: "", phone: "" });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.name?.trim()) newErrors.name = "نام مشتری الزامی است";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      const res = await createCustomer(formData);
+      toast.success("مشتری با موفقیت ثبت شد");
+      onSuccess(res.data);
+      onClose();
+      setFormData({ name: "", phone: "" });
+    } catch {
+      toast.error("خطا در ثبت مشتری");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md" dir="rtl">
+        <h3 className="text-lg font-bold mb-4">ثبت سریع مشتری</h3>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                نام مشتری <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className={`w-full border rounded px-3 py-2 ${errors.name ? "border-red-500" : "border-gray-300"}`}
+                placeholder="مثلاً: علی احمدی"
+              />
+              {errors.name && (
+                <p className="text-xs text-red-600 mt-1">{errors.name}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                شماره تماس
+              </label>
+              <input
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="مثلاً: ۰۹۱۲۳۴۵۶۷۸۹"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "در حال ثبت..." : "ثبت"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Modal برای تعریف سریع کالا
+function QuickItemModal({ isOpen, onClose, onSuccess }) {
+  const [formData, setFormData] = useState({
+    code: "",
+    name: "",
+    unit: "عدد",
+    minStock: 0,
+  });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.code?.trim()) newErrors.code = "کد کالا الزامی است";
+    if (!formData.name?.trim()) newErrors.name = "نام کالا الزامی است";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      const res = await createItem(formData);
+      toast.success("کالا با موفقیت تعریف شد");
+      onSuccess(res.data);
+      onClose();
+      setFormData({ code: "", name: "", unit: "عدد", minStock: 0 });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "خطا در تعریف کالا");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md" dir="rtl">
+        <h3 className="text-lg font-bold mb-4">تعریف سریع کالا</h3>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                کد کالا <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="code"
+                value={formData.code}
+                onChange={handleChange}
+                className={`w-full border rounded px-3 py-2 ${errors.code ? "border-red-500" : "border-gray-300"}`}
+              />
+              {errors.code && (
+                <p className="text-xs text-red-600 mt-1">{errors.code}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                نام کالا <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className={`w-full border rounded px-3 py-2 ${errors.name ? "border-red-500" : "border-gray-300"}`}
+              />
+              {errors.name && (
+                <p className="text-xs text-red-600 mt-1">{errors.name}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">واحد</label>
+              <select
+                name="unit"
+                value={formData.unit}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded px-3 py-2"
+              >
+                <option value="عدد">عدد</option>
+                <option value="متر">متر</option>
+                <option value="کیلوگرم">کیلوگرم</option>
+                <option value="بسته">بسته</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "در حال ثبت..." : "ثبت"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────────
+export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [errors, setErrors] = useState({});
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showQuickItemModal, setShowQuickItemModal] = useState(false);
+
+  const [formData, setFormData] = useState({
+    customer_id: "",
+    customer_name: "",
+    customer_phone: "",
+    invoice_date: new Date().toISOString().split("T")[0],
+    paid_amount: 0,
+    note: "",
+  });
+
+  const [selectedItems, setSelectedItems] = useState([]);
+
+  const fetchData = async () => {
+    setLoadingData(true);
+    try {
+      const [itemsRes, customersRes] = await Promise.all([
+        getItems({ limit: 1000 }),
+        getCustomers(),
+      ]);
+      setItems(itemsRes.data?.data || itemsRes.data || []);
+      setCustomers(customersRes.data?.data || customersRes.data || []);
+    } catch {
+      toast.error("خطا در دریافت اطلاعات");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) fetchData();
+  }, [isOpen]);
+
+  const customerOptions = customers.map((c) => ({
+    value: c.id,
+    label: `${c.name} ${c.phone ? `- ${c.phone}` : ""}`,
+    phone: c.phone,
+    name: c.name,
+  }));
+
+  const itemOptions = items.map((item) => ({
+    value: item.id,
+    label: `[${item.code}] ${item.name}`,
+    subLabel: `موجودی: ${item.currentStock} ${item.unit} | میانگین قیمت خرید: ${Number(item.avgPurchasePrice || 0).toLocaleString()} ریال`,
+    stock: item.currentStock,
+    unit: item.unit,
+    avgPrice: item.avgPurchasePrice || 0,
+  }));
+
+  const calculateItemTotal = (qty, price) => (qty || 0) * (price || 0);
+  const calculateTotal = () =>
+    selectedItems.reduce(
+      (sum, item) => sum + calculateItemTotal(item.quantity, item.unit_price),
+      0,
+    );
+  const calculateRemaining = () =>
+    calculateTotal() - (formData.paid_amount || 0);
+
+  const handleInputChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "number" ? (value === "" ? 0 : Number(value)) : value,
+    }));
+  };
+
+  const handleCustomerSelect = (customerId) => {
+    const customer = customers.find((c) => c.id === customerId);
+    if (customer)
+      setFormData((prev) => ({
+        ...prev,
+        customer_id: customer.id,
+        customer_name: customer.name,
+        customer_phone: customer.phone || "",
+      }));
+  };
+
+  const handleAddItem = () =>
+    setSelectedItems((prev) => [
+      ...prev,
+      { item_id: "", quantity: 1, unit_price: 0 },
+    ]);
+  const handleRemoveItem = (index) =>
+    setSelectedItems((prev) => prev.filter((_, i) => i !== index));
+
+  const handleItemChange = (index, field, value) => {
+    setSelectedItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const updated = { ...item, [field]: value };
+        if (field === "item_id" && value) {
+          const selectedItem = items.find((it) => it.id === value);
+          if (selectedItem)
+            updated.unit_price = Math.round(
+              (selectedItem.avgPurchasePrice || 0) * 1.2,
+            );
+        }
+        return updated;
+      }),
+    );
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (selectedItems.length === 0)
+      newErrors.items = "حداقل یک کالا باید انتخاب شود";
+    selectedItems.forEach((item, index) => {
+      if (!item.item_id) newErrors[`item_${index}`] = "کالا را انتخاب کنید";
+      else {
+        const selectedItem = items.find((it) => it.id === item.item_id);
+        if (selectedItem && item.quantity > selectedItem.currentStock)
+          newErrors[`quantity_${index}`] =
+            `موجودی کافی نیست (موجودی: ${selectedItem.currentStock})`;
+      }
+      if (!item.quantity || item.quantity <= 0)
+        newErrors[`quantity_${index}`] = "تعداد باید بیشتر از صفر باشد";
+      if (!item.unit_price || item.unit_price < 0)
+        newErrors[`price_${index}`] = "قیمت باید مثبت باشد";
+    });
+    if (formData.paid_amount < 0)
+      newErrors.paid_amount = "مبلغ پرداختی نمی‌تواند منفی باشد";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      toast.error("لطفاً خطاهای فرم را برطرف کنید");
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        customer_id: formData.customer_id || null,
+        customer_name: formData.customer_name?.trim() || "مشتری متفرقه",
+        customer_phone: formData.customer_phone?.trim() || null,
+        invoice_date: formData.invoice_date,
+        paid_amount: formData.paid_amount,
+        note: formData.note?.trim() || null,
+        items: selectedItems.map((item) => ({
+          item_id: parseInt(item.item_id),
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+      };
+      await createSaleInvoice(payload);
+      toast.success("فاکتور فروش با موفقیت ثبت شد");
+      onSuccess && onSuccess();
+      onClose();
+    } catch (error) {
+      toast.error(error.response?.data?.error || "خطا در ثبت فاکتور");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount) => Number(amount).toLocaleString();
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-6xl my-8"
+        dir="rtl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <CurrencyDollarIcon className="w-5 h-5 text-gray-600" />
+            ثبت فاکتور فروش جدید
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                  اطلاعات مشتری
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      انتخاب مشتری
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <SearchableSelect
+                          options={customerOptions}
+                          value={formData.customer_id}
+                          onChange={handleCustomerSelect}
+                          placeholder="جستجو و انتخاب مشتری..."
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerModal(true)}
+                        className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+                        title="ثبت سریع مشتری"
+                      >
+                        <UserPlusIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      نام مشتری
+                    </label>
+                    <input
+                      type="text"
+                      name="customer_name"
+                      value={formData.customer_name}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                      placeholder="مشتری متفرقه"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      شماره تماس
+                    </label>
+                    <input
+                      type="tel"
+                      name="customer_phone"
+                      value={formData.customer_phone}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                      placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      تاریخ فاکتور
+                    </label>
+                    <PersianDatePicker
+                      value={formData.invoice_date}
+                      onChange={(val) =>
+                        setFormData((prev) => ({ ...prev, invoice_date: val }))
+                      }
+                      placeholder="انتخاب تاریخ"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      توضیحات
+                    </label>
+                    <textarea
+                      name="note"
+                      value={formData.note}
+                      onChange={handleInputChange}
+                      rows="3"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                      placeholder="توضیحات اضافی..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                  خلاصه پرداخت
+                </h2>
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2">
+                    <span>جمع کل:</span>
+                    <span className="font-medium">
+                      {formatCurrency(calculateTotal())} ریال
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      مبلغ دریافتی
+                    </label>
+                    <input
+                      type="number"
+                      name="paid_amount"
+                      value={formData.paid_amount}
+                      onChange={handleInputChange}
+                      min="0"
+                      step="1000"
+                      className={`w-full border rounded-lg px-4 py-2 text-sm ${errors.paid_amount ? "border-red-500" : "border-gray-300"}`}
+                    />
+                    {errors.paid_amount && (
+                      <p className="mt-1 text-xs text-red-600">
+                        {errors.paid_amount}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex justify-between py-2 border-t border-gray-200">
+                    <span>مانده:</span>
+                    <span
+                      className={`font-medium ${calculateRemaining() > 0 ? "text-red-600" : "text-green-600"}`}
+                    >
+                      {formatCurrency(calculateRemaining())} ریال
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Items */}
+            <div className="lg:col-span-2">
+              <div className="bg-white shadow rounded-lg p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-medium text-gray-900">
+                    اقلام فاکتور
+                  </h2>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickItemModal(true)}
+                      className="bg-green-100 text-green-700 px-3 py-2 rounded-lg hover:bg-green-200 text-sm flex items-center gap-1"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      تعریف سریع کالا
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      افزودن کالا
+                    </button>
+                  </div>
+                </div>
+
+                {errors.items && (
+                  <p className="mb-4 text-sm text-red-600">{errors.items}</p>
+                )}
+
+                {selectedItems.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                    <p>هیچ کالایی انتخاب نشده است</p>
+                    <p className="text-sm mt-1">
+                      از دکمه "افزودن کالا" استفاده کنید
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedItems.map((item, index) => {
+                      const selectedItem = items.find(
+                        (it) => it.id === item.item_id,
+                      );
+                      return (
+                        <div
+                          key={index}
+                          className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                        >
+                          <div className="grid grid-cols-12 gap-3 items-end">
+                            <div className="col-span-5">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                کالا <span className="text-red-500">*</span>
+                              </label>
+                              <SearchableSelect
+                                options={itemOptions}
+                                value={item.item_id}
+                                onChange={(val) =>
+                                  handleItemChange(index, "item_id", val)
+                                }
+                                placeholder="جستجو و انتخاب کالا..."
+                                loading={loadingData}
+                                required
+                                error={errors[`item_${index}`]}
+                              />
+                              {selectedItem && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                  موجودی: {selectedItem.currentStock}{" "}
+                                  {selectedItem.unit}
+                                </p>
+                              )}
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                تعداد <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    "quantity",
+                                    parseInt(e.target.value) || 0,
+                                  )
+                                }
+                                min="1"
+                                max={selectedItem?.currentStock}
+                                className={`w-full border rounded-lg px-3 py-2 text-sm ${errors[`quantity_${index}`] ? "border-red-500" : "border-gray-300"}`}
+                              />
+                              {errors[`quantity_${index}`] && (
+                                <p className="mt-1 text-xs text-red-600">
+                                  {errors[`quantity_${index}`]}
+                                </p>
+                              )}
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                قیمت واحد (ریال){" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                value={item.unit_price}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    "unit_price",
+                                    parseInt(e.target.value) || 0,
+                                  )
+                                }
+                                min="0"
+                                className={`w-full border rounded-lg px-3 py-2 text-sm ${errors[`price_${index}`] ? "border-red-500" : "border-gray-300"}`}
+                              />
+                              {errors[`price_${index}`] && (
+                                <p className="mt-1 text-xs text-red-600">
+                                  {errors[`price_${index}`]}
+                                </p>
+                              )}
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                جمع
+                              </label>
+                              <div className="px-3 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg">
+                                {formatCurrency(
+                                  calculateItemTotal(
+                                    item.quantity,
+                                    item.unit_price,
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                            <div className="col-span-1">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(index)}
+                                className="w-full px-2 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              >
+                                <TrashIcon className="w-4 h-4 mx-auto" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "در حال ثبت..." : "ثبت فاکتور فروش"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Quick Customer Modal */}
+      <QuickCustomerModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onSuccess={(newCustomer) => {
+          setCustomers((prev) => [...prev, newCustomer]);
+          handleCustomerSelect(newCustomer.id);
+        }}
+      />
+      {/* Quick Item Modal */}
+      <QuickItemModal
+        isOpen={showQuickItemModal}
+        onClose={() => setShowQuickItemModal(false)}
+        onSuccess={() => {
+          fetchData();
+          toast.success("کالا اضافه شد");
+        }}
+      />
+    </div>
+  );
+}

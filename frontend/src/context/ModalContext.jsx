@@ -11,6 +11,8 @@ import SaleInvoiceDetailModal from "../components/SaleInvoiceDetailModal";
 import SaleInvoiceFormModal from "../components/SaleInvoiceFormModal";
 import PurchaseInvoiceDetailModal from "../components/PurchaseInvoiceDetailModal";
 import PurchaseInvoiceFormModal from "../components/PurchaseInvoiceFormModal.jsx";
+import RepairInvoiceFormModal from "../components/RepairInvoiceFormModal";
+import RepairInvoiceDetailModal from "../components/RepairInvoiceDetailModal";
 
 const ModalContext = createContext();
 
@@ -60,6 +62,10 @@ export function ModalProvider({ children }) {
   const openPurchaseInvoiceCreate = () =>
     openModal("purchaseInvoiceCreate", null);
 
+  const openRepairInvoiceDetail = (id) => openModal("repairInvoiceDetail", id);
+  const openRepairInvoiceCreate = () => openModal("repairInvoiceCreate", null);
+  const openRepairInvoiceEdit = (id) => openModal("repairInvoiceEdit", id);
+
   return (
     <ModalContext.Provider
       value={{
@@ -74,6 +80,9 @@ export function ModalProvider({ children }) {
         openSaleInvoiceCreate,
         openPurchaseInvoiceDetail,
         openPurchaseInvoiceCreate,
+        openRepairInvoiceDetail,
+        openRepairInvoiceCreate,
+        openRepairInvoiceEdit,
         closeModal,
       }}
     >
@@ -171,6 +180,28 @@ export function ModalProvider({ children }) {
 
       {modalState.type === "purchaseInvoiceCreate" && (
         <PurchaseInvoiceFormModal
+          isOpen={true}
+          onClose={closeModal}
+          onSuccess={closeModal}
+        />
+      )}
+      {modalState.type === "repairInvoiceDetail" && (
+        <RepairInvoiceDetailModal
+          invoiceId={modalState.id}
+          isOpen={true}
+          onClose={closeModal}
+        />
+      )}
+      {modalState.type === "repairInvoiceCreate" && (
+        <RepairInvoiceFormModal
+          isOpen={true}
+          onClose={closeModal}
+          onSuccess={closeModal}
+        />
+      )}
+      {modalState.type === "repairInvoiceEdit" && (
+        <RepairInvoiceFormModal
+          invoiceId={modalState.id}
           isOpen={true}
           onClose={closeModal}
           onSuccess={closeModal}

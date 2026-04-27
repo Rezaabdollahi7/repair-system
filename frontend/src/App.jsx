@@ -21,8 +21,6 @@ import ProfitReport from "./pages/ProfitReport";
 import TransactionsReport from "./pages/TransactionsReport";
 import Settings from "./pages/Settings";
 import RepairInvoiceList from "./pages/RepairInvoiceList";
-import RepairInvoiceForm from "./pages/RepairInvoiceForm";
-import RepairInvoiceDetail from "./pages/RepairInvoiceDetail";
 
 import { ModalProvider } from "./context/ModalContext";
 
@@ -56,18 +54,6 @@ function App() {
                   <Route
                     path="repair-invoices"
                     element={<RepairInvoiceList />}
-                  />
-                  <Route
-                    path="repair-invoices/new"
-                    element={<RepairInvoiceForm />}
-                  />
-                  <Route
-                    path="repair-invoices/:id"
-                    element={<RepairInvoiceDetail />}
-                  />
-                  <Route
-                    path="repair-invoices/:id/edit"
-                    element={<RepairInvoiceForm />}
                   />
                 </Route>
 

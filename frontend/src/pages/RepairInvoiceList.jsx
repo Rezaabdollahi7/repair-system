@@ -1,8 +1,10 @@
 // src/pages/RepairInvoiceList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
 import { getRepairInvoices, deleteRepairInvoice } from "../api";
 import Pagination from "../components/Pagination";
+import ConfirmModal from "../components/ConfirmModal";
+import { useModal } from "../context/ModalContext";
+import { formatPersianPhone } from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -16,6 +18,7 @@ import {
   ExclamationCircleIcon,
   DocumentTextIcon,
   XCircleIcon,
+  WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 
 function useDebounce(value, delay = 400) {
@@ -98,11 +101,18 @@ export default function RepairInvoiceList() {
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const { isAtLeast } = useAuth();
+  const {
+    openRepairInvoiceDetail,
+    openRepairInvoiceCreate,
+    openRepairInvoiceEdit,
+    openDeviceDetail,
+  } = useModal();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const debouncedSearch = useDebounce(searchInput, 400);
 
   const fetchInvoices = useCallback(
@@ -112,13 +122,10 @@ export default function RepairInvoiceList() {
         const params = { page: currentPage, limit: currentLimit };
         if (searchTerm) params.search = searchTerm;
         if (status) params.status = status;
-
         const res = await getRepairInvoices(params);
-        const apiData = res.data;
-
-        setInvoices(apiData.data || []);
-        setTotal(apiData.total || 0);
-        setTotalPages(apiData.totalPages || 1);
+        setInvoices(res.data.data || []);
+        setTotal(res.data.total || 0);
+        setTotalPages(res.data.totalPages || 1);
       } catch {
         toast.error("خطا در دریافت لیست فاکتورهای تعمیر");
         setInvoices([]);
@@ -132,7 +139,6 @@ export default function RepairInvoiceList() {
   useEffect(() => {
     fetchInvoices(debouncedSearch, statusFilter, page, limit);
   }, [debouncedSearch, statusFilter, page, limit, fetchInvoices]);
-
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -142,27 +148,9 @@ export default function RepairInvoiceList() {
     setPage(1);
   }, [debouncedSearch, statusFilter]);
 
-  const handleDelete = async (id, invoiceNumber) => {
-    if (
-      !confirm(
-        `آیا از حذف فاکتور "${invoiceNumber}" مطمئن هستید؟\nدر صورت حذف، موجودی کالاها به حالت قبل برمی‌گردد.`,
-      )
-    )
-      return;
-
-    try {
-      await deleteRepairInvoice(id);
-      toast.success("فاکتور با موفقیت حذف شد");
-      fetchInvoices(debouncedSearch, statusFilter, page, limit);
-    } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در حذف فاکتور");
-    }
-  };
-
-  const formatDate = (dateStr) =>
-    dateStr ? new Date(dateStr).toLocaleDateString("fa-IR") : "—";
-  const formatCurrency = (amount) =>
-    amount ? Number(amount).toLocaleString() + " ریال" : "—";
+  const formatDate = (d) => (d ? new Date(d).toLocaleDateString("fa-IR") : "—");
+  const formatCurrency = (a) =>
+    a ? Number(a).toLocaleString() + " ریال" : "—";
 
   const statusOptions = [
     { value: "", label: "همه وضعیت‌ها" },
@@ -175,17 +163,19 @@ export default function RepairInvoiceList() {
   return (
     <div dir="rtl">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">فاکتورهای تعمیر</h1>
-        <Link
-          to="/repair-invoices/new"
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <WrenchScrewdriverIcon className="w-6 h-6 text-gray-600" />
+          فاکتورهای تعمیر
+        </h1>
+        <button
+          onClick={() => openRepairInvoiceCreate()}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
           فاکتور تعمیر جدید
-        </Link>
+        </button>
       </div>
 
-      {/* Search and Filter */}
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex-1 min-w-[250px] relative">
           <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -197,7 +187,6 @@ export default function RepairInvoiceList() {
             className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg text-sm"
           />
         </div>
-
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -209,7 +198,6 @@ export default function RepairInvoiceList() {
             </option>
           ))}
         </select>
-
         {(searchInput || statusFilter) && (
           <button
             onClick={() => {
@@ -223,7 +211,6 @@ export default function RepairInvoiceList() {
         )}
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="text-center py-10 text-gray-500">
           در حال بارگذاری...
@@ -237,56 +224,60 @@ export default function RepairInvoiceList() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   شماره فاکتور
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   دستگاه
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   مشتری
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   تاریخ
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   مبلغ کل
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   پرداخت شده
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   مانده
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   وضعیت
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                   پرداخت
                 </th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                  عملیات
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {invoices.map((invoice) => {
+              {invoices.map((invoice, index) => {
                 const remaining = invoice.total_amount - invoice.paid_amount;
                 const canEdit = invoice.status === "draft";
-
                 return (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
+                  <tr
+                    key={invoice.id}
+                    className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                  >
                     <td className="px-4 py-3 text-sm font-mono font-medium">
                       {invoice.invoice_number}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <Link
-                        to={`/devices/${invoice.device_id}`}
+                      <button
+                        onClick={() => openDeviceDetail(invoice.device_id)}
                         className="text-blue-600 hover:underline"
                       >
                         {invoice.device_name}{" "}
                         {invoice.brand && `(${invoice.brand})`}
-                      </Link>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {invoice.customer_name || "—"}
@@ -310,32 +301,30 @@ export default function RepairInvoiceList() {
                       <PaymentStatusBadge status={invoice.payment_status} />
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <div className="flex gap-2 justify-end">
-                        <Link
-                          to={`/repair-invoices/${invoice.id}`}
-                          className="text-blue-600 hover:underline flex items-center gap-1"
+                      <div className="flex gap-1 justify-center">
+                        <button
+                          onClick={() => openRepairInvoiceDetail(invoice.id)}
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          title="جزئیات"
                         >
-                          <EyeIcon className="w-4 h-4" />
-                          جزئیات
-                        </Link>
+                          <EyeIcon className="w-5 h-5" />
+                        </button>
                         {canEdit && (
-                          <Link
-                            to={`/repair-invoices/${invoice.id}/edit`}
-                            className="text-green-600 hover:underline flex items-center gap-1"
+                          <button
+                            onClick={() => openRepairInvoiceEdit(invoice.id)}
+                            className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                            title="ویرایش"
                           >
-                            <PencilSquareIcon className="w-4 h-4" />
-                            ویرایش
-                          </Link>
+                            <PencilSquareIcon className="w-5 h-5" />
+                          </button>
                         )}
                         {isAtLeast("admin") && (
                           <button
-                            onClick={() =>
-                              handleDelete(invoice.id, invoice.invoice_number)
-                            }
-                            className="text-red-600 hover:underline flex items-center gap-1"
+                            onClick={() => setDeleteTarget(invoice)}
+                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="حذف"
                           >
-                            <TrashIcon className="w-4 h-4" />
-                            حذف
+                            <TrashIcon className="w-5 h-5" />
                           </button>
                         )}
                       </div>
@@ -348,7 +337,6 @@ export default function RepairInvoiceList() {
         </div>
       )}
 
-      {/* Pagination */}
       {!loading && invoices.length > 0 && (
         <div className="mt-4">
           <Pagination
@@ -357,13 +345,36 @@ export default function RepairInvoiceList() {
             total={total}
             limit={limit}
             onPageChange={setPage}
-            onLimitChange={(newLimit) => {
-              setLimit(newLimit);
+            onLimitChange={(l) => {
+              setLimit(l);
               setPage(1);
             }}
           />
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          setDeleting(true);
+          try {
+            await deleteRepairInvoice(deleteTarget.id);
+            toast.success("فاکتور حذف شد");
+            setDeleteTarget(null);
+            fetchInvoices(debouncedSearch, statusFilter, page, limit);
+          } catch {
+            toast.error("خطا");
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        title="حذف فاکتور تعمیر"
+        message={`آیا از حذف "${deleteTarget?.invoice_number}" مطمئن هستید؟\nموجودی کالاها به حالت قبل برمی‌گردد.`}
+        confirmText="حذف"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

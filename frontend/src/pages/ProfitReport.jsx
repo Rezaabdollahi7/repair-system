@@ -7,6 +7,7 @@ import {
   ArrowRightIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
 
@@ -38,16 +39,12 @@ export default function ProfitReport() {
   const formatPercent = (value) => Number(value || 0).toFixed(1) + "%";
 
   return (
-    <div dir="rtl" className="max-w-7xl mx-auto">
+    <div dir="rtl" className=" mx-auto">
       <div className="mb-6">
-        <Link
-          to="/dashboard"
-          className="text-gray-600 hover:text-gray-900 flex items-center gap-1 mb-2"
-        >
-          <ArrowRightIcon className="w-4 h-4" />
-          بازگشت به داشبورد
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">گزارش سود و زیان</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex gap-2">
+          <ChartPieIcon className="w-6 h-6 text-gray-600" />
+          گزارش سود و زیان
+        </h1>
       </div>
 
       {/* Date Filters */}

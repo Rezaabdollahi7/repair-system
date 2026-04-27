@@ -5,6 +5,7 @@ import { getStockReport, getCategories } from "../api";
 import toast from "react-hot-toast";
 import {
   ArrowRightIcon,
+  ChartBarIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/solid";
 
@@ -79,16 +80,12 @@ export default function StockReport() {
   };
 
   return (
-    <div dir="rtl" className="max-w-7xl mx-auto">
+    <div dir="rtl" className=" mx-auto">
       <div className="mb-6">
-        <Link
-          to="/dashboard"
-          className="text-gray-600 hover:text-gray-900 flex items-center gap-1 mb-2"
-        >
-          <ArrowRightIcon className="w-4 h-4" />
-          بازگشت به داشبورد
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">گزارش موجودی انبار</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex gap-2">
+          <ChartBarIcon className="w-6 h-6 text-gray-600" />
+          گزارش موجودی انبار
+        </h1>
       </div>
 
       {/* Filters */}

@@ -16,6 +16,7 @@ import {
   DocumentTextIcon,
   CreditCardIcon,
   BanknotesIcon,
+  HomeIcon,
 } from "@heroicons/react/24/solid";
 
 function StatCard({ title, value, icon: Icon, color, subtitle }) {
@@ -122,14 +123,15 @@ export default function Dashboard() {
   const formatCurrency = (amount) => Number(amount).toLocaleString();
 
   return (
-    <div dir="rtl" className="max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">داشبورد مدیریتی</h1>
+    <div dir="rtl" className=" mx-auto">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6 flex gap-2">
+        <HomeIcon className="w-6 h-6 text-gray-600" />
+        داشبورد مدیریتی
+      </h1>
 
       <hr className="text-gray-300 " />
       {/* Device Stats */}
-      <h2 className="text-lg font-medium text-gray-900 my-8">
-        آمار دستگاه‌ها
-      </h2>
+      <h2 className="text-lg font-medium text-gray-900 my-8">آمار دستگاه‌ها</h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <StatCard
           title="کل دستگاه‌ها"

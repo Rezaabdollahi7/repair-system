@@ -14,6 +14,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   DocumentPlusIcon,
+  WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
@@ -268,7 +269,10 @@ export default function DeviceList() {
     <div dir="rtl">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">دستگاه‌ها</h1>
+        <h1 className="text-2xl font-bold text-gray-900 flex gap-2">
+          <WrenchScrewdriverIcon className="w-6 h-6 text-gray-600" />
+          دستگاه‌ها
+        </h1>
         <button
           onClick={() => openDeviceEdit(null)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"

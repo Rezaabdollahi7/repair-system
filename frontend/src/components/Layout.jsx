@@ -15,6 +15,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Cog6ToothIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/solid";
 
 export default function Layout() {
@@ -94,7 +95,7 @@ export default function Layout() {
     {
       name: "گزارش سود و زیان",
       path: "/reports/profit",
-      icon: ChartBarIcon,
+      icon: ChartPieIcon,
       adminOnly: true,
     },
     {

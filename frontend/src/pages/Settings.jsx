@@ -238,8 +238,11 @@ export default function Settings() {
   ];
 
   return (
-    <div dir="rtl" className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">تنظیمات</h1>
+    <div dir="rtl" className=" mx-auto">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6 flex gap-2">
+        <Cog6ToothIcon className="w-6 h-6 text-gray-600" />
+        تنظیمات
+      </h1>
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">

@@ -7,6 +7,7 @@ import CustomerFormModal from "../components/CustomerFormModal";
 import PersonnelFormModal from "../components/PersonnelFormModal";
 import ItemFormModal from "../components/ItemFormModal";
 import ItemDetailModal from "../components/ItemDetailModal";
+import SaleInvoiceDetailModal from "../components/SaleInvoiceDetailModal";
 
 const ModalContext = createContext();
 
@@ -46,6 +47,10 @@ export function ModalProvider({ children }) {
   const openCustomerEdit = (customerId) =>
     openModal("customerEdit", customerId);
 
+  const openSaleInvoiceDetail = (invoiceId) =>
+    openModal("saleInvoiceDetail", invoiceId);
+  const openSaleInvoiceCreate = () => openModal("saleInvoiceCreate", null);
+
   return (
     <ModalContext.Provider
       value={{
@@ -56,6 +61,8 @@ export function ModalProvider({ children }) {
         openPersonnelEdit,
         openItemEdit,
         openItemDetail,
+        openSaleInvoiceDetail,
+        openSaleInvoiceCreate,
         closeModal,
       }}
     >
@@ -126,7 +133,21 @@ export function ModalProvider({ children }) {
           onClose={closeModal}
         />
       )}
-      
+
+      {modalState.type === "saleInvoiceDetail" && (
+        <SaleInvoiceDetailModal
+          invoiceId={modalState.id}
+          isOpen={true}
+          onClose={closeModal}
+        />
+      )}
+      {modalState.type === "saleInvoiceCreate" && (
+        <SaleInvoiceFormModal
+          isOpen={true}
+          onClose={closeModal}
+          onSuccess={closeModal}
+        />
+      )}
     </ModalContext.Provider>
   );
 }

@@ -14,11 +14,7 @@ import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
 import CategoryManagement from "./pages/CategoryManagement";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
-import PurchaseInvoiceForm from "./pages/PurchaseInvoiceForm";
-import PurchaseInvoiceDetail from "./pages/PurchaseInvoiceDetail";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
-import SaleInvoiceForm from "./pages/SaleInvoiceForm";
-import SaleInvoiceDetail from "./pages/SaleInvoiceDetail";
 import Dashboard from "./pages/Dashboard";
 import StockReport from "./pages/StockReport";
 import ProfitReport from "./pages/ProfitReport";
@@ -55,23 +51,7 @@ function App() {
                     path="purchase-invoices"
                     element={<PurchaseInvoiceList />}
                   />
-                  <Route
-                    path="purchase-invoices/new"
-                    element={<PurchaseInvoiceForm />}
-                  />
-                  <Route
-                    path="purchase-invoices/:id"
-                    element={<PurchaseInvoiceDetail />}
-                  />
                   <Route path="sale-invoices" element={<SaleInvoiceList />} />
-                  <Route
-                    path="sale-invoices/new"
-                    element={<SaleInvoiceForm />}
-                  />
-                  <Route
-                    path="sale-invoices/:id"
-                    element={<SaleInvoiceDetail />}
-                  />
                   <Route path="settings" element={<Settings />} />
                   <Route
                     path="repair-invoices"

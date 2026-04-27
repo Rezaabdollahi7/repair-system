@@ -9,6 +9,8 @@ import ItemFormModal from "../components/ItemFormModal";
 import ItemDetailModal from "../components/ItemDetailModal";
 import SaleInvoiceDetailModal from "../components/SaleInvoiceDetailModal";
 import SaleInvoiceFormModal from "../components/SaleInvoiceFormModal";
+import PurchaseInvoiceDetailModal from "../components/PurchaseInvoiceDetailModal";
+import PurchaseInvoiceFormModal from "../components/PurchaseInvoiceFormModal.jsx";
 
 const ModalContext = createContext();
 
@@ -52,6 +54,12 @@ export function ModalProvider({ children }) {
     openModal("saleInvoiceDetail", invoiceId);
   const openSaleInvoiceCreate = () => openModal("saleInvoiceCreate", null);
 
+  const openPurchaseInvoiceDetail = (invoiceId) =>
+    openModal("purchaseInvoiceDetail", invoiceId);
+
+  const openPurchaseInvoiceCreate = () =>
+    openModal("purchaseInvoiceCreate", null);
+
   return (
     <ModalContext.Provider
       value={{
@@ -64,6 +72,8 @@ export function ModalProvider({ children }) {
         openItemDetail,
         openSaleInvoiceDetail,
         openSaleInvoiceCreate,
+        openPurchaseInvoiceDetail,
+        openPurchaseInvoiceCreate,
         closeModal,
       }}
     >
@@ -144,6 +154,23 @@ export function ModalProvider({ children }) {
       )}
       {modalState.type === "saleInvoiceCreate" && (
         <SaleInvoiceFormModal
+          isOpen={true}
+          onClose={closeModal}
+          onSuccess={closeModal}
+        />
+      )}
+
+      {modalState.type === "purchaseInvoiceDetail" && (
+        <PurchaseInvoiceDetailModal
+          invoiceId={modalState.id}
+          isOpen={true}
+          onClose={closeModal}
+          onSuccess={closeModal}
+        />
+      )}
+
+      {modalState.type === "purchaseInvoiceCreate" && (
+        <PurchaseInvoiceFormModal
           isOpen={true}
           onClose={closeModal}
           onSuccess={closeModal}

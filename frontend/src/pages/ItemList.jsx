@@ -7,6 +7,9 @@ import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { FolderPlusIcon } from "@heroicons/react/24/solid";
+import CategoryManageModal from "../components/CategoryManageModal";
+
 import {
   PlusIcon,
   EyeIcon,
@@ -67,6 +70,8 @@ export default function ItemList() {
   const [deleting, setDeleting] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 400);
+
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const fetchItems = useCallback(
     async (searchTerm, categoryId, lowStock, currentPage, currentLimit) => {
@@ -153,13 +158,22 @@ export default function ItemList() {
           <CubeIcon className="w-6 h-6 text-gray-600" />
           مدیریت کالاها
         </h1>
-        <button
-          onClick={() => openItemEdit(null)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <PlusIcon className="size-5.5" />
-          کالای جدید
-        </button>
+        <div className=" flex gap-2">
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 flex items-center gap-2"
+          >
+            <FolderPlusIcon className="w-5 h-5" />
+            دسته‌بندی‌ها
+          </button>
+          <button
+            onClick={() => openItemEdit(null)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <PlusIcon className="size-5.5" />
+            کالای جدید
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 space-y-3">
@@ -376,6 +390,21 @@ export default function ItemList() {
         variant="danger"
         loading={deleting}
       />
+      {showCategoryModal && (
+        <CategoryManageModal
+          isOpen={showCategoryModal}
+          onClose={() => setShowCategoryModal(false)}
+          onSuccess={() =>
+            fetchItems(
+              debouncedSearch,
+              selectedCategory,
+              showLowStockOnly,
+              page,
+              limit,
+            )
+          }
+        />
+      )}
     </div>
   );
 }

@@ -9,10 +9,8 @@ import Login from "./pages/Login";
 
 import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
-import CustomerDetail from "./pages/CustomerDetail";
 import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
-import CategoryManagement from "./pages/CategoryManagement";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import Dashboard from "./pages/Dashboard";
@@ -38,13 +36,11 @@ function App() {
                 <Route index element={<Navigate to="/devices" replace />} />
                 <Route path="devices" element={<DeviceList />} />
                 <Route path="customers" element={<CustomerList />} />
-                <Route path="customers/:id" element={<CustomerDetail />} />
 
                 <Route element={<ProtectedRoute minRole="admin" />}>
                   <Route path="personnel" element={<PersonnelList />} />
                   //!TODO : check
                   <Route path="items" element={<ItemList />} />
-                  <Route path="categories" element={<CategoryManagement />} />
                   <Route
                     path="purchase-invoices"
                     element={<PurchaseInvoiceList />}

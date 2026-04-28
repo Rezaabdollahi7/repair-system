@@ -5,18 +5,18 @@ function rowToDevice(row) {
   return {
     id: row[0],
     customer_id: row[1],
-    device_name: row[2],
-    brand: row[3],
-    model: row[4],
-    serial_number: row[5],
-    entry_date: row[6],
-    exit_date: row[7],
-    status: row[8],
-    description: row[9],
-    created_at: row[10],
-    updated_at: row[11],
-    customer_name: row[12],
-    customer_phone: row[13],
+    device_name: row[3],
+    brand: row[4],
+    model: row[5],
+    serial_number: row[6],
+    entry_date: row[7],
+    exit_date: row[8],
+    status: row[9],
+    description: row[10],
+    created_at: row[11],
+    updated_at: row[12],
+    customer_name: row[13],
+    customer_phone: row[14],
   };
 }
 
@@ -189,11 +189,12 @@ exports.create = async (req, res) => {
     } = req.body;
 
     db.run(
-      `INSERT INTO devices (customer_id, device_name, brand, model, serial_number, entry_date, exit_date, status, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?)`,
+      `INSERT INTO devices (customer_id, personnel_id, device_name, brand, model, serial_number, entry_date, exit_date, status, description, created_at, updated_at) 
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       [
         customer_id || null,
-        device_name,
+        null, // personnel_id
+        device_name || null,
         brand || null,
         model || null,
         serial_number || null,

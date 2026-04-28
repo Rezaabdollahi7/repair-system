@@ -12,6 +12,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
+import LoadingSpinner from "./LoadingSpinner";
 
 const STATUS_MAP = {
   pending: { label: "در انتظار بررسی", color: "bg-yellow-100 text-yellow-800" },
@@ -110,8 +111,8 @@ export default function DeviceDetailModal({
         {/* Content - دقیقاً مثل DeviceDetail */}
         <div className="p-6">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">در حال بارگذاری...</div>
+            <div className="flex justify-center items-center h-64">
+              <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
             </div>
           ) : device ? (
             <div className="space-y-6">

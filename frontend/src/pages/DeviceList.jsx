@@ -20,6 +20,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
 import DeviceDetailModal from "../components/DeviceDetailModal";
 import DeviceFormModal from "../components/DeviceFormModal";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 import { useModal } from "../context/ModalContext";
 
@@ -306,8 +307,8 @@ export default function DeviceList() {
       </div>
       {/* Table */}
       {loading ? (
-        <div className="text-center py-10 text-gray-500">
-          در حال بارگذاری...
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : devices.length === 0 ? (
         <div className="text-center py-20 text-gray-400">

@@ -21,6 +21,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
+import LoadingSpinner from "./LoadingSpinner";
 
 // ── helper ──────────────────────────────────────────────
 const statusColor = {
@@ -196,8 +197,8 @@ export default function CustomerDetailModal({
 
         <div className="p-6">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="flex justify-center items-center h-64">
+              <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
             </div>
           ) : customer ? (
             <div className="space-y-6">

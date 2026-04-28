@@ -17,6 +17,7 @@ import {
   ExclamationCircleIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -151,8 +152,8 @@ export default function PurchaseInvoiceList() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-gray-500">
-          در حال بارگذاری...
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : invoices.length === 0 ? (
         <div className="text-center py-20 text-gray-400">

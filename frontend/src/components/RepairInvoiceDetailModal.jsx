@@ -24,6 +24,7 @@ import {
   PencilSquareIcon,
   WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
+import LoadingSpinner from "./LoadingSpinner";
 
 function StatusBadge({ status }) {
   const map = {
@@ -221,8 +222,8 @@ export default function RepairInvoiceDetailModal({
 
         <div className="p-6">
           {loading ? (
-            <div className="text-center py-10 text-gray-500">
-              در حال بارگذاری...
+            <div className="flex justify-center items-center h-64">
+              <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
             </div>
           ) : invoice ? (
             <>

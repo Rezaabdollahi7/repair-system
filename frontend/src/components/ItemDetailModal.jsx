@@ -16,6 +16,7 @@ import {
   ExclamationTriangleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/solid";
+import LoadingSpinner from "./LoadingSpinner";
 
 // ─── Quick Purchase Modal (دقیقاً همون قبلیه) ──────────────────
 function QuickPurchaseModal({ isOpen, onClose, onSuccess, item }) {
@@ -378,7 +379,7 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
 
         {loading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="text-gray-500">در حال بارگذاری...</div>
+            <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
           </div>
         ) : item ? (
           <div className="p-6">

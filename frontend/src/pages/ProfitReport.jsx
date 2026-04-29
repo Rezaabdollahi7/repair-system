@@ -122,27 +122,27 @@ export default function ProfitReport() {
           {/* Table */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className=" bg-gradient-to-r from-indigo-50 to-blue-50">
                 <tr>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     کد
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     نام کالا
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     تعداد فروش
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     درآمد
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     هزینه
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">  
                     سود
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     حاشیه سود
                   </th>
                 </tr>

@@ -1,4 +1,5 @@
 const { getDb, saveDb } = require("../config/database");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 // Helper: تبدیل row به object
 function rowToItem(row) {
@@ -253,7 +254,7 @@ exports.search = async (req, res) => {
     const params = [];
 
     if (q && q.trim()) {
-      const searchTerm = q.trim().replace(/\s+/g, " ");
+      const searchTerm = persianToEnglish(q.trim()).replace(/\s+/g, " ");
       baseQuery += ` AND (i.code LIKE ? OR i.name LIKE ?)`;
       params.push(`%${searchTerm}%`, `%${searchTerm}%`);
     }
@@ -635,7 +636,7 @@ exports.searchForInvoice = async (req, res) => {
     const params = [];
 
     if (q && q.trim()) {
-      const searchTerm = q.trim().replace(/\s+/g, " ");
+      const searchTerm = persianToEnglish(q.trim()).replace(/\s+/g, " ");
       query += ` AND (i.code LIKE ? OR i.name LIKE ?)`;
       params.push(`%${searchTerm}%`, `%${searchTerm}%`);
     }

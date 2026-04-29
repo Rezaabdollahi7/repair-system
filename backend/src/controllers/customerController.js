@@ -1,4 +1,5 @@
 const { getDb, saveDb } = require("../config/database");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 exports.getAll = async (req, res) => {
   try {
@@ -14,7 +15,10 @@ exports.getAll = async (req, res) => {
 
     if (search?.trim()) {
       where += ` AND (c.name LIKE ? OR c.phone LIKE ?)`;
-      params.push(`%${search.trim()}%`, `%${search.trim()}%`);
+      params.push(
+        `%${persianToEnglish(search.trim())}%`,
+        `%${persianToEnglish(search.trim())}%`,
+      );
     }
 
     const countResult = db.exec(

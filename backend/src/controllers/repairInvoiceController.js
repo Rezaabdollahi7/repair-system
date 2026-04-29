@@ -1,4 +1,5 @@
 const { getDb, saveDb } = require("../config/database");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 // Generate invoice number
 function generateInvoiceNumber(db) {
@@ -162,7 +163,7 @@ exports.getAll = async (req, res) => {
 
     if (search) {
       baseQuery += ` AND (ri.invoice_number LIKE ? OR ri.customer_name LIKE ? OR d.device_name LIKE ?)`;
-      const term = `%${search}%`;
+      const term = `%${persianToEnglish(search)}%`;
       params.push(term, term, term);
     }
 
@@ -589,7 +590,7 @@ exports.update = async (req, res) => {
       item.unit_price = Number(item.unit_price) || 0;
       item.quantity = Number(item.quantity) || 1;
     }
-    
+
     // Calculate totals
     const calculations = calculateInvoiceTotals(
       items,

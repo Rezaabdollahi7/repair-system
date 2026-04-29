@@ -1,5 +1,6 @@
 const { getDb, saveDb } = require("../config/database");
 const { deleteDeviceImages } = require("./imageController");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 function rowToDevice(row) {
   return {
@@ -57,7 +58,7 @@ exports.getAll = async (req, res) => {
     const params = [];
 
     if (search && search.trim()) {
-      const term = `%${search.trim()}%`;
+      const term = `%${persianToEnglish(search.trim())}%`;
       baseQuery += ` AND (
         CAST(d.id AS TEXT) LIKE ? OR
         d.device_name LIKE ? OR

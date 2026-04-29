@@ -1,4 +1,5 @@
 const { getDb, saveDb } = require("../config/database");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 // Generate invoice number
 function generateInvoiceNumber(db) {
@@ -59,7 +60,7 @@ exports.getAll = async (req, res) => {
 
     if (search) {
       baseQuery += ` AND (customer_name LIKE ? OR customer_phone LIKE ? OR invoice_number LIKE ?)`;
-      const term = `%${search}%`;
+      const term = `%${persianToEnglish(search)}%`;
       params.push(term, term, term);
     }
     if (from_date) {

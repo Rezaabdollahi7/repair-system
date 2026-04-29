@@ -1,4 +1,5 @@
 const { getDb, saveDb } = require("../config/database");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 // Helper: Generate invoice number (YYYYMMDD-XXX)
 function generateInvoiceNumber(db) {
@@ -69,7 +70,7 @@ exports.getAll = async (req, res) => {
 
     if (supplier) {
       baseQuery += ` AND supplier_name LIKE ?`;
-      params.push(`%${supplier}%`);
+      params.push(`%${persianToEnglish(supplier)}%`);
     }
     if (from_date) {
       baseQuery += ` AND date(invoice_date) >= date(?)`;

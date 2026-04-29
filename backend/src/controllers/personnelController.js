@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const { getDb, saveDb } = require("../config/database");
+const persianToEnglish = require("../utils/persianToEnglish");
 
 function rowToObj(columns, values) {
   const obj = {};
@@ -30,7 +31,7 @@ exports.getAll = async (req, res) => {
         u.username LIKE ? OR 
         u.phone LIKE ?
       )`;
-      const searchPattern = `%${search.trim()}%`;
+      const searchPattern = `%${persianToEnglish(search.trim())}%`;
       params.push(searchPattern, searchPattern, searchPattern);
     }
 

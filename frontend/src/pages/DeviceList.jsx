@@ -171,7 +171,8 @@ export default function DeviceList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { openDeviceDetail, openDeviceEdit, openCustomerDetail } = useModal();
+  const { openDeviceDetail, openDeviceEdit, openCustomerDetail, refreshList } =
+    useModal();
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -221,6 +222,7 @@ export default function DeviceList() {
   );
 
   // ─── Effects ──────────────────────────────────────────────────
+  // ─── Effects ──────────────────────────────────────────────────
   useEffect(() => {
     getCustomers()
       .then((res) => setCustomers(res.data.data ?? res.data))
@@ -253,6 +255,12 @@ export default function DeviceList() {
     setPage(1);
   }, [debouncedSearch, filters]);
 
+  // Register refresh callback
+  useEffect(() => {
+    refreshList(() => {
+      fetchDevices(debouncedSearch, filters, page, limit);
+    });
+  }, [refreshList, fetchDevices, debouncedSearch, filters, page, limit]);
   // ─── Handlers ─────────────────────────────────────────────────
 
   const handleStatusChange = async (deviceId, newStatus) => {

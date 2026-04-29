@@ -1,5 +1,5 @@
 // src/context/ModalContext.jsx
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useRef } from "react";
 import DeviceDetailModal from "../components/DeviceDetailModal";
 import DeviceFormModal from "../components/DeviceFormModal";
 import CustomerDetailModal from "../components/CustomerDetailModal";
@@ -23,12 +23,21 @@ export function ModalProvider({ children }) {
     props: {},
   });
 
+  const refreshCallbackRef = useRef(null);
+
   const openModal = (type, id, props = {}) => {
     setModalState({ type, id, props });
   };
 
   const closeModal = () => {
     setModalState({ type: null, id: null, props: {} });
+    if (refreshCallbackRef.current) {
+      refreshCallbackRef.current();
+    }
+  };
+
+  const setRefreshCallback = (callback) => {
+    refreshCallbackRef.current = callback;
   };
 
   const openPersonnelEdit = (personnelId) =>
@@ -84,6 +93,7 @@ export function ModalProvider({ children }) {
         openRepairInvoiceCreate,
         openRepairInvoiceEdit,
         closeModal,
+        refreshList: setRefreshCallback,
       }}
     >
       {children}

@@ -63,7 +63,9 @@ export default function SaleInvoiceList() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const { isAtLeast } = useAuth();
-  const { openSaleInvoiceDetail, openSaleInvoiceCreate } = useModal();
+  const { openSaleInvoiceDetail, openSaleInvoiceCreate, refreshList } =
+    useModal();
+
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -105,6 +107,12 @@ export default function SaleInvoiceList() {
     }
     setPage(1);
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    refreshList(() => {
+      fetchInvoices(debouncedSearch, page, limit);
+    });
+  }, [refreshList, fetchInvoices, debouncedSearch, page, limit]);
 
   const formatDate = (dateStr) =>
     dateStr ? new Date(dateStr).toLocaleDateString("fa-IR") : "—";

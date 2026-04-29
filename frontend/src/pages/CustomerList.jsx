@@ -37,7 +37,7 @@ export default function CustomerList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { openCustomerDetail, openCustomerEdit } = useModal();
+  const { openCustomerDetail, openCustomerEdit, refreshList } = useModal();
   const { isAtLeast } = useAuth();
   const debouncedSearch = useDebounce(searchInput);
 
@@ -70,14 +70,25 @@ export default function CustomerList() {
     [],
   );
 
-  const prevSearchRef = useRef(debouncedSearch);
   useEffect(() => {
-    const searchChanged = prevSearchRef.current !== debouncedSearch;
-    prevSearchRef.current = debouncedSearch;
-    const currentPage = searchChanged ? 1 : page;
-    if (searchChanged) setPage(1);
-    fetchCustomers(debouncedSearch, currentPage, limit);
+    fetchCustomers(debouncedSearch, page, limit);
   }, [debouncedSearch, page, limit, fetchCustomers]);
+
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setPage(1);
+  }, [debouncedSearch]);
+
+  // Register refresh callback
+  useEffect(() => {
+    refreshList(() => {
+      fetchCustomers(debouncedSearch, page, limit);
+    });
+  }, [refreshList, fetchCustomers, debouncedSearch, page, limit]);
 
   return (
     <div dir="rtl">

@@ -60,7 +60,7 @@ export default function ItemList() {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   const { isAtLeast } = useAuth();
-  const { openItemEdit, openItemDetail } = useModal();
+  const { openItemEdit, openItemDetail, refreshList } = useModal();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -145,6 +145,27 @@ export default function ItemList() {
     }
     setPage(1);
   }, [debouncedSearch, selectedCategory, showLowStockOnly]);
+
+  // Register refresh callback
+  useEffect(() => {
+    refreshList(() => {
+      fetchItems(
+        debouncedSearch,
+        selectedCategory,
+        showLowStockOnly,
+        page,
+        limit,
+      );
+    });
+  }, [
+    refreshList,
+    fetchItems,
+    debouncedSearch,
+    selectedCategory,
+    showLowStockOnly,
+    page,
+    limit,
+  ]);
 
   const handleClearFilters = () => {
     setSearchInput("");

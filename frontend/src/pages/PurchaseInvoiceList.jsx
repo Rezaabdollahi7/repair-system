@@ -66,7 +66,9 @@ export default function PurchaseInvoiceList() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const { isAtLeast } = useAuth();
-  const { openPurchaseInvoiceDetail, openPurchaseInvoiceCreate } = useModal();
+  const { openPurchaseInvoiceDetail, openPurchaseInvoiceCreate, refreshList } =
+    useModal();
+
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -111,6 +113,12 @@ export default function PurchaseInvoiceList() {
     }
     setPage(1);
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    refreshList(() => {
+      fetchInvoices(debouncedSearch, page, limit);
+    });
+  }, [refreshList, fetchInvoices, debouncedSearch, page, limit]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";

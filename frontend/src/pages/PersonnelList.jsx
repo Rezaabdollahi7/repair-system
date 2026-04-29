@@ -32,7 +32,7 @@ function useDebounce(value, delay = 400) {
 
 export default function PersonnelList() {
   const { user, isAtLeast } = useAuth();
-  const { openPersonnelEdit } = useModal();
+  const { openPersonnelEdit, refreshList } = useModal();
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
@@ -89,6 +89,13 @@ export default function PersonnelList() {
     }
     setPage(1);
   }, [debouncedSearch]);
+
+  // Register refresh callback
+  useEffect(() => {
+    refreshList(() => {
+      fetchPersonnel(debouncedSearch, page, limit);
+    });
+  }, [refreshList, fetchPersonnel, debouncedSearch, page, limit]);
 
   const handleToggleActive = async () => {
     if (!toggleTarget) return;

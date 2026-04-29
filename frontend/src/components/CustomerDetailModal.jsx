@@ -22,6 +22,7 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
+import { formatPersianPhone } from "../utils/formatters";
 
 // ── helper ──────────────────────────────────────────────
 const statusColor = {
@@ -87,7 +88,7 @@ function DeviceTimeline({ devices, openDeviceDetail }) {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-medium text-gray-900">
-                    {device.device_name}
+                    {device.device_name} <span className="text-gray-500"> ( کد پذیرش : {device.id}) </span>
                   </p>
                   {device.brand && (
                     <p className="text-sm text-gray-500 mt-0.5">
@@ -214,7 +215,7 @@ export default function CustomerDetailModal({
                       </h2>
                       <div className="flex items-center gap-2 mt-1 text-gray-500 text-sm">
                         <PhoneIcon className="w-4 h-4" />
-                        <span>{customer.phone || "—"}</span>
+                        {formatPersianPhone(customer.phone)}
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-gray-400 text-xs">
                         <CalendarIcon className="w-3.5 h-3.5" />

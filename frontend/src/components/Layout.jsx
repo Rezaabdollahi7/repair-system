@@ -81,7 +81,7 @@ export default function Layout() {
       name: "فاکتورهای تعمیر",
       path: "/repair-invoices",
       icon: WrenchScrewdriverIcon,
-      adminOnly: false,
+      adminOnly: true,
     },
     {
       divider: true,
@@ -110,9 +110,31 @@ export default function Layout() {
     },
   ];
 
+  // First filter by role
   const filteredMenuItems = menuItems.filter(
     (item) => !item.adminOnly || (item.adminOnly && isAtLeast("admin")),
   );
+
+  // Then remove leading/trailing dividers and consecutive dividers
+  const cleanMenuItems = filteredMenuItems.filter((item, index, arr) => {
+    if (!item.divider) return true; // Keep non-dividers
+
+    // Remove divider if it's the first visible item
+    if (index === 0) return false;
+
+    // Remove divider if it's the last visible item
+    if (index === arr.length - 1) return false;
+
+    // Remove divider if the previous visible item is also a divider
+    const prevItem = arr[index - 1];
+    if (prevItem?.divider) return false;
+
+    // Remove divider if the next visible item is also a divider
+    const nextItem = arr[index + 1];
+    if (nextItem?.divider) return false;
+
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 flex" dir="rtl">
@@ -144,7 +166,7 @@ export default function Layout() {
         {/* Navigation Menu - Scrollable */}
         <nav className="flex-1 py-4 overflow-y-auto">
           <ul className="space-y-1 px-2">
-            {filteredMenuItems.map((item, index) => {
+            {cleanMenuItems.map((item, index) => {
               if (item.divider) {
                 return (
                   <li

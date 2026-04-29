@@ -7,9 +7,9 @@ export default function Pagination({
   onPageChange,
   onLimitChange,
 }) {
-  if (totalPages <= 0) return null;
+  if (total <= 0 || totalPages <= 0) return null;
 
-  const from = total === 0 ? 0 : (page - 1) * limit + 1;
+  const from = (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
 
   return (

@@ -72,7 +72,8 @@ export function ModalProvider({ children }) {
     openModal("purchaseInvoiceCreate", null);
 
   const openRepairInvoiceDetail = (id) => openModal("repairInvoiceDetail", id);
-  const openRepairInvoiceCreate = () => openModal("repairInvoiceCreate", null);
+  const openRepairInvoiceCreate = (deviceId) =>
+    openModal("repairInvoiceCreate", deviceId);
   const openRepairInvoiceEdit = (id) => openModal("repairInvoiceEdit", id);
 
   return (
@@ -207,6 +208,7 @@ export function ModalProvider({ children }) {
           isOpen={true}
           onClose={closeModal}
           onSuccess={closeModal}
+          initialDeviceId={modalState.id}
         />
       )}
       {modalState.type === "repairInvoiceEdit" && (
@@ -215,6 +217,7 @@ export function ModalProvider({ children }) {
           isOpen={true}
           onClose={closeModal}
           onSuccess={closeModal}
+          initialInvoiceId={modalState.id}
         />
       )}
     </ModalContext.Provider>

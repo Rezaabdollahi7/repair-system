@@ -198,8 +198,13 @@ export default function DeviceList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { openDeviceDetail, openDeviceEdit, openCustomerDetail, refreshList } =
-    useModal();
+  const {
+    openDeviceDetail,
+    openDeviceEdit,
+    openCustomerDetail,
+    refreshList,
+    openRepairInvoiceCreate,
+  } = useModal();
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -432,13 +437,13 @@ export default function DeviceList() {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-2 justify-center">
-                      <Link
-                        to={`/repair-invoices/new?device_id=${device.id}`}
-                        className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors  "
+                      <button
+                        onClick={() => openRepairInvoiceCreate(device.id)}
+                        className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
                         title="ایجاد فاکتور تعمیر"
                       >
                         <DocumentPlusIcon className="w-5 h-5" />
-                      </Link>
+                      </button>
                       <button
                         onClick={() => openDeviceDetail(device.id)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "

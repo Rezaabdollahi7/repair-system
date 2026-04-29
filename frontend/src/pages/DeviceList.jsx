@@ -15,6 +15,7 @@ import {
   TrashIcon,
   DocumentPlusIcon,
   WrenchScrewdriverIcon,
+  ArrowsRightLeftIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
@@ -34,8 +35,7 @@ function useDebounce(value, delay = 400) {
 }
 
 function StatusBadge({ status, onStatusChange }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const [showModal, setShowModal] = useState(false);
 
   const map = {
     pending: {
@@ -61,60 +61,87 @@ function StatusBadge({ status, onStatusChange }) {
     color: "bg-gray-100 text-gray-600",
   };
 
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
-        setIsOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   return (
-    <div ref={dropdownRef} className="relative inline-block">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-pointer hover:opacity-80 transition-colors ${current.color}`}
-      >
-        {current.label}
-        <svg
-          className="w-3 h-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+    <>
+      <div className="flex items-center  gap-3">
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${current.color}`}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      </button>
+          {current.label}
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowModal(true);
+          }}
+          className="p-0.5 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          title="تغییر وضعیت"
+        >
+          <ArrowsRightLeftIcon className="size-5" />
+        </button>
+      </div>
 
-      {isOpen && (
-        <div className="absolute right-0 z-50 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-          {Object.entries(map)
-            .filter(([key]) => key !== status)
-            .map(([key, val]) => (
+      {/* Modal انتخاب وضعیت */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">تغییر وضعیت</h3>
+            </div>
+            <div className="p-2">
+              {Object.entries(map).map(([key, val]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    onStatusChange(key);
+                    setShowModal(false);
+                  }}
+                  className={`w-full text-right px-4 py-3 rounded-lg text-sm font-medium transition-colors mb-1 ${
+                    key === status
+                      ? `${val.color} ring-2 ring-inset`
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{val.label}</span>
+                    {key === status && (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="p-2 border-t border-gray-100">
               <button
-                key={key}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStatusChange(key);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-right px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${val.color}`}
+                onClick={() => setShowModal(false)}
+                className="w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
               >
-                {val.label}
+                انصراف
               </button>
-            ))}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

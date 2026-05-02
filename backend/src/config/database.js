@@ -391,6 +391,19 @@ function initSchema() {
   CREATE INDEX IF NOT EXISTS idx_repair_invoices_date ON repair_invoices(invoice_date);
   CREATE INDEX IF NOT EXISTS idx_repair_invoice_items_invoice ON repair_invoice_items(invoice_id);
 `);
+
+  // Backup metadata table
+  db.run(`
+  CREATE TABLE IF NOT EXISTS backups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    size_bytes INTEGER DEFAULT 0,
+    includes_uploads INTEGER DEFAULT 0,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  )
+`);
 }
 
 function saveDb() {

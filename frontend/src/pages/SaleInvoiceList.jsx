@@ -63,8 +63,12 @@ export default function SaleInvoiceList() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const { isAtLeast } = useAuth();
-  const { openSaleInvoiceDetail, openSaleInvoiceCreate, refreshList } =
-    useModal();
+  const {
+    openSaleInvoiceDetail,
+    openSaleInvoiceCreate,
+    openCustomerDetail,
+    refreshList,
+  } = useModal();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -196,13 +200,28 @@ export default function SaleInvoiceList() {
                 return (
                   <tr
                     key={invoice.id}
-                    className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                    onClick={() => openSaleInvoiceDetail(invoice.id)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    }`}
                   >
                     <td className="px-4 py-3 text-sm font-mono font-medium">
                       {invoice.invoice_number}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {invoice.customer_name || "—"}
+                      {invoice.customer_id ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openCustomerDetail(invoice.customer_id);
+                          }}
+                          className="text-blue-600 hover:underline font-medium"
+                        >
+                          {invoice.customer_name || "—"}
+                        </button>
+                      ) : (
+                        invoice.customer_name || "—"
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {formatPersianPhone(invoice.customer_phone)}
@@ -225,7 +244,10 @@ export default function SaleInvoiceList() {
                     <td className="px-4 py-3 text-sm">
                       <div className="flex gap-1 justify-center">
                         <button
-                          onClick={() => openSaleInvoiceDetail(invoice.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSaleInvoiceDetail(invoice.id);
+                          }}
                           className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                           title="مشاهده جزئیات"
                         >
@@ -233,7 +255,10 @@ export default function SaleInvoiceList() {
                         </button>
                         {isAtLeast("admin") && (
                           <button
-                            onClick={() => setDeleteTarget(invoice)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(invoice);
+                            }}
                             className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                             title="حذف"
                           >

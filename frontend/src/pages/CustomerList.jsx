@@ -149,15 +149,13 @@ export default function CustomerList() {
               {customers.map((c, index) => (
                 <tr
                   key={c.id}
-                  className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                  onClick={() => openCustomerDetail(c.id)}
+                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                    index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                  }`}
                 >
                   <td className="px-4 py-3 text-sm font-medium">
-                    <button
-                      onClick={() => openCustomerDetail(c.id)}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      {c.name}
-                    </button>
+                    <span className="text-blue-600 font-medium">{c.name}</span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {formatPersianPhone(c.phone)}
@@ -170,14 +168,20 @@ export default function CustomerList() {
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-1 justify-center">
                       <button
-                        onClick={() => openCustomerDetail(c.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCustomerDetail(c.id);
+                        }}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => openCustomerEdit(c.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCustomerEdit(c.id);
+                        }}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                         title="ویرایش"
                       >
@@ -185,7 +189,10 @@ export default function CustomerList() {
                       </button>
                       {isAtLeast("admin") && (
                         <button
-                          onClick={() => setDeleteTarget(c)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(c);
+                          }}
                           className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           title="حذف"
                         >

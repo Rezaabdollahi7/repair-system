@@ -107,6 +107,7 @@ export default function RepairInvoiceList() {
     openRepairInvoiceCreate,
     openRepairInvoiceEdit,
     openDeviceDetail,
+    openCustomerDetail,
   } = useModal();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -266,7 +267,10 @@ export default function RepairInvoiceList() {
                 return (
                   <tr
                     key={invoice.id}
-                    className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                    onClick={() => openRepairInvoiceDetail(invoice.id)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    }`}
                   >
                     <td className="px-4 py-3 text-sm font-mono font-medium">
                       {invoice.invoice_number}
@@ -281,7 +285,19 @@ export default function RepairInvoiceList() {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {invoice.customer_name || "—"}
+                      {invoice.customer_id ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openCustomerDetail(invoice.customer_id);
+                          }}
+                          className="text-blue-600 hover:underline font-medium"
+                        >
+                          {invoice.customer_name || "—"}
+                        </button>
+                      ) : (
+                        invoice.customer_name || "—"
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {formatDate(invoice.invoice_date)}
@@ -304,7 +320,10 @@ export default function RepairInvoiceList() {
                     <td className="px-4 py-3 text-sm">
                       <div className="flex gap-1 justify-center">
                         <button
-                          onClick={() => openRepairInvoiceDetail(invoice.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openRepairInvoiceDetail(invoice.id);
+                          }}
                           className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                           title="جزئیات"
                         >
@@ -312,7 +331,10 @@ export default function RepairInvoiceList() {
                         </button>
                         {canEdit && (
                           <button
-                            onClick={() => openRepairInvoiceEdit(invoice.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRepairInvoiceEdit(invoice.id);
+                            }}
                             className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                             title="ویرایش"
                           >
@@ -321,7 +343,10 @@ export default function RepairInvoiceList() {
                         )}
                         {isAtLeast("admin") && (
                           <button
-                            onClick={() => setDeleteTarget(invoice)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(invoice);
+                            }}
                             className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                             title="حذف"
                           >

@@ -300,18 +300,18 @@ export default function ItemList() {
               {items.map((item, index) => (
                 <tr
                   key={item.id}
-                  className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                  onClick={() => openItemDetail(item.id)}
+                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                    index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                  }`}
                 >
                   <td className="px-4 py-3 text-sm font-mono">
                     {item.code || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    <button
-                      onClick={() => openItemDetail(item.id)}
-                      className="text-blue-600 hover:underline"
-                    >
+                    <span className="text-blue-600 font-medium">
                       {item.name}
-                    </button>
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.categoryName || "—"}
@@ -336,14 +336,20 @@ export default function ItemList() {
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-1 justify-center">
                       <button
-                        onClick={() => openItemDetail(item.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openItemDetail(item.id);
+                        }}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="size-5.5" />
                       </button>
                       <button
-                        onClick={() => openItemEdit(item.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openItemEdit(item.id);
+                        }}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                         title="ویرایش"
                       >
@@ -351,7 +357,10 @@ export default function ItemList() {
                       </button>
                       {isAtLeast("admin") && (
                         <button
-                          onClick={() => setDeleteTarget(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(item);
+                          }}
                           className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           title="حذف"
                         >

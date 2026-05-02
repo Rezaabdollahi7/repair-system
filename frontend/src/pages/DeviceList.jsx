@@ -397,7 +397,8 @@ export default function DeviceList() {
               {devices.map((device, index) => (
                 <tr
                   key={device.id}
-                  className={`hover:bg-gray-50 transition-colors ${
+                  onClick={() => openDeviceEdit(device.id)}
+                  className={`hover:bg-gray-50 transition-colors hover:cursor-pointer ${
                     index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                   }`}
                 >
@@ -438,21 +439,30 @@ export default function DeviceList() {
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-2 justify-center">
                       <button
-                        onClick={() => openRepairInvoiceCreate(device.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRepairInvoiceCreate(device.id);
+                        }}
                         className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
                         title="ایجاد فاکتور تعمیر"
                       >
                         <DocumentPlusIcon className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => openDeviceDetail(device.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeviceDetail(device.id);
+                        }}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
                         title="مشاهده جزئیات"
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => openDeviceEdit(device.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeviceEdit(device.id);
+                        }}
                         className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
                         title="ویرایش"
                       >
@@ -460,7 +470,10 @@ export default function DeviceList() {
                       </button>
                       {isAtLeast("admin") && (
                         <button
-                          onClick={() => setDeleteTarget(device)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(device);
+                          }}
                           className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           title="حذف"
                         >

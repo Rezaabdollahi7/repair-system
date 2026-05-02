@@ -313,79 +313,6 @@ export default function RepairInvoiceDetailModal({
                     </div>
                   </div>
 
-                  {/* Invoice Details */}
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      جزئیات فاکتور
-                    </h3>
-                    <div className="space-y-3">
-                      <InfoRow
-                        label="تاریخ"
-                        value={formatDate(invoice.invoice_date)}
-                      />
-                      <InfoRow
-                        label="تعمیرکار"
-                        value={invoice.technician_name || "—"}
-                      />
-                      <InfoRow
-                        label="گارانتی"
-                        value={
-                          invoice.warranty_months > 0
-                            ? `${invoice.warranty_months} ماه`
-                            : "بدون گارانتی"
-                        }
-                      />
-                      <InfoRow label="توضیحات" value={invoice.notes || "—"} />
-                    </div>
-                  </div>
-
-                  {/* Payment Summary */}
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      پرداخت
-                    </h3>
-                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                      <div className="flex justify-between mb-2">
-                        <span>جمع کل:</span>
-                        <span className="font-bold">
-                          {formatCurrency(invoice.total_amount)} ریال
-                        </span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span>پرداخت شده:</span>
-                        <span className="text-green-600">
-                          {formatCurrency(invoice.paid_amount)} ریال
-                        </span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t">
-                        <span>مانده:</span>
-                        <span
-                          className={
-                            invoice.total_amount - invoice.paid_amount > 0
-                              ? "text-red-600"
-                              : "text-green-600"
-                          }
-                        >
-                          {formatCurrency(
-                            invoice.total_amount - invoice.paid_amount,
-                          )}{" "}
-                          ریال
-                        </span>
-                      </div>
-                    </div>
-                    {(invoice.status === "issued" ||
-                      invoice.status === "paid") &&
-                      invoice.total_amount - invoice.paid_amount > 0 && (
-                        <button
-                          onClick={() => setShowPaymentModal(true)}
-                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
-                        >
-                          <CurrencyDollarIcon className="w-4 h-4" />
-                          ثبت پرداخت
-                        </button>
-                      )}
-                  </div>
-
                   {/* Status Actions */}
                   <div className="bg-white shadow rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -418,143 +345,225 @@ export default function RepairInvoiceDetailModal({
                 {/* Right Column */}
                 <div className="lg:col-span-2 space-y-6">
                   {/* Items Table */}
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      اقلام فاکتور
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              #
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              نوع
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              نام
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              تعداد
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              واحد
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              قیمت واحد
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              تخفیف
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              جمع
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {invoice.items?.map((item, index) => (
-                            <tr key={item.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-500">
-                                {index + 1}
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                <span
-                                  className={`text-xs px-2 py-1 rounded-full ${item.item_type === "inventory" ? "bg-green-100 text-green-700" : item.item_type === "service" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}
-                                >
-                                  {item.item_type === "inventory"
-                                    ? "انبار"
-                                    : item.item_type === "service"
-                                      ? "خدمت"
-                                      : "دلخواه"}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {item.item_type === "inventory" ? (
-                                  <button
-                                    onClick={() => {
-                                      onClose();
-                                      openItemDetail(item.item_id);
-                                    }}
-                                    className="text-blue-600 hover:underline"
+                  <div className="">
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Invoice Details */}
+                      <div className="bg-white shadow rounded-lg p-6 col-span-1">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                          جزئیات فاکتور
+                        </h3>
+                        <div className="space-y-3">
+                          <InfoRow
+                            label="تاریخ"
+                            value={formatDate(invoice.invoice_date)}
+                          />
+                          <InfoRow
+                            label="تعمیرکار"
+                            value={invoice.technician_name || "—"}
+                          />
+                          <InfoRow
+                            label="گارانتی"
+                            value={
+                              invoice.warranty_months > 0
+                                ? `${invoice.warranty_months} ماه`
+                                : "بدون گارانتی"
+                            }
+                          />
+                          <InfoRow
+                            label="توضیحات"
+                            value={invoice.notes || "—"}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Payment Summary */}
+                      <div className="bg-white shadow rounded-lg p-6 col-span-1">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                          پرداخت
+                        </h3>
+                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                          <div className="flex justify-between mb-2">
+                            <span>جمع کل:</span>
+                            <span className="font-bold">
+                              {formatCurrency(invoice.total_amount)} ریال
+                            </span>
+                          </div>
+                          <div className="flex justify-between mb-2">
+                            <span>پرداخت شده:</span>
+                            <span className="text-green-600">
+                              {formatCurrency(invoice.paid_amount)} ریال
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t">
+                            <span>مانده:</span>
+                            <span
+                              className={
+                                invoice.total_amount - invoice.paid_amount > 0
+                                  ? "text-red-600"
+                                  : "text-green-600"
+                              }
+                            >
+                              {formatCurrency(
+                                invoice.total_amount - invoice.paid_amount,
+                              )}{" "}
+                              ریال
+                            </span>
+                          </div>
+                        </div>
+                        {(invoice.status === "issued" ||
+                          invoice.status === "paid") &&
+                          invoice.total_amount - invoice.paid_amount > 0 && (
+                            <button
+                              onClick={() => setShowPaymentModal(true)}
+                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                            >
+                              <CurrencyDollarIcon className="w-4 h-4" />
+                              ثبت پرداخت
+                            </button>
+                          )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 mt-6 bg-white shadow rounded-lg p-6">
+                      <h3 className="text-lg font-medium text-gray-900 ">
+                        اقلام فاکتور
+                      </h3>
+
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                #
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                نوع
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                نام
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                تعداد
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                واحد
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                قیمت واحد
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                تخفیف
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                                جمع
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {invoice.items?.map((item, index) => (
+                              <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm text-gray-500">
+                                  {index + 1}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full ${item.item_type === "inventory" ? "bg-green-100 text-green-700" : item.item_type === "service" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}
                                   >
-                                    {item.name}
-                                  </button>
-                                ) : (
-                                  item.name
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {item.quantity}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {item.unit}
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {formatCurrency(item.unit_price)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-red-600">
-                                {item.discount_amount > 0
-                                  ? `-${formatCurrency(item.discount_amount)}`
-                                  : "—"}
+                                    {item.item_type === "inventory"
+                                      ? "انبار"
+                                      : item.item_type === "service"
+                                        ? "خدمت"
+                                        : "دلخواه"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.item_type === "inventory" ? (
+                                    <button
+                                      onClick={() => {
+                                        onClose();
+                                        openItemDetail(item.item_id);
+                                      }}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {item.name}
+                                    </button>
+                                  ) : (
+                                    item.name
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.quantity}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {item.unit}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {formatCurrency(item.unit_price)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-red-600">
+                                  {item.discount_amount > 0
+                                    ? `-${formatCurrency(item.discount_amount)}`
+                                    : "—"}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-medium">
+                                  {formatCurrency(item.total_price)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="px-4 py-3 text-left text-sm"
+                              >
+                                جمع کل:
                               </td>
                               <td className="px-4 py-3 text-sm font-medium">
-                                {formatCurrency(item.total_price)}
+                                {formatCurrency(invoice.subtotal)} ریال
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50">
-                          <tr>
-                            <td
-                              colSpan={7}
-                              className="px-4 py-3 text-left text-sm"
-                            >
-                              جمع کل:
-                            </td>
-                            <td className="px-4 py-3 text-sm font-medium">
-                              {formatCurrency(invoice.subtotal)} ریال
-                            </td>
-                          </tr>
-                          {invoice.discount_amount > 0 && (
+                            {invoice.discount_amount > 0 && (
+                              <tr>
+                                <td
+                                  colSpan={7}
+                                  className="px-4 py-3 text-left text-sm"
+                                >
+                                  تخفیف:
+                                </td>
+                                <td className="px-4 py-3 text-sm text-red-600">
+                                  -{formatCurrency(invoice.discount_amount)}{" "}
+                                  ریال
+                                </td>
+                              </tr>
+                            )}
+                            {invoice.tax_amount > 0 && (
+                              <tr>
+                                <td
+                                  colSpan={7}
+                                  className="px-4 py-3 text-left text-sm"
+                                >
+                                  مالیات ({invoice.tax_rate}%):
+                                </td>
+                                <td className="px-4 py-3 text-sm text-blue-600">
+                                  +{formatCurrency(invoice.tax_amount)} ریال
+                                </td>
+                              </tr>
+                            )}
                             <tr>
                               <td
                                 colSpan={7}
-                                className="px-4 py-3 text-left text-sm"
+                                className="px-4 py-3 text-left text-sm font-medium"
                               >
-                                تخفیف:
+                                مبلغ نهایی:
                               </td>
-                              <td className="px-4 py-3 text-sm text-red-600">
-                                -{formatCurrency(invoice.discount_amount)} ریال
+                              <td className="px-4 py-3 text-sm font-bold text-blue-600">
+                                {formatCurrency(invoice.total_amount)} ریال
                               </td>
                             </tr>
-                          )}
-                          {invoice.tax_amount > 0 && (
-                            <tr>
-                              <td
-                                colSpan={7}
-                                className="px-4 py-3 text-left text-sm"
-                              >
-                                مالیات ({invoice.tax_rate}%):
-                              </td>
-                              <td className="px-4 py-3 text-sm text-blue-600">
-                                +{formatCurrency(invoice.tax_amount)} ریال
-                              </td>
-                            </tr>
-                          )}
-                          <tr>
-                            <td
-                              colSpan={7}
-                              className="px-4 py-3 text-left text-sm font-medium"
-                            >
-                              مبلغ نهایی:
-                            </td>
-                            <td className="px-4 py-3 text-sm font-bold text-blue-600">
-                              {formatCurrency(invoice.total_amount)} ریال
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                          </tfoot>
+                        </table>
+                      </div>
                     </div>
                   </div>
 

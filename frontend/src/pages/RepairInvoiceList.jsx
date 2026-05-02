@@ -277,7 +277,10 @@ export default function RepairInvoiceList() {
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <button
-                        onClick={() => openDeviceDetail(invoice.device_id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeviceDetail(invoice.device_id);
+                        }}
                         className="text-blue-600 hover:underline"
                       >
                         {invoice.device_name}{" "}

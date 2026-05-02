@@ -199,10 +199,16 @@ export default function PurchaseInvoiceList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {invoices.map((invoice) => {
+              {invoices.map((invoice, index) => {
                 const remaining = invoice.total_amount - invoice.paid_amount;
                 return (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
+                  <tr
+                    key={invoice.id}
+                    onClick={() => openPurchaseInvoiceDetail(invoice.id)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    }`}
+                  >
                     <td className="px-4 py-3 text-sm font-mono font-medium">
                       {invoice.invoice_number}
                     </td>
@@ -227,7 +233,10 @@ export default function PurchaseInvoiceList() {
                     <td className="px-4 py-3 text-sm">
                       <div className="flex gap-1 justify-center">
                         <button
-                          onClick={() => openPurchaseInvoiceDetail(invoice.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPurchaseInvoiceDetail(invoice.id);
+                          }}
                           className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                           title="مشاهده جزئیات"
                         >
@@ -236,7 +245,10 @@ export default function PurchaseInvoiceList() {
 
                         {isAtLeast("admin") && (
                           <button
-                            onClick={() => setDeleteTarget(invoice)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(invoice);
+                            }}
                             className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                           >
                             <TrashIcon className="w-5 h-5" />

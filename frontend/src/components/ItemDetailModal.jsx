@@ -382,7 +382,7 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
             <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
           </div>
         ) : item ? (
-          <div className="p-6">
+          <div className="p-6 ">
             {/* Main Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1 space-y-6">
@@ -412,6 +412,9 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <div className="lg:col-span-2">
                 <div className="bg-white shadow rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
                     اطلاعات کالا
@@ -441,113 +444,103 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
                           : "—"
                       }
                     />
-                    <InfoRow
-                      label="آخرین بروزرسانی"
-                      value={
-                        item.updatedAt
-                          ? new Date(item.updatedAt).toLocaleDateString("fa-IR")
-                          : "—"
-                      }
-                    />
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="lg:col-span-2">
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                    <ClipboardDocumentListIcon className="w-5 h-5 text-gray-600" />
-                    تاریخچه گردش موجودی
-                  </h3>
-                  {loadingTransactions ? (
-                    <div className="text-center py-10 text-gray-500">
-                      در حال بارگذاری...
-                    </div>
-                  ) : transactions.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400">
-                      <ClipboardDocumentListIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                      <p>هنوز تراکنشی برای این کالا ثبت نشده است</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              تاریخ
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              نوع
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              تعداد
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              قیمت واحد
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                              توضیحات
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {transactions.map((tx) => (
-                            <tr key={tx.id}>
-                              <td className="px-4 py-2 text-sm">
-                                {new Date(tx.created_at).toLocaleDateString(
-                                  "fa-IR",
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                {tx.type === "purchase" ? (
-                                  <span className="text-green-600">خرید</span>
-                                ) : tx.type === "sale" ? (
-                                  <span className="text-red-600">فروش</span>
-                                ) : (
-                                  <span className="text-gray-600">
-                                    تنظیم موجودی
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                <span
-                                  className={
-                                    tx.quantity > 0
-                                      ? "text-green-600"
-                                      : "text-red-600"
-                                  }
-                                >
-                                  {tx.quantity > 0 ? "+" : ""}
-                                  {tx.quantity}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                {tx.unit_price
-                                  ? Number(tx.unit_price).toLocaleString()
-                                  : "—"}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-600">
-                                {tx.purchase_invoice_number ? (
-                                  <button
-                                    onClick={() =>
-                                      openPurchaseInvoiceDetail(tx.reference_id)
-                                    }
-                                    className="text-blue-600 hover:underline"
-                                  >
-                                    {tx.purchase_invoice_number}
-                                  </button>
-                                ) : (
-                                  tx.note || "—"
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+            <div className="bg-white shadow rounded-lg p-6 mt-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <ClipboardDocumentListIcon className="w-5 h-5 text-gray-600" />
+                تاریخچه گردش موجودی
+              </h3>
+              {loadingTransactions ? (
+                <div className="text-center py-10 text-gray-500">
+                  در حال بارگذاری...
                 </div>
-              </div>
+              ) : transactions.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <ClipboardDocumentListIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>هنوز تراکنشی برای این کالا ثبت نشده است</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                          تاریخ
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                          نوع
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                          تعداد
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                          قیمت واحد
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                          توضیحات
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {transactions.map((tx) => (
+                        <tr key={tx.id}>
+                          <td className="px-4 py-2 text-sm">
+                            {new Date(tx.created_at).toLocaleDateString(
+                              "fa-IR",
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-sm">
+                            {tx.type === "purchase" ? (
+                              <span className="text-green-600">خرید</span>
+                            ) : tx.type === "sale" ? (
+                              <span className="text-red-600">فروش</span>
+                            ) : (
+                              <span className="text-gray-600">
+                                تنظیم موجودی
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-sm">
+                            <span
+                              className={
+                                tx.quantity > 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {tx.quantity > 0 ? "+" : ""}
+                              {tx.quantity}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-sm">
+                            {tx.unit_price
+                              ? Number(tx.unit_price).toLocaleString()
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600">
+                            {tx.purchase_invoice_number ? (
+                              <button
+                                onClick={() =>
+                                  openPurchaseInvoiceDetail(tx.reference_id)
+                                }
+                                className="text-blue-600 hover:underline"
+                              >
+                                {tx.purchase_invoice_number}
+                              </button>
+                            ) : (
+                              tx.note || "—"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         ) : null}

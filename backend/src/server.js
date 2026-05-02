@@ -4,6 +4,8 @@ const path = require("path");
 require("dotenv").config();
 const { getDb } = require("./config/database");
 
+const { startBackupScheduler } = require("./jobs/backupScheduler");
+
 const routes = require("./routes");
 
 const app = express();
@@ -21,4 +23,5 @@ app.get("/api/health", async (req, res) => {
 app.listen(PORT, async () => {
   await getDb();
   console.log(`Server running on http://localhost:${PORT}`);
+  startBackupScheduler();
 });

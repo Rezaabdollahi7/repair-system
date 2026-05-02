@@ -1,6 +1,7 @@
 // src/components/ItemFormModal.jsx
 import { useState, useEffect } from "react";
 import { getItem, createItem, updateItem, getCategories } from "../api";
+import api from "../api";
 import toast from "react-hot-toast";
 import { XMarkIcon, CubeIcon } from "@heroicons/react/24/solid";
 
@@ -17,6 +18,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
   const isEditMode = Boolean(itemId);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [initialStock, setInitialStock] = useState(0);
   const [categories, setCategories] = useState([]);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
@@ -64,6 +66,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
           minStock: 0,
           description: "",
         });
+        setInitialStock(0);
         setInitialLoading(false);
       }
     }
@@ -85,6 +88,8 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
     if (!formData.unit?.trim()) newErrors.unit = "واحد کالا الزامی است";
     if (formData.minStock < 0)
       newErrors.minStock = "حداقل موجودی نمی‌تواند منفی باشد";
+    if (initialStock < 0)
+      newErrors.initialStock = "موجودی اولیه نمی‌تواند منفی باشد";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -105,13 +110,30 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
         minStock: formData.minStock,
         description: formData.description?.trim() || null,
       };
+
+      let newItemId = itemId;
+
       if (isEditMode) {
         await updateItem(itemId, payload);
         toast.success("کالا با موفقیت ویرایش شد");
       } else {
-        await createItem(payload);
+        const res = await createItem(payload);
+        newItemId = res.data.id;
         toast.success("کالا با موفقیت ثبت شد");
+
+        if (initialStock > 0) {
+          try {
+            await api.post(`/items/${newItemId}/quick-purchase`, {
+              quantity: initialStock,
+              unit_price: 0,
+              note: "موجودی اولیه",
+            });
+          } catch (err) {
+            console.error("Initial stock error:", err);
+          }
+        }
       }
+
       onSuccess && onSuccess();
       onClose();
     } catch (error) {
@@ -151,6 +173,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* کد کالا */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 کد کالا <span className="text-red-500">*</span>
@@ -168,6 +191,8 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 <p className="mt-1 text-xs text-red-600">{errors.code}</p>
               )}
             </div>
+
+            {/* نام کالا */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 نام کالا <span className="text-red-500">*</span>
@@ -185,6 +210,8 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 <p className="mt-1 text-xs text-red-600">{errors.name}</p>
               )}
             </div>
+
+            {/* دسته‌بندی */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 دسته‌بندی
@@ -204,6 +231,8 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 ))}
               </select>
             </div>
+
+            {/* واحد */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 واحد شمارش <span className="text-red-500">*</span>
@@ -225,6 +254,8 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 <p className="mt-1 text-xs text-red-600">{errors.unit}</p>
               )}
             </div>
+
+            {/* حداقل موجودی */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 حداقل موجودی (هشدار)
@@ -246,6 +277,35 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 وقتی موجودی به این عدد برسد، هشدار کم‌موجودی نمایش داده می‌شود
               </p>
             </div>
+
+            {/* موجودی اولیه - فقط در حالت ایجاد */}
+            {!isEditMode && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  موجودی اولیه
+                </label>
+                <input
+                  type="number"
+                  name="initialStock"
+                  value={initialStock}
+                  onChange={(e) => setInitialStock(Number(e.target.value) || 0)}
+                  disabled={loading}
+                  min="0"
+                  step="1"
+                  className={`w-full border rounded-lg px-4 py-2 text-sm ${errors.initialStock ? "border-red-500" : "border-gray-300"}`}
+                />
+                {errors.initialStock && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {errors.initialStock}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  اگر از قبل موجودی دارید، تعداد را وارد کنید
+                </p>
+              </div>
+            )}
+
+            {/* موجودی فعلی - فقط در حالت ویرایش */}
             {isEditMode && (
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -261,6 +321,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
             )}
           </div>
 
+          {/* توضیحات */}
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               توضیحات
@@ -276,6 +337,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
             />
           </div>
 
+          {/* دکمه‌ها */}
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"

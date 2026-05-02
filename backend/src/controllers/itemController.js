@@ -435,7 +435,7 @@ exports.quickPurchase = async (req, res) => {
     if (!quantity || quantity <= 0) {
       return res.status(400).json({ error: "تعداد باید بیشتر از صفر باشد" });
     }
-    if (!unit_price || unit_price < 0) {
+    if (unit_price === undefined || unit_price === null || unit_price < 0) {
       return res.status(400).json({ error: "قیمت باید مثبت باشد" });
     }
 

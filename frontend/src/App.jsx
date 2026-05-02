@@ -19,6 +19,7 @@ import ProfitReport from "./pages/ProfitReport";
 import TransactionsReport from "./pages/TransactionsReport";
 import Settings from "./pages/Settings";
 import RepairInvoiceList from "./pages/RepairInvoiceList";
+import BackupList from "./pages/BackupList";
 
 import { ModalProvider } from "./context/ModalContext";
 
@@ -51,6 +52,7 @@ function App() {
                     path="repair-invoices"
                     element={<RepairInvoiceList />}
                   />
+                  <Route path="backups" element={<BackupList />} />
                 </Route>
 
                 {/* <Route index element={<Dashboard />} /> */}

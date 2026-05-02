@@ -77,7 +77,7 @@ exports.download = async (req, res) => {
   }
 };
 
-// Restore backup
+// restore
 exports.restore = async (req, res) => {
   try {
     const db = await getDb();
@@ -100,43 +100,46 @@ exports.restore = async (req, res) => {
     }
 
     // Auto-backup before restore
-    const { filename: autoBackupFile } = await createBackup(true);
+    const { filename: autoBackupFile, size: autoBackupSize } =
+      await createBackup(true);
     db.run(
       `INSERT INTO backups (filename, size_bytes, includes_uploads, created_by) VALUES (?, ?, ?, ?)`,
-      [
-        autoBackupFile,
-        fs.statSync(path.join(BACKUP_DIR, autoBackupFile)).size,
-        1,
-        req.user?.id || null,
-      ],
+      [autoBackupFile, autoBackupSize, 1, req.user?.id || null],
     );
     saveDb();
 
-    // Extract zip
+    // Extract zip directly
     const zip = new AdmZip(filepath);
     const DB_PATH = path.join(__dirname, "../repair_system.db");
     const UPLOADS_DIR = path.join(__dirname, "../uploads");
 
-    // Restore database
+    // Extract database
     const dbEntry = zip
       .getEntries()
       .find((e) => e.entryName === "repair_system.db");
     if (dbEntry) {
-      zip.extractEntryTo(dbEntry, path.dirname(DB_PATH), true, true);
+      const dbData = dbEntry.getData();
+      fs.writeFileSync(DB_PATH, dbData);
     }
 
-    // Restore uploads if included
+    // Extract uploads if included
     if (includesUploads) {
       const uploadEntries = zip
         .getEntries()
         .filter((e) => e.entryName.startsWith("uploads/"));
       for (const entry of uploadEntries) {
-        zip.extractEntryTo(entry, path.join(__dirname, ".."), true, true);
+        const targetPath = path.join(__dirname, "..", entry.entryName);
+        const dir = path.dirname(targetPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        if (!entry.isDirectory) {
+          fs.writeFileSync(targetPath, entry.getData());
+        }
       }
     }
 
     res.json({
-      message: "بکاپ با موفقیت بازگردانی شد. لطفاً سرور را ری‌استارت کنید.",
+      message:
+        "فایل‌ها جایگزین شدند. لطفاً برنامه را ببندید و دوباره اجرا کنید.",
       auto_backup_filename: autoBackupFile,
     });
   } catch (error) {

@@ -16,6 +16,7 @@ import {
   ChevronRightIcon,
   Cog6ToothIcon,
   ChartPieIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/solid";
 
 export default function Layout() {
@@ -96,6 +97,12 @@ export default function Layout() {
       name: "گزارش سود و زیان",
       path: "/reports/profit",
       icon: ChartPieIcon,
+      adminOnly: true,
+    },
+    {
+      name: "پشتیبان‌گیری",
+      path: "/backups",
+      icon: ArchiveBoxIcon,
       adminOnly: true,
     },
     {

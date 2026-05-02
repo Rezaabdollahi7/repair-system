@@ -1,6 +1,5 @@
 // src/pages/ItemList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
 import { getItems, deleteItem, getCategories, searchItems } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
@@ -307,12 +306,12 @@ export default function ItemList() {
                     {item.code || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    <Link
-                      to={`/items/${item.id}`}
+                    <button
+                      onClick={() => openItemDetail(item.id)}
                       className="text-blue-600 hover:underline"
                     >
                       {item.name}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.categoryName || "—"}

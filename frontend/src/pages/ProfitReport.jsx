@@ -1,6 +1,5 @@
 // src/pages/ProfitReport.jsx
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { getProfitReport } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -10,10 +9,12 @@ import {
   ChartPieIcon,
 } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
+import { useModal } from "../context/ModalContext";
 
 export default function ProfitReport() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { openItemDetail } = useModal();
   const [dateRange, setDateRange] = useState({
     from_date: "",
     to_date: "",
@@ -139,7 +140,7 @@ export default function ProfitReport() {
                   <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     هزینه
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">  
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     سود
                   </th>
                   <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
@@ -154,12 +155,12 @@ export default function ProfitReport() {
                       {item.item_code}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <Link
-                        to={`/items/${item.item_id}`}
+                      <button
+                        onClick={() => openItemDetail(item.item_id)}
                         className="text-blue-600 hover:underline"
                       >
                         {item.item_name}
-                      </Link>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-sm">{item.total_quantity}</td>
                     <td className="px-4 py-3 text-sm">

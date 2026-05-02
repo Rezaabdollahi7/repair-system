@@ -1,6 +1,5 @@
 // src/components/ItemDetailModal.jsx
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { getItem, deleteItem, getItemTransactions } from "../api";
 import api from "../api";
 import toast from "react-hot-toast";
@@ -316,6 +315,7 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
   const [showQuickSale, setShowQuickSale] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { openPurchaseInvoiceDetail } = useModal();
 
   const fetchData = async () => {
     if (!itemId) return;
@@ -528,12 +528,14 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-600">
                                 {tx.purchase_invoice_number ? (
-                                  <Link
-                                    to={`/purchase-invoices/${tx.reference_id}`}
+                                  <button
+                                    onClick={() =>
+                                      openPurchaseInvoiceDetail(tx.reference_id)
+                                    }
                                     className="text-blue-600 hover:underline"
                                   >
                                     {tx.purchase_invoice_number}
-                                  </Link>
+                                  </button>
                                 ) : (
                                   tx.note || "—"
                                 )}

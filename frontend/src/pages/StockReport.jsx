@@ -1,6 +1,5 @@
 // src/pages/StockReport.jsx
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { getStockReport, getCategories } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -8,6 +7,7 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/solid";
+import { useModal } from "../context/ModalContext";
 
 export default function StockReport() {
   const [report, setReport] = useState(null);
@@ -20,6 +20,8 @@ export default function StockReport() {
 
   const searchParams = new URLSearchParams(window.location.search);
   const lowStockParam = searchParams.get("lowStock") === "true";
+
+  const { openItemDetail } = useModal();
 
   useEffect(() => {
     // Set initial filter from URL
@@ -196,12 +198,12 @@ export default function StockReport() {
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono">{item.code}</td>
                   <td className="px-4 py-3 text-sm">
-                    <Link
-                      to={`/items/${item.id}`}
+                    <button
+                      onClick={() => openItemDetail(item.id)}
                       className="text-blue-600 hover:underline"
                     >
                       {item.name}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.category_name || "—"}

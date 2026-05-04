@@ -16,8 +16,12 @@ import {
   ChevronRightIcon,
   Cog6ToothIcon,
   ChartPieIcon,
+  CogIcon,
+  PlusIcon,
+  XMarkIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/solid";
+import { useModal } from "../context/ModalContext";
 
 export default function Layout() {
   const location = useLocation();
@@ -142,6 +146,111 @@ export default function Layout() {
 
     return true;
   });
+
+  // Floating Action Button with animated menu
+  function FloatingActionButton() {
+    const [isOpen, setIsOpen] = useState(false);
+    const {
+      openPurchaseInvoiceCreate,
+      openSaleInvoiceCreate,
+      openRepairInvoiceCreate,
+      openDeviceEdit,
+      openCustomerEdit,
+      openItemEdit,
+    } = useModal();
+
+    const actions = [
+      {
+        label: "فاکتور خرید",
+        icon: ShoppingCartIcon,
+        color: "bg-orange-500 hover:bg-orange-600",
+        onClick: () => openPurchaseInvoiceCreate(),
+      },
+      {
+        label: "فاکتور فروش",
+        icon: CurrencyDollarIcon,
+        color: "bg-green-500 hover:bg-green-600",
+        onClick: () => openSaleInvoiceCreate(),
+      },
+      {
+        label: "فاکتور تعمیر",
+        icon: WrenchScrewdriverIcon,
+        color: "bg-blue-500 hover:bg-blue-600",
+        onClick: () => openRepairInvoiceCreate(),
+      },
+      {
+        label: "دستگاه جدید",
+        icon: CogIcon,
+        color: "bg-purple-500 hover:bg-purple-600",
+        onClick: () => openDeviceEdit(null),
+      },
+      {
+        label: "مشتری جدید",
+        icon: HomeIcon,
+        color: "bg-pink-500 hover:bg-pink-600",
+        onClick: () => openCustomerEdit(null),
+      },
+      {
+        label: "کالای جدید",
+        icon: CubeIcon,
+        color: "bg-teal-500 hover:bg-teal-600",
+        onClick: () => openItemEdit(null),
+      },
+    ];
+
+    return (
+      <div className="fixed bottom-6 left-6 z-40 flex flex-col items-center gap-3">
+        {/* Backdrop */}
+        {isOpen && (
+          <div
+            className="fixed inset-0 -z-30"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex flex-col-reverse items-center gap-3">
+          {actions.map((action, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                action.onClick();
+                setIsOpen(false);
+              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-full text-white shadow-lg transition-all duration-300 ${action.color} ${
+                isOpen
+                  ? "opacity-100 translate-y-0 scale-100"
+                  : "opacity-0 translate-y-4 scale-75 pointer-events-none"
+              }`}
+              style={{ transitionDelay: isOpen ? `${index * 50}ms` : "0ms" }}
+              title={action.label}
+            >
+              <action.icon className="w-5 h-5" />
+              <span className="text-sm font-medium whitespace-nowrap">
+                {action.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Main FAB Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`p-4 rounded-full shadow-2xl text-white transition-all duration-300 z-40 ${
+            isOpen
+              ? "bg-red-500 hover:bg-red-600 rotate-45"
+              : "bg-blue-600 hover:bg-blue-700 rotate-0"
+          }`}
+        >
+          {isOpen ? (
+            <XMarkIcon className="w-6 h-6" />
+          ) : (
+            <PlusIcon className="w-6 h-6" />
+          )}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex" dir="rtl">
@@ -290,6 +399,9 @@ export default function Layout() {
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6 overflow-x-auto">
           <Outlet />
+
+          {/* Floating Action Button */}
+          <FloatingActionButton />
         </main>
       </div>
     </div>

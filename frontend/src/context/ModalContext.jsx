@@ -78,7 +78,7 @@ export function ModalProvider({ children }) {
     openModal("purchaseInvoiceCreate", null);
   const openRepairInvoiceDetail = (id) => openModal("repairInvoiceDetail", id);
   const openRepairInvoiceCreate = (deviceId) =>
-    openModal("repairInvoiceCreate", deviceId);
+    openModal("repairInvoiceCreate", deviceId || null);
   const openRepairInvoiceEdit = (id) => openModal("repairInvoiceEdit", id);
 
   // آخرین Modal توی stack

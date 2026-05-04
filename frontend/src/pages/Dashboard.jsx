@@ -86,7 +86,7 @@ function TopItemItem({ item, index }) {
       </div>
       <div className="text-right">
         <p className="text-sm font-medium text-gray-900">
-          {Number(item.revenue).toLocaleString()} ریال
+          {formatPersianCurrency(item.revenue)} ریال
         </p>
         <p className="text-xs text-gray-500">{item.sold_quantity} عدد فروش</p>
       </div>
@@ -100,15 +100,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     getDashboardStats()
-      .then((res) => {
-        setStats(res.data);
-      })
-      .catch(() => {
-        toast.error("خطا در دریافت آمار");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .then((res) => setStats(res.data))
+      .catch(() => toast.error("خطا در دریافت آمار"))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -121,17 +115,14 @@ export default function Dashboard() {
 
   if (!stats) return null;
 
-  const formatCurrency = (amount) => Number(amount).toLocaleString();
-
   return (
-    <div dir="rtl" className=" mx-auto">
+    <div dir="rtl" className="mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6 flex gap-2">
         <HomeIcon className="w-6 h-6 text-gray-600" />
         داشبورد مدیریتی
       </h1>
 
-      <hr className="text-gray-300 " />
-      {/* Device Stats */}
+      <hr className="text-gray-300" />
       <h2 className="text-lg font-medium text-gray-900 my-8">آمار دستگاه‌ها</h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <StatCard
@@ -161,7 +152,6 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Status Breakdown */}
       {stats.devices?.by_status?.length > 0 && (
         <div className="bg-white rounded-lg shadow p-4 mb-12">
           <h3 className="text-sm font-medium text-gray-700 mb-3">
@@ -192,8 +182,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <hr className="text-gray-300 " />
-      {/* Repair Invoice Stats */}
+      <hr className="text-gray-300" />
       <h2 className="text-lg font-medium text-gray-900 my-8 flex items-center gap-2">
         <DocumentTextIcon className="w-5 h-5 text-gray-600" />
         آمار فاکتورهای تعمیر
@@ -237,12 +226,10 @@ export default function Dashboard() {
       </div>
 
       <hr className="text-gray-300" />
-
       <h2 className="text-lg font-medium text-gray-900 mt-12 mb-4 flex items-center gap-2">
         <DocumentTextIcon className="w-5 h-5 text-gray-600" />
         آمار کالا ها
       </h2>
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           title="کل کالاها"
@@ -272,7 +259,6 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Monthly Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
           <p className="text-sm text-blue-700 mb-1">فروش این ماه</p>
@@ -302,7 +288,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Low Stock Alert */}
       {stats.items.low_stock > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-3">
@@ -324,9 +309,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Transactions */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -340,7 +323,6 @@ export default function Dashboard() {
               مشاهده همه
             </Link>
           </div>
-
           <div className="space-y-1">
             {stats.recent_transactions.length === 0 ? (
               <p className="text-center text-gray-400 py-6">
@@ -353,8 +335,6 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-
-        {/* Top Selling Items */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -368,7 +348,6 @@ export default function Dashboard() {
               گزارش کامل
             </Link>
           </div>
-
           <div className="space-y-1">
             {stats.top_items.length === 0 ? (
               <p className="text-center text-gray-400 py-6">
@@ -381,34 +360,6 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Quick Links */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-        <Link
-          to="/purchase-invoices/new"
-          className="bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg p-3 text-center text-sm font-medium transition"
-        >
-          ➕ فاکتور خرید جدید
-        </Link>
-        <Link
-          to="/sale-invoices/new"
-          className="bg-green-50 hover:bg-green-100 text-green-700 rounded-lg p-3 text-center text-sm font-medium transition"
-        >
-          🛒 فاکتور فروش جدید
-        </Link>
-        <Link
-          to="/repair-invoices/new"
-          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg p-3 text-center text-sm font-medium transition"
-        >
-          🔧 فاکتور تعمیر جدید
-        </Link>
-        <Link
-          to="/items"
-          className="bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg p-3 text-center text-sm font-medium transition"
-        >
-          📦 مدیریت کالاها
-        </Link>
       </div>
     </div>
   );

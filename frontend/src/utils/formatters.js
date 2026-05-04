@@ -36,7 +36,7 @@ export function toPersianDigits(num) {
 
 export function formatPersianCurrency(amount) {
   if (amount === null || amount === undefined || amount === "") return "—";
-  const num = Number(amount);
+  const num = Math.round(Number(amount));
   if (isNaN(num)) return "—";
 
   return toPersianDigits(num.toLocaleString("en-US"));

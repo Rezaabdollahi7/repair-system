@@ -11,6 +11,7 @@ export default function SearchableSelect({
   value,
   onChange,
   onSearch,
+  onOpen,
   placeholder = "انتخاب کنید...",
   disabled = false,
   loading = false,
@@ -28,11 +29,14 @@ export default function SearchableSelect({
         setSearch("");
       }
     }
-    if (search.length >= 2 && onSearch) {
-      onSearch(search);
-    }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (onSearch) {
+      onSearch(search);
+    }
   }, [search, onSearch]);
 
   const filteredOptions = options.filter((opt) =>
@@ -41,11 +45,20 @@ export default function SearchableSelect({
 
   const selectedOption = options.find((opt) => opt.value === value);
 
+  const handleToggle = () => {
+    if (disabled) return;
+    const willOpen = !isOpen;
+    setIsOpen(willOpen);
+    if (willOpen && onOpen) {
+      onOpen();
+    }
+  };
+
   return (
     <div ref={dropdownRef} className="relative">
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleToggle}
         disabled={disabled}
         className={`w-full border rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center ${
           error ? "border-red-500" : "border-gray-300"
@@ -97,7 +110,7 @@ export default function SearchableSelect({
                     setIsOpen(false);
                     setSearch("");
                   }}
-                  className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                  className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-50 transition-colors border-b border-b-gray-200 ${
                     value === opt.value
                       ? "bg-blue-50 text-blue-700 font-medium"
                       : "text-gray-700"
@@ -105,7 +118,7 @@ export default function SearchableSelect({
                 >
                   {opt.label}
                   {opt.subLabel && (
-                    <span className="text-xs text-gray-500 block">
+                    <span className="text-xs text-gray-500 block mt-1">
                       {opt.subLabel}
                     </span>
                   )}

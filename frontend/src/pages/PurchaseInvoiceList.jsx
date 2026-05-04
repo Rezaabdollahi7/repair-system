@@ -18,6 +18,7 @@ import {
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { formatPersianCurrency } from "../utils/formatters";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -125,11 +126,6 @@ export default function PurchaseInvoiceList() {
     return new Date(dateStr).toLocaleDateString("fa-IR");
   };
 
-  const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) return "—";
-    return Number(amount).toLocaleString() + " ریال";
-  };
-
   return (
     <div dir="rtl">
       <div className="flex justify-between items-center mb-6">
@@ -219,13 +215,13 @@ export default function PurchaseInvoiceList() {
                       {formatDate(invoice.invoice_date)}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">
-                      {formatCurrency(invoice.total_amount)}
+                      {formatPersianCurrency(invoice.total_amount)} {` `} ریال
                     </td>
                     <td className="px-4 py-3 text-sm text-green-600">
-                      {formatCurrency(invoice.paid_amount)}
+                      {formatPersianCurrency(invoice.paid_amount)} {` `} ریال
                     </td>
                     <td className="px-4 py-3 text-sm text-red-600">
-                      {remaining > 0 ? formatCurrency(remaining) : "—"}
+                      {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <PaymentStatusBadge status={invoice.payment_status} />

@@ -8,6 +8,7 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/solid";
 import { useModal } from "../context/ModalContext";
+import { formatPersianCurrency } from "../utils/formatters";
 
 export default function StockReport() {
   const [report, setReport] = useState(null);
@@ -56,8 +57,6 @@ export default function StockReport() {
   const applyFilters = () => {
     fetchReport();
   };
-
-  const formatCurrency = (amount) => Number(amount || 0).toLocaleString();
 
   const getStockStatusBadge = (status) => {
     if (status === "critical") {
@@ -156,7 +155,7 @@ export default function StockReport() {
           <div className="bg-blue-50 rounded-lg shadow p-4 border border-blue-200">
             <p className="text-sm text-blue-700">ارزش کل موجودی</p>
             <p className="text-xl font-bold text-blue-800">
-              {formatCurrency(report.summary.total_inventory_value)} ریال
+              {formatPersianCurrency(report.summary.total_inventory_value)} ریال
             </p>
           </div>
         </div>
@@ -218,7 +217,7 @@ export default function StockReport() {
                     {getStockStatusBadge(item.stock_status)}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {formatCurrency(
+                    {formatPersianCurrency(
                       item.current_stock * item.avg_purchase_price,
                     )}{" "}
                     ریال

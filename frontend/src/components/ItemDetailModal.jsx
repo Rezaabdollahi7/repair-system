@@ -16,6 +16,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
+import { formatPersianCurrency } from "../utils/formatters";
 
 // ─── Quick Purchase Modal (دقیقاً همون قبلیه) ──────────────────
 function QuickPurchaseModal({ isOpen, onClose, onSuccess, item }) {
@@ -432,7 +433,7 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
                       label="میانگین قیمت خرید"
                       value={
                         item.avgPurchasePrice
-                          ? `${Number(item.avgPurchasePrice).toLocaleString()} ریال`
+                          ? ` ${formatPersianCurrency(item.avgPurchasePrice)} ریال`
                           : "—"
                       }
                     />
@@ -518,7 +519,7 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
                           </td>
                           <td className="px-4 py-2 text-sm">
                             {tx.unit_price
-                              ? Number(tx.unit_price).toLocaleString()
+                              ? formatPersianCurrency(tx.unit_price)
                               : "—"}
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-600">

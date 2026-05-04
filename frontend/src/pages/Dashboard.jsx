@@ -18,6 +18,7 @@ import {
   BanknotesIcon,
   HomeIcon,
 } from "@heroicons/react/24/solid";
+import { formatPersianCurrency } from "../utils/formatters";
 
 function StatCard({ title, value, icon: Icon, color, subtitle }) {
   return (
@@ -207,7 +208,8 @@ export default function Dashboard() {
         <StatCard
           title="درآمد امروز (تعمیرات)"
           value={
-            formatCurrency(stats.repair_invoices?.today_revenue || 0) + " ریال"
+            formatPersianCurrency(stats.repair_invoices?.today_revenue || 0) +
+            " ریال"
           }
           icon={BanknotesIcon}
           color="bg-emerald-500"
@@ -217,7 +219,7 @@ export default function Dashboard() {
           value={stats.repair_invoices?.pending_payment_count || 0}
           subtitle={
             stats.repair_invoices?.issued_unpaid_amount
-              ? `${formatCurrency(stats.repair_invoices.issued_unpaid_amount)} ریال`
+              ? `${formatPersianCurrency(stats.repair_invoices.issued_unpaid_amount)} ریال`
               : "—"
           }
           icon={ClockIcon}
@@ -226,7 +228,8 @@ export default function Dashboard() {
         <StatCard
           title="درآمد این ماه (تعمیرات)"
           value={
-            formatCurrency(stats.repair_invoices?.month_revenue || 0) + " ریال"
+            formatPersianCurrency(stats.repair_invoices?.month_revenue || 0) +
+            " ریال"
           }
           icon={CalendarIcon}
           color="bg-cyan-500"
@@ -250,19 +253,19 @@ export default function Dashboard() {
         />
         <StatCard
           title="فروش امروز"
-          value={formatCurrency(stats.today.sale) + " ریال"}
+          value={formatPersianCurrency(stats.today.sale) + " ریال"}
           icon={ArrowTrendingUpIcon}
           color="bg-green-500"
         />
         <StatCard
           title="خرید امروز"
-          value={formatCurrency(stats.today.purchase) + " ریال"}
+          value={formatPersianCurrency(stats.today.purchase) + " ریال"}
           icon={ArrowTrendingDownIcon}
           color="bg-orange-500"
         />
         <StatCard
           title="سود خالص امروز"
-          value={formatCurrency(stats.today.net) + " ریال"}
+          value={formatPersianCurrency(stats.today.net) + " ریال"}
           subtitle={stats.today.net >= 0 ? "مثبت" : "منفی"}
           icon={CurrencyDollarIcon}
           color={stats.today.net >= 0 ? "bg-emerald-500" : "bg-red-500"}
@@ -274,13 +277,13 @@ export default function Dashboard() {
         <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
           <p className="text-sm text-blue-700 mb-1">فروش این ماه</p>
           <p className="text-xl font-bold text-blue-900">
-            {formatCurrency(stats.month.sale)} ریال
+            {formatPersianCurrency(stats.month.sale)} ریال
           </p>
         </div>
         <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
           <p className="text-sm text-orange-700 mb-1">خرید این ماه</p>
           <p className="text-xl font-bold text-orange-900">
-            {formatCurrency(stats.month.purchase)} ریال
+            {formatPersianCurrency(stats.month.purchase)} ریال
           </p>
         </div>
         <div
@@ -294,7 +297,7 @@ export default function Dashboard() {
           <p
             className={`text-xl font-bold ${stats.month.net >= 0 ? "text-emerald-900" : "text-red-900"}`}
           >
-            {formatCurrency(stats.month.net)} ریال
+            {formatPersianCurrency(stats.month.net)} ریال
           </p>
         </div>
       </div>

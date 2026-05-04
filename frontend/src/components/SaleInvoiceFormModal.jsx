@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
+import { formatPersianCurrency } from "../utils/formatters";
 
 // Modal برای ثبت سریع مشتری
 function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
@@ -392,8 +393,6 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
-  const formatCurrency = (amount) => Number(amount).toLocaleString();
-
   if (!isOpen) return null;
 
   return (
@@ -510,7 +509,7 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                   <div className="flex justify-between py-2">
                     <span>جمع کل:</span>
                     <span className="font-medium">
-                      {formatCurrency(calculateTotal())} ریال
+                      {formatPersianCurrency(calculateTotal())} ریال
                     </span>
                   </div>
                   <div>
@@ -537,7 +536,7 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                     <span
                       className={`font-medium ${calculateRemaining() > 0 ? "text-red-600" : "text-green-600"}`}
                     >
-                      {formatCurrency(calculateRemaining())} ریال
+                      {formatPersianCurrency(calculateRemaining())} ریال
                     </span>
                   </div>
                 </div>
@@ -669,7 +668,7 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                                 جمع
                               </label>
                               <div className="px-3 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg">
-                                {formatCurrency(
+                                {formatPersianCurrency(
                                   calculateItemTotal(
                                     item.quantity,
                                     item.unit_price,

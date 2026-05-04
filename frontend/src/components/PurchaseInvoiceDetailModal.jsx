@@ -17,6 +17,7 @@ import {
   ExclamationCircleIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
+import { formatPersianCurrency } from "../utils/formatters";
 
 function PaymentStatusBadge({ status }) {
   const map = {
@@ -123,7 +124,6 @@ export default function PurchaseInvoiceDetailModal({
     }
   };
 
-  const formatCurrency = (val) => Number(val).toLocaleString();
   const formatDate = (date) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
@@ -218,13 +218,13 @@ export default function PurchaseInvoiceDetailModal({
                         <div className="flex justify-between mb-2">
                           <span className="text-gray-600">جمع کل:</span>
                           <span className="font-bold">
-                            {formatCurrency(invoice.total_amount)} ریال
+                            {formatPersianCurrency(invoice.total_amount)} ریال
                           </span>
                         </div>
                         <div className="flex justify-between mb-2">
                           <span className="text-gray-600">پرداخت شده:</span>
                           <span className="text-green-600">
-                            {formatCurrency(invoice.paid_amount)} ریال
+                            {formatPersianCurrency(invoice.paid_amount)} ریال
                           </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-gray-200">
@@ -232,7 +232,7 @@ export default function PurchaseInvoiceDetailModal({
                           <span
                             className={`font-bold ${invoice.total_amount - invoice.paid_amount > 0 ? "text-red-600" : "text-green-600"}`}
                           >
-                            {formatCurrency(
+                            {formatPersianCurrency(
                               invoice.total_amount - invoice.paid_amount,
                             )}{" "}
                             ریال
@@ -321,10 +321,10 @@ export default function PurchaseInvoiceDetailModal({
                               {item.item_unit}
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              {formatCurrency(item.unit_price)}
+                              {formatPersianCurrency(item.unit_price)}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium">
-                              {formatCurrency(item.total_price)}
+                              {formatPersianCurrency(item.total_price)}
                             </td>
                           </tr>
                         ))}
@@ -338,7 +338,7 @@ export default function PurchaseInvoiceDetailModal({
                             جمع کل:
                           </td>
                           <td className="px-4 py-3 text-sm font-bold">
-                            {formatCurrency(invoice.total_amount)} ریال
+                            {formatPersianCurrency(invoice.total_amount)} ریال
                           </td>
                         </tr>
                       </tfoot>

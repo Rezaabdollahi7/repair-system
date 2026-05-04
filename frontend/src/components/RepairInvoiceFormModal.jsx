@@ -22,6 +22,7 @@ import {
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
+import { formatPersianCurrency } from "../utils/formatters";
 
 export default function RepairInvoiceFormModal({
   isOpen,
@@ -451,8 +452,6 @@ export default function RepairInvoiceFormModal({
     }
   };
 
-  const formatCurrency = (amount) => Number(amount).toLocaleString();
-
   if (!isOpen) return null;
 
   if (initialLoading) {
@@ -806,7 +805,9 @@ export default function RepairInvoiceFormModal({
                             {/* Total */}
                             <div className="col-span-1 text-left">
                               <span className="text-sm font-medium">
-                                {formatCurrency(calculateItemTotal(item))}
+                                {formatPersianCurrency(
+                                  calculateItemTotal(item),
+                                )}
                               </span>
                             </div>
 
@@ -843,7 +844,7 @@ export default function RepairInvoiceFormModal({
                     <div className="flex justify-between">
                       <span>جمع کل:</span>
                       <span className="font-medium">
-                        {formatCurrency(calculateSubtotal())} ریال
+                        {formatPersianCurrency(calculateSubtotal())} ریال
                       </span>
                     </div>
 
@@ -871,7 +872,7 @@ export default function RepairInvoiceFormModal({
                       )}
                       {formData.discount_type && (
                         <span className="text-red-600 mr-auto">
-                          -{formatCurrency(calculateDiscount())} ریال
+                          -{formatPersianCurrency(calculateDiscount())} ریال
                         </span>
                       )}
                     </div>
@@ -890,14 +891,14 @@ export default function RepairInvoiceFormModal({
                         className="border border-gray-300 rounded px-3 py-2 text-sm w-24"
                       />
                       <span className="text-blue-600 mr-auto">
-                        +{formatCurrency(calculateTax())} ریال
+                        +{formatPersianCurrency(calculateTax())} ریال
                       </span>
                     </div>
 
                     <div className="flex justify-between pt-3 border-t text-lg font-bold">
                       <span>مبلغ نهایی:</span>
                       <span className="text-blue-600">
-                        {formatCurrency(calculateTotal())} ریال
+                        {formatPersianCurrency(calculateTotal())} ریال
                       </span>
                     </div>
                   </div>

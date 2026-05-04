@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
 import { useModal } from "../context/ModalContext";
+import { formatPersianCurrency } from "../utils/formatters";
 
 export default function ProfitReport() {
   const [report, setReport] = useState(null);
@@ -36,7 +37,6 @@ export default function ProfitReport() {
       .finally(() => setLoading(false));
   };
 
-  const formatCurrency = (amount) => Number(amount || 0).toLocaleString();
   const formatPercent = (value) => Number(value || 0).toFixed(1) + "%";
 
   return (
@@ -87,13 +87,13 @@ export default function ProfitReport() {
             <div className="bg-blue-50 rounded-lg shadow p-4 border border-blue-200">
               <p className="text-sm text-blue-700">کل فروش</p>
               <p className="text-2xl font-bold text-blue-800">
-                {formatCurrency(report.summary.total_revenue)} ریال
+                {formatPersianCurrency(report.summary.total_revenue)} ریال
               </p>
             </div>
             <div className="bg-orange-50 rounded-lg shadow p-4 border border-orange-200">
               <p className="text-sm text-orange-700">هزینه کل</p>
               <p className="text-2xl font-bold text-orange-800">
-                {formatCurrency(report.summary.total_cost)} ریال
+                {formatPersianCurrency(report.summary.total_cost)} ریال
               </p>
             </div>
             <div
@@ -107,7 +107,7 @@ export default function ProfitReport() {
               <p
                 className={`text-2xl font-bold ${report.summary.total_profit >= 0 ? "text-green-800" : "text-red-800"}`}
               >
-                {formatCurrency(report.summary.total_profit)} ریال
+                {formatPersianCurrency(report.summary.total_profit)} ریال
               </p>
             </div>
             <div
@@ -164,15 +164,15 @@ export default function ProfitReport() {
                     </td>
                     <td className="px-4 py-3 text-sm">{item.total_quantity}</td>
                     <td className="px-4 py-3 text-sm">
-                      {formatCurrency(item.total_revenue)}
+                      {formatPersianCurrency(item.total_revenue)}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {formatCurrency(item.total_cost)}
+                      {formatPersianCurrency(item.total_cost)}
                     </td>
                     <td
                       className={`px-4 py-3 text-sm font-medium ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
-                      {formatCurrency(item.profit)}
+                      {formatPersianCurrency(item.profit)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span

@@ -4,7 +4,7 @@ import { getRepairInvoices, deleteRepairInvoice } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
-import { formatPersianPhone } from "../utils/formatters";
+import { formatPersianCurrency } from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -151,8 +151,6 @@ export default function RepairInvoiceList() {
   }, [debouncedSearch, statusFilter]);
 
   const formatDate = (d) => (d ? new Date(d).toLocaleDateString("fa-IR") : "—");
-  const formatCurrency = (a) =>
-    a ? Number(a).toLocaleString() + " ریال" : "—";
 
   const statusOptions = [
     { value: "", label: "همه وضعیت‌ها" },
@@ -306,13 +304,13 @@ export default function RepairInvoiceList() {
                       {formatDate(invoice.invoice_date)}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">
-                      {formatCurrency(invoice.total_amount)}
+                      {formatPersianCurrency(invoice.total_amount)}
                     </td>
                     <td className="px-4 py-3 text-sm text-green-600">
-                      {formatCurrency(invoice.paid_amount)}
+                      {formatPersianCurrency(invoice.paid_amount)}
                     </td>
                     <td className="px-4 py-3 text-sm text-red-600">
-                      {remaining > 0 ? formatCurrency(remaining) : "—"}
+                      {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={invoice.status} />

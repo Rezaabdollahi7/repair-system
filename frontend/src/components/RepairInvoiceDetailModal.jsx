@@ -25,6 +25,7 @@ import {
   WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
+import { formatPersianCurrency } from "../utils/formatters";
 
 function StatusBadge({ status }) {
   const map = {
@@ -194,7 +195,6 @@ export default function RepairInvoiceDetailModal({
     }
   };
 
-  const formatCurrency = (val) => Number(val).toLocaleString();
   const formatDate = (date) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
@@ -385,13 +385,13 @@ export default function RepairInvoiceDetailModal({
                           <div className="flex justify-between mb-2">
                             <span>جمع کل:</span>
                             <span className="font-bold">
-                              {formatCurrency(invoice.total_amount)} ریال
+                              {formatPersianCurrency(invoice.total_amount)} ریال
                             </span>
                           </div>
                           <div className="flex justify-between mb-2">
                             <span>پرداخت شده:</span>
                             <span className="text-green-600">
-                              {formatCurrency(invoice.paid_amount)} ریال
+                              {formatPersianCurrency(invoice.paid_amount)} ریال
                             </span>
                           </div>
                           <div className="flex justify-between pt-2 border-t">
@@ -403,7 +403,7 @@ export default function RepairInvoiceDetailModal({
                                   : "text-green-600"
                               }
                             >
-                              {formatCurrency(
+                              {formatPersianCurrency(
                                 invoice.total_amount - invoice.paid_amount,
                               )}{" "}
                               ریال
@@ -498,15 +498,15 @@ export default function RepairInvoiceDetailModal({
                                   {item.unit}
                                 </td>
                                 <td className="px-4 py-3 text-sm">
-                                  {formatCurrency(item.unit_price)}
+                                  {formatPersianCurrency(item.unit_price)}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-red-600">
                                   {item.discount_amount > 0
-                                    ? `-${formatCurrency(item.discount_amount)}`
+                                    ? `-${formatPersianCurrency(item.discount_amount)}`
                                     : "—"}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-medium">
-                                  {formatCurrency(item.total_price)}
+                                  {formatPersianCurrency(item.total_price)}
                                 </td>
                               </tr>
                             ))}
@@ -520,7 +520,7 @@ export default function RepairInvoiceDetailModal({
                                 جمع کل:
                               </td>
                               <td className="px-4 py-3 text-sm font-medium">
-                                {formatCurrency(invoice.subtotal)} ریال
+                                {formatPersianCurrency(invoice.subtotal)} ریال
                               </td>
                             </tr>
                             {invoice.discount_amount > 0 && (
@@ -532,7 +532,10 @@ export default function RepairInvoiceDetailModal({
                                   تخفیف:
                                 </td>
                                 <td className="px-4 py-3 text-sm text-red-600">
-                                  -{formatCurrency(invoice.discount_amount)}{" "}
+                                  -
+                                  {formatPersianCurrency(
+                                    invoice.discount_amount,
+                                  )}{" "}
                                   ریال
                                 </td>
                               </tr>
@@ -546,7 +549,8 @@ export default function RepairInvoiceDetailModal({
                                   مالیات ({invoice.tax_rate}%):
                                 </td>
                                 <td className="px-4 py-3 text-sm text-blue-600">
-                                  +{formatCurrency(invoice.tax_amount)} ریال
+                                  +{formatPersianCurrency(invoice.tax_amount)}{" "}
+                                  ریال
                                 </td>
                               </tr>
                             )}
@@ -558,7 +562,8 @@ export default function RepairInvoiceDetailModal({
                                 مبلغ نهایی:
                               </td>
                               <td className="px-4 py-3 text-sm font-bold text-blue-600">
-                                {formatCurrency(invoice.total_amount)} ریال
+                                {formatPersianCurrency(invoice.total_amount)}{" "}
+                                ریال
                               </td>
                             </tr>
                           </tfoot>
@@ -590,7 +595,7 @@ export default function RepairInvoiceDetailModal({
                               </div>
                               <div>
                                 <p className="font-medium">
-                                  {formatCurrency(payment.amount)} ریال
+                                  {formatPersianCurrency(payment.amount)} ریال
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {payment.payment_method === "cash"

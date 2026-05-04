@@ -19,6 +19,7 @@ import {
   PrinterIcon,
   CurrencyDollarIcon,
 } from "@heroicons/react/24/solid";
+import { formatPersianCurrency } from "../utils/formatters";
 
 function PaymentStatusBadge({ status }) {
   const map = {
@@ -122,7 +123,6 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
     }
   };
 
-  const formatCurrency = (val) => Number(val).toLocaleString();
   const formatDate = (date) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
@@ -211,13 +211,13 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                       <div className="flex justify-between mb-2">
                         <span>جمع کل:</span>
                         <span className="font-bold">
-                          {formatCurrency(invoice.total_amount)}
+                          {formatPersianCurrency(invoice.total_amount)}
                         </span>
                       </div>
                       <div className="flex justify-between mb-2">
                         <span>دریافت شده:</span>
                         <span className="text-green-600">
-                          {formatCurrency(invoice.paid_amount)}
+                          {formatPersianCurrency(invoice.paid_amount)}
                         </span>
                       </div>
                       <div className="flex justify-between pt-2 border-t">
@@ -229,7 +229,7 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                               : "text-green-600"
                           }
                         >
-                          {formatCurrency(
+                          {formatPersianCurrency(
                             invoice.total_amount - invoice.paid_amount,
                           )}
                         </span>
@@ -308,10 +308,10 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                               {item.item_unit}
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              {formatCurrency(item.unit_price)}
+                              {formatPersianCurrency(item.unit_price)}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium">
-                              {formatCurrency(item.total_price)}
+                              {formatPersianCurrency(item.total_price)}
                             </td>
                           </tr>
                         ))}
@@ -325,7 +325,7 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                             جمع کل:
                           </td>
                           <td className="px-4 py-3 text-sm font-bold">
-                            {formatCurrency(invoice.total_amount)} ریال
+                            {formatPersianCurrency(invoice.total_amount)} ریال
                           </td>
                         </tr>
                       </tfoot>

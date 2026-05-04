@@ -33,7 +33,11 @@ export function toPersianDigits(num) {
 /**
  * فرمت مبلغ با اعداد فارسی
  */
+
 export function formatPersianCurrency(amount) {
-  if (!amount) return "۰ ریال";
-  return `${toPersianDigits(Number(amount).toLocaleString())} ریال`;
+  if (amount === null || amount === undefined || amount === "") return "—";
+  const num = Number(amount);
+  if (isNaN(num)) return "—";
+
+  return toPersianDigits(num.toLocaleString("en-US"));
 }

@@ -7,6 +7,7 @@ import {
   ArrowDownTrayIcon,
 } from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
+import { formatPersianCurrency } from "../utils/formatters";
 
 export default function InvoicePreview({ invoice, isOpen, onClose }) {
   const [settings, setSettings] = useState(null);
@@ -21,7 +22,6 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  const formatCurrency = (val) => Number(val || 0).toLocaleString();
   const formatDate = (date) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
@@ -211,10 +211,10 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                         {item.unit}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-sm text-left">
-                        {formatCurrency(item.unit_price)}
+                        {formatPersianCurrency(item.unit_price)}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-sm text-left font-medium">
-                        {formatCurrency(item.total_price)}
+                        {formatPersianCurrency(item.total_price)}
                       </td>
                     </tr>
                   ))}
@@ -228,7 +228,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                       جمع کل:
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-sm text-left font-medium">
-                      {formatCurrency(invoice.subtotal)}
+                      {formatPersianCurrency(invoice.subtotal)}
                     </td>
                   </tr>
                   {invoice.discount_amount > 0 && (
@@ -240,7 +240,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                         تخفیف:
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-sm text-left text-red-600">
-                        ({formatCurrency(invoice.discount_amount)})
+                        ({formatPersianCurrency(invoice.discount_amount)})
                       </td>
                     </tr>
                   )}
@@ -253,7 +253,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                         مالیات (%{invoice.tax_rate}):
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-sm text-left">
-                        {formatCurrency(invoice.tax_amount)}
+                        {formatPersianCurrency(invoice.tax_amount)}
                       </td>
                     </tr>
                   )}
@@ -265,7 +265,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                       مبلغ قابل پرداخت:
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-sm text-left text-blue-700">
-                      {formatCurrency(invoice.total_amount)} ریال
+                      {formatPersianCurrency(invoice.total_amount)} ریال
                     </td>
                   </tr>
                 </tfoot>

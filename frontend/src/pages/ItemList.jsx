@@ -18,6 +18,7 @@ import {
   CubeIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { formatPersianCurrency } from "../utils/formatters";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -330,7 +331,7 @@ export default function ItemList() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.avgPurchasePrice
-                      ? Number(item.avgPurchasePrice).toLocaleString()
+                      ? formatPersianCurrency(item.avgPurchasePrice)
                       : "—"}
                   </td>
                   <td className="px-4 py-3 text-sm">

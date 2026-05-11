@@ -212,13 +212,13 @@ export default function DeviceFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-5xl my-8"
+        className="bg-white rounded-xl shadow-xl w-full max-w-5xl my-2 sm:my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
             <WrenchScrewdriverIcon className="w-5 h-5 text-gray-600" />
             {isEdit ? `ویرایش دستگاه #${deviceId}` : "ثبت دستگاه جدید"}
           </h2>
@@ -230,24 +230,10 @@ export default function DeviceFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className=" space-y-5">
-          {/* {isEdit && (
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4">
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
-                شماره پذیرش
-              </label>
-              <input
-                value={deviceId}
-                readOnly
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
-              />
-            </div>
-          )} */}
-
-          <div className="grid grid-cols-2 gap-4 p-4">
-            {/* مشتری */}
-            <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 مشتری
               </label>
               <div className="flex gap-2">
@@ -293,7 +279,7 @@ export default function DeviceFormModal({
                 <button
                   type="button"
                   onClick={() => setShowNewCustomer((v) => !v)}
-                  className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+                  className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg whitespace-nowrap"
                 >
                   + مشتری جدید
                 </button>
@@ -336,12 +322,10 @@ export default function DeviceFormModal({
               )}
             </div>
 
-            {/* پرسنل */}
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 مسئول(ین) دستگاه
               </label>
-
               <div className="relative">
                 <input
                   placeholder="جستجو و انتخاب مسئول..."
@@ -405,10 +389,9 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* فیلدهای متنی */}
-          <div className="grid grid-cols-4 gap-4 px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 px-3 sm:px-4">
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 نام دستگاه *
               </label>
               <input
@@ -421,7 +404,7 @@ export default function DeviceFormModal({
               />
             </div>
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 برند
               </label>
               <input
@@ -433,7 +416,7 @@ export default function DeviceFormModal({
               />
             </div>
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 مدل
               </label>
               <input
@@ -445,7 +428,7 @@ export default function DeviceFormModal({
               />
             </div>
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 سریال
               </label>
               <input
@@ -457,10 +440,9 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* تاریخ */}
-          <div className="grid grid-cols-2 gap-4 px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 px-3 sm:px-4">
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 تاریخ ورود *
               </label>
               <PersianDatePicker
@@ -471,7 +453,7 @@ export default function DeviceFormModal({
               />
             </div>
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 تاریخ خروج
               </label>
               <PersianDatePicker
@@ -483,9 +465,8 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* وضعیت */}
-          <div className="px-4">
-            <label className="block  font-medium text-gray-700 mb-1">
+          <div className="px-3 sm:px-4">
+            <label className="block font-medium text-gray-700 mb-1">
               وضعیت
             </label>
             <select
@@ -502,21 +483,20 @@ export default function DeviceFormModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 px-3 sm:px-4">
             <div>
-              <label className="block  font-medium text-gray-700 mb-1">
+              <label className="block font-medium text-gray-700 mb-1">
                 توضیحات
               </label>
               <textarea
                 name="description"
                 value={form.description}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm h-[calc(100%-28px)]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm h-28 sm:h-[calc(100%-28px)]"
               />
             </div>
-
             <div>
-              <label className="block  font-medium text-gray-700 mb-1 w-full">
+              <label className="block font-medium text-gray-700 mb-1 w-full">
                 عکس های دستگاه
               </label>
               <ImageUploader
@@ -534,11 +514,11 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl ">
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-2 p-3 sm:p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -549,7 +529,7 @@ export default function DeviceFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              className="w-full sm:w-auto px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
             >
               انصراف
             </button>

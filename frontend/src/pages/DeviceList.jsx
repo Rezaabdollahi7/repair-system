@@ -358,134 +358,136 @@ export default function DeviceList() {
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
-              <tr>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  شماره پذیرش
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  مشتری
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  شماره تماس
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  نوع دستگاه
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  مدل
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  وضعیت
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  مسئول
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  تاریخ ثبت
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  تاریخ خروج
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-indigo-700">
-                  عملیات
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {devices.map((device, index) => (
-                <tr
-                  key={device.id}
-                  onClick={() => openDeviceEdit(device.id)}
-                  className={`hover:bg-gray-50 transition-colors hover:cursor-pointer ${
-                    index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                  }`}
-                >
-                  <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openCustomerDetail(device.customer_id);
-                      }}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      {device.customer_name ?? "مشتری"}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatPersianPhone(device.customer_phone)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">{device.device_name}</td>
-                  <td className="px-4 py-3 text-sm">{device.model ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge
-                      status={device.status}
-                      onStatusChange={(newStatus) =>
-                        handleStatusChange(device.id, newStatus)
-                      }
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <AssigneeBadge assignees={device.assignees} />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {formatDate(device.entry_date)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {formatDate(device.exit_date)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex gap-2 justify-center">
+          <div className="overflow-x-auto">
+            <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    شماره پذیرش
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    مشتری
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    شماره تماس
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    نوع دستگاه
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    مدل
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    وضعیت
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    مسئول
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    تاریخ ثبت
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    تاریخ خروج
+                  </th>
+                  <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                    عملیات
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {devices.map((device, index) => (
+                  <tr
+                    key={device.id}
+                    onClick={() => openDeviceEdit(device.id)}
+                    className={`hover:bg-gray-50 transition-colors hover:cursor-pointer ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
+                    <td className="px-4 py-3 text-sm">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openRepairInvoiceCreate(device.id);
+                          openCustomerDetail(device.customer_id);
                         }}
-                        className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
-                        title="ایجاد فاکتور تعمیر"
+                        className="text-blue-600 hover:underline font-medium"
                       >
-                        <DocumentPlusIcon className="w-5 h-5" />
+                        {device.customer_name ?? "مشتری"}
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeviceDetail(device.id);
-                        }}
-                        className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
-                        title="مشاهده جزئیات"
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeviceEdit(device.id);
-                        }}
-                        className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
-                        title="ویرایش"
-                      >
-                        <PencilSquareIcon className="w-5 h-5" />
-                      </button>
-                      {isAtLeast("admin") && (
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {formatPersianPhone(device.customer_phone)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{device.device_name}</td>
+                    <td className="px-4 py-3 text-sm">{device.model ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge
+                        status={device.status}
+                        onStatusChange={(newStatus) =>
+                          handleStatusChange(device.id, newStatus)
+                        }
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <AssigneeBadge assignees={device.assignees} />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {formatDate(device.entry_date)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {formatDate(device.exit_date)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex gap-2 justify-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDeleteTarget(device);
+                            openRepairInvoiceCreate(device.id);
                           }}
-                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                          title="حذف"
+                          className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
+                          title="ایجاد فاکتور تعمیر"
                         >
-                          <TrashIcon className="w-5 h-5" />
+                          <DocumentPlusIcon className="w-5 h-5" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeviceDetail(device.id);
+                          }}
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
+                          title="مشاهده جزئیات"
+                        >
+                          <EyeIcon className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeviceEdit(device.id);
+                          }}
+                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
+                          title="ویرایش"
+                        >
+                          <PencilSquareIcon className="w-5 h-5" />
+                        </button>
+                        {isAtLeast("admin") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(device);
+                            }}
+                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="حذف"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {/* Pagination */}

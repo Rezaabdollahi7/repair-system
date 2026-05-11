@@ -40,18 +40,17 @@ export default function ProfitReport() {
   const formatPercent = (value) => Number(value || 0).toFixed(1) + "%";
 
   return (
-    <div dir="rtl" className=" mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex gap-2">
-          <ChartPieIcon className="w-6 h-6 text-gray-600" />
+    <div dir="rtl" className="px-2 sm:px-0 mx-auto">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex gap-2 items-center">
+          <ChartPieIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
           گزارش سود و زیان
         </h1>
       </div>
 
-      {/* Date Filters */}
-      <div className="bg-white shadow rounded-lg p-4 mb-6">
-        <div className="flex flex-wrap gap-4 items-end">
-          <div>
+      <div className="bg-white shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-end">
+          <div className="w-full sm:w-auto">
             <label className="block text-xs text-gray-600 mb-1">از تاریخ</label>
             <PersianDatePicker
               value={dateRange.from_date}
@@ -61,7 +60,7 @@ export default function ProfitReport() {
               placeholder="از تاریخ"
             />
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="block text-xs text-gray-600 mb-1">تا تاریخ</label>
             <PersianDatePicker
               value={dateRange.to_date}
@@ -73,77 +72,75 @@ export default function ProfitReport() {
           </div>
           <button
             onClick={fetchReport}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm w-full sm:w-auto"
           >
             اعمال فیلتر
           </button>
         </div>
       </div>
 
-      {/* Summary */}
       {report && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg shadow p-4 border border-blue-200">
-              <p className="text-sm text-blue-700">کل فروش</p>
-              <p className="text-2xl font-bold text-blue-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <div className="bg-blue-50 rounded-lg shadow p-3 sm:p-4 border border-blue-200">
+              <p className="text-xs sm:text-sm text-blue-700">کل فروش</p>
+              <p className="text-lg sm:text-2xl font-bold text-blue-800 break-words">
                 {formatPersianCurrency(report.summary.total_revenue)} ریال
               </p>
             </div>
-            <div className="bg-orange-50 rounded-lg shadow p-4 border border-orange-200">
-              <p className="text-sm text-orange-700">هزینه کل</p>
-              <p className="text-2xl font-bold text-orange-800">
+            <div className="bg-orange-50 rounded-lg shadow p-3 sm:p-4 border border-orange-200">
+              <p className="text-xs sm:text-sm text-orange-700">هزینه کل</p>
+              <p className="text-lg sm:text-2xl font-bold text-orange-800 break-words">
                 {formatPersianCurrency(report.summary.total_cost)} ریال
               </p>
             </div>
             <div
-              className={`rounded-lg shadow p-4 border ${report.summary.total_profit >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}
+              className={`rounded-lg shadow p-3 sm:p-4 border ${report.summary.total_profit >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}
             >
               <p
-                className={`text-sm ${report.summary.total_profit >= 0 ? "text-green-700" : "text-red-700"}`}
+                className={`text-xs sm:text-sm ${report.summary.total_profit >= 0 ? "text-green-700" : "text-red-700"}`}
               >
                 سود خالص
               </p>
               <p
-                className={`text-2xl font-bold ${report.summary.total_profit >= 0 ? "text-green-800" : "text-red-800"}`}
+                className={`text-lg sm:text-2xl font-bold ${report.summary.total_profit >= 0 ? "text-green-800" : "text-red-800"} break-words`}
               >
                 {formatPersianCurrency(report.summary.total_profit)} ریال
               </p>
             </div>
             <div
-              className={`rounded-lg shadow p-4 border ${report.summary.profit_margin >= 0 ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"}`}
+              className={`rounded-lg shadow p-3 sm:p-4 border ${report.summary.profit_margin >= 0 ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"}`}
             >
-              <p className="text-sm text-purple-700">حاشیه سود</p>
-              <p className="text-2xl font-bold text-purple-800">
+              <p className="text-xs sm:text-sm text-purple-700">حاشیه سود</p>
+              <p className="text-lg sm:text-2xl font-bold text-purple-800">
                 {formatPercent(report.summary.profit_margin)}
               </p>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className=" bg-gradient-to-r from-indigo-50 to-blue-50">
+          <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
+            <table className="min-w-[640px] sm:min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
                 <tr>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     کد
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     نام کالا
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     تعداد فروش
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     درآمد
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     هزینه
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     سود
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
                     حاشیه سود
                   </th>
                 </tr>
@@ -151,10 +148,10 @@ export default function ProfitReport() {
               <tbody className="divide-y divide-gray-200">
                 {report.data.map((item) => (
                   <tr key={item.item_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-mono">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono">
                       {item.item_code}
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       <button
                         onClick={() => openItemDetail(item.item_id)}
                         className="text-blue-600 hover:underline"
@@ -162,27 +159,25 @@ export default function ProfitReport() {
                         {item.item_name}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-sm">{item.total_quantity}</td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                      {item.total_quantity}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       {formatPersianCurrency(item.total_revenue)}
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       {formatPersianCurrency(item.total_cost)}
                     </td>
                     <td
-                      className={`px-4 py-3 text-sm font-medium ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                      className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
                       {formatPersianCurrency(item.profit)}
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       <span
                         className={`flex items-center gap-1 ${item.profit_margin >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
-                        {item.profit_margin >= 0 ? (
-                          <ArrowTrendingUpIcon className="w-4 h-4" />
-                        ) : (
-                          <ArrowTrendingDownIcon className="w-4 h-4" />
-                        )}
+                        <ArrowTrendingUpIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         {formatPercent(item.profit_margin)}
                       </span>
                     </td>

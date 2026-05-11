@@ -2,6 +2,7 @@ import { useRef } from "react";
 import toast from "react-hot-toast";
 import { uploadDeviceImages, deleteDeviceImage } from "../api";
 import { TrashIcon, PhotoIcon } from "@heroicons/react/24/outline";
+import { getImageUrl } from "../utils/helpers";
 
 export default function ImageUploader({
   deviceId,
@@ -61,7 +62,7 @@ export default function ImageUploader({
           {existingImages.map((img) => (
             <div key={img.id} className="relative group">
               <img
-                src={`http://localhost:5001/uploads/devices/${img.filename}`}
+                src={getImageUrl("/uploads/devices/" + img.filename)}
                 className="w-full h-28 object-cover rounded-lg border"
               />
               <button

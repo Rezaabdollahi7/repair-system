@@ -8,6 +8,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
 import { formatPersianCurrency } from "../utils/formatters";
+import { getBaseUrl } from "../utils/helpers";
 
 export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
   const [settings, setSettings] = useState(null);
@@ -37,7 +38,7 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
 
   if (!isOpen || !invoice) return null;
 
-  const baseUrl = "http://localhost:5001";
+  const baseUrl = getBaseUrl();
   const showLogo = settings?.sale_invoice_show_logo === 1;
   const showCompanyInfo = settings?.sale_invoice_show_company_info === 1;
   const showEmail = settings?.sale_invoice_show_email === 1;

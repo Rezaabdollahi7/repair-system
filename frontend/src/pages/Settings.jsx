@@ -13,6 +13,7 @@ import {
   Cog6ToothIcon,
   DocumentIcon,
 } from "@heroicons/react/24/solid";
+import { getBaseUrl } from "../utils/helpers";
 
 function ImageUploadBox({ label, imagePath, type, onUpload }) {
   const [uploading, setUploading] = useState(false);
@@ -33,7 +34,7 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
     }
   };
 
-  const baseUrl = "http://localhost:5001";
+  const baseUrl = getBaseUrl();
 
   return (
     <div>

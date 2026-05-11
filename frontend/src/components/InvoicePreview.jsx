@@ -8,6 +8,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
 import { formatPersianCurrency } from "../utils/formatters";
+import { getBaseUrl } from "../utils/helpers";
 
 export default function InvoicePreview({ invoice, isOpen, onClose }) {
   const [settings, setSettings] = useState(null);
@@ -37,7 +38,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
 
   if (!isOpen || !invoice) return null;
 
-  const baseUrl = "http://localhost:5001";
+  const baseUrl = getBaseUrl();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

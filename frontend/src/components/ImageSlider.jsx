@@ -4,6 +4,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import { getImageUrl } from "../utils/helpers";
 
 export default function ImageSlider({ images, initialIndex = 0, onClose }) {
   const [current, setCurrent] = useState(initialIndex);
@@ -28,8 +29,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
 
   if (!images || images.length === 0) return null;
 
-  const imgUrl = (filename) =>
-    `http://localhost:5001/uploads/devices/${filename}`;
+  const imgUrl = (filename) => getImageUrl("/uploads/devices/" + filename);
 
   return (
     <div

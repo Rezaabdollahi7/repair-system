@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
+import { getImageUrl } from "../utils/helpers";
 
 const STATUS_MAP = {
   pending: { label: "در انتظار بررسی", color: "bg-yellow-100 text-yellow-800" },
@@ -201,7 +202,7 @@ export default function DeviceDetailModal({
                       {images.map((img, i) => (
                         <img
                           key={img.id}
-                          src={`http://localhost:5001/uploads/devices/${img.filename}`}
+                          src={getImageUrl("/uploads/devices/" + img.filename)}
                           alt={img.filename}
                           onClick={() => setSliderIndex(i)}
                           className="w-full h-32 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 hover:scale-[1.02] transition-all"

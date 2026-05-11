@@ -40,7 +40,7 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
       <label className="block text-sm font-medium text-gray-700 mb-2">
         {label}
       </label>
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 text-center">
         {imagePath ? (
           <div className="space-y-2">
             <img
@@ -51,10 +51,10 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
             <p className="text-xs text-gray-500">تصویر آپلود شده</p>
           </div>
         ) : (
-          <PhotoIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+          <PhotoIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-400 mb-2" />
         )}
         <label className="cursor-pointer inline-block mt-2">
-          <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-sm hover:bg-blue-100 transition">
+          <span className="bg-blue-50 text-blue-700 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm hover:bg-blue-100 transition">
             {uploading ? "در حال آپلود..." : "انتخاب تصویر"}
           </span>
           <input
@@ -73,7 +73,7 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
 
 function ToggleSwitch({ label, description, checked, onChange }) {
   return (
-    <div className="flex items-center justify-between py-2">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
       <div>
         <span className="text-sm font-medium text-gray-700">{label}</span>
         {description && <p className="text-xs text-gray-500">{description}</p>}
@@ -81,7 +81,7 @@ function ToggleSwitch({ label, description, checked, onChange }) {
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
           checked ? "bg-blue-600" : "bg-gray-300"
         }`}
       >
@@ -113,7 +113,6 @@ export default function Settings() {
     default_warranty_months: 3,
     invoice_prefix: "INV-",
     invoice_footer_text: "",
-    // Sale invoice template settings
     sale_invoice_paper_size: "A5",
     sale_invoice_show_logo: true,
     sale_invoice_show_company_info: true,
@@ -131,7 +130,6 @@ export default function Settings() {
     sale_invoice_footer_text: "با تشکر از اعتماد شما",
   });
 
-  // Only super_admin can access
   if (user?.role !== "super_admin") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -238,45 +236,45 @@ export default function Settings() {
   ];
 
   return (
-    <div dir="rtl" className=" mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6 flex gap-2">
-        <Cog6ToothIcon className="w-6 h-6 text-gray-600" />
+    <div dir="rtl" className="px-2 sm:px-4 mx-auto">
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 flex gap-2 items-center">
+        <Cog6ToothIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
         تنظیمات
       </h1>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-6">
+      <div className="border-b border-gray-200 mb-4 sm:mb-6 overflow-x-auto">
+        <nav className="flex gap-3 sm:gap-6 min-w-max">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-1 py-3 border-b-2 transition-colors ${
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{tab.label}</span>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
+                  {tab.label}
+                </span>
               </button>
             );
           })}
         </nav>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Company Information Tab */}
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {activeTab === "company" && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <BuildingOfficeIcon className="w-5 h-5 text-gray-600" />
               اطلاعات شرکت
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   نام شرکت/تعمیرگاه
@@ -286,7 +284,7 @@ export default function Settings() {
                   name="company_name"
                   value={settings.company_name || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                   placeholder="مثلاً: تعمیرگاه تخصصی الکترونیک"
                 />
               </div>
@@ -300,7 +298,7 @@ export default function Settings() {
                   name="company_phone"
                   value={settings.company_phone || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                   placeholder="مثلاً: 021-12345678, 09123456789"
                 />
               </div>
@@ -314,7 +312,7 @@ export default function Settings() {
                   value={settings.company_address || ""}
                   onChange={handleChange}
                   rows="2"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                   placeholder="آدرس کامل تعمیرگاه..."
                 />
               </div>
@@ -328,7 +326,7 @@ export default function Settings() {
                   name="company_email"
                   value={settings.company_email || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                   placeholder="info@example.com"
                 />
               </div>
@@ -342,7 +340,7 @@ export default function Settings() {
                   name="company_website"
                   value={settings.company_website || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                   placeholder="www.example.com"
                 />
               </div>
@@ -350,15 +348,14 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Images Tab */}
         {activeTab === "images" && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <PhotoIcon className="w-5 h-5 text-gray-600" />
               تصاویر
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <ImageUploadBox
                 label="لوگوی شرکت"
                 imagePath={settings.company_logo}
@@ -381,15 +378,14 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Invoice Defaults Tab */}
         {activeTab === "invoice" && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <DocumentTextIcon className="w-5 h-5 text-gray-600" />
               تنظیمات پیش‌فرض فاکتور
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   پیشوند شماره فاکتور
@@ -399,7 +395,7 @@ export default function Settings() {
                   name="invoice_prefix"
                   value={settings.invoice_prefix || "INV-"}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                 />
               </div>
 
@@ -415,7 +411,7 @@ export default function Settings() {
                   min="0"
                   max="100"
                   step="0.5"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                 />
               </div>
 
@@ -429,12 +425,12 @@ export default function Settings() {
                   value={settings.default_warranty_months || 3}
                   onChange={handleChange}
                   min="0"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                 />
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 متن ثابت پایین فاکتور (برای فاکتور تعمیر)
               </label>
@@ -443,23 +439,21 @@ export default function Settings() {
                 value={settings.invoice_footer_text || ""}
                 onChange={handleChange}
                 rows="2"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                 placeholder="مثلاً: با تشکر از اعتماد شما - تحویل گرفته شد"
               />
             </div>
           </div>
         )}
 
-        {/* Sale Invoice Template Tab */}
         {activeTab === "template" && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white shadow rounded-lg p-4 sm:p-6 overflow-x-auto">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <Cog6ToothIcon className="w-5 h-5 text-gray-600" />
               قالب فاکتور فروش
             </h2>
 
-            <div className="space-y-6">
-              {/* Paper Size */}
+            <div className="space-y-4 sm:space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   اندازه کاغذ
@@ -468,7 +462,7 @@ export default function Settings() {
                   name="sale_invoice_paper_size"
                   value={settings.sale_invoice_paper_size || "A5"}
                   onChange={handleChange}
-                  className="w-full md:w-64 border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white"
+                  className="w-full sm:w-64 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm bg-white"
                 >
                   <option value="A4">A4 - حرفه‌ای (کامل)</option>
                   <option value="A5">A5 - نیمه‌حرفه‌ای (متوسط)</option>
@@ -476,13 +470,12 @@ export default function Settings() {
                 </select>
               </div>
 
-              {/* Display Toggles */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-3">
                   بخش‌های قابل نمایش
                 </h3>
                 <div className="space-y-1 border border-gray-200 rounded-lg divide-y divide-gray-200">
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش لوگو"
                       checked={settings.sale_invoice_show_logo}
@@ -491,7 +484,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش اطلاعات شرکت"
                       checked={settings.sale_invoice_show_company_info}
@@ -500,7 +493,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش ایمیل"
                       checked={settings.sale_invoice_show_email}
@@ -509,7 +502,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش وب‌سایت"
                       checked={settings.sale_invoice_show_website}
@@ -518,7 +511,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش اطلاعات دستگاه"
                       checked={settings.sale_invoice_show_device_info}
@@ -527,7 +520,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش شماره تماس مشتری"
                       checked={settings.sale_invoice_show_customer_phone}
@@ -536,7 +529,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش تخفیف"
                       checked={settings.sale_invoice_show_discount}
@@ -545,7 +538,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش مالیات"
                       checked={settings.sale_invoice_show_tax}
@@ -554,7 +547,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش مهر"
                       checked={settings.sale_invoice_show_stamp}
@@ -563,7 +556,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش امضا"
                       checked={settings.sale_invoice_show_signature}
@@ -572,7 +565,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش گارانتی"
                       checked={settings.sale_invoice_show_warranty}
@@ -581,7 +574,7 @@ export default function Settings() {
                       }
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش تعمیرکار"
                       checked={settings.sale_invoice_show_technician}
@@ -593,12 +586,11 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Custom Texts */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-3">
                   متون سفارشی
                 </h3>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       متن بالای فاکتور
@@ -608,7 +600,7 @@ export default function Settings() {
                       value={settings.sale_invoice_header_text || ""}
                       onChange={handleChange}
                       rows="2"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                       placeholder="متن دلخواه برای بالای فاکتور..."
                     />
                   </div>
@@ -624,7 +616,7 @@ export default function Settings() {
                       }
                       onChange={handleChange}
                       rows="2"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                       placeholder="متن دلخواه برای پایین فاکتور..."
                     />
                   </div>
@@ -634,14 +626,13 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Submit Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-center">
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
           >
-            <CheckCircleIcon className="w-5 h-5" />
+            <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
           </button>
         </div>

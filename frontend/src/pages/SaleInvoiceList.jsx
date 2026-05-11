@@ -134,7 +134,7 @@ export default function SaleInvoiceList() {
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
-          فاکتور فروش جدید
+          فاکتور جدید
         </button>
       </div>
 
@@ -161,116 +161,118 @@ export default function SaleInvoiceList() {
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
-              <tr>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  شماره فاکتور
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  مشتری
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  تلفن
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  تاریخ
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  مبلغ کل
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  پرداخت شده
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  مانده
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  وضعیت
-                </th>
-                <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
-                  عملیات
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {invoices.map((invoice, index) => {
-                const remaining = invoice.total_amount - invoice.paid_amount;
-                return (
-                  <tr
-                    key={invoice.id}
-                    onClick={() => openSaleInvoiceDetail(invoice.id)}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                    }`}
-                  >
-                    <td className="px-4 py-3 text-sm font-mono font-medium">
-                      {invoice.invoice_number}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {invoice.customer_id ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openCustomerDetail(invoice.customer_id);
-                          }}
-                          className="text-blue-600 hover:underline font-medium"
-                        >
-                          {invoice.customer_name || "—"}
-                        </button>
-                      ) : (
-                        invoice.customer_name || "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatPersianPhone(invoice.customer_phone)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatDate(invoice.invoice_date)}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium">
-                      {formatPersianCurrency(invoice.total_amount)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-green-600">
-                      {formatPersianCurrency(invoice.paid_amount)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-red-600">
-                      {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PaymentStatusBadge status={invoice.payment_status} />
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex gap-1 justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openSaleInvoiceDetail(invoice.id);
-                          }}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                          title="مشاهده جزئیات"
-                        >
-                          <EyeIcon className="w-5 h-5" />
-                        </button>
-                        {isAtLeast("admin") && (
+          <div className="overflow-x-auto">
+            <table className="min-w-[1200px] lg:min-w-full  divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    شماره فاکتور
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    مشتری
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    تلفن
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    تاریخ
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    مبلغ کل
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    پرداخت شده
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    مانده
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    وضعیت
+                  </th>
+                  <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
+                    عملیات
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {invoices.map((invoice, index) => {
+                  const remaining = invoice.total_amount - invoice.paid_amount;
+                  return (
+                    <tr
+                      key={invoice.id}
+                      onClick={() => openSaleInvoiceDetail(invoice.id)}
+                      className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-sm font-mono font-medium">
+                        {invoice.invoice_number}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {invoice.customer_id ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setDeleteTarget(invoice);
+                              openCustomerDetail(invoice.customer_id);
                             }}
-                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                            title="حذف"
+                            className="text-blue-600 hover:underline font-medium"
                           >
-                            <TrashIcon className="w-5 h-5" />
+                            {invoice.customer_name || "—"}
                           </button>
+                        ) : (
+                          invoice.customer_name || "—"
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {formatPersianPhone(invoice.customer_phone)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {formatDate(invoice.invoice_date)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium">
+                        {formatPersianCurrency(invoice.total_amount)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-green-600">
+                        {formatPersianCurrency(invoice.paid_amount)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-red-600">
+                        {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PaymentStatusBadge status={invoice.payment_status} />
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex gap-1 justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openSaleInvoiceDetail(invoice.id);
+                            }}
+                            className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                            title="مشاهده جزئیات"
+                          >
+                            <EyeIcon className="w-5 h-5" />
+                          </button>
+                          {isAtLeast("admin") && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget(invoice);
+                              }}
+                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                              title="حذف"
+                            >
+                              <TrashIcon className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

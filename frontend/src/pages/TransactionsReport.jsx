@@ -25,41 +25,45 @@ export default function TransactionsReport() {
   };
 
   return (
-    <div dir="rtl" className="max-w-7xl mx-auto">
-      <div className="mb-6">
+    <div dir="rtl" className="px-2 sm:px-0 max-w-7xl mx-auto">
+      <div className="mb-4 sm:mb-6">
         <Link
           to="/dashboard"
-          className="text-gray-600 hover:text-gray-900 flex items-center gap-1 mb-2"
+          className="text-gray-600 hover:text-gray-900 flex items-center gap-1 mb-2 text-sm sm:text-base"
         >
-          <ArrowRightIcon className="w-4 h-4" />
+          <ArrowRightIcon className="w-3 h-3 sm:w-4 sm:h-4" />
           بازگشت به داشبورد
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">گزارش تراکنش‌ها</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          گزارش تراکنش‌ها
+        </h1>
       </div>
 
       {loading ? (
-        <div className="text-center py-10">در حال بارگذاری...</div>
+        <div className="text-center py-10 text-sm sm:text-base">
+          در حال بارگذاری...
+        </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
+          <table className="min-w-[640px] sm:min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500">
                   تاریخ
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500">
                   نوع
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500">
                   کالا
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500">
                   تعداد
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500">
                   قیمت واحد
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500">
                   جمع
                 </th>
               </tr>
@@ -69,36 +73,36 @@ export default function TransactionsReport() {
                 const typeInfo = getTypeLabel(tx.type);
                 return (
                   <tr key={tx.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       {new Date(tx.created_at).toLocaleDateString("fa-IR")}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${typeInfo.bg} ${typeInfo.color}`}
+                        className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs ${typeInfo.bg} ${typeInfo.color}`}
                       >
                         {typeInfo.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       <Link
                         to={`/items/${tx.item_id}`}
-                        className="text-blue-600 hover:underline"
+                        className="text-blue-600 hover:underline break-words"
                       >
                         [{tx.item_code}] {tx.item_name}
                       </Link>
                     </td>
                     <td
-                      className={`px-4 py-3 text-sm font-medium ${tx.quantity > 0 ? "text-green-600" : "text-red-600"}`}
+                      className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${tx.quantity > 0 ? "text-green-600" : "text-red-600"}`}
                     >
                       {tx.quantity > 0 ? "+" : ""}
                       {tx.quantity}
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       {tx.unit_price
                         ? Number(tx.unit_price).toLocaleString()
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
                       {tx.unit_price
                         ? Number(
                             Math.abs(tx.quantity) * tx.unit_price,

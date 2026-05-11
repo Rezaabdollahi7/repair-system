@@ -1,63 +1,42 @@
 const { getDb, saveDb } = require("../config/database");
 const persianToEnglish = require("../utils/persianToEnglish");
 
-// Generate invoice number
 function generateInvoiceNumber(db) {
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-
   const result = db.exec(`
     SELECT COUNT(*) as count 
     FROM sale_invoices 
     WHERE date(invoice_date) = date('now')
   `);
-
   const count = (result[0]?.values[0][0] || 0) + 1;
   const paddedCount = count.toString().padStart(3, "0");
-
   return `SAL-${dateStr}-${paddedCount}`;
 }
 
-// Update item stock after sale
 function updateItemAfterSale(db, itemId, quantity, unitPrice) {
-  // Get current item
   const itemResult = db.exec(`SELECT current_stock FROM items WHERE id = ?`, [
     itemId,
   ]);
-
   if (!itemResult[0]?.values[0]) return;
-
   const currentStock = itemResult[0].values[0][0] || 0;
   const newStock = Math.max(0, currentStock - quantity);
-
-  // Update item stock (avg price doesn't change on sale)
   db.run(
-    `UPDATE items 
-     SET current_stock = ?, updated_at = CURRENT_TIMESTAMP 
-     WHERE id = ?`,
+    `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     [newStock, itemId],
   );
-
-  // Log transaction
   db.run(
-    `INSERT INTO inventory_transactions 
-     (item_id, type, quantity, unit_price, reference_id, reference_type, note)
-     VALUES (?, 'sale', ?, ?, ?, 'sale_invoice', ?)`,
+    `INSERT INTO inventory_transactions (item_id, type, quantity, unit_price, reference_id, reference_type, note) VALUES (?, 'sale', ?, ?, ?, 'sale_invoice', ?)`,
     [itemId, -quantity, unitPrice, null, "فروش از فاکتور"],
   );
 }
 
-// ────────────────────────────────────────────────────────────────
-
-// Get all sale invoices
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
     const { page = 1, limit = 10, search, from_date, to_date } = req.query;
-
     let baseQuery = `FROM sale_invoices WHERE 1=1`;
     const params = [];
-
     if (search) {
       baseQuery += ` AND (customer_name LIKE ? OR customer_phone LIKE ? OR invoice_number LIKE ?)`;
       const term = `%${persianToEnglish(search)}%`;
@@ -71,22 +50,15 @@ exports.getAll = async (req, res) => {
       baseQuery += ` AND date(invoice_date) <= date(?)`;
       params.push(to_date);
     }
-
-    // Count
     const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
     const total = countResult[0]?.values[0][0] || 0;
-
-    // Pagination
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = parseInt(limit) || 10;
     const offset = (pageNum - 1) * limitNum;
-
-    // Get data
     const result = db.exec(
       `SELECT * ${baseQuery} ORDER BY invoice_date DESC LIMIT ? OFFSET ?`,
       [...params, limitNum, offset],
     );
-
     const invoices = result[0]
       ? result[0].values.map((row) => ({
           id: row[0],
@@ -104,7 +76,6 @@ exports.getAll = async (req, res) => {
           updated_at: row[12],
         }))
       : [];
-
     res.json({
       data: invoices,
       total,
@@ -117,20 +88,15 @@ exports.getAll = async (req, res) => {
   }
 };
 
-// Get single invoice with items
 exports.getById = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
-
     const invoiceResult = db.exec(`SELECT * FROM sale_invoices WHERE id = ?`, [
       id,
     ]);
-
-    if (!invoiceResult[0]?.values[0]) {
+    if (!invoiceResult[0]?.values[0])
       return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
     const row = invoiceResult[0].values[0];
     const invoice = {
       id: row[0],
@@ -147,22 +113,10 @@ exports.getById = async (req, res) => {
       created_at: row[11],
       updated_at: row[12],
     };
-
-    // Get items
     const itemsResult = db.exec(
-      `SELECT 
-        sii.*,
-        i.code,
-        i.name,
-        i.unit,
-        i.current_stock
-       FROM sale_invoice_items sii
-       JOIN items i ON sii.item_id = i.id
-       WHERE sii.invoice_id = ?
-       ORDER BY sii.id`,
+      `SELECT sii.*, i.code, i.name, i.unit, i.current_stock FROM sale_invoice_items sii JOIN items i ON sii.item_id = i.id WHERE sii.invoice_id = ? ORDER BY sii.id`,
       [id],
     );
-
     invoice.items = itemsResult[0]
       ? itemsResult[0].values.map((row) => ({
           id: row[0],
@@ -178,14 +132,12 @@ exports.getById = async (req, res) => {
           current_stock: row[10],
         }))
       : [];
-
     res.json(invoice);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Create sale invoice
 exports.create = async (req, res) => {
   try {
     const db = await getDb();
@@ -198,36 +150,32 @@ exports.create = async (req, res) => {
       note,
       items,
     } = req.body;
-
-    // Validation
-    if (!items || items.length === 0) {
+    if (!items || items.length === 0)
       return res.status(400).json({ error: "حداقل یک کالا باید انتخاب شود" });
-    }
 
-    // Validate stock for each item
     for (const item of items) {
-      if (!item.item_id || !item.quantity || item.quantity <= 0) {
-        return res.status(400).json({ error: "مشخصات کالاها ناقص است" });
-      }
-
-      const stockCheck = db.exec(
-        `SELECT current_stock, name FROM items WHERE id = ?`,
-        [item.item_id],
-      );
-
-      if (!stockCheck[0]?.values[0]) {
-        return res
-          .status(400)
-          .json({ error: `کالا با شناسه ${item.item_id} یافت نشد` });
-      }
-
-      const currentStock = stockCheck[0].values[0][0] || 0;
-      const itemName = stockCheck[0].values[0][1];
-
-      if (currentStock < item.quantity) {
-        return res.status(400).json({
-          error: `موجودی کالای "${itemName}" کافی نیست. موجودی فعلی: ${currentStock}`,
-        });
+      if (item.item_type === "inventory") {
+        if (!item.item_id || !item.quantity || item.quantity <= 0)
+          return res.status(400).json({ error: "مشخصات کالاها ناقص است" });
+        const stockCheck = db.exec(
+          `SELECT current_stock, name FROM items WHERE id = ?`,
+          [item.item_id],
+        );
+        if (!stockCheck[0]?.values[0])
+          return res
+            .status(400)
+            .json({ error: `کالا با شناسه ${item.item_id} یافت نشد` });
+        const currentStock = stockCheck[0].values[0][0] || 0;
+        const itemName = stockCheck[0].values[0][1];
+        if (currentStock < item.quantity)
+          return res.status(400).json({
+            error: `موجودی کالای "${itemName}" کافی نیست. موجودی فعلی: ${currentStock}`,
+          });
+      } else {
+        if (!item.name || !item.quantity || item.quantity <= 0)
+          return res
+            .status(400)
+            .json({ error: "نام و تعداد آیتم دلخواه الزامی است" });
       }
     }
 
@@ -243,11 +191,8 @@ exports.create = async (req, res) => {
           ? "partial"
           : "pending";
 
-    // Insert invoice
     db.run(
-      `INSERT INTO sale_invoices 
-       (invoice_number, customer_id, customer_name, customer_phone, invoice_date, total_amount, paid_amount, payment_status, note, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sale_invoices (invoice_number, customer_id, customer_name, customer_phone, invoice_date, total_amount, paid_amount, payment_status, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         invoiceNumber,
         customer_id || null,
@@ -265,23 +210,24 @@ exports.create = async (req, res) => {
     const idResult = db.exec("SELECT last_insert_rowid() as id");
     const invoiceId = idResult[0].values[0][0];
 
-    // Insert items and update stock
     for (const item of items) {
       const totalPrice = item.quantity * item.unit_price;
-
       db.run(
-        `INSERT INTO sale_invoice_items 
-         (invoice_id, item_id, quantity, unit_price, total_price)
-         VALUES (?, ?, ?, ?, ?)`,
-        [invoiceId, item.item_id, item.quantity, item.unit_price, totalPrice],
+        `INSERT INTO sale_invoice_items (invoice_id, item_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)`,
+        [
+          invoiceId,
+          item.item_type === "inventory" ? item.item_id : null,
+          item.quantity,
+          item.unit_price,
+          totalPrice,
+        ],
       );
-
-      // Update item stock
-      updateItemAfterSale(db, item.item_id, item.quantity, item.unit_price);
+      if (item.item_type === "inventory" && item.item_id) {
+        updateItemAfterSale(db, item.item_id, item.quantity, item.unit_price);
+      }
     }
 
     saveDb();
-
     res.status(201).json({
       id: invoiceId,
       invoice_number: invoiceNumber,
@@ -293,22 +239,17 @@ exports.create = async (req, res) => {
   }
 };
 
-// Update payment status
 exports.updatePayment = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
     const { paid_amount } = req.body;
-
     const invoiceResult = db.exec(
       `SELECT total_amount FROM sale_invoices WHERE id = ?`,
       [id],
     );
-
-    if (!invoiceResult[0]?.values[0]) {
+    if (!invoiceResult[0]?.values[0])
       return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
     const totalAmount = invoiceResult[0].values[0][0];
     const paymentStatus =
       paid_amount >= totalAmount
@@ -316,16 +257,11 @@ exports.updatePayment = async (req, res) => {
         : paid_amount > 0
           ? "partial"
           : "pending";
-
     db.run(
-      `UPDATE sale_invoices 
-       SET paid_amount = ?, payment_status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+      `UPDATE sale_invoices SET paid_amount = ?, payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [paid_amount, paymentStatus, id],
     );
-
     saveDb();
-
     res.json({
       message: "وضعیت پرداخت بروز شد",
       payment_status: paymentStatus,
@@ -335,54 +271,38 @@ exports.updatePayment = async (req, res) => {
   }
 };
 
-// Delete invoice (with stock reversal)
 exports.delete = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
-
-    // Get invoice items
     const itemsResult = db.exec(
       `SELECT item_id, quantity FROM sale_invoice_items WHERE invoice_id = ?`,
       [id],
     );
-
-    if (!itemsResult[0]?.values.length) {
+    if (!itemsResult[0]?.values.length)
       return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
-    // Reverse stock updates (add back to stock)
     for (const row of itemsResult[0].values) {
       const itemId = row[0];
       const quantity = row[1];
-
-      const stockResult = db.exec(
-        `SELECT current_stock FROM items WHERE id = ?`,
-        [itemId],
-      );
-
-      const currentStock = stockResult[0]?.values[0][0] || 0;
-      const newStock = currentStock + quantity;
-
-      db.run(
-        `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [newStock, itemId],
-      );
-
-      // Add reversal transaction
-      db.run(
-        `INSERT INTO inventory_transactions 
-         (item_id, type, quantity, reference_id, reference_type, note)
-         VALUES (?, 'adjustment', ?, ?, 'sale_invoice', ?)`,
-        [itemId, quantity, id, "ابطال فاکتور فروش"],
-      );
+      if (itemId) {
+        const stockResult = db.exec(
+          `SELECT current_stock FROM items WHERE id = ?`,
+          [itemId],
+        );
+        const currentStock = stockResult[0]?.values[0][0] || 0;
+        const newStock = currentStock + quantity;
+        db.run(
+          `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [newStock, itemId],
+        );
+        db.run(
+          `INSERT INTO inventory_transactions (item_id, type, quantity, reference_id, reference_type, note) VALUES (?, 'adjustment', ?, ?, 'sale_invoice', ?)`,
+          [itemId, quantity, id, "ابطال فاکتور فروش"],
+        );
+      }
     }
-
-    // Delete invoice
     db.run(`DELETE FROM sale_invoices WHERE id = ?`, [id]);
-
     saveDb();
-
     res.json({ message: "فاکتور فروش حذف و موجودی کالاها بازگردانده شد" });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -237,7 +237,7 @@ function initSchema() {
   CREATE TABLE IF NOT EXISTS sale_invoice_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id INTEGER NOT NULL,
-    item_id INTEGER NOT NULL,
+    item_id INTEGER ,
     quantity INTEGER NOT NULL,
     unit_price REAL NOT NULL,
     total_price REAL NOT NULL,

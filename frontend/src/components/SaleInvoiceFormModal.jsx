@@ -14,6 +14,7 @@ import {
   TrashIcon,
   UserPlusIcon,
   CurrencyDollarIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
@@ -313,11 +314,32 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
       }));
   };
 
-  const handleAddItem = () =>
-    setSelectedItems((prev) => [
-      ...prev,
-      { item_id: "", quantity: 1, unit_price: 0 },
-    ]);
+  const handleAddItem = (type) => {
+    if (type === "inventory") {
+      setSelectedItems((prev) => [
+        ...prev,
+        {
+          item_type: "inventory",
+          item_id: "",
+          name: "",
+          quantity: 1,
+          unit: "عدد",
+          unit_price: 0,
+        },
+      ]);
+    } else {
+      setSelectedItems((prev) => [
+        ...prev,
+        {
+          item_type: "custom",
+          name: "",
+          quantity: 1,
+          unit: "عدد",
+          unit_price: 0,
+        },
+      ]);
+    }
+  };
   const handleRemoveItem = (index) =>
     setSelectedItems((prev) => prev.filter((_, i) => i !== index));
 
@@ -342,19 +364,29 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
     const newErrors = {};
     if (selectedItems.length === 0)
       newErrors.items = "حداقل یک کالا باید انتخاب شود";
+
     selectedItems.forEach((item, index) => {
-      if (!item.item_id) newErrors[`item_${index}`] = "کالا را انتخاب کنید";
-      else {
+      if (item.item_type === "inventory" && !item.item_id) {
+        newErrors[`item_${index}`] = "کالا را انتخاب کنید";
+      }
+
+      if (item.item_type === "custom" && !item.name?.trim()) {
+        newErrors[`item_${index}`] = "نام آیتم را وارد کنید";
+      }
+
+      if (item.item_type === "inventory") {
         const selectedItem = items.find((it) => it.id === item.item_id);
         if (selectedItem && item.quantity > selectedItem.currentStock)
           newErrors[`quantity_${index}`] =
             `موجودی کافی نیست (موجودی: ${selectedItem.currentStock})`;
       }
+
       if (!item.quantity || item.quantity <= 0)
         newErrors[`quantity_${index}`] = "تعداد باید بیشتر از صفر باشد";
       if (!item.unit_price || item.unit_price < 0)
         newErrors[`price_${index}`] = "قیمت باید مثبت باشد";
     });
+
     if (formData.paid_amount < 0)
       newErrors.paid_amount = "مبلغ پرداختی نمی‌تواند منفی باشد";
     setErrors(newErrors);
@@ -377,8 +409,12 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
         paid_amount: formData.paid_amount,
         note: formData.note?.trim() || null,
         items: selectedItems.map((item) => ({
-          item_id: parseInt(item.item_id),
+          item_type: item.item_type || "inventory",
+          item_id:
+            item.item_type === "inventory" ? parseInt(item.item_id) : null,
+          name: item.item_type === "inventory" ? item.name || "" : item.name,
           quantity: item.quantity,
+          unit: item.unit || "عدد",
           unit_price: item.unit_price,
         })),
       };
@@ -561,11 +597,19 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                     </button>
                     <button
                       type="button"
-                      onClick={handleAddItem}
-                      className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1"
+                      onClick={() => handleAddItem("inventory")}
+                      className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-200 text-sm flex items-center gap-1"
                     >
                       <PlusIcon className="w-4 h-4" />
-                      افزودن کالا
+                      از انبار
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddItem("custom")}
+                      className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-200 text-sm flex items-center gap-1"
+                    >
+                      <PencilSquareIcon className="w-4 h-4" />
+                      دلخواه
                     </button>
                   </div>
                 </div>
@@ -592,22 +636,36 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                           key={index}
                           className="border border-gray-200 rounded-lg p-4 bg-gray-50"
                         >
-                          <div className="grid grid-cols-12 gap-3 items-end">
-                            <div className="col-span-5">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                کالا <span className="text-red-500">*</span>
-                              </label>
-                              <SearchableSelect
-                                options={itemOptions}
-                                value={item.item_id}
-                                onChange={(val) =>
-                                  handleItemChange(index, "item_id", val)
-                                }
-                                placeholder="جستجو و انتخاب کالا..."
-                                loading={loadingData}
-                                required
-                                error={errors[`item_${index}`]}
-                              />
+                          <div className="grid grid-cols-10 gap-3 items-end">
+                            {/* Name/Selection */}
+                            <div className="col-span-3">
+                              {item.item_type === "inventory" ? (
+                                <SearchableSelect
+                                  options={itemOptions}
+                                  value={item.item_id}
+                                  onChange={(val) =>
+                                    handleItemChange(index, "item_id", val)
+                                  }
+                                  placeholder="جستجو و انتخاب کالا..."
+                                  loading={loadingData}
+                                  required
+                                  error={errors[`item_${index}`]}
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      index,
+                                      "name",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="نام آیتم دلخواه"
+                                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                />
+                              )}
                               {selectedItem && (
                                 <p className="mt-1 text-xs text-gray-500">
                                   موجودی: {selectedItem.currentStock}{" "}
@@ -615,9 +673,11 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                                 </p>
                               )}
                             </div>
-                            <div className="col-span-2">
+
+                            {/* Quantity */}
+                            <div className="col-span-1">
                               <label className="block text-xs font-medium text-gray-600 mb-1">
-                                تعداد <span className="text-red-500">*</span>
+                                تعداد *
                               </label>
                               <input
                                 type="number"
@@ -639,10 +699,30 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                                 </p>
                               )}
                             </div>
+
+                            {/* Unit */}
+                            <div className="col-span-1">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                واحد
+                              </label>
+                              <input
+                                type="text"
+                                value={item.unit}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    "unit",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                              />
+                            </div>
+
+                            {/* Unit Price */}
                             <div className="col-span-2">
                               <label className="block text-xs font-medium text-gray-600 mb-1">
-                                قیمت واحد (ریال){" "}
-                                <span className="text-red-500">*</span>
+                                قیمت واحد (ریال) *
                               </label>
                               <input
                                 type="number"
@@ -663,6 +743,8 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                                 </p>
                               )}
                             </div>
+
+                            {/* Total */}
                             <div className="col-span-2">
                               <label className="block text-xs font-medium text-gray-600 mb-1">
                                 جمع
@@ -676,6 +758,8 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
                                 )}
                               </div>
                             </div>
+
+                            {/* Delete */}
                             <div className="col-span-1">
                               <button
                                 type="button"

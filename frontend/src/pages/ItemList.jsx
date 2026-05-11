@@ -268,112 +268,114 @@ export default function ItemList() {
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
-              <tr>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  کد کالا
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  نام کالا
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  دسته‌بندی
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  واحد
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  وضعیت موجودی
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  حداقل موجودی
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                  قیمت میانگین (ریال)
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-indigo-700">
-                  عملیات
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {items.map((item, index) => (
-                <tr
-                  key={item.id}
-                  onClick={() => openItemDetail(item.id)}
-                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                    index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                  }`}
-                >
-                  <td className="px-4 py-3 text-sm font-mono">
-                    {item.code || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    <span className="text-blue-600 font-medium">
-                      {item.name}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.categoryName || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.unit}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StockBadge
-                      current={item.currentStock || 0}
-                      min={item.minStock || 0}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.minStock || 0}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.avgPurchasePrice
-                      ? formatPersianCurrency(item.avgPurchasePrice)
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex gap-1 justify-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openItemDetail(item.id);
-                        }}
-                        className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                        title="مشاهده جزئیات"
-                      >
-                        <EyeIcon className="size-5.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openItemEdit(item.id);
-                        }}
-                        className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                        title="ویرایش"
-                      >
-                        <PencilSquareIcon className="size-5.5" />
-                      </button>
-                      {isAtLeast("admin") && (
+          <div className="overflow-x-auto">
+            <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    کد کالا
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    نام کالا
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    دسته‌بندی
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    واحد
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    وضعیت موجودی
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    حداقل موجودی
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    قیمت میانگین (ریال)
+                  </th>
+                  <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                    عملیات
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {items.map((item, index) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => openItemDetail(item.id)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-sm font-mono">
+                      {item.code || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      <span className="text-blue-600 font-medium">
+                        {item.name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.categoryName || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.unit}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StockBadge
+                        current={item.currentStock || 0}
+                        min={item.minStock || 0}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.minStock || 0}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.avgPurchasePrice
+                        ? formatPersianCurrency(item.avgPurchasePrice)
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex gap-1 justify-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDeleteTarget(item);
+                            openItemDetail(item.id);
                           }}
-                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                          title="حذف"
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          title="مشاهده جزئیات"
                         >
-                          <TrashIcon className="size-5.5" />
+                          <EyeIcon className="size-5.5" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openItemEdit(item.id);
+                          }}
+                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                          title="ویرایش"
+                        >
+                          <PencilSquareIcon className="size-5.5" />
+                        </button>
+                        {isAtLeast("admin") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(item);
+                            }}
+                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="حذف"
+                          >
+                            <TrashIcon className="size-5.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

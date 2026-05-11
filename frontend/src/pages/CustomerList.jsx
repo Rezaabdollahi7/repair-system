@@ -128,83 +128,87 @@ export default function CustomerList() {
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
-              <tr>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  نام
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  شماره تماس
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  تعداد دستگاه
-                </th>
-                <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
-                  عملیات
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {customers.map((c, index) => (
-                <tr
-                  key={c.id}
-                  onClick={() => openCustomerDetail(c.id)}
-                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                    index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                  }`}
-                >
-                  <td className="px-4 py-3 text-sm font-medium">
-                    <span className="text-blue-600 font-medium">{c.name}</span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatPersianPhone(c.phone)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                      {c.device_count ?? 0} دستگاه
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex gap-1 justify-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openCustomerDetail(c.id);
-                        }}
-                        className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                        title="مشاهده جزئیات"
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openCustomerEdit(c.id);
-                        }}
-                        className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                        title="ویرایش"
-                      >
-                        <PencilSquareIcon className="w-5 h-5" />
-                      </button>
-                      {isAtLeast("admin") && (
+          <div className="overflow-x-auto">
+            <table className="min-w-[600px] lg:min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    نام
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    شماره تماس
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    تعداد دستگاه
+                  </th>
+                  <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
+                    عملیات
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {customers.map((c, index) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => openCustomerDetail(c.id)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-sm font-medium">
+                      <span className="text-blue-600 font-medium">
+                        {c.name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {formatPersianPhone(c.phone)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                        {c.device_count ?? 0} دستگاه
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex gap-1 justify-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDeleteTarget(c);
+                            openCustomerDetail(c.id);
                           }}
-                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                          title="حذف"
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          title="مشاهده جزئیات"
                         >
-                          <TrashIcon className="w-5 h-5" />
+                          <EyeIcon className="w-5 h-5" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openCustomerEdit(c.id);
+                          }}
+                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                          title="ویرایش"
+                        >
+                          <PencilSquareIcon className="w-5 h-5" />
+                        </button>
+                        {isAtLeast("admin") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(c);
+                            }}
+                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="حذف"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

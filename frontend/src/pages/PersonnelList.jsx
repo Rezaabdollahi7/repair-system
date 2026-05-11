@@ -165,134 +165,138 @@ export default function PersonnelList() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
-              <tr>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  نام
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  نام کاربری
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  نقش
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  تلفن
-                </th>
-                <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                  وضعیت
-                </th>
-                {canManage && (
-                  <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
-                    عملیات
+          <div className="overflow-x-auto">
+            <table className="min-w-[700px] lg:min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    نام
                   </th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {personnel.map((person, index) => (
-                <tr
-                  key={person.id}
-                  className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
-                        {person.full_name?.charAt(0)}
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {person.full_name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                    {person.username}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        person.role_name === "super_admin"
-                          ? "bg-purple-100 text-purple-700"
-                          : person.role_name === "admin"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {person.role_label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {formatPersianPhone(person.phone)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
-                        person.is_active
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {person.is_active ? (
-                        <CheckCircleIcon className="w-3.5 h-3.5" />
-                      ) : (
-                        <XCircleIcon className="w-3.5 h-3.5" />
-                      )}
-                      {person.is_active ? "فعال" : "غیرفعال"}
-                    </span>
-                  </td>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    نام کاربری
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    نقش
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    تلفن
+                  </th>
+                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                    وضعیت
+                  </th>
                   {canManage && (
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <div className="flex gap-1 justify-center">
-                        {!(
-                          user?.role === "admin" &&
-                          (person.role_name === "super_admin" ||
-                            person.role_name === "admin")
-                        ) && (
-                          <button
-                            onClick={() => openPersonnelEdit(person.id)}
-                            className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                            title="ویرایش"
-                          >
-                            <PencilSquareIcon className="size-5.5" />
-                          </button>
+                    <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
+                      عملیات
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {personnel.map((person, index) => (
+                  <tr
+                    key={person.id}
+                    className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                          {person.full_name?.charAt(0)}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {person.full_name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
+                      {person.username}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          person.role_name === "super_admin"
+                            ? "bg-purple-100 text-purple-700"
+                            : person.role_name === "admin"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {person.role_label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {formatPersianPhone(person.phone)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                          person.is_active
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {person.is_active ? (
+                          <CheckCircleIcon className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircleIcon className="w-3.5 h-3.5" />
                         )}
-                        {person.id !== user?.id &&
-                          !(
+                        {person.is_active ? "فعال" : "غیرفعال"}
+                      </span>
+                    </td>
+                    {canManage && (
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <div className="flex gap-1 justify-center">
+                          {!(
                             user?.role === "admin" &&
                             (person.role_name === "super_admin" ||
                               person.role_name === "admin")
                           ) && (
                             <button
-                              onClick={() => setToggleTarget(person)}
-                              className={`p-2 rounded-lg transition-colors ${person.is_active ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
-                              title={
-                                person.is_active ? "غیرفعال‌سازی" : "فعال‌سازی"
-                              }
+                              onClick={() => openPersonnelEdit(person.id)}
+                              className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                              title="ویرایش"
                             >
-                              {person.is_active ? (
-                                <XCircleIcon className="size-5.5" />
-                              ) : (
-                                <CheckCircleIcon className="size-5.5" />
-                              )}
+                              <PencilSquareIcon className="size-5.5" />
                             </button>
                           )}
-                        {canDelete && person.id !== user?.id && (
-                          <button
-                            onClick={() => setDeleteTarget(person)}
-                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                            title="حذف"
-                          >
-                            <TrashIcon className="size-5.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                          {person.id !== user?.id &&
+                            !(
+                              user?.role === "admin" &&
+                              (person.role_name === "super_admin" ||
+                                person.role_name === "admin")
+                            ) && (
+                              <button
+                                onClick={() => setToggleTarget(person)}
+                                className={`p-2 rounded-lg transition-colors ${person.is_active ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
+                                title={
+                                  person.is_active
+                                    ? "غیرفعال‌سازی"
+                                    : "فعال‌سازی"
+                                }
+                              >
+                                {person.is_active ? (
+                                  <XCircleIcon className="size-5.5" />
+                                ) : (
+                                  <CheckCircleIcon className="size-5.5" />
+                                )}
+                              </button>
+                            )}
+                          {canDelete && person.id !== user?.id && (
+                            <button
+                              onClick={() => setDeleteTarget(person)}
+                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                              title="حذف"
+                            >
+                              <TrashIcon className="size-5.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

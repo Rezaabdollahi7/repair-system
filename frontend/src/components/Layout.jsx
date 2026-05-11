@@ -27,7 +27,8 @@ export default function Layout() {
   const location = useLocation();
   const { isAtLeast, user, logoutUser } = useAuth();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const isActive = (path) => location.pathname.startsWith(path);
 
@@ -37,39 +38,17 @@ export default function Layout() {
   };
 
   const menuItems = [
-    {
-      name: "داشبورد",
-      path: "/dashboard",
-      icon: HomeIcon,
-      adminOnly: true,
-    },
+    { name: "داشبورد", path: "/dashboard", icon: HomeIcon, adminOnly: true },
     {
       name: "دستگاه‌ها",
       path: "/devices",
       icon: WrenchScrewdriverIcon,
       adminOnly: false,
     },
-    {
-      name: "مشتریان",
-      path: "/customers",
-      icon: UsersIcon,
-      adminOnly: false,
-    },
-    {
-      name: "پرسنل",
-      path: "/personnel",
-      icon: UserGroupIcon,
-      adminOnly: true,
-    },
-    {
-      divider: true,
-    },
-    {
-      name: "انبار و کالاها",
-      path: "/items",
-      icon: CubeIcon,
-      adminOnly: true,
-    },
+    { name: "مشتریان", path: "/customers", icon: UsersIcon, adminOnly: false },
+    { name: "پرسنل", path: "/personnel", icon: UserGroupIcon, adminOnly: true },
+    { divider: true },
+    { name: "انبار و کالاها", path: "/items", icon: CubeIcon, adminOnly: true },
     {
       name: "فاکتورهای خرید",
       path: "/purchase-invoices",
@@ -88,9 +67,7 @@ export default function Layout() {
       icon: WrenchScrewdriverIcon,
       adminOnly: true,
     },
-    {
-      divider: true,
-    },
+    { divider: true },
     {
       name: "گزارش موجودی",
       path: "/reports/stock",
@@ -109,9 +86,7 @@ export default function Layout() {
       icon: ArchiveBoxIcon,
       adminOnly: true,
     },
-    {
-      divider: true,
-    },
+    { divider: true },
     {
       name: "تنظیمات",
       path: "/settings",
@@ -121,33 +96,21 @@ export default function Layout() {
     },
   ];
 
-  // First filter by role
   const filteredMenuItems = menuItems.filter(
     (item) => !item.adminOnly || (item.adminOnly && isAtLeast("admin")),
   );
 
-  // Then remove leading/trailing dividers and consecutive dividers
   const cleanMenuItems = filteredMenuItems.filter((item, index, arr) => {
-    if (!item.divider) return true; // Keep non-dividers
-
-    // Remove divider if it's the first visible item
+    if (!item.divider) return true;
     if (index === 0) return false;
-
-    // Remove divider if it's the last visible item
     if (index === arr.length - 1) return false;
-
-    // Remove divider if the previous visible item is also a divider
     const prevItem = arr[index - 1];
     if (prevItem?.divider) return false;
-
-    // Remove divider if the next visible item is also a divider
     const nextItem = arr[index + 1];
     if (nextItem?.divider) return false;
-
     return true;
   });
 
-  // Floating Action Button with animated menu
   function FloatingActionButton() {
     const [isOpen, setIsOpen] = useState(false);
     const {
@@ -199,17 +162,14 @@ export default function Layout() {
     ];
 
     return (
-      <div className="fixed bottom-6 left-6 z-40 flex flex-col items-center gap-3">
-        {/* Backdrop */}
+      <div className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 flex flex-col items-center gap-3">
         {isOpen && (
           <div
             className="fixed inset-0 -z-30"
             onClick={() => setIsOpen(false)}
           />
         )}
-
-        {/* Action Buttons */}
-        <div className="flex flex-col-reverse items-center gap-3">
+        <div className="flex flex-col-reverse items-center gap-2 sm:gap-3">
           {actions.map((action, index) => (
             <button
               key={index}
@@ -217,7 +177,7 @@ export default function Layout() {
                 action.onClick();
                 setIsOpen(false);
               }}
-              className={`flex items-center gap-3 px-4 py-3 rounded-full text-white shadow-lg transition-all duration-300 ${action.color} ${
+              className={`flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-full text-white shadow-lg transition-all duration-300 ${action.color} ${
                 isOpen
                   ? "opacity-100 translate-y-0 scale-100"
                   : "opacity-0 translate-y-4 scale-75 pointer-events-none"
@@ -225,166 +185,170 @@ export default function Layout() {
               style={{ transitionDelay: isOpen ? `${index * 50}ms` : "0ms" }}
               title={action.label}
             >
-              <action.icon className="w-5 h-5" />
-              <span className="text-sm font-medium whitespace-nowrap">
+              <action.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                 {action.label}
               </span>
             </button>
           ))}
         </div>
-
-        {/* Main FAB Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`p-4 rounded-full shadow-2xl text-white transition-all duration-300 z-40 ${
+          className={`p-3 sm:p-4 rounded-full shadow-2xl text-white transition-all duration-300 z-40 ${
             isOpen
               ? "bg-red-500 hover:bg-red-600 rotate-45"
               : "bg-blue-600 hover:bg-blue-700 rotate-0"
           }`}
         >
           {isOpen ? (
-            <XMarkIcon className="w-6 h-6" />
+            <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           ) : (
-            <PlusIcon className="w-6 h-6" />
+            <PlusIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           )}
         </button>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex" dir="rtl">
-      {/* Sidebar - Fixed */}
-      <aside
-        className={`bg-white shadow-lg transition-all duration-300 flex flex-col fixed inset-y-0 right-0 z-30 ${
-          sidebarOpen ? "w-64" : "w-20"
-        }`}
-      >
-        {/* Sidebar Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
-          {sidebarOpen && (
-            <h1 className="text-lg font-bold text-gray-900 truncate">
-              سیستم مدیریت تعمیرات
-            </h1>
+  const sidebarContent = (
+    <>
+      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
+        {sidebarOpen && (
+          <h1 className="text-lg font-bold text-gray-900 truncate">
+            سیستم مدیریت تعمیرات
+          </h1>
+        )}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:flex"
+        >
+          {sidebarOpen ? (
+            <ChevronRightIcon className="w-5 h-5 text-gray-600" />
+          ) : (
+            <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
           )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        </button>
+        <button
+          onClick={() => setMobileSidebarOpen(false)}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
+        >
+          <XMarkIcon className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+      <nav className="flex-1 py-4 overflow-y-auto">
+        <ul className="space-y-1 px-2">
+          {cleanMenuItems.map((item, index) => {
+            if (item.divider)
+              return (
+                <li
+                  key={`divider-${index}`}
+                  className="my-3 border-t border-gray-200"
+                />
+              );
+            const Icon = item.icon;
+            const active = isActive(item.path);
+            return (
+              <li key={item.path}>
+                <Link
+                  to={item.path}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    active
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-700 hover:bg-gray-100"
+                  } ${!sidebarOpen && "lg:justify-center"}`}
+                  title={!sidebarOpen ? item.name : ""}
+                >
+                  <Icon
+                    className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}
+                  />
+                  {sidebarOpen && (
+                    <span className="font-medium">{item.name}</span>
+                  )}
+                  {active && sidebarOpen && (
+                    <span className="mr-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <div className="border-t border-gray-200 shrink-0">
+        <div className="p-4 border-b border-gray-200 shrink-0">
+          <div
+            className={`flex items-center ${sidebarOpen ? "gap-3" : "lg:justify-center"}`}
           >
-            {sidebarOpen ? (
-              <ChevronRightIcon className="w-5 h-5 text-gray-600" />
-            ) : (
-              <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+              <span className="text-blue-600 font-medium text-sm">
+                {user?.full_name?.charAt(0) || user?.username?.charAt(0) || "U"}
+              </span>
+            </div>
+            {sidebarOpen && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user?.full_name || user?.username}
+                </p>
+              </div>
             )}
+          </div>
+        </div>
+        <div className="p-4 pt-0">
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ${!sidebarOpen && "lg:justify-center"}`}
+            title={!sidebarOpen ? "خروج" : ""}
+          >
+            <svg
+              className="w-5 h-5 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            {sidebarOpen && <span className="text-sm font-medium">خروج</span>}
           </button>
         </div>
+      </div>
+    </>
+  );
 
-        {/* Navigation Menu - Scrollable */}
-        <nav className="flex-1 py-4 overflow-y-auto">
-          <ul className="space-y-1 px-2">
-            {cleanMenuItems.map((item, index) => {
-              if (item.divider) {
-                return (
-                  <li
-                    key={`divider-${index}`}
-                    className="my-3 border-t border-gray-200"
-                  />
-                );
-              }
-
-              const Icon = item.icon;
-              const active = isActive(item.path);
-
-              return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      active
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-700 hover:bg-gray-100"
-                    } ${!sidebarOpen && "justify-center"}`}
-                    title={!sidebarOpen ? item.name : ""}
-                  >
-                    <Icon
-                      className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}
-                    />
-                    {sidebarOpen && (
-                      <span className="font-medium">{item.name}</span>
-                    )}
-                    {active && sidebarOpen && (
-                      <span className="mr-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        {/* Footer - Role & Logout */}
-        <div className="border-t border-gray-200 shrink-0">
-          {/* User Info - Top */}
-          <div className="p-4 border-b border-gray-200 shrink-0">
-            <div
-              className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}
-            >
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <span className="text-blue-600 font-medium text-sm">
-                  {user?.full_name?.charAt(0) ||
-                    user?.username?.charAt(0) ||
-                    "U"}
-                </span>
-              </div>
-              {sidebarOpen && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.full_name || user?.username}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Logout Button */}
-          <div className="p-4 pt-0">
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ${
-                !sidebarOpen && "justify-center"
-              }`}
-              title={!sidebarOpen ? "خروج" : ""}
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              {sidebarOpen && <span className="text-sm font-medium">خروج</span>}
-            </button>
-          </div>
-        </div>
+  return (
+    <div className="min-h-screen bg-gray-50" dir="rtl">
+      {/* Desktop Sidebar */}
+      <aside
+        className={`bg-white shadow-lg transition-all duration-300 flex-col fixed inset-y-0 right-0 z-30 hidden lg:flex ${sidebarOpen ? "w-64" : "w-20"}`}
+      >
+        {sidebarContent}
       </aside>
 
-      {/* Main Content - with margin for fixed sidebar */}
+      {/* Mobile Sidebar Overlay */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <aside className="absolute inset-y-0 right-0 w-64 bg-white shadow-xl flex flex-col z-50">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+
+      {/* Main Content */}
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-          sidebarOpen ? "mr-64" : "mr-20"
-        }`}
+        className={`transition-all duration-300 ${sidebarOpen ? "lg:mr-64" : "lg:mr-20"}`}
       >
-        {/* Mobile Header */}
         <header className="bg-white shadow-sm lg:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <button
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => setMobileSidebarOpen(true)}
               className="p-2 rounded-lg hover:bg-gray-100"
             >
               <Bars3Icon className="w-6 h-6 text-gray-600" />
@@ -395,12 +359,8 @@ export default function Layout() {
             <div className="w-6" />
           </div>
         </header>
-
-        {/* Page Content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-x-auto">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-auto">
           <Outlet />
-
-          {/* Floating Action Button */}
           <FloatingActionButton />
         </main>
       </div>

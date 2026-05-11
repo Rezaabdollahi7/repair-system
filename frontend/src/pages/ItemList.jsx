@@ -175,25 +175,26 @@ export default function ItemList() {
 
   return (
     <div dir="rtl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <CubeIcon className="w-6 h-6 text-gray-600" />
+      {/* Header - responsive */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <CubeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
           مدیریت کالاها
         </h1>
-        <div className=" flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 flex items-center gap-2"
+            className="bg-indigo-100 text-indigo-700 px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-indigo-200 flex items-center gap-1 flex-1 sm:gap-2 text-sm"
           >
-            <FolderPlusIcon className="w-5 h-5" />
-            دسته‌بندی‌ها
+            <FolderPlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="lg:text-base">دسته‌بندی‌ها</span>
           </button>
           <button
             onClick={() => openItemEdit(null)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 flex items-center gap-1 sm:gap-2 text-sm flex-1 sm:flex-none justify-center"
           >
-            <PlusIcon className="size-5.5" />
-            کالای جدید
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="lg:text-base">کالای جدید</span>
           </button>
         </div>
       </div>

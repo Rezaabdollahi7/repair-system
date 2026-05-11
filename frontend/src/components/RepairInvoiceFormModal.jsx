@@ -1,6 +1,5 @@
 // src/components/RepairInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
 import {
   createRepairInvoice,
   updateRepairInvoice,
@@ -37,7 +36,6 @@ export default function RepairInvoiceFormModal({
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [settings, setSettings] = useState(null);
 
-  // Form state
   const [formData, setFormData] = useState({
     device_id: "",
     customer_name: "",
@@ -55,17 +53,14 @@ export default function RepairInvoiceFormModal({
   const [selectedItems, setSelectedItems] = useState([]);
   const [errors, setErrors] = useState({});
 
-  // Data for dropdowns
   const [devices, setDevices] = useState([]);
   const [items, setItems] = useState([]);
   const [services, setServices] = useState([]);
   const [technicians, setTechnicians] = useState([]);
 
-  // ─── Fetch Settings & Data ─────────────────────────────────
   useEffect(() => {
     if (!isOpen) return;
 
-    // Get default tax rate from settings
     getSettings()
       .then((res) => {
         setSettings(res.data);
@@ -77,7 +72,6 @@ export default function RepairInvoiceFormModal({
       })
       .catch(() => {});
 
-    // Load services and technicians
     Promise.all([getServices(), getTechnicians()])
       .then(([servicesRes, techRes]) => {
         setServices(servicesRes.data || []);
@@ -86,7 +80,6 @@ export default function RepairInvoiceFormModal({
       .catch(() => {});
   }, [isOpen]);
 
-  // Load from initialDeviceId (new invoice mode)
   useEffect(() => {
     if (!isOpen) return;
     if (!isEditMode && initialDeviceId) {
@@ -109,7 +102,6 @@ export default function RepairInvoiceFormModal({
     }
   }, [isOpen, isEditMode, initialDeviceId]);
 
-  // Load invoice data in edit mode
   useEffect(() => {
     if (!isOpen) return;
     if (isEditMode && initialInvoiceId) {
@@ -131,7 +123,6 @@ export default function RepairInvoiceFormModal({
             notes: invoice.notes || "",
           });
 
-          // Transform items
           const items = invoice.items.map((item) => ({
             item_type: item.item_type,
             item_id: item.item_id || "",
@@ -144,7 +135,6 @@ export default function RepairInvoiceFormModal({
           }));
           setSelectedItems(items);
 
-          // Load device info
           if (invoice.device_id) {
             searchDevicesForInvoice("").then((res) => {
               const device = res.data?.data?.find(
@@ -162,7 +152,6 @@ export default function RepairInvoiceFormModal({
     }
   }, [isOpen, initialInvoiceId, isEditMode, onClose]);
 
-  // Reset form when modal closes
   const resetForm = () => {
     setFormData({
       device_id: "",
@@ -186,7 +175,6 @@ export default function RepairInvoiceFormModal({
     onClose();
   };
 
-  // ─── Device Options for SearchableSelect ─────────────────
   const deviceOptions = devices.map((d) => ({
     value: d.id,
     label: `${d.id} - ${d.device_name} ${d.brand ? `(${d.brand})` : ""}`,
@@ -196,7 +184,6 @@ export default function RepairInvoiceFormModal({
     customer_id: d.customer_id,
   }));
 
-  // Item options
   const itemOptions = items.map((i) => ({
     value: i.id,
     label: `[${i.code}] ${i.name}`,
@@ -205,13 +192,11 @@ export default function RepairInvoiceFormModal({
     unit: i.unit,
   }));
 
-  // Technician options
   const technicianOptions = technicians.map((t) => ({
     value: t.id,
     label: t.full_name || t.name || t.username,
   }));
 
-  // ─── Calculations ─────────────────────────────────────────
   const calculateItemTotal = (item) => {
     const subtotal = item.quantity * item.unit_price;
     let discount = 0;
@@ -249,7 +234,6 @@ export default function RepairInvoiceFormModal({
     return calculateSubtotal() - calculateDiscount() + calculateTax();
   };
 
-  // ─── Handlers ─────────────────────────────────────────────
   const handleDeviceSearch = async (query) => {
     try {
       const res = await searchDevicesForInvoice(query || "");
@@ -343,7 +327,6 @@ export default function RepairInvoiceFormModal({
         if (i !== index) return item;
         const updated = { ...item, [field]: value };
 
-        // Auto-fill for inventory items
         if (field === "item_id" && item.item_type === "inventory" && value) {
           const selectedItem = items.find((it) => it.id === value);
           if (selectedItem) {
@@ -353,7 +336,6 @@ export default function RepairInvoiceFormModal({
           }
         }
 
-        // Auto-fill for service items
         if (field === "name" && item.item_type === "service" && value) {
           const selectedService = services.find(
             (s) => s.name === value || s.id === value,
@@ -467,13 +449,13 @@ export default function RepairInvoiceFormModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-7xl my-8"
+        className="bg-white rounded-xl shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-xl font-bold text-gray-900">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
             {isEditMode ? "ویرایش فاکتور تعمیر" : "ثبت فاکتور تعمیر جدید"}
           </h2>
           <button
@@ -484,19 +466,17 @@ export default function RepairInvoiceFormModal({
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Info */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Device Selection */}
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="lg:col-span-1 space-y-4 sm:space-y-6">
+                <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
                     <WrenchScrewdriverIcon className="w-5 h-5 text-gray-600" />
                     اطلاعات دستگاه
                   </h2>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         انتخاب دستگاه <span className="text-red-500">*</span>
@@ -512,7 +492,6 @@ export default function RepairInvoiceFormModal({
                         required
                       />
                     </div>
-                    {/* Customer Info - Read Only */}
                     {formData.device_id && (
                       <>
                         <div>
@@ -524,7 +503,7 @@ export default function RepairInvoiceFormModal({
                             value={formData.customer_name || "—"}
                             readOnly
                             disabled
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed"
+                            className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed text-sm"
                           />
                           {!formData.customer_name && (
                             <p className="text-yellow-600 text-xs mt-1">
@@ -542,7 +521,7 @@ export default function RepairInvoiceFormModal({
                             value={formData.customer_phone || "—"}
                             readOnly
                             disabled
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed"
+                            className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 bg-gray-100 text-gray-700 cursor-not-allowed text-sm"
                           />
                         </div>
                       </>
@@ -550,13 +529,12 @@ export default function RepairInvoiceFormModal({
                   </div>
                 </div>
 
-                {/* Invoice Details */}
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">
+                <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
                     جزئیات فاکتور
                   </h2>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         تاریخ فاکتور
@@ -580,7 +558,7 @@ export default function RepairInvoiceFormModal({
                         name="technician_id"
                         value={formData.technician_id}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white"
+                        className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 bg-white text-sm"
                       >
                         <option value="">انتخاب تعمیرکار...</option>
                         {technicianOptions.map((t) => (
@@ -601,7 +579,7 @@ export default function RepairInvoiceFormModal({
                         value={formData.warranty_months}
                         onChange={handleInputChange}
                         min="0"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                        className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                       />
                     </div>
 
@@ -614,7 +592,7 @@ export default function RepairInvoiceFormModal({
                         value={formData.notes}
                         onChange={handleInputChange}
                         rows="3"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                        className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
                         placeholder="توضیحات اضافی..."
                       />
                     </div>
@@ -622,67 +600,66 @@ export default function RepairInvoiceFormModal({
                 </div>
               </div>
 
-              {/* Right Column - Items & Totals */}
               <div className="lg:col-span-2">
-                {/* Items */}
-                <div className="bg-white shadow rounded-lg p-3 mb-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                <div className="bg-white shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
+                    <h2 className="text-base sm:text-lg font-medium text-gray-900 flex items-center gap-2">
                       <CubeIcon className="w-5 h-5 text-gray-600" />
                       اقلام فاکتور
                     </h2>
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => handleAddItem("inventory")}
-                        className="bg-green-100 text-green-700 px-3 py-2 rounded-lg hover:bg-green-200 text-sm flex items-center gap-1"
+                        className="bg-green-100 text-green-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-green-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
-                        <PlusIcon className="w-4 h-4" />
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         از انبار
                       </button>
                       <button
                         type="button"
                         onClick={() => handleAddItem("service")}
-                        className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-200 text-sm flex items-center gap-1"
+                        className="bg-blue-100 text-blue-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-blue-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
-                        <PlusIcon className="w-4 h-4" />
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         خدمت
                       </button>
                       <button
                         type="button"
                         onClick={() => handleAddItem("custom")}
-                        className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-200 text-sm flex items-center gap-1"
+                        className="bg-purple-100 text-purple-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-purple-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
-                        <PencilSquareIcon className="w-4 h-4" />
+                        <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         دلخواه
                       </button>
                     </div>
                   </div>
 
                   {errors.items && (
-                    <p className="text-sm text-red-600 mb-4">{errors.items}</p>
+                    <p className="text-sm text-red-600 mb-3 sm:mb-4">
+                      {errors.items}
+                    </p>
                   )}
 
                   {selectedItems.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 border-2 border-dashed rounded-lg">
+                    <div className="text-center py-8 sm:py-10 text-gray-400 border-2 border-dashed rounded-lg">
                       <p>هیچ آیتمی اضافه نشده است</p>
-                      <p className="text-sm mt-1">
+                      <p className="text-xs sm:text-sm mt-1">
                         از دکمه‌های بالا برای افزودن آیتم استفاده کنید
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {selectedItems.map((item, index) => (
                         <div
                           key={index}
-                          className="border border-gray-300 rounded-lg p-4 bg-gray-50"
+                          className="border border-gray-300 rounded-lg p-3 sm:p-4 bg-gray-50"
                         >
-                          <div className="grid grid-cols-12 gap-2 items-center">
-                            {/* Item Type Badge */}
-                            <div className="col-span-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-center">
+                            <div className="col-span-1 sm:col-span-2">
                               <span
-                                className={`text-xs px-2 py-1 rounded-full ${
+                                className={`text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
                                   item.item_type === "inventory"
                                     ? "bg-green-100 text-green-700"
                                     : item.item_type === "service"
@@ -698,8 +675,7 @@ export default function RepairInvoiceFormModal({
                               </span>
                             </div>
 
-                            {/* Name/Selection */}
-                            <div className="col-span-4">
+                            <div className="col-span-7 sm:col-span-4">
                               {item.item_type === "inventory" ? (
                                 <SearchableSelect
                                   options={itemOptions}
@@ -722,7 +698,7 @@ export default function RepairInvoiceFormModal({
                                       e.target.value,
                                     )
                                   }
-                                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                  className="w-full border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
                                 >
                                   <option value="">انتخاب خدمت...</option>
                                   {services.map((s) => (
@@ -746,13 +722,12 @@ export default function RepairInvoiceFormModal({
                                     )
                                   }
                                   placeholder="نام آیتم"
-                                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                  className="w-full border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
                                 />
                               )}
                             </div>
 
-                            {/* Quantity */}
-                            <div className="col-span-1">
+                            <div className="col-span-2 sm:col-span-1">
                               <input
                                 type="number"
                                 value={item.quantity}
@@ -765,12 +740,11 @@ export default function RepairInvoiceFormModal({
                                 }
                                 min="0.01"
                                 step="0.01"
-                                className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                                className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
                               />
                             </div>
 
-                            {/* Unit */}
-                            <div className="col-span-1">
+                            <div className="col-span-2 sm:col-span-1">
                               <input
                                 type="text"
                                 value={item.unit}
@@ -781,12 +755,11 @@ export default function RepairInvoiceFormModal({
                                     e.target.value,
                                   )
                                 }
-                                className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                                className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
                               />
                             </div>
 
-                            {/* Unit Price */}
-                            <div className="col-span-2">
+                            <div className="col-span-3 sm:col-span-2">
                               <input
                                 type="number"
                                 value={item.unit_price}
@@ -798,27 +771,25 @@ export default function RepairInvoiceFormModal({
                                   )
                                 }
                                 min="0"
-                                className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                                className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
                               />
                             </div>
 
-                            {/* Total */}
-                            <div className="col-span-1 text-left">
-                              <span className="text-sm font-medium">
+                            <div className="col-span-3 sm:col-span-1 text-left">
+                              <span className="text-xs sm:text-sm font-medium">
                                 {formatPersianCurrency(
                                   calculateItemTotal(item),
                                 )}
                               </span>
                             </div>
 
-                            {/* Delete */}
-                            <div className="col-span-1 text-center">
+                            <div className="col-span-1 sm:col-span-1 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(index)}
                                 className="text-red-500 hover:text-red-700"
                               >
-                                <TrashIcon className="w-4 h-4" />
+                                <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                               </button>
                             </div>
                           </div>
@@ -834,52 +805,49 @@ export default function RepairInvoiceFormModal({
                   )}
                 </div>
 
-                {/* Totals */}
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">
+                <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
                     محاسبات
                   </h2>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex justify-between text-sm sm:text-base">
                       <span>جمع کل:</span>
                       <span className="font-medium">
                         {formatPersianCurrency(calculateSubtotal())} ریال
                       </span>
                     </div>
 
-                    {/* Discount */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
                       <select
                         name="discount_type"
                         value={formData.discount_type}
                         onChange={handleInputChange}
-                        className="border border-gray-300 rounded px-3 py-2 text-sm"
+                        className="border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm"
                       >
                         <option value="">بدون تخفیف</option>
                         <option value="percentage">درصدی</option>
                         <option value="fixed">مبلغ ثابت</option>
                       </select>
                       {formData.discount_type && (
-                        <input
-                          type="number"
-                          name="discount_value"
-                          value={formData.discount_value}
-                          onChange={handleInputChange}
-                          min="0"
-                          className="border border-gray-300 rounded px-3 py-2 text-sm w-32"
-                        />
-                      )}
-                      {formData.discount_type && (
-                        <span className="text-red-600 mr-auto">
-                          -{formatPersianCurrency(calculateDiscount())} ریال
-                        </span>
+                        <>
+                          <input
+                            type="number"
+                            name="discount_value"
+                            value={formData.discount_value}
+                            onChange={handleInputChange}
+                            min="0"
+                            className="border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm w-24 sm:w-32"
+                          />
+                          <span className="text-red-600 text-sm sm:mr-auto">
+                            -{formatPersianCurrency(calculateDiscount())} ریال
+                          </span>
+                        </>
                       )}
                     </div>
 
-                    {/* Tax */}
-                    <div className="flex items-center gap-3">
-                      <span>مالیات (%):</span>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                      <span className="text-sm">مالیات (%):</span>
                       <input
                         type="number"
                         name="tax_rate"
@@ -888,14 +856,14 @@ export default function RepairInvoiceFormModal({
                         min="0"
                         max="100"
                         step="0.5"
-                        className="border border-gray-300 rounded px-3 py-2 text-sm w-24"
+                        className="border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm w-20 sm:w-24"
                       />
-                      <span className="text-blue-600 mr-auto">
+                      <span className="text-blue-600 text-sm sm:mr-auto">
                         +{formatPersianCurrency(calculateTax())} ریال
                       </span>
                     </div>
 
-                    <div className="flex justify-between pt-3 border-t text-lg font-bold">
+                    <div className="flex justify-between pt-2 sm:pt-3 border-t text-base sm:text-lg font-bold">
                       <span>مبلغ نهایی:</span>
                       <span className="text-blue-600">
                         {formatPersianCurrency(calculateTotal())} ریال
@@ -904,19 +872,18 @@ export default function RepairInvoiceFormModal({
                   </div>
                 </div>
 
-                {/* Submit Buttons */}
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={handleModalClose}
-                    className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                    className="px-3 sm:px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm sm:text-base order-2 sm:order-1"
                   >
                     انصراف
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2"
                   >
                     {loading
                       ? "در حال ذخیره..."

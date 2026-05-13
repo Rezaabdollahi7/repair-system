@@ -164,7 +164,7 @@ export default function Layout() {
     ];
 
     return (
-      <div className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 flex flex-col items-center gap-3">
+      <div className="fixed bottom-4 left-1 sm:bottom-6 sm:left-6 z-40 flex flex-col items-center gap-3">
         {isOpen && (
           <div
             className="fixed inset-0 -z-30"
@@ -437,7 +437,7 @@ export default function Layout() {
         </header>
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-auto">
           <Outlet />
-          <FloatingActionButton />
+          {isAtLeast("admin") && <FloatingActionButton />}
         </main>
       </div>
     </div>

@@ -91,14 +91,16 @@ export default function Layout() {
       name: "تنظیمات",
       path: "/settings",
       icon: Cog6ToothIcon,
-      adminOnly: true,
       superAdminOnly: true,
     },
   ];
 
-  const filteredMenuItems = menuItems.filter(
-    (item) => !item.adminOnly || (item.adminOnly && isAtLeast("admin")),
-  );
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (item.divider) return true;
+    if (item.superAdminOnly) return user?.role === "super_admin";
+    if (item.adminOnly) return isAtLeast("admin");
+    return true;
+  });
 
   const cleanMenuItems = filteredMenuItems.filter((item, index, arr) => {
     if (!item.divider) return true;
@@ -210,122 +212,111 @@ export default function Layout() {
     );
   }
 
-  const sidebarContent = (
-    <>
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
-        {sidebarOpen && (
-          <h1 className="text-lg font-bold text-gray-900 truncate">
-            سیستم مدیریت تعمیرات
-          </h1>
-        )}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:flex"
-        >
-          {sidebarOpen ? (
-            <ChevronRightIcon className="w-5 h-5 text-gray-600" />
-          ) : (
-            <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
-          )}
-        </button>
-        <button
-          onClick={() => setMobileSidebarOpen(false)}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
-        >
-          <XMarkIcon className="w-5 h-5 text-gray-600" />
-        </button>
-      </div>
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-1 px-2">
-          {cleanMenuItems.map((item, index) => {
-            if (item.divider)
-              return (
-                <li
-                  key={`divider-${index}`}
-                  className="my-3 border-t border-gray-200"
-                />
-              );
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            return (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                    active
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-100"
-                  } ${!sidebarOpen && "lg:justify-center"}`}
-                  title={!sidebarOpen ? item.name : ""}
-                >
-                  <Icon
-                    className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}
-                  />
-                  {sidebarOpen && (
-                    <span className="font-medium">{item.name}</span>
-                  )}
-                  {active && sidebarOpen && (
-                    <span className="mr-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-      <div className="border-t border-gray-200 shrink-0">
-        <div className="p-4 border-b border-gray-200 shrink-0">
-          <div
-            className={`flex items-center ${sidebarOpen ? "gap-3" : "lg:justify-center"}`}
-          >
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-              <span className="text-blue-600 font-medium text-sm">
-                {user?.full_name?.charAt(0) || user?.username?.charAt(0) || "U"}
-              </span>
-            </div>
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.full_name || user?.username}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="p-4 pt-0">
-          <button
-            onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ${!sidebarOpen && "lg:justify-center"}`}
-            title={!sidebarOpen ? "خروج" : ""}
-          >
-            <svg
-              className="w-5 h-5 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-            {sidebarOpen && <span className="text-sm font-medium">خروج</span>}
-          </button>
-        </div>
-      </div>
-    </>
-  );
-
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
       {/* Desktop Sidebar */}
       <aside
         className={`bg-white shadow-lg transition-all duration-300 flex-col fixed inset-y-0 right-0 z-30 hidden lg:flex ${sidebarOpen ? "w-64" : "w-20"}`}
       >
-        {sidebarContent}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
+          {sidebarOpen && (
+            <h1 className="text-lg font-bold text-gray-900 truncate">
+              سیستم مدیریت تعمیرات
+            </h1>
+          )}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            {sidebarOpen ? (
+              <ChevronRightIcon className="w-5 h-5 text-gray-600" />
+            ) : (
+              <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
+            )}
+          </button>
+        </div>
+        <nav className="flex-1 py-4 overflow-y-auto">
+          <ul className="space-y-1 px-2">
+            {cleanMenuItems.map((item, index) => {
+              if (item.divider)
+                return (
+                  <li
+                    key={`divider-${index}`}
+                    className="my-3 border-t border-gray-200"
+                  />
+                );
+              const Icon = item.icon;
+              const active = isActive(item.path);
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                      active
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-700 hover:bg-gray-100"
+                    } ${!sidebarOpen && "justify-center"}`}
+                    title={!sidebarOpen ? item.name : ""}
+                  >
+                    <Icon
+                      className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}
+                    />
+                    {sidebarOpen && (
+                      <span className="font-medium">{item.name}</span>
+                    )}
+                    {active && sidebarOpen && (
+                      <span className="mr-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        <div className="border-t border-gray-200 shrink-0">
+          <div className="p-4 border-b border-gray-200 shrink-0">
+            <div
+              className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <span className="text-blue-600 font-medium text-sm">
+                  {user?.full_name?.charAt(0) ||
+                    user?.username?.charAt(0) ||
+                    "U"}
+                </span>
+              </div>
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.full_name || user?.username}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="p-4 pt-0">
+            <button
+              onClick={handleLogout}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ${!sidebarOpen && "justify-center"}`}
+              title={!sidebarOpen ? "خروج" : ""}
+            >
+              <svg
+                className="w-5 h-5 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              {sidebarOpen && <span className="text-sm font-medium">خروج</span>}
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Mobile Sidebar Overlay */}
@@ -336,7 +327,92 @@ export default function Layout() {
             onClick={() => setMobileSidebarOpen(false)}
           />
           <aside className="absolute inset-y-0 right-0 w-64 bg-white shadow-xl flex flex-col z-50">
-            {sidebarContent}
+            <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
+              <h1 className="text-lg font-bold text-gray-900 truncate">
+                سیستم مدیریت تعمیرات
+              </h1>
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <nav className="flex-1 py-4 overflow-y-auto">
+              <ul className="space-y-1 px-2">
+                {cleanMenuItems.map((item, index) => {
+                  if (item.divider)
+                    return (
+                      <li
+                        key={`divider-${index}`}
+                        className="my-3 border-t border-gray-200"
+                      />
+                    );
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <li key={item.path}>
+                      <Link
+                        to={item.path}
+                        onClick={() => setMobileSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                          active
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-gray-700 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Icon
+                          className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}
+                        />
+                        <span className="font-medium">{item.name}</span>
+                        {active && (
+                          <span className="mr-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+            <div className="border-t border-gray-200 shrink-0">
+              <div className="p-4 border-b border-gray-200 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <span className="text-blue-600 font-medium text-sm">
+                      {user?.full_name?.charAt(0) ||
+                        user?.username?.charAt(0) ||
+                        "U"}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user?.full_name || user?.username}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 pt-0">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <svg
+                    className="w-5 h-5 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium">خروج</span>
+                </button>
+              </div>
+            </div>
           </aside>
         </div>
       )}

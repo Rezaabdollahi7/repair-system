@@ -499,6 +499,8 @@ export default function DeviceFormModal({
               <label className="block font-medium text-gray-700 mb-1 w-full">
                 عکس های دستگاه
               </label>
+
+              {/* آپلودر */}
               <ImageUploader
                 deviceId={isEdit ? deviceId : null}
                 existingImages={images}

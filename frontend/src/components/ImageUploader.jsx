@@ -1,8 +1,10 @@
-import { useRef } from "react";
+// src/components/ImageUploader.jsx
+import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { uploadDeviceImages, deleteDeviceImage } from "../api";
 import { TrashIcon, PhotoIcon } from "@heroicons/react/24/outline";
 import { getImageUrl } from "../utils/helpers";
+import ImageSlider from "./ImageSlider";
 
 export default function ImageUploader({
   deviceId,
@@ -13,6 +15,7 @@ export default function ImageUploader({
   onUploadDone,
 }) {
   const inputRef = useRef();
+  const [sliderIndex, setSliderIndex] = useState(null);
 
   function handleSelect(e) {
     const files = Array.from(e.target.files);
@@ -55,20 +58,22 @@ export default function ImageUploader({
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-      {/* <h2 className="font-semibold text-gray-700">📷 عکس‌های دستگاه</h2> */}
-
       {existingImages.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          {existingImages.map((img) => (
+          {existingImages.map((img, i) => (
             <div key={img.id} className="relative group">
               <img
                 src={getImageUrl("/uploads/devices/" + img.filename)}
-                className="w-full h-28 object-cover rounded-lg border"
+                onClick={() => setSliderIndex(i)}
+                className="w-full h-28 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition"
               />
               <button
                 type="button"
-                onClick={() => handleDelete(img.id)}
-                className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(img.id);
+                }}
+                className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <TrashIcon className="w-5 h-5" />
               </button>
@@ -101,7 +106,7 @@ export default function ImageUploader({
         <button
           type="button"
           onClick={() => inputRef.current.click()}
-          className="px-4 py-2 flex gap-2 justify-center items-center bg-gray-100 rounded-lg hover:bg-gray-200 "
+          className="px-4 py-2 flex gap-2 justify-center items-center bg-gray-100 rounded-lg hover:bg-gray-200"
         >
           <PhotoIcon className="w-5 h-5" />
           <span>انتخاب عکس</span>
@@ -131,6 +136,14 @@ export default function ImageUploader({
         <p className="text-xs text-gray-500">
           بعد از ثبت دستگاه می‌توانید عکس‌ها را آپلود کنید
         </p>
+      )}
+
+      {sliderIndex !== null && (
+        <ImageSlider
+          images={existingImages}
+          initialIndex={sliderIndex}
+          onClose={() => setSliderIndex(null)}
+        />
       )}
     </div>
   );

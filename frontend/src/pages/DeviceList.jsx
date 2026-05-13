@@ -439,16 +439,18 @@ export default function DeviceList() {
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openRepairInvoiceCreate(device.id);
-                          }}
-                          className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
-                          title="ایجاد فاکتور تعمیر"
-                        >
-                          <DocumentPlusIcon className="w-5 h-5" />
-                        </button>
+                        {isAtLeast("admin") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRepairInvoiceCreate(device.id);
+                            }}
+                            className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
+                            title="ایجاد فاکتور تعمیر"
+                          >
+                            <DocumentPlusIcon className="w-5 h-5" />
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

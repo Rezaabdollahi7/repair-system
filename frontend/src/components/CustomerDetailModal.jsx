@@ -41,6 +41,8 @@ const statusLabel = {
   repaired: "تعمیر شد",
   delivered: "تحویل داده شد",
   unrepairable: "تعمیر نشد",
+  not_repaired: "غیر قابل تعمیر",
+  ready_for_pickup: "آماده تحویل",
 };
 
 function toJalali(dateStr) {
@@ -88,7 +90,11 @@ function DeviceTimeline({ devices, openDeviceDetail }) {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-medium text-gray-900">
-                    {device.device_name} <span className="text-gray-500"> ( کد پذیرش : {device.id}) </span>
+                    {device.device_name}{" "}
+                    <span className="text-gray-500">
+                      {" "}
+                      ( کد پذیرش : {device.id}){" "}
+                    </span>
                   </p>
                   {device.brand && (
                     <p className="text-sm text-gray-500 mt-0.5">

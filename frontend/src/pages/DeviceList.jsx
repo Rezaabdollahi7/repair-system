@@ -53,7 +53,12 @@ function StatusBadge({ status, onStatusChange }) {
     },
     repaired: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
     delivered: { label: "تحویل داده شده", color: "bg-gray-100 text-gray-800" },
+    ready_for_pickup: {
+      label: "آماده تحویل",
+      color: "bg-blue-100 text-red-800",
+    },
     unrepairable: { label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
+    not_repaired: { label: "تعمیر نشد", color: "bg-orange-100 text-red-800" },
   };
 
   const current = map[status] || {

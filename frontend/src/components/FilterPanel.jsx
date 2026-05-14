@@ -18,6 +18,8 @@ const STATUS_OPTIONS = [
   { value: "repaired", label: "تعمیر شده" },
   { value: "delivered", label: "تحویل داده شده" },
   { value: "unrepairable", label: "غیرقابل تعمیر" },
+  { value: "ready_for_pickup", label: "آماده تحویل" },
+  { value: "not_repaired", label: "تعمیر نشد" },
 ];
 
 export default function FilterPanel({

@@ -37,8 +37,10 @@ const STATUS_OPTIONS = [
   { value: "waiting_for_parts", label: "در انتظار قطعه" },
   { value: "repairing", label: "در حال تعمیر" },
   { value: "repaired", label: "تعمیر شده" },
+  { value: "ready_for_pickup", label: "آماده تحویل" },
   { value: "delivered", label: "تحویل داده شده" },
   { value: "unrepairable", label: "غیرقابل تعمیر" },
+  { value: "not_repaired", label: "تعمیر نشد" },
 ];
 
 export default function DeviceFormModal({

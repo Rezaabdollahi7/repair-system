@@ -167,6 +167,8 @@ export default function Dashboard() {
                 repaired: "تعمیر شده",
                 delivered: "تحویل شده",
                 unrepairable: "غیرقابل تعمیر",
+                ready_for_pickup: "آماده تحویل",
+                not_repaired:"تعمیر نشد"
               };
               return (
                 <span

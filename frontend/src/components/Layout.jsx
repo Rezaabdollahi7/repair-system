@@ -164,7 +164,7 @@ export default function Layout() {
     ];
 
     return (
-      <div className="fixed bottom-4 left-1 sm:bottom-6 sm:left-6 z-40 flex flex-col items-center gap-3">
+      <div className="fixed bottom-4 left-1 sm:bottom-14 sm:left-10 z-40 flex flex-col items-center gap-3">
         {isOpen && (
           <div
             className="fixed inset-0 -z-30"
@@ -236,13 +236,13 @@ export default function Layout() {
           </button>
         </div>
         <nav className="flex-1 py-4 overflow-y-auto">
-          <ul className="space-y-1 px-2">
+          <ul className=" px-2">
             {cleanMenuItems.map((item, index) => {
               if (item.divider)
                 return (
                   <li
                     key={`divider-${index}`}
-                    className="my-3 border-t border-gray-200"
+                    className="my-2 border-t border-gray-200"
                   />
                 );
               const Icon = item.icon;
@@ -274,7 +274,7 @@ export default function Layout() {
           </ul>
         </nav>
         <div className="border-t border-gray-200 shrink-0">
-          <div className="p-4 border-b border-gray-200 shrink-0">
+          <div className="p-2 border-b border-gray-200 shrink-0">
             <div
               className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}
             >
@@ -297,7 +297,7 @@ export default function Layout() {
           <div className="p-4 pt-0">
             <button
               onClick={handleLogout}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ${!sidebarOpen && "justify-center"}`}
+              className={`w-full flex pt-2 gap-3 px-3  text-red-600 hover:bg-red-50 rounded-lg transition-colors ${!sidebarOpen && "justify-center"}`}
               title={!sidebarOpen ? "خروج" : ""}
             >
               <svg
@@ -394,7 +394,7 @@ export default function Layout() {
               <div className="p-4 pt-0">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="w-full flex items-center gap-3 px-3 mt-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   <svg
                     className="w-5 h-5 shrink-0"
@@ -409,7 +409,7 @@ export default function Layout() {
                       d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                     />
                   </svg>
-                  <span className="text-sm font-medium">خروج</span>
+                  <span className="text-sm font-medium ">خروج</span>
                 </button>
               </div>
             </div>

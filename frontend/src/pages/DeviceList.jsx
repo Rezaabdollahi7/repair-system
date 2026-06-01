@@ -42,7 +42,7 @@ function StatusBadge({ status, onStatusChange }) {
       label: "در انتظار بررسی",
       color: "bg-yellow-100 text-yellow-800",
     },
-    diagnosing: { label: "در حال بررسی", color: "bg-blue-100 text-blue-800" },
+    diagnosing: { label: "در حال بررسی", color: "bg-cyan-100 text-cyan-800" },
     waiting_for_parts: {
       label: "در انتظار قطعه",
       color: "bg-orange-100 text-orange-800",
@@ -51,11 +51,14 @@ function StatusBadge({ status, onStatusChange }) {
       label: "در حال تعمیر",
       color: "bg-purple-100 text-purple-800",
     },
-    repaired: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
-    delivered: { label: "تحویل داده شده", color: "bg-gray-100 text-gray-800" },
+    repaired: { label: "تعمیر شده", color: "bg-gray-100 text-gray-800" },
+    delivered: {
+      label: "تحویل داده شده",
+      color: "bg-green-100 text-green-800",
+    },
     ready_for_pickup: {
       label: "آماده تحویل",
-      color: "bg-blue-100 text-red-800",
+      color: "bg-blue-100 text-blue-800",
     },
     unrepairable: { label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
     not_repaired: { label: "تعمیر نشد", color: "bg-orange-100 text-red-800" },
@@ -364,7 +367,7 @@ export default function DeviceList() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1400px] lg:min-w-full divide-y divide-gray-200">
+            <table className="min-w-[1400px] lg:min-w-[1700px] divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
                 <tr>
                   <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
@@ -424,7 +427,7 @@ export default function DeviceList() {
                       {formatPersianPhone(device.customer_phone)}
                     </td>
                     <td className="px-4 py-3 text-sm">{device.device_name}</td>
-                    <td className="px-4 py-3 text-sm">{device.model ?? "—"}</td>
+                    <td className="px-4 py-3 text-sm">{device.brand ?? "—"}</td>
                     <td className="px-4 py-3">
                       <StatusBadge
                         status={device.status}

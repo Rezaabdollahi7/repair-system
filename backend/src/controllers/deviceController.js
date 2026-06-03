@@ -16,8 +16,12 @@ function rowToDevice(row) {
     description: row[10],
     created_at: row[11],
     updated_at: row[12],
-    customer_name: row[13],
-    customer_phone: row[14],
+    needs_invoice: row[13],
+    customer_name: row[14],
+    customer_phone: row[15],
+    invoice_status: row[16] || null,
+    sale_invoice_id: row[17] || null,
+    invoice_count: row[18] || 0,
   };
 }
 
@@ -127,8 +131,11 @@ exports.getAll = async (req, res) => {
     const offset = (pageNum - 1) * limitNum;
 
     const dataResult = db.exec(
-      `SELECT d.*, c.name as customer_name, c.phone as customer_phone
-       ${baseQuery} ORDER BY d.id DESC LIMIT ? OFFSET ?`,
+      `SELECT d.*, c.name as customer_name, c.phone as customer_phone,
+    (SELECT si.payment_status FROM sale_invoices si WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) as invoice_status,
+    (SELECT si.id FROM sale_invoices si WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) as sale_invoice_id,
+    (SELECT COUNT(*) FROM sale_invoices si WHERE si.device_id = d.id) as invoice_count
+   ${baseQuery} ORDER BY d.id DESC LIMIT ? OFFSET ?`,
       [...params, limitNum, offset],
     );
 

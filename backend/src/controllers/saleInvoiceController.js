@@ -1,17 +1,32 @@
 const { getDb, saveDb } = require("../config/database");
 const persianToEnglish = require("../utils/persianToEnglish");
+const jalaali = require("jalaali-js");
 
 function generateInvoiceNumber(db) {
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+  const today = jalaali.toJalaali(new Date());
+  const yearShort = String(today.jy - 1400).padStart(3, "0"); // "405", "406"
+
   const result = db.exec(`
-    SELECT COUNT(*) as count 
+    SELECT invoice_number 
     FROM sale_invoices 
-    WHERE date(invoice_date) = date('now')
+    WHERE invoice_number LIKE '${yearShort}-%' 
+    ORDER BY invoice_number DESC 
+    LIMIT 1
   `);
-  const count = (result[0]?.values[0][0] || 0) + 1;
-  const paddedCount = count.toString().padStart(3, "0");
-  return `SAL-${dateStr}-${paddedCount}`;
+
+  let nextNumber = 1;
+
+  if (result[0]?.values.length > 0) {
+    const lastNumber = result[0].values[0][0]; // "405-058"
+    const lastSeq = parseInt(lastNumber.split("-")[1]);
+    nextNumber = lastSeq + 1;
+  }
+
+  if (yearShort === "405" && nextNumber < 59) {
+    nextNumber = 59;
+  }
+
+  return `${yearShort}-${String(nextNumber).padStart(3, "0")}`;
 }
 
 function updateItemAfterSale(db, itemId, quantity, unitPrice) {
@@ -149,6 +164,7 @@ exports.create = async (req, res) => {
       paid_amount,
       note,
       items,
+      device_id,
     } = req.body;
     if (!items || items.length === 0)
       return res.status(400).json({ error: "حداقل یک کالا باید انتخاب شود" });
@@ -192,7 +208,9 @@ exports.create = async (req, res) => {
           : "pending";
 
     db.run(
-      `INSERT INTO sale_invoices (invoice_number, customer_id, customer_name, customer_phone, invoice_date, total_amount, paid_amount, payment_status, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sale_invoices 
+   (invoice_number, customer_id, customer_name, customer_phone, invoice_date, total_amount, paid_amount, payment_status, note, created_by, device_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         invoiceNumber,
         customer_id || null,
@@ -204,6 +222,7 @@ exports.create = async (req, res) => {
         paymentStatus,
         note || null,
         req.user?.id || null,
+        device_id || null,
       ],
     );
 

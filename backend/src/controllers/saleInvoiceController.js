@@ -4,7 +4,7 @@ const jalaali = require("jalaali-js");
 
 function generateInvoiceNumber(db) {
   const today = jalaali.toJalaali(new Date());
-  const yearShort = String(today.jy - 1400).padStart(3, "0"); // "405", "406"
+  const yearShort = String(today.jy - 1000).padStart(3, "0"); // 1405-1000=405 → "405"
 
   const result = db.exec(`
     SELECT invoice_number 

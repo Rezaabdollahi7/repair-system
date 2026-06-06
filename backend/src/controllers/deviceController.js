@@ -254,14 +254,15 @@ exports.update = async (req, res) => {
 
     const fieldMap = {
       customer_id: 1,
-      device_name: 2,
-      brand: 3,
-      model: 4,
-      serial_number: 5,
-      entry_date: 6,
-      exit_date: 7,
-      status: 8,
-      description: 9,
+      device_name: 3,
+      brand: 4,
+      model: 5,
+      serial_number: 6,
+      entry_date: 7,
+      exit_date: 8,
+      status: 9,
+      description: 10,
+      needs_invoice: 13,
     };
 
     Object.keys(fieldMap).forEach((field) => {

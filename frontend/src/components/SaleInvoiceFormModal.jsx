@@ -231,7 +231,12 @@ function QuickItemModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
-export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
+export default function SaleInvoiceFormModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  deviceId,
+}) {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -270,6 +275,12 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
   useEffect(() => {
     if (isOpen) fetchData();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && deviceId) {
+      setFormData((prev) => ({ ...prev, device_id: deviceId }));
+    }
+  }, [isOpen, deviceId]);
 
   const customerOptions = customers.map((c) => ({
     value: c.id,
@@ -404,6 +415,7 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
     try {
       const payload = {
         customer_id: formData.customer_id || null,
+        device_id: formData.device_id || deviceId || null,
         customer_name: formData.customer_name?.trim() || "مشتری متفرقه",
         customer_phone: formData.customer_phone?.trim() || null,
         invoice_date: formData.invoice_date,

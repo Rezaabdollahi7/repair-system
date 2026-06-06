@@ -71,7 +71,8 @@ export function ModalProvider({ children }) {
     openModal("customerEdit", customerId);
   const openSaleInvoiceDetail = (invoiceId) =>
     openModal("saleInvoiceDetail", invoiceId);
-  const openSaleInvoiceCreate = () => openModal("saleInvoiceCreate", null);
+  const openSaleInvoiceCreate = (deviceId) =>
+    openModal("saleInvoiceCreate", deviceId || null);
   const openPurchaseInvoiceDetail = (invoiceId) =>
     openModal("purchaseInvoiceDetail", invoiceId);
   const openPurchaseInvoiceCreate = () =>
@@ -210,7 +211,7 @@ export function ModalProvider({ children }) {
                 isOpen={true}
                 onClose={closeModal}
                 onSuccess={closeModal}
-                zIndex={zIndex}
+                deviceId={modal.id}
               />
             );
           case "purchaseInvoiceDetail":

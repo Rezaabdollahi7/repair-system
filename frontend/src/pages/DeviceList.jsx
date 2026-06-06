@@ -1,6 +1,5 @@
 // src/pages/DeviceList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
 import { getDevices, deleteDevice, getCustomers, getPersonnel } from "../api";
 import FilterPanel from "../components/FilterPanel";
 import Pagination from "../components/Pagination";
@@ -13,14 +12,15 @@ import {
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
-  DocumentPlusIcon,
+  DocumentCurrencyDollarIcon,
   WrenchScrewdriverIcon,
   ArrowsRightLeftIcon,
+  XCircleIcon,
+  CheckCircleIcon,
+  DocumentCheckIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
-import DeviceDetailModal from "../components/DeviceDetailModal";
-import DeviceFormModal from "../components/DeviceFormModal";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 import { useModal } from "../context/ModalContext";
@@ -32,6 +32,30 @@ function useDebounce(value, delay = 400) {
     return () => clearTimeout(timer);
   }, [value, delay]);
   return debounced;
+}
+
+function InvoiceStatusBadge({ device }) {
+  const getInvoiceStatus = () => {
+    if (device.needs_invoice === 0) {
+      return { label: "نیاز ندارد", color: "bg-blue-100 text-blue-800" };
+    }
+    if (device.invoice_count > 0) {
+      return device.invoice_status === "paid"
+        ? { label: "پرداخت شده", color: "bg-green-100 text-green-800" }
+        : { label: "پرداخت نشده", color: "bg-red-100 text-red-800" };
+    }
+    return { label: "ثبت نشده", color: "bg-yellow-100 text-yellow-800" };
+  };
+
+  const status = getInvoiceStatus();
+
+  return (
+    <span
+      className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}
+    >
+      {status.label}
+    </span>
+  );
 }
 
 function StatusBadge({ status, onStatusChange }) {
@@ -211,7 +235,8 @@ export default function DeviceList() {
     openDeviceEdit,
     openCustomerDetail,
     refreshList,
-    openRepairInvoiceCreate,
+    openSaleInvoiceCreate,
+    openSaleInvoiceDetail,
   } = useModal();
 
   const debouncedSearch = useDebounce(searchInput, 400);
@@ -313,6 +338,16 @@ export default function DeviceList() {
     }
   };
 
+  const handleToggleNeedsInvoice = async (deviceId, value) => {
+    try {
+      await updateDevice(deviceId, { needs_invoice: value });
+      toast.success(value === 0 ? "فاکتور لازم نیست" : "آماده برای فاکتور");
+      fetchDevices(debouncedSearch, filters, page, limit);
+    } catch {
+      toast.error("خطا در تغییر وضعیت");
+    }
+  };
+
   // ─── Render ───────────────────────────────────────────────────
   return (
     <div dir="rtl">
@@ -367,7 +402,7 @@ export default function DeviceList() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1400px] lg:min-w-[1700px] divide-y divide-gray-200">
+            <table className="min-w-[1400px] lg:min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
                 <tr>
                   <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
@@ -396,6 +431,9 @@ export default function DeviceList() {
                   </th>
                   <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
                     تاریخ خروج
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                    وضعیت فاکتور
                   </th>
                   <th className="px-4 py-3 text-center font-semibold text-indigo-700">
                     عملیات
@@ -445,26 +483,83 @@ export default function DeviceList() {
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {formatDate(device.exit_date)}
                     </td>
+                    <td className="px-4 py-3">
+                      <InvoiceStatusBadge
+                        device={device}
+                        onToggleNeedsInvoice={handleToggleNeedsInvoice}
+                        isAdmin={isAtLeast("admin")}
+                      />
+                    </td>
+
                     <td className="px-4 py-3 text-sm">
-                      <div className="flex gap-2 justify-center">
+                      <div className="flex gap-2 justify-end items-center">
                         {isAtLeast("admin") && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openRepairInvoiceCreate(device.id);
-                            }}
-                            className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
-                            title="ایجاد فاکتور تعمیر"
-                          >
-                            <DocumentPlusIcon className="w-5 h-5" />
-                          </button>
+                          <>
+                            {device.invoice_count > 0 ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSaleInvoiceDetail(device.sale_invoice_id);
+                                }}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  device.invoice_status === "paid"
+                                    ? "bg-green-50 text-green-600 hover:bg-green-100"
+                                    : "bg-red-50 text-red-600 hover:bg-red-100"
+                                }`}
+                                title={
+                                  device.invoice_status === "paid"
+                                    ? "فاکتور پرداخت شده"
+                                    : "فاکتور پرداخت نشده"
+                                }
+                              >
+                                <DocumentCheckIcon className="w-5 h-5" />
+                              </button>
+                            ) : device.needs_invoice === 0 ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleNeedsInvoice(device.id, 1);
+                                }}
+                                className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                                title=" اگر نیاز به فاکتور دارد - کلیک کنید"
+                              >
+                                <CheckCircleIcon className="w-5 h-5" />
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openSaleInvoiceCreate(device.id);
+                                  }}
+                                  className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
+                                  title="ایجاد فاکتور فروش"
+                                >
+                                  <DocumentCurrencyDollarIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleNeedsInvoice(device.id, 0);
+                                  }}
+                                  className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                  title="فاکتور لازم نیست"
+                                >
+                                  <XCircleIcon className="w-5 h-5" />
+                                </button>
+                              </>
+                            )}
+
+                            <div className="w-px h-8 bg-gray-300 mx-1" />
+                          </>
                         )}
-                        <button
+
+                        {/* <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openDeviceDetail(device.id);
                           }}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors "
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                           title="مشاهده جزئیات"
                         >
                           <EyeIcon className="w-5 h-5" />
@@ -474,11 +569,11 @@ export default function DeviceList() {
                             e.stopPropagation();
                             openDeviceEdit(device.id);
                           }}
-                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors "
+                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="w-5 h-5" />
-                        </button>
+                        </button> */}
                         {isAtLeast("admin") && (
                           <button
                             onClick={(e) => {

@@ -18,6 +18,7 @@ import {
   XCircleIcon,
   CheckCircleIcon,
   DocumentCheckIcon,
+  FunnelIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
@@ -231,6 +232,11 @@ export default function DeviceList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const activeFilterCount = Object.values(filters).filter((v) =>
+    Array.isArray(v) ? v.length > 0 : v !== "",
+  ).length;
+  const [filterOpen, setFilterOpen] = useState(false);
+
   const {
     openDeviceDetail,
     openDeviceEdit,
@@ -355,18 +361,32 @@ export default function DeviceList() {
   return (
     <div dir="rtl">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 flex gap-2">
           <WrenchScrewdriverIcon className="w-6 h-6 text-gray-600" />
           دستگاه‌ها
         </h1>
-        <button
-          onClick={() => openDeviceEdit(null)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <PlusIcon className="w-5 h-5" />
-          ثبت دستگاه جدید
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setFilterOpen(true)}
+            className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <FunnelIcon className="w-5 h-5" />
+            <span>فیلترها</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-white text-green-600 text-xs font-bold rounded-full  py-1 px-2.5 flex items-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => openDeviceEdit(null)}
+            className="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <PlusIcon className="w-5 h-5" />
+            ثبت دستگاه جدید
+          </button>
+        </div>
       </div>
       {/* Search + Filter */}
       <div className="mb-4">
@@ -378,6 +398,8 @@ export default function DeviceList() {
           className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <FilterPanel
+          isOpen={filterOpen}
+          onClose={() => setFilterOpen(false)}
           filters={filters}
           onChange={(newFilters) => {
             setFilters(newFilters);

@@ -50,6 +50,7 @@ exports.getAll = async (req, res) => {
       entry_from,
       entry_to,
       personnel_ids,
+      invoice_status, // اضافه شد
       page = 1,
       limit = 10,
     } = req.query;
@@ -118,6 +119,55 @@ exports.getAll = async (req, res) => {
       WHERE personnel_id IN (${placeholders})
     )`;
         params.push(...ids);
+      }
+    }
+
+    // اضافه شد: فیلتر وضعیت فاکتور
+    if (invoice_status && invoice_status.trim()) {
+      const statuses = invoice_status
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (statuses.length > 0) {
+        const conditions = [];
+
+        statuses.forEach((st) => {
+          switch (st) {
+            case "no_invoice": // ثبت نشده
+              conditions.push(`(
+                d.needs_invoice = 1 
+                AND (SELECT COUNT(*) FROM sale_invoices si WHERE si.device_id = d.id) = 0
+              )`);
+              break;
+            case "paid": // پرداخت شده
+              conditions.push(`(
+                (SELECT si.payment_status FROM sale_invoices si 
+                 WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) = 'paid'
+              )`);
+              break;
+            case "unpaid": // پرداخت نشده
+              conditions.push(`(
+                (SELECT COUNT(*) FROM sale_invoices si WHERE si.device_id = d.id) > 0
+                AND (
+                  (SELECT si.payment_status FROM sale_invoices si 
+                   WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) != 'paid'
+                  OR (SELECT si.payment_status FROM sale_invoices si 
+                      WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) IS NULL
+                )
+              )`);
+              break;
+            case "not_needed": // نیاز به فاکتور ندارد
+              conditions.push(`d.needs_invoice = 0`);
+              break;
+            default:
+              break;
+          }
+        });
+
+        if (conditions.length > 0) {
+          baseQuery += ` AND (${conditions.join(" OR ")})`;
+        }
       }
     }
 

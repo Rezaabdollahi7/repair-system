@@ -210,6 +210,7 @@ const EMPTY_FILTERS = {
   personnel_ids: [],
   entry_from: "",
   entry_to: "",
+  invoice_status: [],
 };
 
 export default function DeviceList() {
@@ -259,6 +260,8 @@ export default function DeviceList() {
         if (activeFilters.entry_to) params.entry_to = activeFilters.entry_to;
         if (activeFilters.personnel_ids?.length > 0)
           params.personnel_ids = activeFilters.personnel_ids.join(",");
+        if (activeFilters.invoice_status?.length > 0)
+          params.invoice_status = activeFilters.invoice_status.join(",");
 
         const res = await getDevices(params);
         const api = res.data;

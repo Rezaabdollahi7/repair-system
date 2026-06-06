@@ -22,6 +22,14 @@ const STATUS_OPTIONS = [
   { value: "not_repaired", label: "تعمیر نشد" },
 ];
 
+// اضافه شد: گزینه‌های وضعیت فاکتور
+const INVOICE_STATUS_OPTIONS = [
+  { value: "no_invoice", label: "ثبت نشده" },
+  { value: "paid", label: "پرداخت شده" },
+  { value: "unpaid", label: "پرداخت نشده" },
+  { value: "not_needed", label: "نیاز به فاکتور ندارد" },
+];
+
 export default function FilterPanel({
   filters,
   onChange,
@@ -31,13 +39,17 @@ export default function FilterPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] =
+    useState(false); // اضافه شد
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [personnelSearch, setPersonnelSearch] = useState("");
   const [statusSearch, setStatusSearch] = useState("");
+  const [invoiceStatusSearch, setInvoiceStatusSearch] = useState(""); // اضافه شد
 
   const statusRef = useRef(null);
+  const invoiceStatusRef = useRef(null); // اضافه شد
   const customerRef = useRef(null);
   const personnelRef = useRef(null);
 
@@ -50,6 +62,14 @@ export default function FilterPanel({
       if (statusRef.current && !statusRef.current.contains(e.target)) {
         setStatusDropdownOpen(false);
         setStatusSearch("");
+      }
+      if (
+        invoiceStatusRef.current &&
+        !invoiceStatusRef.current.contains(e.target)
+      ) {
+        // اضافه شد
+        setInvoiceStatusDropdownOpen(false);
+        setInvoiceStatusSearch("");
       }
       if (customerRef.current && !customerRef.current.contains(e.target)) {
         setCustomerDropdownOpen(false);
@@ -72,6 +92,15 @@ export default function FilterPanel({
     onChange({ ...filters, status: updated });
   }
 
+  // اضافه شد: تابع toggle برای وضعیت فاکتور
+  function toggleInvoiceStatus(value) {
+    const current = filters.invoice_status || [];
+    const updated = current.includes(value)
+      ? current.filter((s) => s !== value)
+      : [...current, value];
+    onChange({ ...filters, invoice_status: updated });
+  }
+
   function togglePersonnel(id) {
     const current = filters.personnel_ids || [];
     const updated = current.includes(id)
@@ -89,6 +118,19 @@ export default function FilterPanel({
         selected[0]
       );
     return `${selected.length} وضعیت انتخاب شده`;
+  }
+
+  // اضافه شد: تابع getLabel برای وضعیت فاکتور
+  function getInvoiceStatusLabel() {
+    const selected = filters.invoice_status || [];
+    if (selected.length === 0) return "همه وضعیت‌های فاکتور";
+    if (selected.length === 1) {
+      return (
+        INVOICE_STATUS_OPTIONS.find((o) => o.value === selected[0])?.label ??
+        selected[0]
+      );
+    }
+    return `${selected.length} وضعیت فاکتور انتخاب شده`;
   }
 
   function getCustomerLabel() {
@@ -112,6 +154,12 @@ export default function FilterPanel({
   const filteredStatuses = STATUS_OPTIONS.filter((o) =>
     o.label.includes(statusSearch),
   );
+
+  // اضافه شد: فیلتر وضعیت‌های فاکتور
+  const filteredInvoiceStatuses = INVOICE_STATUS_OPTIONS.filter((o) =>
+    o.label.includes(invoiceStatusSearch),
+  );
+
   const filteredCustomers = (customers || []).filter((c) =>
     `${c.name} ${c.phone}`.includes(customerSearch),
   );
@@ -181,10 +229,10 @@ export default function FilterPanel({
 
       {open && (
         <div className="mt-3 p-4 border border-gray-200 rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* وضعیت */}
+          {/* وضعیت دستگاه */}
           <div ref={statusRef} className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-2">
-              وضعیت
+              وضعیت دستگاه
             </label>
             <button
               type="button"
@@ -238,6 +286,95 @@ export default function FilterPanel({
                           className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                             isSelected
                               ? "bg-blue-600 border-blue-600"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {isSelected && (
+                            <svg
+                              className="w-3 h-3 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          )}
+                        </span>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* اضافه شد: وضعیت فاکتور */}
+          <div ref={invoiceStatusRef} className="relative">
+            <label className="block text-xs font-medium text-gray-600 mb-2">
+              وضعیت فاکتور
+            </label>
+            <button
+              type="button"
+              onClick={() => setInvoiceStatusDropdownOpen((p) => !p)}
+              className={dropdownBtnClass}
+            >
+              <span
+                className={
+                  filters.invoice_status?.length > 0
+                    ? "text-gray-800"
+                    : "text-gray-400"
+                }
+              >
+                {getInvoiceStatusLabel()}
+              </span>
+              {invoiceStatusDropdownOpen ? (
+                <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+              )}
+            </button>
+
+            {invoiceStatusDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                <SearchInput
+                  value={invoiceStatusSearch}
+                  onChange={(e) => setInvoiceStatusSearch(e.target.value)}
+                />
+                <div className="max-h-48 overflow-y-auto">
+                  {filters.invoice_status?.length > 0 && (
+                    <ClearButton
+                      multi
+                      onClick={() => {
+                        onChange({ ...filters, invoice_status: [] });
+                        setInvoiceStatusDropdownOpen(false);
+                        setInvoiceStatusSearch("");
+                      }}
+                    />
+                  )}
+                  {filteredInvoiceStatuses.map((opt) => {
+                    const isSelected = filters.invoice_status?.includes(
+                      opt.value,
+                    );
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => toggleInvoiceStatus(opt.value)}
+                        className={`w-full text-right px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors ${
+                          isSelected
+                            ? "bg-green-50 text-green-700"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? "bg-green-600 border-green-600"
                               : "border-gray-300"
                           }`}
                         >

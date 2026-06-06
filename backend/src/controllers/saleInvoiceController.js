@@ -49,31 +49,82 @@ function updateItemAfterSale(db, itemId, quantity, unitPrice) {
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
-    const { page = 1, limit = 10, search, from_date, to_date } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      date_from,
+      date_to,
+      amount_from,
+      amount_to,
+      payment_status,
+    } = req.query;
+
     let baseQuery = `FROM sale_invoices WHERE 1=1`;
     const params = [];
-    if (search) {
+
+    // جستجو
+    if (search && search.trim()) {
       baseQuery += ` AND (customer_name LIKE ? OR customer_phone LIKE ? OR invoice_number LIKE ?)`;
       const term = `%${persianToEnglish(search)}%`;
       params.push(term, term, term);
     }
-    if (from_date) {
+
+    // فیلتر وضعیت پرداخت
+    if (payment_status && payment_status.trim()) {
+      const statuses = payment_status
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statuses.length > 0) {
+        const placeholders = statuses.map(() => "?").join(",");
+        baseQuery += ` AND payment_status IN (${placeholders})`;
+        params.push(...statuses);
+      }
+    }
+
+    // فیلتر بازه تاریخ
+    if (date_from && date_from.trim()) {
       baseQuery += ` AND date(invoice_date) >= date(?)`;
-      params.push(from_date);
+      params.push(date_from);
     }
-    if (to_date) {
+    if (date_to && date_to.trim()) {
       baseQuery += ` AND date(invoice_date) <= date(?)`;
-      params.push(to_date);
+      params.push(date_to);
     }
+
+    // فیلتر بازه مبلغ کل - نسخه اصلاح شده
+    if (
+      amount_from &&
+      String(amount_from).trim() !== "" &&
+      !isNaN(Number(amount_from))
+    ) {
+      baseQuery += ` AND total_amount >= ?`;
+      params.push(Number(amount_from));
+    }
+    if (
+      amount_to &&
+      String(amount_to).trim() !== "" &&
+      !isNaN(Number(amount_to))
+    ) {
+      baseQuery += ` AND total_amount <= ?`;
+      params.push(Number(amount_to));
+    }
+
+    // count
     const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
     const total = countResult[0]?.values[0][0] || 0;
+
+    // pagination
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = parseInt(limit) || 10;
     const offset = (pageNum - 1) * limitNum;
+
     const result = db.exec(
       `SELECT * ${baseQuery} ORDER BY invoice_date DESC LIMIT ? OFFSET ?`,
       [...params, limitNum, offset],
     );
+
     const invoices = result[0]
       ? result[0].values.map((row) => ({
           id: row[0],
@@ -91,6 +142,7 @@ exports.getAll = async (req, res) => {
           updated_at: row[12],
         }))
       : [];
+
     res.json({
       data: invoices,
       total,
@@ -99,6 +151,7 @@ exports.getAll = async (req, res) => {
       totalPages: Math.ceil(total / limitNum),
     });
   } catch (error) {
+    console.error("Error in getAll:", error);
     res.status(500).json({ error: error.message });
   }
 };

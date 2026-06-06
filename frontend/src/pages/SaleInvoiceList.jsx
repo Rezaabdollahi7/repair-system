@@ -1,4 +1,3 @@
-// src/pages/SaleInvoiceList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getSaleInvoices, deleteSaleInvoice } from "../api";
 import Pagination from "../components/Pagination";
@@ -16,9 +15,11 @@ import {
   ClockIcon,
   ExclamationCircleIcon,
   CurrencyDollarIcon,
+  FunnelIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
+import SaleInvoiceFilterPanel from "../components/SaleInvoiceFilterPanel";
 
 function useDebounce(value, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -59,10 +60,20 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
+const EMPTY_FILTERS = {
+  payment_status: [],
+  date_from: "",
+  date_to: "",
+  amount_from: "",
+  amount_to: "",
+};
+
 export default function SaleInvoiceList() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
   const { isAtLeast } = useAuth();
   const {
     openSaleInvoiceDetail,
@@ -79,12 +90,27 @@ export default function SaleInvoiceList() {
   const [deleting, setDeleting] = useState(false);
   const debouncedSearch = useDebounce(searchInput, 400);
 
+  const activeFilterCount = Object.values(filters).filter((v) =>
+    Array.isArray(v) ? v.length > 0 : v !== "",
+  ).length;
+
   const fetchInvoices = useCallback(
-    async (searchTerm, currentPage, currentLimit) => {
+    async (searchTerm, activeFilters, currentPage, currentLimit) => {
       setLoading(true);
       try {
         const params = { page: currentPage, limit: currentLimit };
         if (searchTerm) params.search = searchTerm;
+
+        // اضافه کردن فیلترها
+        if (activeFilters.payment_status?.length > 0) {
+          params.payment_status = activeFilters.payment_status.join(",");
+        }
+        if (activeFilters.date_from) params.date_from = activeFilters.date_from;
+        if (activeFilters.date_to) params.date_to = activeFilters.date_to;
+        if (activeFilters.amount_from)
+          params.amount_from = activeFilters.amount_from;
+        if (activeFilters.amount_to) params.amount_to = activeFilters.amount_to;
+
         const res = await getSaleInvoices(params);
         const apiData = res.data;
         setInvoices(apiData.data || []);
@@ -101,8 +127,8 @@ export default function SaleInvoiceList() {
   );
 
   useEffect(() => {
-    fetchInvoices(debouncedSearch, page, limit);
-  }, [debouncedSearch, page, limit, fetchInvoices]);
+    fetchInvoices(debouncedSearch, filters, page, limit);
+  }, [debouncedSearch, filters, page, limit, fetchInvoices]);
 
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -111,33 +137,49 @@ export default function SaleInvoiceList() {
       return;
     }
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, filters]);
 
   useEffect(() => {
     refreshList(() => {
-      fetchInvoices(debouncedSearch, page, limit);
+      fetchInvoices(debouncedSearch, filters, page, limit);
     });
-  }, [refreshList, fetchInvoices, debouncedSearch, page, limit]);
+  }, [refreshList, fetchInvoices, debouncedSearch, filters, page, limit]);
 
   const formatDate = (dateStr) =>
     dateStr ? new Date(dateStr).toLocaleDateString("fa-IR") : "—";
 
   return (
     <div dir="rtl">
-      <div className="flex justify-between items-center mb-6">
+      {/* هدر با دکمه فیلتر سبز */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <CurrencyDollarIcon className="w-6 h-6 text-gray-600" />
           فاکتورهای فروش
         </h1>
-        <button
-          onClick={() => openSaleInvoiceCreate()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <PlusIcon className="w-5 h-5" />
-          فاکتور جدید
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setFilterOpen(true)}
+            className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <FunnelIcon className="w-5 h-5" />
+            <span>فیلترها</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-white text-green-600 text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px]">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => openSaleInvoiceCreate()}
+            className="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <PlusIcon className="w-5 h-5" />
+            فاکتور جدید
+          </button>
+        </div>
       </div>
 
+      {/* جستجو */}
       <div className="mb-4">
         <div className="relative">
           <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -151,45 +193,62 @@ export default function SaleInvoiceList() {
         </div>
       </div>
 
+      {/* مودال فیلتر */}
+      <SaleInvoiceFilterPanel
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        filters={filters}
+        onChange={(newFilters) => {
+          setFilters(newFilters);
+          setPage(1);
+        }}
+        onClear={() => {
+          setFilters(EMPTY_FILTERS);
+          setPage(1);
+        }}
+      />
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : invoices.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
-          {searchInput ? "نتیجه‌ای یافت نشد" : "هیچ فاکتور فروشی ثبت نشده"}
+          {searchInput || activeFilterCount > 0
+            ? "نتیجه‌ای یافت نشد"
+            : "هیچ فاکتور فروشی ثبت نشده"}
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] lg:min-w-full  divide-y divide-gray-200">
+            <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
                 <tr>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     شماره فاکتور
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     تلفن
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     تاریخ
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     مبلغ کل
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     پرداخت شده
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     مانده
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
                     وضعیت
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center font-semibold text-indigo-700">
                     عملیات
                   </th>
                 </tr>
@@ -301,7 +360,7 @@ export default function SaleInvoiceList() {
             await deleteSaleInvoice(deleteTarget.id);
             toast.success("فاکتور حذف شد");
             setDeleteTarget(null);
-            fetchInvoices(debouncedSearch, page, limit);
+            fetchInvoices(debouncedSearch, filters, page, limit);
           } catch {
             toast.error("خطا در حذف فاکتور");
           } finally {

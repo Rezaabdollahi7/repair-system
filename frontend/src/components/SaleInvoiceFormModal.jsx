@@ -1,4 +1,3 @@
-// src/components/SaleInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
 import {
   createSaleInvoice,
@@ -6,6 +5,7 @@ import {
   getCustomers,
   createCustomer,
   createItem,
+  getDevice,
 } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -238,6 +238,7 @@ export default function SaleInvoiceFormModal({
   deviceId,
 }) {
   const [loading, setLoading] = useState(false);
+  const [loadingDevice, setLoadingDevice] = useState(false);
   const [items, setItems] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -256,6 +257,33 @@ export default function SaleInvoiceFormModal({
 
   const [selectedItems, setSelectedItems] = useState([]);
 
+  const loadDeviceInfo = async (id) => {
+    if (!id) return;
+    setLoadingDevice(true);
+    try {
+      const res = await getDevice(id);
+      const device = res.data;
+
+      if (device) {
+        const customerInfo = {
+          customer_id: device.customer_id || "",
+          customer_name: device.customer_name || "",
+          customer_phone: device.customer_phone || "",
+        };
+
+        setFormData((prev) => ({
+          ...prev,
+          ...customerInfo,
+        }));
+      }
+    } catch (error) {
+      console.error("خطا در دریافت اطلاعات دستگاه:", error);
+      toast.error("خطا در دریافت اطلاعات دستگاه");
+    } finally {
+      setLoadingDevice(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoadingData(true);
     try {
@@ -273,8 +301,16 @@ export default function SaleInvoiceFormModal({
   };
 
   useEffect(() => {
-    if (isOpen) fetchData();
+    if (isOpen) {
+      fetchData();
+    }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && deviceId) {
+      loadDeviceInfo(deviceId);
+    }
+  }, [isOpen, deviceId]);
 
   useEffect(() => {
     if (isOpen && deviceId) {
@@ -454,6 +490,11 @@ export default function SaleInvoiceFormModal({
           <h2 className="text-base sm:text-xl font-bold text-gray-900 flex items-center gap-2">
             <CurrencyDollarIcon className="w-5 h-5 text-gray-600" />
             ثبت فاکتور فروش جدید
+            {loadingDevice && (
+              <span className="text-xs text-gray-500 mr-2">
+                (در حال بارگذاری اطلاعات دستگاه...)
+              </span>
+            )}
           </h2>
           <button
             onClick={onClose}

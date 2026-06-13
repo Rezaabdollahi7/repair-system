@@ -1,4 +1,3 @@
-// src/components/SaleInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
 import {
   createSaleInvoice,
@@ -6,6 +5,7 @@ import {
   getCustomers,
   createCustomer,
   createItem,
+  getDevice,
 } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -15,6 +15,7 @@ import {
   UserPlusIcon,
   CurrencyDollarIcon,
   PencilSquareIcon,
+  CubeIcon,
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
@@ -231,8 +232,14 @@ function QuickItemModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
-export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
+export default function SaleInvoiceFormModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  deviceId,
+}) {
   const [loading, setLoading] = useState(false);
+  const [loadingDevice, setLoadingDevice] = useState(false);
   const [items, setItems] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -251,6 +258,33 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
 
   const [selectedItems, setSelectedItems] = useState([]);
 
+  const loadDeviceInfo = async (id) => {
+    if (!id) return;
+    setLoadingDevice(true);
+    try {
+      const res = await getDevice(id);
+      const device = res.data;
+
+      if (device) {
+        const customerInfo = {
+          customer_id: device.customer_id || "",
+          customer_name: device.customer_name || "",
+          customer_phone: device.customer_phone || "",
+        };
+
+        setFormData((prev) => ({
+          ...prev,
+          ...customerInfo,
+        }));
+      }
+    } catch (error) {
+      console.error("خطا در دریافت اطلاعات دستگاه:", error);
+      toast.error("خطا در دریافت اطلاعات دستگاه");
+    } finally {
+      setLoadingDevice(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoadingData(true);
     try {
@@ -268,8 +302,22 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
   };
 
   useEffect(() => {
-    if (isOpen) fetchData();
+    if (isOpen) {
+      fetchData();
+    }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && deviceId) {
+      loadDeviceInfo(deviceId);
+    }
+  }, [isOpen, deviceId]);
+
+  useEffect(() => {
+    if (isOpen && deviceId) {
+      setFormData((prev) => ({ ...prev, device_id: deviceId }));
+    }
+  }, [isOpen, deviceId]);
 
   const customerOptions = customers.map((c) => ({
     value: c.id,
@@ -394,6 +442,24 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
     return Object.keys(newErrors).length === 0;
   };
 
+  const resetForm = () => {
+    setFormData({
+      customer_id: "",
+      customer_name: "",
+      customer_phone: "",
+      invoice_date: new Date().toISOString().split("T")[0],
+      paid_amount: 0,
+      note: "",
+    });
+    setSelectedItems([]);
+    setErrors({});
+  };
+
+  const handleModalClose = () => {
+    resetForm();
+    onClose();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -404,6 +470,7 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
     try {
       const payload = {
         customer_id: formData.customer_id || null,
+        device_id: formData.device_id || deviceId || null,
         customer_name: formData.customer_name?.trim() || "مشتری متفرقه",
         customer_phone: formData.customer_phone?.trim() || null,
         invoice_date: formData.invoice_date,
@@ -421,6 +488,7 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
       };
       await createSaleInvoice(payload);
       toast.success("فاکتور فروش با موفقیت ثبت شد");
+      resetForm();
       onSuccess && onSuccess();
       onClose();
     } catch (error) {
@@ -435,363 +503,382 @@ export default function SaleInvoiceFormModal({ isOpen, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-6xl my-2 sm:my-8"
+        className="bg-white rounded-xl shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-base sm:text-xl font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
             <CurrencyDollarIcon className="w-5 h-5 text-gray-600" />
             ثبت فاکتور فروش جدید
+            {loadingDevice && (
+              <span className="text-xs text-gray-500 mr-2">
+                (در حال بارگذاری اطلاعات دستگاه...)
+              </span>
+            )}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleModalClose}
             className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-3 sm:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            <div className="lg:col-span-1 space-y-4 sm:space-y-6">
-              <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
-                  اطلاعات مشتری
-                </h2>
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      انتخاب مشتری
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <SearchableSelect
-                          options={customerOptions}
-                          value={formData.customer_id}
-                          onChange={handleCustomerSelect}
-                          placeholder="جستجو و انتخاب مشتری..."
-                        />
+        <div className="p-3 sm:p-6">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* ستون راست - اطلاعات مشتری و پرداخت */}
+              <div className="lg:col-span-1 space-y-4 sm:space-y-6">
+                {/* اطلاعات مشتری */}
+                <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                    <UserPlusIcon className="w-5 h-5 text-gray-600" />
+                    اطلاعات مشتری
+                  </h2>
+
+                  <div className="space-y-3 sm:space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        انتخاب مشتری
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <SearchableSelect
+                            options={customerOptions}
+                            value={formData.customer_id}
+                            onChange={handleCustomerSelect}
+                            placeholder="جستجو و انتخاب مشتری..."
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomerModal(true)}
+                          className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+                          title="ثبت سریع مشتری"
+                        >
+                          <UserPlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        نام مشتری
+                      </label>
+                      <input
+                        type="text"
+                        name="customer_name"
+                        value={formData.customer_name}
+                        onChange={handleInputChange}
+                        className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                        placeholder="مشتری متفرقه"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        شماره تماس
+                      </label>
+                      <input
+                        type="tel"
+                        name="customer_phone"
+                        value={formData.customer_phone}
+                        onChange={handleInputChange}
+                        className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                        placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        تاریخ فاکتور
+                      </label>
+                      <PersianDatePicker
+                        value={formData.invoice_date}
+                        onChange={(val) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            invoice_date: val,
+                          }))
+                        }
+                        placeholder="انتخاب تاریخ"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        توضیحات
+                      </label>
+                      <textarea
+                        name="note"
+                        value={formData.note}
+                        onChange={handleInputChange}
+                        rows="3"
+                        className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                        placeholder="توضیحات اضافی..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* خلاصه پرداخت */}
+                <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
+                    خلاصه پرداخت
+                  </h2>
+
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex justify-between py-2 text-sm sm:text-base">
+                      <span>جمع کل:</span>
+                      <span className="font-medium">
+                        {formatPersianCurrency(calculateTotal())} ریال
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        مبلغ دریافتی
+                      </label>
+                      <input
+                        type="number"
+                        name="paid_amount"
+                        value={formData.paid_amount}
+                        onChange={handleInputChange}
+                        min="0"
+                        step="1000"
+                        className={`w-full border rounded-lg px-3 sm:px-4 py-2 text-sm ${errors.paid_amount ? "border-red-500" : "border-gray-300"}`}
+                      />
+                      {errors.paid_amount && (
+                        <p className="mt-1 text-xs text-red-600">
+                          {errors.paid_amount}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between py-2 border-t border-gray-200 text-sm sm:text-base">
+                      <span>مانده:</span>
+                      <span
+                        className={`font-medium ${calculateRemaining() > 0 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {formatPersianCurrency(calculateRemaining())} ریال
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ستون چپ - اقلام فاکتور */}
+              <div className="lg:col-span-2">
+                <div className="bg-white shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
+                    <h2 className="text-base sm:text-lg font-medium text-gray-900 flex items-center gap-2">
+                      <CubeIcon className="w-5 h-5 text-gray-600" />
+                      اقلام فاکتور
+                    </h2>
+
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                       <button
                         type="button"
-                        onClick={() => setShowCustomerModal(true)}
-                        className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
-                        title="ثبت سریع مشتری"
+                        onClick={() => setShowQuickItemModal(true)}
+                        className="bg-green-100 text-green-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-green-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
-                        <UserPlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        تعریف سریع کالا
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem("inventory")}
+                        className="bg-blue-100 text-blue-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-blue-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        از انبار
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem("custom")}
+                        className="bg-purple-100 text-purple-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-purple-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        دلخواه
                       </button>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      نام مشتری
-                    </label>
-                    <input
-                      type="text"
-                      name="customer_name"
-                      value={formData.customer_name}
-                      onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
-                      placeholder="مشتری متفرقه"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      شماره تماس
-                    </label>
-                    <input
-                      type="tel"
-                      name="customer_phone"
-                      value={formData.customer_phone}
-                      onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
-                      placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      تاریخ فاکتور
-                    </label>
-                    <PersianDatePicker
-                      value={formData.invoice_date}
-                      onChange={(val) =>
-                        setFormData((prev) => ({ ...prev, invoice_date: val }))
-                      }
-                      placeholder="انتخاب تاریخ"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      توضیحات
-                    </label>
-                    <textarea
-                      name="note"
-                      value={formData.note}
-                      onChange={handleInputChange}
-                      rows="3"
-                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
-                      placeholder="توضیحات اضافی..."
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
-                  خلاصه پرداخت
-                </h2>
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between py-2 text-sm sm:text-base">
-                    <span>جمع کل:</span>
-                    <span className="font-medium">
-                      {formatPersianCurrency(calculateTotal())} ریال
-                    </span>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      مبلغ دریافتی
-                    </label>
-                    <input
-                      type="number"
-                      name="paid_amount"
-                      value={formData.paid_amount}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="1000"
-                      className={`w-full border rounded-lg px-3 sm:px-4 py-2 text-sm ${errors.paid_amount ? "border-red-500" : "border-gray-300"}`}
-                    />
-                    {errors.paid_amount && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {errors.paid_amount}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex justify-between py-2 border-t border-gray-200 text-sm sm:text-base">
-                    <span>مانده:</span>
-                    <span
-                      className={`font-medium ${calculateRemaining() > 0 ? "text-red-600" : "text-green-600"}`}
-                    >
-                      {formatPersianCurrency(calculateRemaining())} ریال
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-2">
-              <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                  <h2 className="text-base sm:text-lg font-medium text-gray-900">
-                    اقلام فاکتور
-                  </h2>
-                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickItemModal(true)}
-                      className="bg-green-100 text-green-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-green-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
-                    >
-                      <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                      تعریف سریع کالا
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddItem("inventory")}
-                      className="bg-blue-100 text-blue-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-blue-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
-                    >
-                      <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                      از انبار
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddItem("custom")}
-                      className="bg-purple-100 text-purple-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-purple-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
-                    >
-                      <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                      دلخواه
-                    </button>
-                  </div>
-                </div>
-
-                {errors.items && (
-                  <p className="mb-3 sm:mb-4 text-sm text-red-600">
-                    {errors.items}
-                  </p>
-                )}
-
-                {selectedItems.length === 0 ? (
-                  <div className="text-center py-8 sm:py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-                    <p>هیچ کالایی انتخاب نشده است</p>
-                    <p className="text-xs sm:text-sm mt-1">
-                      از دکمه "افزودن کالا" استفاده کنید
+                  {errors.items && (
+                    <p className="text-sm text-red-600 mb-3 sm:mb-4">
+                      {errors.items}
                     </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 sm:space-y-4">
-                    {selectedItems.map((item, index) => {
-                      const selectedItem = items.find(
-                        (it) => it.id === item.item_id,
-                      );
-                      return (
-                        <div
-                          key={index}
-                          className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50"
-                        >
-                          <div className="grid grid-cols-2 sm:grid-cols-10 gap-2 sm:gap-3 items-center">
-                            <div className="col-span-2 sm:col-span-3">
-                              {item.item_type === "inventory" ? (
-                                <>
+                  )}
+
+                  {selectedItems.length === 0 ? (
+                    <div className="text-center py-8 sm:py-10 text-gray-400 border-2 border-dashed rounded-lg">
+                      <p>هیچ کالایی انتخاب نشده است</p>
+                      <p className="text-xs sm:text-sm mt-1">
+                        از دکمه‌های بالا برای افزودن کالا استفاده کنید
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 sm:space-y-4">
+                      {selectedItems.map((item, index) => {
+                        const selectedItem = items.find(
+                          (it) => it.id === item.item_id,
+                        );
+                        return (
+                          <div
+                            key={index}
+                            className="border border-gray-300 rounded-lg p-3 sm:p-4 bg-gray-50"
+                          >
+                            <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-center">
+                              <div className="col-span-1 sm:col-span-2">
+                                <span className="text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-blue-100 text-blue-700">
+                                  {item.item_type === "inventory"
+                                    ? "انبار"
+                                    : "دلخواه"}
+                                </span>
+                              </div>
+
+                              <div className="col-span-7 sm:col-span-4">
+                                {item.item_type === "inventory" ? (
                                   <SearchableSelect
                                     options={itemOptions}
                                     value={item.item_id}
                                     onChange={(val) =>
                                       handleItemChange(index, "item_id", val)
                                     }
-                                    placeholder="جستجو و انتخاب کالا..."
+                                    placeholder="جستجوی کالا..."
                                     loading={loadingData}
-                                    required
                                     error={errors[`item_${index}`]}
                                   />
-                                  {selectedItem && (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                      موجودی: {selectedItem.currentStock}{" "}
-                                      {selectedItem.unit}
-                                    </p>
-                                  )}
-                                </>
-                              ) : (
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "name",
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="نام کالا"
+                                    className="w-full border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
+                                  />
+                                )}
+                                {selectedItem && (
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    موجودی: {selectedItem.currentStock}{" "}
+                                    {selectedItem.unit}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="col-span-2 sm:col-span-1">
                                 <input
-                                  type="text"
-                                  value={item.name}
+                                  type="number"
+                                  value={item.quantity}
                                   onChange={(e) =>
                                     handleItemChange(
                                       index,
-                                      "name",
+                                      "quantity",
+                                      parseInt(e.target.value) || 0,
+                                    )
+                                  }
+                                  min="1"
+                                  max={selectedItem?.currentStock}
+                                  className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
+                                />
+                                {errors[`quantity_${index}`] && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    {errors[`quantity_${index}`]}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="col-span-2 sm:col-span-1">
+                                <input
+                                  type="text"
+                                  value={item.unit}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      index,
+                                      "unit",
                                       e.target.value,
                                     )
                                   }
-                                  placeholder="نام آیتم دلخواه"
-                                  className="w-full border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
+                                  className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
                                 />
-                              )}
-                            </div>
+                              </div>
 
-                            <div className="col-span-1">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                تعداد *
-                              </label>
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "quantity",
-                                    parseInt(e.target.value) || 0,
-                                  )
-                                }
-                                min="1"
-                                max={selectedItem?.currentStock}
-                                className={`w-full border rounded-lg px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${errors[`quantity_${index}`] ? "border-red-500" : "border-gray-300"}`}
-                              />
-                              {errors[`quantity_${index}`] && (
-                                <p className="mt-1 text-xs text-red-600">
-                                  {errors[`quantity_${index}`]}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="col-span-1">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                واحد
-                              </label>
-                              <input
-                                type="text"
-                                value={item.unit}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "unit",
-                                    e.target.value,
-                                  )
-                                }
-                                className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
-                              />
-                            </div>
-
-                            <div className="col-span-2">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                قیمت واحد (ریال) *
-                              </label>
-                              <input
-                                type="number"
-                                value={item.unit_price}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "unit_price",
-                                    parseInt(e.target.value) || 0,
-                                  )
-                                }
-                                min="0"
-                                className={`w-full border rounded-lg px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${errors[`price_${index}`] ? "border-red-500" : "border-gray-300"}`}
-                              />
-                              {errors[`price_${index}`] && (
-                                <p className="mt-1 text-xs text-red-600">
-                                  {errors[`price_${index}`]}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="col-span-2">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                جمع
-                              </label>
-                              <div className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium bg-white border border-gray-200 rounded-lg">
-                                {formatPersianCurrency(
-                                  calculateItemTotal(
-                                    item.quantity,
-                                    item.unit_price,
-                                  ),
+                              <div className="col-span-3 sm:col-span-2">
+                                <input
+                                  type="number"
+                                  value={item.unit_price}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      index,
+                                      "unit_price",
+                                      parseInt(e.target.value) || 0,
+                                    )
+                                  }
+                                  min="0"
+                                  className="w-full border border-gray-300 rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm"
+                                />
+                                {errors[`price_${index}`] && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    {errors[`price_${index}`]}
+                                  </p>
                                 )}
                               </div>
-                            </div>
 
-                            <div className="col-span-1">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(index)}
-                                className="w-full px-2 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />
-                              </button>
+                              <div className="col-span-3 sm:col-span-1 text-left">
+                                <span className="text-xs sm:text-sm font-medium">
+                                  {formatPersianCurrency(
+                                    calculateItemTotal(
+                                      item.quantity,
+                                      item.unit_price,
+                                    ),
+                                  )}
+                                </span>
+                              </div>
+
+                              <div className="col-span-1 sm:col-span-1 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* دکمه‌های اقدام */}
+                <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={handleModalClose}
+                    className="px-3 sm:px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm sm:text-base order-2 sm:order-1"
+                  >
+                    انصراف
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2"
+                  >
+                    {loading ? "در حال ثبت..." : "ثبت فاکتور فروش"}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 order-2 sm:order-1"
-            >
-              انصراف
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 order-1 sm:order-2"
-            >
-              {loading ? "در حال ثبت..." : "ثبت فاکتور فروش"}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
       <QuickCustomerModal

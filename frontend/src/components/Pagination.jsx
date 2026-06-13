@@ -33,7 +33,7 @@ export default function Pagination({
           disabled={page === 1}
           className="px-3 py-1 rounded border disabled:opacity-40 hover:bg-gray-100 transition"
         >
-          قبلی
+          بعدی
         </button>
 
         <span className="px-3 py-1 rounded border bg-blue-50 text-blue-700 font-medium">
@@ -45,7 +45,7 @@ export default function Pagination({
           disabled={page === totalPages}
           className="px-3 py-1 rounded border disabled:opacity-40 hover:bg-gray-100 transition"
         >
-          بعدی
+          قبلی
         </button>
         <button
           onClick={() => onPageChange(totalPages)}

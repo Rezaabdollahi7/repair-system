@@ -58,7 +58,7 @@ function StatusBadge({ status }) {
   const Icon = s.icon;
   return (
     <span
-      className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${s.color}`}
+      className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit mx-auto ${s.color}`}
     >
       {Icon && <Icon className="w-3 h-3" />}
       {s.label}
@@ -88,7 +88,7 @@ function PaymentStatusBadge({ status }) {
   const Icon = s.icon;
   return (
     <span
-      className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${s.color}`}
+      className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit mx-auto ${s.color}`}
     >
       {Icon && <Icon className="w-3 h-3" />}
       {s.label}
@@ -225,36 +225,36 @@ export default function RepairInvoiceList() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[1200px] lg:min-w-full  divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     شماره فاکتور
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     دستگاه
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     تاریخ
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     مبلغ کل
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     پرداخت شده
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     مانده
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     وضعیت
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
                     پرداخت
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500   ">
                     عملیات
                   </th>
                 </tr>
@@ -267,33 +267,33 @@ export default function RepairInvoiceList() {
                     <tr
                       key={invoice.id}
                       onClick={() => openRepairInvoiceDetail(invoice.id)}
-                      className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                        index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                      className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm font-mono font-medium">
+                      <td className="px-4 py-3 text-sm font-mono font-medium  text-center border-l border-gray-600 group-hover:text-white">
                         {invoice.invoice_number}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openDeviceDetail(invoice.device_id);
                           }}
-                          className="text-blue-600 hover:underline"
+                          className="text-blue-600 hover:underline font-medium  group-hover:text-white "
                         >
                           {invoice.device_name}{" "}
                           {invoice.brand && `(${invoice.brand})`}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm text-center border-l border-gray-600 group-hover:text-white">
                         {invoice.customer_id ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               openCustomerDetail(invoice.customer_id);
                             }}
-                            className="text-blue-600 hover:underline font-medium"
+                            className="text-blue-600 hover:underline font-medium group-hover:text-white "
                           >
                             {invoice.customer_name || "—"}
                           </button>
@@ -301,22 +301,22 @@ export default function RepairInvoiceList() {
                           invoice.customer_name || "—"
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
                         {formatDate(invoice.invoice_date)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium">
+                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-gray-600 group-hover:text-white">
                         {formatPersianCurrency(invoice.total_amount)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-green-600">
+                      <td className="px-4 py-3 text-sm text-green-600 text-center border-l border-gray-600 group-hover:text-white">
                         {formatPersianCurrency(invoice.paid_amount)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-red-600">
+                      <td className="px-4 py-3 text-sm text-red-600 text-center border-l border-gray-600 group-hover:text-white">
                         {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-center border-l border-gray-600 group-hover:text-white ">
                         <StatusBadge status={invoice.status} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-center border-l border-gray-600 group-hover:text-white ">
                         <PaymentStatusBadge status={invoice.payment_status} />
                       </td>
                       <td className="px-4 py-3 text-sm">

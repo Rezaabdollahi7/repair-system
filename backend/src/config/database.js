@@ -404,6 +404,14 @@ function initSchema() {
     FOREIGN KEY (created_by) REFERENCES users(id)
   )
 `);
+
+  try {
+    db.run(`ALTER TABLE devices ADD COLUMN needs_invoice INTEGER DEFAULT 1`);
+  } catch (e) {}
+
+  try {
+    db.run(`ALTER TABLE sale_invoices ADD COLUMN device_id INTEGER`);
+  } catch (e) {}
 }
 
 function saveDb() {

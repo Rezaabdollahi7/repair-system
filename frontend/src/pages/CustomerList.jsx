@@ -130,18 +130,18 @@ export default function CustomerList() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[600px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     نام
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     شماره تماس
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     تعداد دستگاه
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     عملیات
                   </th>
                 </tr>
@@ -151,19 +151,19 @@ export default function CustomerList() {
                   <tr
                     key={c.id}
                     onClick={() => openCustomerDetail(c.id)}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm font-medium">
-                      <span className="text-blue-600 font-medium">
+                    <td className="px-4 py-3 text-sm font-medium text-center border-l border-gray-600">
+                      <span className="text-blue-600 font-medium group-hover:text-white ">
                         {c.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 group-hover:text-white ">
                       {formatPersianPhone(c.phone)}
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
                       <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                         {c.device_count ?? 0} دستگاه
                       </span>

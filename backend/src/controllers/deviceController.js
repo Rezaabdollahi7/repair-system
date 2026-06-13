@@ -16,8 +16,12 @@ function rowToDevice(row) {
     description: row[10],
     created_at: row[11],
     updated_at: row[12],
-    customer_name: row[13],
-    customer_phone: row[14],
+    needs_invoice: row[13],
+    customer_name: row[14],
+    customer_phone: row[15],
+    invoice_status: row[16] || null,
+    sale_invoice_id: row[17] || null,
+    invoice_count: row[18] || 0,
   };
 }
 
@@ -46,6 +50,7 @@ exports.getAll = async (req, res) => {
       entry_from,
       entry_to,
       personnel_ids,
+      invoice_status, // اضافه شد
       page = 1,
       limit = 10,
     } = req.query;
@@ -117,6 +122,55 @@ exports.getAll = async (req, res) => {
       }
     }
 
+    // اضافه شد: فیلتر وضعیت فاکتور
+    if (invoice_status && invoice_status.trim()) {
+      const statuses = invoice_status
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (statuses.length > 0) {
+        const conditions = [];
+
+        statuses.forEach((st) => {
+          switch (st) {
+            case "no_invoice": // ثبت نشده
+              conditions.push(`(
+                d.needs_invoice = 1 
+                AND (SELECT COUNT(*) FROM sale_invoices si WHERE si.device_id = d.id) = 0
+              )`);
+              break;
+            case "paid": // پرداخت شده
+              conditions.push(`(
+                (SELECT si.payment_status FROM sale_invoices si 
+                 WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) = 'paid'
+              )`);
+              break;
+            case "unpaid": // پرداخت نشده
+              conditions.push(`(
+                (SELECT COUNT(*) FROM sale_invoices si WHERE si.device_id = d.id) > 0
+                AND (
+                  (SELECT si.payment_status FROM sale_invoices si 
+                   WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) != 'paid'
+                  OR (SELECT si.payment_status FROM sale_invoices si 
+                      WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) IS NULL
+                )
+              )`);
+              break;
+            case "not_needed": // نیاز به فاکتور ندارد
+              conditions.push(`d.needs_invoice = 0`);
+              break;
+            default:
+              break;
+          }
+        });
+
+        if (conditions.length > 0) {
+          baseQuery += ` AND (${conditions.join(" OR ")})`;
+        }
+      }
+    }
+
     // count
     const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
     const total = countResult[0]?.values[0][0] ?? 0;
@@ -127,8 +181,11 @@ exports.getAll = async (req, res) => {
     const offset = (pageNum - 1) * limitNum;
 
     const dataResult = db.exec(
-      `SELECT d.*, c.name as customer_name, c.phone as customer_phone
-       ${baseQuery} ORDER BY d.id DESC LIMIT ? OFFSET ?`,
+      `SELECT d.*, c.name as customer_name, c.phone as customer_phone,
+    (SELECT si.payment_status FROM sale_invoices si WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) as invoice_status,
+    (SELECT si.id FROM sale_invoices si WHERE si.device_id = d.id ORDER BY si.invoice_date DESC LIMIT 1) as sale_invoice_id,
+    (SELECT COUNT(*) FROM sale_invoices si WHERE si.device_id = d.id) as invoice_count
+   ${baseQuery} ORDER BY d.id DESC LIMIT ? OFFSET ?`,
       [...params, limitNum, offset],
     );
 
@@ -247,14 +304,15 @@ exports.update = async (req, res) => {
 
     const fieldMap = {
       customer_id: 1,
-      device_name: 2,
-      brand: 3,
-      model: 4,
-      serial_number: 5,
-      entry_date: 6,
-      exit_date: 7,
-      status: 8,
-      description: 9,
+      device_name: 3,
+      brand: 4,
+      model: 5,
+      serial_number: 6,
+      entry_date: 7,
+      exit_date: 8,
+      status: 9,
+      description: 10,
+      needs_invoice: 13,
     };
 
     Object.keys(fieldMap).forEach((field) => {

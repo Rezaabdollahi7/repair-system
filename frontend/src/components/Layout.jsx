@@ -27,7 +27,7 @@ export default function Layout() {
   const location = useLocation();
   const { isAtLeast, user, logoutUser } = useAuth();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const isActive = (path) => location.pathname.startsWith(path);
@@ -164,7 +164,7 @@ export default function Layout() {
     ];
 
     return (
-      <div className="fixed bottom-4 left-1 sm:bottom-14 sm:left-10 z-40 flex flex-col items-center gap-3">
+      <div className="fixed bottom-4 left-1 sm:bottom-14 sm:left-10 z-40 flex flex-col items-center gap-3 hidden">
         {isOpen && (
           <div
             className="fixed inset-0 -z-30"

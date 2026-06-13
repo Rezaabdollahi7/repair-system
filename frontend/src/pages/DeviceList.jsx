@@ -38,21 +38,21 @@ function useDebounce(value, delay = 400) {
 function InvoiceStatusBadge({ device }) {
   const getInvoiceStatus = () => {
     if (device.needs_invoice === 0) {
-      return { label: "نیاز ندارد", color: "bg-blue-100 text-blue-800" };
+      return { label: "فاکتور نیاز ندارد", color: "bg-blue-100 text-blue-800" };
     }
     if (device.invoice_count > 0) {
       return device.invoice_status === "paid"
         ? { label: "پرداخت شده", color: "bg-green-100 text-green-800" }
         : { label: "پرداخت نشده", color: "bg-red-100 text-red-800" };
     }
-    return { label: "ثبت نشده", color: "bg-yellow-100 text-yellow-800" };
+    return { label: "فاکتور ندارد", color: "bg-yellow-100 text-yellow-800" };
   };
 
   const status = getInvoiceStatus();
 
   return (
     <span
-      className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}
+      className={`px-2 py-1 mt-3 rounded-full text-xs font-medium  ${status.color}`}
     >
       {status.label}
     </span>
@@ -98,7 +98,7 @@ function StatusBadge({ status, onStatusChange }) {
     <>
       <div className="flex items-center  gap-3">
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${current.color}`}
+          className={`px-2 py-1 mr-5 rounded-full text-xs font-medium ${current.color}`}
         >
           {current.label}
         </span>
@@ -107,7 +107,7 @@ function StatusBadge({ status, onStatusChange }) {
             e.stopPropagation();
             setShowModal(true);
           }}
-          className="p-0.5 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          className="p-0.5 rounded-full text-gray-400 hover:text-blue-600 group-hover:text-white hover:bg-blue-50 transition-colors"
           title="تغییر وضعیت"
         >
           <ArrowsRightLeftIcon className="size-5" />
@@ -428,39 +428,39 @@ export default function DeviceList() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[1400px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     شماره پذیرش
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     شماره تماس
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     نوع دستگاه
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     مدل
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                    وضعیت
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                    وضعیت دستگاه
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
-                    مسئول
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                    تعمیرکار
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     تاریخ ثبت
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     تاریخ خروج
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
-                    وضعیت فاکتور
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500  border-l  ">
+                    وضعیت پرداخت
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500    ">
                     عملیات
                   </th>
                 </tr>
@@ -470,28 +470,34 @@ export default function DeviceList() {
                   <tr
                     key={device.id}
                     onClick={() => openDeviceEdit(device.id)}
-                    className={`hover:bg-gray-50 transition-colors hover:cursor-pointer ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    className={`hover:bg-gray-500 hover:text-white transition-colors hover:cursor-pointer group ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm font-mono">{device.id}</td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 font-mono">
+                      {device.id}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           openCustomerDetail(device.customer_id);
                         }}
-                        className="text-blue-600 hover:underline font-medium"
+                        className="text-blue-600 group-hover:text-white hover:underline font-medium"
                       >
                         {device.customer_name ?? "مشتری"}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatPersianPhone(device.customer_phone)}
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">                      
+                {device.customer_phone}
                     </td>
-                    <td className="px-4 py-3 text-sm">{device.device_name}</td>
-                    <td className="px-4 py-3 text-sm">{device.brand ?? "—"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                      {device.device_name}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                      {device.brand ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 border-l border-gray-600">
                       <StatusBadge
                         status={device.status}
                         onStatusChange={(newStatus) =>
@@ -499,16 +505,16 @@ export default function DeviceList() {
                         }
                       />
                     </td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
                       <AssigneeBadge assignees={device.assignees} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
                       {formatDate(device.entry_date)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
                       {formatDate(device.exit_date)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex  justify-center border-l border-gray-600">
                       <InvoiceStatusBadge
                         device={device}
                         onToggleNeedsInvoice={handleToggleNeedsInvoice}
@@ -516,7 +522,7 @@ export default function DeviceList() {
                       />
                     </td>
 
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-4 py-3 text-sm text-center ">
                       <div className="flex gap-2 justify-end items-center">
                         {isAtLeast("admin") && (
                           <>

@@ -32,20 +32,20 @@ function useDebounce(value, delay = 400) {
 function StockBadge({ current, min }) {
   if (current === 0) {
     return (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 mx-auto">
         اتمام موجودی
       </span>
     );
   }
   if (current <= min) {
     return (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mx-auto">
         کم‌موجود ({current})
       </span>
     );
   }
   return (
-    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mx-auto">
       موجود ({current})
     </span>
   );
@@ -271,30 +271,30 @@ export default function ItemList() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     کد کالا
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     نام کالا
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     دسته‌بندی
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     واحد
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     وضعیت موجودی
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     حداقل موجودی
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     قیمت میانگین (ریال)
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center   font-semibold text-black border-b border-gray-500  ">
                     عملیات
                   </th>
                 </tr>
@@ -304,34 +304,34 @@ export default function ItemList() {
                   <tr
                     key={item.id}
                     onClick={() => openItemDetail(item.id)}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm font-mono">
+                    <td className="px-4 py-3 text-sm font-mono font-medium  text-center border-l border-gray-600 group-hover:text-white">
                       {item.code || "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      <span className="text-blue-600 font-medium">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900  text-center border-l border-gray-600 ">
+                      <span className="text-blue-600 font-medium group-hover:text-white">
                         {item.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
                       {item.categoryName || "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
                       {item.unit}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center border-l border-gray-600">
                       <StockBadge
                         current={item.currentStock || 0}
                         min={item.minStock || 0}
                       />
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
                       {item.minStock || 0}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
                       {item.avgPurchasePrice
                         ? formatPersianCurrency(item.avgPurchasePrice)
                         : "—"}

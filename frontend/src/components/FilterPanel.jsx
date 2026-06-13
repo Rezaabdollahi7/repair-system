@@ -62,7 +62,7 @@ const STATUS_OPTIONS = [
 const INVOICE_STATUS_OPTIONS = [
   {
     value: "no_invoice",
-    label: "ثبت نشده",
+    label: " فاکتور ندارد",
     color: "bg-gray-100 text-gray-700",
   },
   { value: "paid", label: "پرداخت شده", color: "bg-green-100 text-green-700" },

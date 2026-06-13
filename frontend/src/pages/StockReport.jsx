@@ -166,27 +166,27 @@ export default function StockReport() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
           <table className="min-w-[720px] sm:min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+            <thead className="bg-yellow-300">
               <tr>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
                   کد
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
                   نام کالا
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
                   دسته‌بندی
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
                   موجودی
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
                   حداقل
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
                   وضعیت
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500   text-xs sm:text-sm">
                   ارزش موجودی
                 </th>
               </tr>
@@ -194,10 +194,10 @@ export default function StockReport() {
             <tbody className="divide-y divide-gray-200">
               {report?.data.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono text-center border-l border-gray-600 ">
                     {item.code}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-gray-600 ">
                     <button
                       onClick={() => openItemDetail(item.id)}
                       className="text-blue-600 hover:underline"
@@ -205,19 +205,19 @@ export default function StockReport() {
                       {item.name}
                     </button>
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 text-center border-l border-gray-600">
                     {item.category_name || "—"}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-center border-l border-gray-600">
                     {item.current_stock} {item.unit}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 text-center border-l border-gray-600">
                     {item.min_stock} {item.unit}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-center border-l border-gray-600">
                     {getStockStatusBadge(item.stock_status)}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center  border-gray-600">
                     {formatPersianCurrency(
                       item.current_stock * item.avg_purchase_price,
                     )}{" "}

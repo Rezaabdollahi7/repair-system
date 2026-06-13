@@ -167,25 +167,25 @@ export default function PersonnelList() {
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[700px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     نام
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     نام کاربری
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     نقش
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     تلفن
                   </th>
-                  <th className="px-4 py-3 text-right  font-semibold text-indigo-700">
+                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                     وضعیت
                   </th>
                   {canManage && (
-                    <th className="px-4 py-3 text-center  font-semibold text-indigo-700">
+                    <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
                       عملیات
                     </th>
                   )}
@@ -195,24 +195,24 @@ export default function PersonnelList() {
                 {personnel.map((person, index) => (
                   <tr
                     key={person.id}
-                    className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                    className={`hover:bg-gray-500 group transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                    <td className="px-4 py-3 whitespace-nowrap text-center border-l border-gray-600">
+                      <div className="flex items-center justify-center gap-3 ">
+                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm ">
                           {person.full_name?.charAt(0)}
                         </div>
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-gray-900 group-hover:text-white">
                           {person.full_name}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-l border-gray-600 font-mono group-hover:text-white">
                       {person.username}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className=" py-3 whitespace-nowrap flex items-center justify-center border-l border-gray-600">
                       <span
-                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        className={`mt-2.5 px-2 py-1 text-xs font-medium rounded-full items-center justify-center ${
                           person.role_name === "super_admin"
                             ? "bg-purple-100 text-purple-700"
                             : person.role_name === "admin"
@@ -223,12 +223,12 @@ export default function PersonnelList() {
                         {person.role_label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 border-l border-gray-600 group-hover:text-white text-center">
                       {formatPersianPhone(person.phone)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-4.5 whitespace-nowrap border-l border-gray-600 flex items-center justify-center">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full  ${
                           person.is_active
                             ? "bg-green-100 text-green-700"
                             : "bg-red-100 text-red-700"

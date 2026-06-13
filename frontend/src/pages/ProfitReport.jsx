@@ -120,27 +120,27 @@ export default function ProfitReport() {
 
           <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
             <table className="min-w-[640px] sm:min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  text-xs sm:text-sm">
                     کد
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  text-xs sm:text-sm">
                     نام کالا
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  text-xs sm:text-sm">
                     تعداد فروش
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  text-xs sm:text-sm">
                     درآمد
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  text-xs sm:text-sm">
                     هزینه
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  text-xs sm:text-sm">
                     سود
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right font-semibold text-indigo-700 text-xs sm:text-sm">
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500    text-xs sm:text-sm">
                     حاشیه سود
                   </th>
                 </tr>
@@ -148,10 +148,10 @@ export default function ProfitReport() {
               <tbody className="divide-y divide-gray-200">
                 {report.data.map((item) => (
                   <tr key={item.item_id} className="hover:bg-gray-50">
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono text-center border-l border-gray-600">
                       {item.item_code}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-gray-600">
                       <button
                         onClick={() => openItemDetail(item.item_id)}
                         className="text-blue-600 hover:underline"
@@ -159,23 +159,23 @@ export default function ProfitReport() {
                         {item.item_name}
                       </button>
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-gray-600">
                       {item.total_quantity}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-gray-600">
                       {formatPersianCurrency(item.total_revenue)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-gray-600">
                       {formatPersianCurrency(item.total_cost)}
                     </td>
                     <td
-                      className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                      className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium  text-center border-l border-gray-600${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
                       {formatPersianCurrency(item.profit)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm  border-gray-600">
                       <span
-                        className={`flex items-center gap-1 ${item.profit_margin >= 0 ? "text-green-600" : "text-red-600"}`}
+                        className={`flex items-center gap-1 justify-center ${item.profit_margin >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
                         <ArrowTrendingUpIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         {formatPercent(item.profit_margin)}

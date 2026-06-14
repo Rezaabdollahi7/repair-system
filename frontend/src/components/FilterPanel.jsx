@@ -87,25 +87,31 @@ export default function FilterPanel({
   const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
-  
+
   const [customerSearch, setCustomerSearch] = useState("");
   const [personnelSearch, setPersonnelSearch] = useState("");
   const [statusSearch, setStatusSearch] = useState("");
   const [invoiceStatusSearch, setInvoiceStatusSearch] = useState("");
-  
+
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [searchingPersonnel, setSearchingPersonnel] = useState(false);
   const [customerResults, setCustomerResults] = useState([]);
   const [personnelResults, setPersonnelResults] = useState([]);
-  
-  // ذخیره مشتری انتخاب شده فعلی برای نمایش در دکمه
-  const [selectedCustomerLabel, setSelectedCustomerLabel] = useState("");
+
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedPersonnelMap, setSelectedPersonnelMap] = useState({});
 
   const statusRef = useRef(null);
   const invoiceStatusRef = useRef(null);
   const customerRef = useRef(null);
   const personnelRef = useRef(null);
-  
+
+  // ─── FIX: همیشه آخرین نسخه filters رو داریم، بدون stale closure ───
+  const filtersRef = useRef(filters);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   const debouncedPersonnelSearch = useDebounce(personnelSearch, 300);
 
@@ -113,7 +119,6 @@ export default function FilterPanel({
     Array.isArray(v) ? v.length > 0 : v !== "",
   ).length;
 
-  // جستجوی مشتری از سرور
   const searchCustomersAPI = useCallback(async (query) => {
     if (!query || query.trim() === "") {
       setCustomerResults([]);
@@ -131,7 +136,6 @@ export default function FilterPanel({
     }
   }, []);
 
-  // جستجوی پرسنل از سرور
   const searchPersonnelAPI = useCallback(async (query) => {
     if (!query || query.trim() === "") {
       setPersonnelResults([]);
@@ -141,32 +145,63 @@ export default function FilterPanel({
     try {
       const res = await getPersonnel({ search: query, limit: 20 });
       setPersonnelResults(res.data?.data || res.data || []);
-    } catch (error) {
-      console.error("خطا در جستجوی پرسنل:", error);
-      setPersonnelResults([]);
     } finally {
       setSearchingPersonnel(false);
     }
   }, []);
 
-  // بارگذاری مشتری انتخاب شده فعلی برای نمایش در دکمه
   useEffect(() => {
-    if (filters.customer_id && !selectedCustomerLabel) {
-      // اگر مشتری انتخاب شده ولی لیبل نداریم، یه درخواست ساده برای گرفتن اسمش
-      searchCustomersAPI("").then(() => {
-        // اینجا می‌تونیم مشتری رو از results پیدا کنیم
-      });
+    if (filters.customer_id && !selectedCustomer) {
+      searchCustomersAPI(String(filters.customer_id));
+    } else if (!filters.customer_id) {
+      setSelectedCustomer(null);
     }
   }, [filters.customer_id]);
 
-  // اثر دیبونس برای جستجوی مشتری
   useEffect(() => {
-    searchCustomersAPI(debouncedCustomerSearch);
+    if (filters.customer_id && customerResults.length > 0) {
+      const found = customerResults.find(c => String(c.id) === String(filters.customer_id));
+      if (found) setSelectedCustomer(found);
+    }
+  }, [customerResults, filters.customer_id]);
+
+  useEffect(() => {
+    if (filters.personnel_ids && filters.personnel_ids.length > 0) {
+      const missingIds = filters.personnel_ids.filter(id => !selectedPersonnelMap[id]);
+      if (missingIds.length > 0) {
+        missingIds.forEach(async (id) => {
+          try {
+            const res = await getPersonnel({ search: "", limit: 200 });
+            const allPersonnel = res.data?.data || res.data || [];
+            const found = allPersonnel.find(p => p.id === id);
+            if (found) {
+              setSelectedPersonnelMap(prev => ({
+                ...prev,
+                [id]: found.name ?? found.full_name ?? found.username ?? `مسئول #${id}`
+              }));
+            }
+          } catch (error) {
+            console.error("خطا در دریافت اطلاعات پرسنل:", error);
+          }
+        });
+      }
+    }
+  }, [filters.personnel_ids]);
+
+  useEffect(() => {
+    if (customerSearch && customerSearch.trim()) {
+      searchCustomersAPI(debouncedCustomerSearch);
+    } else {
+      setCustomerResults([]);
+    }
   }, [debouncedCustomerSearch, searchCustomersAPI]);
 
-  // اثر دیبونس برای جستجوی پرسنل
   useEffect(() => {
-    searchPersonnelAPI(debouncedPersonnelSearch);
+    if (personnelSearch && personnelSearch.trim()) {
+      searchPersonnelAPI(debouncedPersonnelSearch);
+    } else {
+      setPersonnelResults([]);
+    }
   }, [debouncedPersonnelSearch, searchPersonnelAPI]);
 
   useEffect(() => {
@@ -194,28 +229,37 @@ export default function FilterPanel({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ─── FIX: همه toggle ها از filtersRef.current استفاده می‌کنند ───
   function toggleStatus(value) {
-    const current = filters.status || [];
+    const current = filtersRef.current.status || [];
     const updated = current.includes(value)
       ? current.filter((s) => s !== value)
       : [...current, value];
-    onChange({ ...filters, status: updated });
+    onChange({ ...filtersRef.current, status: updated });
   }
 
   function toggleInvoiceStatus(value) {
-    const current = filters.invoice_status || [];
+    const current = filtersRef.current.invoice_status || [];
     const updated = current.includes(value)
       ? current.filter((s) => s !== value)
       : [...current, value];
-    onChange({ ...filters, invoice_status: updated });
+    onChange({ ...filtersRef.current, invoice_status: updated });
   }
 
   function togglePersonnel(id) {
-    const current = filters.personnel_ids || [];
+    const current = filtersRef.current.personnel_ids || [];
     const updated = current.includes(id)
       ? current.filter((p) => p !== id)
       : [...current, id];
-    onChange({ ...filters, personnel_ids: updated });
+    onChange({ ...filtersRef.current, personnel_ids: updated });
+
+    if (current.includes(id)) {
+      setSelectedPersonnelMap(prev => {
+        const newMap = { ...prev };
+        delete newMap[id];
+        return newMap;
+      });
+    }
   }
 
   function getStatusLabel() {
@@ -229,17 +273,15 @@ export default function FilterPanel({
   function getInvoiceStatusLabel() {
     const selected = filters.invoice_status || [];
     if (selected.length === 0) return "همه وضعیت‌های فاکتور";
-    if (selected.length === 1) {
+    if (selected.length === 1)
       return INVOICE_STATUS_OPTIONS.find((o) => o.value === selected[0])?.label || selected[0];
-    }
     return `${selected.length} وضعیت فاکتور انتخاب شده`;
   }
 
   function getCustomerLabel() {
     if (!filters.customer_id) return "همه مشتریان";
-    // اگر مشتری در results هست از اون استفاده کن
-    const c = customerResults.find((c) => String(c.id) === String(filters.customer_id));
-    if (c) return `${c.name} - ${c.phone || ""}`;
+    if (selectedCustomer)
+      return `${selectedCustomer.name}${selectedCustomer.phone ? ` - ${selectedCustomer.phone}` : ""}`;
     return `مشتری #${filters.customer_id}`;
   }
 
@@ -247,8 +289,8 @@ export default function FilterPanel({
     const selected = filters.personnel_ids || [];
     if (selected.length === 0) return "همه مسئولان";
     if (selected.length === 1) {
-      const p = personnelResults.find((p) => p.id === selected[0]);
-      return p?.name ?? p?.full_name ?? p?.username ?? `مسئول #${selected[0]}`;
+      const name = selectedPersonnelMap[selected[0]];
+      return name || `مسئول #${selected[0]}`;
     }
     return `${selected.length} مسئول انتخاب شده`;
   }
@@ -276,16 +318,6 @@ export default function FilterPanel({
         autoFocus
       />
     </div>
-  );
-
-  const ClearButton = ({ onClick, multi }) => (
-    <button
-      onClick={onClick}
-      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
-    >
-      <XCircleIcon className="w-3.5 h-3.5" />
-      {multi ? "پاک کردن انتخاب‌ها" : "پاک کردن انتخاب"}
-    </button>
   );
 
   const SectionTitle = ({ icon: Icon, title }) => (
@@ -351,20 +383,12 @@ export default function FilterPanel({
                     onClick={() => setStatusDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span
-                      className={
-                        filters.status?.length > 0
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
-                      }
-                    >
+                    <span className={filters.status?.length > 0 ? "text-gray-800 font-medium" : "text-gray-400"}>
                       {getStatusLabel()}
                     </span>
-                    {statusDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    )}
+                    {statusDropdownOpen
+                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
                   </button>
 
                   {statusDropdownOpen && (
@@ -374,15 +398,19 @@ export default function FilterPanel({
                         onChange={(e) => setStatusSearch(e.target.value)}
                       />
                       <div className="max-h-56 overflow-y-auto">
+                        {/* ─── FIX: از filtersRef.current استفاده می‌شه ─── */}
                         {filters.status?.length > 0 && (
-                          <ClearButton
-                            multi
+                          <button
                             onClick={() => {
-                              onChange({ ...filters, status: [] });
+                              onChange({ ...filtersRef.current, status: [] });
                               setStatusDropdownOpen(false);
                               setStatusSearch("");
                             }}
-                          />
+                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                          >
+                            <XCircleIcon className="w-3.5 h-3.5" />
+                            پاک کردن انتخاب‌ها
+                          </button>
                         )}
                         {filteredStatuses.map((opt) => {
                           const isSelected = filters.status?.includes(opt.value);
@@ -390,49 +418,23 @@ export default function FilterPanel({
                             <button
                               key={opt.value}
                               onClick={() => toggleStatus(opt.value)}
-                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                                isSelected ? "bg-green-50" : ""
-                              }`}
+                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-green-50" : ""}`}
                             >
-                              <span
-                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                                  isSelected
-                                    ? "bg-green-600 border-green-600"
-                                    : "border-gray-300"
-                                }`}
-                              >
+                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}>
                                 {isSelected && (
-                                  <svg
-                                    className="w-3 h-3 text-white"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={3}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M5 13l4 4L19 7"
-                                    />
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
                                 )}
                               </span>
-                              <span
-                                className={
-                                  opt.color.split(" ")[0] === "bg-yellow-100"
-                                    ? "text-yellow-800"
-                                    : opt.color.split(" ")[1]
-                                }
-                              >
+                              <span className={opt.color.split(" ")[0] === "bg-yellow-100" ? "text-yellow-800" : opt.color.split(" ")[1]}>
                                 {opt.label}
                               </span>
                             </button>
                           );
                         })}
                         {filteredStatuses.length === 0 && (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            نتیجه‌ای یافت نشد
-                          </p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">نتیجه‌ای یافت نشد</p>
                         )}
                       </div>
                     </div>
@@ -449,20 +451,12 @@ export default function FilterPanel({
                     onClick={() => setInvoiceStatusDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span
-                      className={
-                        filters.invoice_status?.length > 0
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
-                      }
-                    >
+                    <span className={filters.invoice_status?.length > 0 ? "text-gray-800 font-medium" : "text-gray-400"}>
                       {getInvoiceStatusLabel()}
                     </span>
-                    {invoiceStatusDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    )}
+                    {invoiceStatusDropdownOpen
+                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
                   </button>
 
                   {invoiceStatusDropdownOpen && (
@@ -472,15 +466,19 @@ export default function FilterPanel({
                         onChange={(e) => setInvoiceStatusSearch(e.target.value)}
                       />
                       <div className="max-h-56 overflow-y-auto">
+                        {/* ─── FIX ─── */}
                         {filters.invoice_status?.length > 0 && (
-                          <ClearButton
-                            multi
+                          <button
                             onClick={() => {
-                              onChange({ ...filters, invoice_status: [] });
+                              onChange({ ...filtersRef.current, invoice_status: [] });
                               setInvoiceStatusDropdownOpen(false);
                               setInvoiceStatusSearch("");
                             }}
-                          />
+                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                          >
+                            <XCircleIcon className="w-3.5 h-3.5" />
+                            پاک کردن انتخاب‌ها
+                          </button>
                         )}
                         {filteredInvoiceStatuses.map((opt) => {
                           const isSelected = filters.invoice_status?.includes(opt.value);
@@ -488,43 +486,21 @@ export default function FilterPanel({
                             <button
                               key={opt.value}
                               onClick={() => toggleInvoiceStatus(opt.value)}
-                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                                isSelected ? "bg-green-50" : ""
-                              }`}
+                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-green-50" : ""}`}
                             >
-                              <span
-                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                                  isSelected
-                                    ? "bg-green-600 border-green-600"
-                                    : "border-gray-300"
-                                }`}
-                              >
+                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}>
                                 {isSelected && (
-                                  <svg
-                                    className="w-3 h-3 text-white"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={3}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M5 13l4 4L19 7"
-                                    />
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
                                 )}
                               </span>
-                              <span className={opt.color.split(" ")[1]}>
-                                {opt.label}
-                              </span>
+                              <span className={opt.color.split(" ")[1]}>{opt.label}</span>
                             </button>
                           );
                         })}
                         {filteredInvoiceStatuses.length === 0 && (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            نتیجه‌ای یافت نشد
-                          </p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">نتیجه‌ای یافت نشد</p>
                         )}
                       </div>
                     </div>
@@ -532,7 +508,7 @@ export default function FilterPanel({
                 </div>
               </div>
 
-              {/* مشتری - با جستجوی سرور */}
+              {/* مشتری */}
               <div>
                 <SectionTitle icon={UserGroupIcon} title="مشتری" />
                 <div ref={customerRef} className="relative">
@@ -541,20 +517,12 @@ export default function FilterPanel({
                     onClick={() => setCustomerDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span
-                      className={
-                        filters.customer_id
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
-                      }
-                    >
+                    <span className={filters.customer_id ? "text-gray-800 font-medium" : "text-gray-400"}>
                       {getCustomerLabel()}
                     </span>
-                    {customerDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    )}
+                    {customerDropdownOpen
+                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
                   </button>
 
                   {customerDropdownOpen && (
@@ -565,52 +533,45 @@ export default function FilterPanel({
                         placeholder="نام یا شماره تلفن..."
                       />
                       <div className="max-h-56 overflow-y-auto">
+                        {/* ─── FIX ─── */}
                         {filters.customer_id && (
-                          <ClearButton
+                          <button
                             onClick={() => {
-                              onChange({ ...filters, customer_id: "" });
+                              onChange({ ...filtersRef.current, customer_id: "" });
+                              setSelectedCustomer(null);
                               setCustomerDropdownOpen(false);
                               setCustomerSearch("");
                               setCustomerResults([]);
                             }}
-                          />
+                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                          >
+                            <XCircleIcon className="w-3.5 h-3.5" />
+                            پاک کردن انتخاب
+                          </button>
                         )}
                         {searchingCustomers ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
-                            در حال جستجو...
-                          </div>
+                          <div className="px-3 py-4 text-sm text-gray-400 text-center">در حال جستجو...</div>
                         ) : customerResults.length > 0 ? (
                           customerResults.map((c) => (
                             <button
                               key={c.id}
                               onClick={() => {
-                                onChange({ ...filters, customer_id: c.id });
+                                onChange({ ...filtersRef.current, customer_id: c.id });
+                                setSelectedCustomer(c);
                                 setCustomerDropdownOpen(false);
                                 setCustomerSearch("");
                                 setCustomerResults([]);
                               }}
-                              className={`w-full text-right px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
-                                String(filters.customer_id) === String(c.id)
-                                  ? "bg-green-50 text-green-700 font-medium"
-                                  : "text-gray-700"
-                              }`}
+                              className={`w-full text-right px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors ${String(filters.customer_id) === String(c.id) ? "bg-green-50 text-green-700 font-medium" : "text-gray-700"}`}
                             >
                               <div className="font-medium">{c.name}</div>
-                              {c.phone && (
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                  {c.phone}
-                                </div>
-                              )}
+                              {c.phone && <div className="text-xs text-gray-500 mt-0.5">{c.phone}</div>}
                             </button>
                           ))
                         ) : customerSearch ? (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            مشتری‌ای یافت نشد
-                          </p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">مشتری‌ای یافت نشد</p>
                         ) : (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            برای جستجو نام یا شماره تلفن وارد کنید
-                          </p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">برای جستجو نام یا شماره تلفن وارد کنید</p>
                         )}
                       </div>
                     </div>
@@ -621,7 +582,7 @@ export default function FilterPanel({
 
             {/* ستون چپ */}
             <div className="space-y-8">
-              {/* مسئول - با جستجوی سرور */}
+              {/* مسئول */}
               <div>
                 <SectionTitle icon={UserIcon} title="مسئول" />
                 <div ref={personnelRef} className="relative">
@@ -630,20 +591,12 @@ export default function FilterPanel({
                     onClick={() => setPersonnelDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span
-                      className={
-                        filters.personnel_ids?.length > 0
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
-                      }
-                    >
+                    <span className={filters.personnel_ids?.length > 0 ? "text-gray-800 font-medium" : "text-gray-400"}>
                       {getPersonnelLabel()}
                     </span>
-                    {personnelDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    )}
+                    {personnelDropdownOpen
+                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
                   </button>
 
                   {personnelDropdownOpen && (
@@ -654,21 +607,24 @@ export default function FilterPanel({
                         placeholder="نام یا نام کاربری..."
                       />
                       <div className="max-h-56 overflow-y-auto">
+                        {/* ─── FIX ─── */}
                         {filters.personnel_ids?.length > 0 && (
-                          <ClearButton
-                            multi
+                          <button
                             onClick={() => {
-                              onChange({ ...filters, personnel_ids: [] });
+                              onChange({ ...filtersRef.current, personnel_ids: [] });
+                              setSelectedPersonnelMap({});
                               setPersonnelDropdownOpen(false);
                               setPersonnelSearch("");
                               setPersonnelResults([]);
                             }}
-                          />
+                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                          >
+                            <XCircleIcon className="w-3.5 h-3.5" />
+                            پاک کردن انتخاب‌ها
+                          </button>
                         )}
                         {searchingPersonnel ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
-                            در حال جستجو...
-                          </div>
+                          <div className="px-3 py-4 text-sm text-gray-400 text-center">در حال جستجو...</div>
                         ) : personnelResults.length > 0 ? (
                           personnelResults.map((p) => {
                             const displayName = p.name ?? p.full_name ?? p.username ?? "—";
@@ -678,57 +634,32 @@ export default function FilterPanel({
                                 key={p.id}
                                 onClick={() => {
                                   togglePersonnel(p.id);
+                                  if (!isSelected) {
+                                    setSelectedPersonnelMap(prev => ({ ...prev, [p.id]: displayName }));
+                                  }
                                   setPersonnelSearch("");
                                   setPersonnelResults([]);
                                   setPersonnelDropdownOpen(false);
                                 }}
-                                className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                                  isSelected ? "bg-purple-50" : ""
-                                }`}
+                                className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-purple-50" : ""}`}
                               >
-                                <span
-                                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                                    isSelected
-                                      ? "bg-purple-600 border-purple-600"
-                                      : "border-gray-300"
-                                  }`}
-                                >
+                                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-purple-600 border-purple-600" : "border-gray-300"}`}>
                                   {isSelected && (
-                                    <svg
-                                      className="w-3 h-3 text-white"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={3}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M5 13l4 4L19 7"
-                                      />
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
                                   )}
                                 </span>
-                                <span
-                                  className={
-                                    isSelected
-                                      ? "text-purple-700 font-medium"
-                                      : "text-gray-700"
-                                  }
-                                >
+                                <span className={isSelected ? "text-purple-700 font-medium" : "text-gray-700"}>
                                   {displayName}
                                 </span>
                               </button>
                             );
                           })
                         ) : personnelSearch ? (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            پرسنلی یافت نشد
-                          </p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">پرسنلی یافت نشد</p>
                         ) : (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            برای جستجو نام وارد کنید
-                          </p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">برای جستجو نام وارد کنید</p>
                         )}
                       </div>
                     </div>
@@ -742,13 +673,13 @@ export default function FilterPanel({
                 <div className="space-y-3">
                   <PersianDatePicker
                     value={filters.entry_from}
-                    onChange={(val) => onChange({ ...filters, entry_from: val })}
+                    onChange={(val) => onChange({ ...filtersRef.current, entry_from: val })}
                     placeholder="از تاریخ..."
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                   <PersianDatePicker
                     value={filters.entry_to}
-                    onChange={(val) => onChange({ ...filters, entry_to: val })}
+                    onChange={(val) => onChange({ ...filtersRef.current, entry_to: val })}
                     placeholder="تا تاریخ..."
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />

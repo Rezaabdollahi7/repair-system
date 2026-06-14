@@ -409,8 +409,6 @@ export default function DeviceList() {
             setFilters(EMPTY_FILTERS);
             setPage(1);
           }}
-          customers={customers}
-          personnel={personnelList}
         />
       </div>
       {/* Table */}

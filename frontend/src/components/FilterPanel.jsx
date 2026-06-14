@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   FunnelIcon,
   ChevronUpIcon,
@@ -14,6 +14,8 @@ import {
 } from "@heroicons/react/24/outline";
 
 import PersianDatePicker from "./PersianDatePicker";
+import { searchCustomers, getPersonnel } from "../api";
+import { useDebounce } from "../utils/helpers";
 
 const STATUS_OPTIONS = [
   {
@@ -62,7 +64,7 @@ const STATUS_OPTIONS = [
 const INVOICE_STATUS_OPTIONS = [
   {
     value: "no_invoice",
-    label: " فاکتور ندارد",
+    label: "فاکتور ندارد",
     color: "bg-gray-100 text-gray-700",
   },
   { value: "paid", label: "پرداخت شده", color: "bg-green-100 text-green-700" },
@@ -78,29 +80,94 @@ export default function FilterPanel({
   filters,
   onChange,
   onClear,
-  customers,
-  personnel,
   isOpen,
   onClose,
 }) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] =
-    useState(false);
+  const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
+  
   const [customerSearch, setCustomerSearch] = useState("");
   const [personnelSearch, setPersonnelSearch] = useState("");
   const [statusSearch, setStatusSearch] = useState("");
   const [invoiceStatusSearch, setInvoiceStatusSearch] = useState("");
+  
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
+  const [searchingPersonnel, setSearchingPersonnel] = useState(false);
+  const [customerResults, setCustomerResults] = useState([]);
+  const [personnelResults, setPersonnelResults] = useState([]);
+  
+  // ذخیره مشتری انتخاب شده فعلی برای نمایش در دکمه
+  const [selectedCustomerLabel, setSelectedCustomerLabel] = useState("");
 
   const statusRef = useRef(null);
   const invoiceStatusRef = useRef(null);
   const customerRef = useRef(null);
   const personnelRef = useRef(null);
+  
+  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
+  const debouncedPersonnelSearch = useDebounce(personnelSearch, 300);
 
   const activeCount = Object.values(filters).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v !== "",
   ).length;
+
+  // جستجوی مشتری از سرور
+  const searchCustomersAPI = useCallback(async (query) => {
+    if (!query || query.trim() === "") {
+      setCustomerResults([]);
+      return;
+    }
+    setSearchingCustomers(true);
+    try {
+      const res = await searchCustomers(query);
+      setCustomerResults(res.data?.data || res.data || []);
+    } catch (error) {
+      console.error("خطا در جستجوی مشتری:", error);
+      setCustomerResults([]);
+    } finally {
+      setSearchingCustomers(false);
+    }
+  }, []);
+
+  // جستجوی پرسنل از سرور
+  const searchPersonnelAPI = useCallback(async (query) => {
+    if (!query || query.trim() === "") {
+      setPersonnelResults([]);
+      return;
+    }
+    setSearchingPersonnel(true);
+    try {
+      const res = await getPersonnel({ search: query, limit: 20 });
+      setPersonnelResults(res.data?.data || res.data || []);
+    } catch (error) {
+      console.error("خطا در جستجوی پرسنل:", error);
+      setPersonnelResults([]);
+    } finally {
+      setSearchingPersonnel(false);
+    }
+  }, []);
+
+  // بارگذاری مشتری انتخاب شده فعلی برای نمایش در دکمه
+  useEffect(() => {
+    if (filters.customer_id && !selectedCustomerLabel) {
+      // اگر مشتری انتخاب شده ولی لیبل نداریم، یه درخواست ساده برای گرفتن اسمش
+      searchCustomersAPI("").then(() => {
+        // اینجا می‌تونیم مشتری رو از results پیدا کنیم
+      });
+    }
+  }, [filters.customer_id]);
+
+  // اثر دیبونس برای جستجوی مشتری
+  useEffect(() => {
+    searchCustomersAPI(debouncedCustomerSearch);
+  }, [debouncedCustomerSearch, searchCustomersAPI]);
+
+  // اثر دیبونس برای جستجوی پرسنل
+  useEffect(() => {
+    searchPersonnelAPI(debouncedPersonnelSearch);
+  }, [debouncedPersonnelSearch, searchPersonnelAPI]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -108,20 +175,19 @@ export default function FilterPanel({
         setStatusDropdownOpen(false);
         setStatusSearch("");
       }
-      if (
-        invoiceStatusRef.current &&
-        !invoiceStatusRef.current.contains(e.target)
-      ) {
+      if (invoiceStatusRef.current && !invoiceStatusRef.current.contains(e.target)) {
         setInvoiceStatusDropdownOpen(false);
         setInvoiceStatusSearch("");
       }
       if (customerRef.current && !customerRef.current.contains(e.target)) {
         setCustomerDropdownOpen(false);
         setCustomerSearch("");
+        setCustomerResults([]);
       }
       if (personnelRef.current && !personnelRef.current.contains(e.target)) {
         setPersonnelDropdownOpen(false);
         setPersonnelSearch("");
+        setPersonnelResults([]);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -156,10 +222,7 @@ export default function FilterPanel({
     const selected = filters.status || [];
     if (selected.length === 0) return "همه وضعیت‌ها";
     if (selected.length === 1)
-      return (
-        STATUS_OPTIONS.find((o) => o.value === selected[0])?.label ||
-        selected[0]
-      );
+      return STATUS_OPTIONS.find((o) => o.value === selected[0])?.label || selected[0];
     return `${selected.length} وضعیت انتخاب شده`;
   }
 
@@ -167,28 +230,25 @@ export default function FilterPanel({
     const selected = filters.invoice_status || [];
     if (selected.length === 0) return "همه وضعیت‌های فاکتور";
     if (selected.length === 1) {
-      return (
-        INVOICE_STATUS_OPTIONS.find((o) => o.value === selected[0])?.label ||
-        selected[0]
-      );
+      return INVOICE_STATUS_OPTIONS.find((o) => o.value === selected[0])?.label || selected[0];
     }
     return `${selected.length} وضعیت فاکتور انتخاب شده`;
   }
 
   function getCustomerLabel() {
     if (!filters.customer_id) return "همه مشتریان";
-    const c = customers.find(
-      (c) => String(c.id) === String(filters.customer_id),
-    );
-    return c ? `${c.name} - ${c.phone}` : "همه مشتریان";
+    // اگر مشتری در results هست از اون استفاده کن
+    const c = customerResults.find((c) => String(c.id) === String(filters.customer_id));
+    if (c) return `${c.name} - ${c.phone || ""}`;
+    return `مشتری #${filters.customer_id}`;
   }
 
   function getPersonnelLabel() {
     const selected = filters.personnel_ids || [];
     if (selected.length === 0) return "همه مسئولان";
     if (selected.length === 1) {
-      const p = personnel.find((p) => p.id === selected[0]);
-      return p?.name ?? p?.full_name ?? p?.username ?? "—";
+      const p = personnelResults.find((p) => p.id === selected[0]);
+      return p?.name ?? p?.full_name ?? p?.username ?? `مسئول #${selected[0]}`;
     }
     return `${selected.length} مسئول انتخاب شده`;
   }
@@ -201,23 +261,15 @@ export default function FilterPanel({
     o.label.includes(invoiceStatusSearch),
   );
 
-  const filteredCustomers = (customers || []).filter((c) =>
-    `${c.name} ${c.phone}`.includes(customerSearch),
-  );
-  const filteredPersonnel = (personnel || []).filter((p) => {
-    const name = p.name ?? p.full_name ?? p.username ?? "";
-    return name.includes(personnelSearch);
-  });
-
   const dropdownBtnClass =
     "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-right flex justify-between items-center hover:border-green-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all";
 
-  const SearchInput = ({ value, onChange: onChangeFn }) => (
+  const SearchInput = ({ value, onChange: onChangeFn, placeholder = "جستجو..." }) => (
     <div className="p-2 border-b border-gray-100 relative">
       <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
       <input
         type="text"
-        placeholder="جستجو..."
+        placeholder={placeholder}
         value={value}
         onChange={onChangeFn}
         className="w-full text-sm pr-8 pl-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -237,7 +289,7 @@ export default function FilterPanel({
   );
 
   const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-2   border-gray-200">
+    <div className="flex items-center gap-2 mb-2 border-gray-200">
       <Icon className="size-6 text-green-600" />
       <span className="text-sm font-semibold text-gray-700">{title}</span>
     </div>
@@ -258,9 +310,7 @@ export default function FilterPanel({
               <FunnelIcon className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
-                فیلترهای پیشرفته
-              </h2>
+              <h2 className="text-lg font-bold text-gray-900">فیلترهای پیشرفته</h2>
               {activeCount > 0 && (
                 <p className="text-xs text-gray-500 mt-0.5">
                   {activeCount} فیلتر فعال
@@ -335,9 +385,7 @@ export default function FilterPanel({
                           />
                         )}
                         {filteredStatuses.map((opt) => {
-                          const isSelected = filters.status?.includes(
-                            opt.value,
-                          );
+                          const isSelected = filters.status?.includes(opt.value);
                           return (
                             <button
                               key={opt.value}
@@ -394,10 +442,7 @@ export default function FilterPanel({
 
               {/* وضعیت فاکتور */}
               <div>
-                <SectionTitle
-                  icon={DocumentCurrencyDollarIcon}
-                  title="وضعیت فاکتور"
-                />
+                <SectionTitle icon={DocumentCurrencyDollarIcon} title="وضعیت فاکتور" />
                 <div ref={invoiceStatusRef} className="relative">
                   <button
                     type="button"
@@ -438,9 +483,7 @@ export default function FilterPanel({
                           />
                         )}
                         {filteredInvoiceStatuses.map((opt) => {
-                          const isSelected = filters.invoice_status?.includes(
-                            opt.value,
-                          );
+                          const isSelected = filters.invoice_status?.includes(opt.value);
                           return (
                             <button
                               key={opt.value}
@@ -489,7 +532,7 @@ export default function FilterPanel({
                 </div>
               </div>
 
-              {/* مشتری */}
+              {/* مشتری - با جستجوی سرور */}
               <div>
                 <SectionTitle icon={UserGroupIcon} title="مشتری" />
                 <div ref={customerRef} className="relative">
@@ -519,6 +562,7 @@ export default function FilterPanel({
                       <SearchInput
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
+                        placeholder="نام یا شماره تلفن..."
                       />
                       <div className="max-h-56 overflow-y-auto">
                         {filters.customer_id && (
@@ -527,17 +571,23 @@ export default function FilterPanel({
                               onChange({ ...filters, customer_id: "" });
                               setCustomerDropdownOpen(false);
                               setCustomerSearch("");
+                              setCustomerResults([]);
                             }}
                           />
                         )}
-                        {filteredCustomers.length > 0 ? (
-                          filteredCustomers.map((c) => (
+                        {searchingCustomers ? (
+                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                            در حال جستجو...
+                          </div>
+                        ) : customerResults.length > 0 ? (
+                          customerResults.map((c) => (
                             <button
                               key={c.id}
                               onClick={() => {
                                 onChange({ ...filters, customer_id: c.id });
                                 setCustomerDropdownOpen(false);
                                 setCustomerSearch("");
+                                setCustomerResults([]);
                               }}
                               className={`w-full text-right px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
                                 String(filters.customer_id) === String(c.id)
@@ -545,12 +595,21 @@ export default function FilterPanel({
                                   : "text-gray-700"
                               }`}
                             >
-                              {c.name} - {c.phone}
+                              <div className="font-medium">{c.name}</div>
+                              {c.phone && (
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {c.phone}
+                                </div>
+                              )}
                             </button>
                           ))
+                        ) : customerSearch ? (
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            مشتری‌ای یافت نشد
+                          </p>
                         ) : (
                           <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            نتیجه‌ای یافت نشد
+                            برای جستجو نام یا شماره تلفن وارد کنید
                           </p>
                         )}
                       </div>
@@ -562,7 +621,7 @@ export default function FilterPanel({
 
             {/* ستون چپ */}
             <div className="space-y-8">
-              {/* مسئول */}
+              {/* مسئول - با جستجوی سرور */}
               <div>
                 <SectionTitle icon={UserIcon} title="مسئول" />
                 <div ref={personnelRef} className="relative">
@@ -592,6 +651,7 @@ export default function FilterPanel({
                       <SearchInput
                         value={personnelSearch}
                         onChange={(e) => setPersonnelSearch(e.target.value)}
+                        placeholder="نام یا نام کاربری..."
                       />
                       <div className="max-h-56 overflow-y-auto">
                         {filters.personnel_ids?.length > 0 && (
@@ -601,20 +661,27 @@ export default function FilterPanel({
                               onChange({ ...filters, personnel_ids: [] });
                               setPersonnelDropdownOpen(false);
                               setPersonnelSearch("");
+                              setPersonnelResults([]);
                             }}
                           />
                         )}
-                        {filteredPersonnel.length > 0 ? (
-                          filteredPersonnel.map((p) => {
-                            const displayName =
-                              p.name ?? p.full_name ?? p.username ?? "—";
-                            const isSelected = filters.personnel_ids?.includes(
-                              p.id,
-                            );
+                        {searchingPersonnel ? (
+                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                            در حال جستجو...
+                          </div>
+                        ) : personnelResults.length > 0 ? (
+                          personnelResults.map((p) => {
+                            const displayName = p.name ?? p.full_name ?? p.username ?? "—";
+                            const isSelected = filters.personnel_ids?.includes(p.id);
                             return (
                               <button
                                 key={p.id}
-                                onClick={() => togglePersonnel(p.id)}
+                                onClick={() => {
+                                  togglePersonnel(p.id);
+                                  setPersonnelSearch("");
+                                  setPersonnelResults([]);
+                                  setPersonnelDropdownOpen(false);
+                                }}
                                 className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${
                                   isSelected ? "bg-purple-50" : ""
                                 }`}
@@ -654,9 +721,13 @@ export default function FilterPanel({
                               </button>
                             );
                           })
+                        ) : personnelSearch ? (
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            پرسنلی یافت نشد
+                          </p>
                         ) : (
                           <p className="px-3 py-4 text-xs text-gray-400 text-center">
-                            نتیجه‌ای یافت نشد
+                            برای جستجو نام وارد کنید
                           </p>
                         )}
                       </div>
@@ -671,9 +742,7 @@ export default function FilterPanel({
                 <div className="space-y-3">
                   <PersianDatePicker
                     value={filters.entry_from}
-                    onChange={(val) =>
-                      onChange({ ...filters, entry_from: val })
-                    }
+                    onChange={(val) => onChange({ ...filters, entry_from: val })}
                     placeholder="از تاریخ..."
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
@@ -698,9 +767,7 @@ export default function FilterPanel({
             بستن
           </button>
           <button
-            onClick={() => {
-              onClose();
-            }}
+            onClick={onClose}
             className="px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-sm"
           >
             اعمال فیلترها

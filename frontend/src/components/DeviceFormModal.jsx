@@ -46,15 +46,47 @@ const INITIAL_DEVICE_NAME = { name: "" };
 const INITIAL_BRAND = { name: "" };
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "در انتظار بررسی", color: "bg-yellow-100 text-yellow-800" },
-  { value: "diagnosing", label: "در حال بررسی", color: "bg-cyan-100 text-cyan-800" },
-  { value: "waiting_for_parts", label: "در انتظار قطعه", color: "bg-orange-100 text-orange-800" },
-  { value: "repairing", label: "در حال تعمیر", color: "bg-purple-100 text-purple-800" },
+  {
+    value: "pending",
+    label: "در انتظار بررسی",
+    color: "bg-yellow-100 text-yellow-800",
+  },
+  {
+    value: "diagnosing",
+    label: "در حال بررسی",
+    color: "bg-cyan-100 text-cyan-800",
+  },
+  {
+    value: "waiting_for_parts",
+    label: "در انتظار قطعه",
+    color: "bg-orange-100 text-orange-800",
+  },
+  {
+    value: "repairing",
+    label: "در حال تعمیر",
+    color: "bg-purple-100 text-purple-800",
+  },
   { value: "repaired", label: "تعمیر شده", color: "bg-gray-100 text-gray-800" },
-  { value: "ready_for_pickup", label: "آماده تحویل", color: "bg-blue-100 text-blue-800" },
-  { value: "delivered", label: "تحویل داده شده", color: "bg-green-100 text-green-800" },
-  { value: "unrepairable", label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
-  { value: "not_repaired", label: "تعمیر نشد", color: "bg-orange-100 text-red-800" },
+  {
+    value: "ready_for_pickup",
+    label: "آماده تحویل",
+    color: "bg-blue-100 text-blue-800",
+  },
+  {
+    value: "delivered",
+    label: "تحویل داده شده",
+    color: "bg-green-100 text-green-800",
+  },
+  {
+    value: "unrepairable",
+    label: "غیرقابل تعمیر",
+    color: "bg-red-100 text-red-800",
+  },
+  {
+    value: "not_repaired",
+    label: "تعمیر نشد",
+    color: "bg-orange-100 text-red-800",
+  },
 ];
 
 export default function DeviceFormModal({
@@ -74,26 +106,26 @@ export default function DeviceFormModal({
   const [newBrand, setNewBrand] = useState(INITIAL_BRAND);
   const [images, setImages] = useState([]);
   const [pendingImages, setPendingImages] = useState([]);
-  
+
   // جستجوی مشتری
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [customerResults, setCustomerResults] = useState([]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  
+
   // جستجوی نام دستگاه (برای انتخاب از دستگاه‌های موجود)
   const [deviceNameSearch, setDeviceNameSearch] = useState("");
   const [showDeviceNameDropdown, setShowDeviceNameDropdown] = useState(false);
   const [deviceNameResults, setDeviceNameResults] = useState([]);
   const [searchingDeviceNames, setSearchingDeviceNames] = useState(false);
-  
+
   // جستجوی برند
   const [brandSearch, setBrandSearch] = useState("");
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [brandResults, setBrandResults] = useState([]);
   const [searchingBrands, setSearchingBrands] = useState(false);
-  
+
   const [personnelList, setPersonnelList] = useState([]);
   const [selectedPersonnel, setSelectedPersonnel] = useState([]);
   const [personnelSearch, setPersonnelSearch] = useState("");
@@ -140,7 +172,9 @@ export default function DeviceFormModal({
       const res = await getDevices({ search: query, limit: 20 });
       const devices = res.data?.data || res.data || [];
       // استخراج نام‌های unique دستگاه
-      const uniqueNames = [...new Map(devices.map(d => [d.device_name, d])).values()];
+      const uniqueNames = [
+        ...new Map(devices.map((d) => [d.device_name, d])).values(),
+      ];
       setDeviceNameResults(uniqueNames);
     } catch (error) {
       console.error("خطا در جستجوی نام دستگاه:", error);
@@ -162,7 +196,11 @@ export default function DeviceFormModal({
       const res = await getDevices({ search: query, limit: 20 });
       const devices = res.data?.data || res.data || [];
       // استخراج برندهای unique
-      const uniqueBrands = [...new Map(devices.filter(d => d.brand).map(d => [d.brand, d])).values()];
+      const uniqueBrands = [
+        ...new Map(
+          devices.filter((d) => d.brand).map((d) => [d.brand, d]),
+        ).values(),
+      ];
       setBrandResults(uniqueBrands);
     } catch (error) {
       console.error("خطا در جستجوی برند:", error);
@@ -247,13 +285,15 @@ export default function DeviceFormModal({
         status: deviceRes.data.status || "pending",
         description: deviceRes.data.description || "",
       });
-      
+
       if (deviceRes.data.customer_name) {
-        setCustomerSearch(`${deviceRes.data.customer_name} - ${deviceRes.data.customer_phone ?? ""}`);
+        setCustomerSearch(
+          `${deviceRes.data.customer_name} - ${deviceRes.data.customer_phone ?? ""}`,
+        );
         setSelectedCustomer({
           id: deviceRes.data.customer_id,
           name: deviceRes.data.customer_name,
-          phone: deviceRes.data.customer_phone
+          phone: deviceRes.data.customer_phone,
         });
       }
       if (deviceRes.data.device_name) {
@@ -409,7 +449,9 @@ export default function DeviceFormModal({
                         setShowCustomerDropdown(true);
                       }}
                       onFocus={() => setShowCustomerDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                      onBlur={() =>
+                        setTimeout(() => setShowCustomerDropdown(false), 200)
+                      }
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     {showCustomerDropdown && (
@@ -436,14 +478,18 @@ export default function DeviceFormModal({
                               onMouseDown={() => {
                                 setForm((p) => ({ ...p, customer_id: c.id }));
                                 setSelectedCustomer(c);
-                                setCustomerSearch(`${c.name} - ${c.phone || ""}`);
+                                setCustomerSearch(
+                                  `${c.name} - ${c.phone || ""}`,
+                                );
                                 setShowCustomerDropdown(false);
                               }}
                               className="px-3 py-2.5 text-sm hover:bg-blue-50 cursor-pointer border-b border-gray-50"
                             >
                               <div className="font-medium">{c.name}</div>
                               {c.phone && (
-                                <div className="text-xs text-gray-500 mt-0.5">{c.phone}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {c.phone}
+                                </div>
                               )}
                             </div>
                           ))
@@ -467,19 +513,23 @@ export default function DeviceFormModal({
                     + جدید
                   </button>
                 </div>
-                
+
                 {showNewCustomer && (
                   <div className="p-4 bg-blue-50 rounded-xl space-y-3 border border-blue-200">
                     <input
                       placeholder="نام مشتری *"
                       value={newCustomer.name}
-                      onChange={(e) => setNewCustomer((p) => ({ ...p, name: e.target.value }))}
+                      onChange={(e) =>
+                        setNewCustomer((p) => ({ ...p, name: e.target.value }))
+                      }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                       placeholder="شماره تلفن *"
                       value={newCustomer.phone}
-                      onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))}
+                      onChange={(e) =>
+                        setNewCustomer((p) => ({ ...p, phone: e.target.value }))
+                      }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                     />
                     <div className="flex gap-2">
@@ -516,14 +566,18 @@ export default function DeviceFormModal({
                       setShowPersonnelDropdown(true);
                     }}
                     onFocus={() => setShowPersonnelDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowPersonnelDropdown(false), 150)}
+                    onBlur={() =>
+                      setTimeout(() => setShowPersonnelDropdown(false), 150)
+                    }
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
                   />
                   {showPersonnelDropdown && (
                     <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                       {filteredPersonnel.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-gray-400">
-                          {personnelList.length === 0 ? "پرسنلی ثبت نشده" : "موردی یافت نشد"}
+                          {personnelList.length === 0
+                            ? "پرسنلی ثبت نشده"
+                            : "موردی یافت نشد"}
                         </div>
                       ) : (
                         filteredPersonnel.map((person) => (
@@ -534,7 +588,9 @@ export default function DeviceFormModal({
                           >
                             <span>{person.name}</span>
                             {person.username && (
-                              <span className="text-xs text-gray-400">@{person.username}</span>
+                              <span className="text-xs text-gray-400">
+                                @{person.username}
+                              </span>
                             )}
                           </div>
                         ))
@@ -585,19 +641,26 @@ export default function DeviceFormModal({
                         setShowDeviceNameDropdown(true);
                       }}
                       onFocus={() => setShowDeviceNameDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowDeviceNameDropdown(false), 200)}
+                      onBlur={() =>
+                        setTimeout(() => setShowDeviceNameDropdown(false), 200)
+                      }
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
                     />
                     {showDeviceNameDropdown && deviceNameResults.length > 0 && (
                       <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {searchingDeviceNames ? (
-                          <div className="px-3 py-2 text-sm text-gray-400">در حال جستجو...</div>
+                          <div className="px-3 py-2 text-sm text-gray-400">
+                            در حال جستجو...
+                          </div>
                         ) : (
                           deviceNameResults.map((d) => (
                             <div
                               key={d.id}
                               onMouseDown={() => {
-                                setForm((p) => ({ ...p, device_name: d.device_name }));
+                                setForm((p) => ({
+                                  ...p,
+                                  device_name: d.device_name,
+                                }));
                                 setDeviceNameSearch(d.device_name);
                                 setShowDeviceNameDropdown(false);
                               }}
@@ -623,7 +686,9 @@ export default function DeviceFormModal({
                     <input
                       placeholder="نام دستگاه جدید"
                       value={newDeviceName.name}
-                      onChange={(e) => setNewDeviceName({ name: e.target.value })}
+                      onChange={(e) =>
+                        setNewDeviceName({ name: e.target.value })
+                      }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2"
                     />
                     <div className="flex gap-2">
@@ -662,13 +727,17 @@ export default function DeviceFormModal({
                         setShowBrandDropdown(true);
                       }}
                       onFocus={() => setShowBrandDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowBrandDropdown(false), 200)}
+                      onBlur={() =>
+                        setTimeout(() => setShowBrandDropdown(false), 200)
+                      }
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
                     />
                     {showBrandDropdown && brandResults.length > 0 && (
                       <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {searchingBrands ? (
-                          <div className="px-3 py-2 text-sm text-gray-400">در حال جستجو...</div>
+                          <div className="px-3 py-2 text-sm text-gray-400">
+                            در حال جستجو...
+                          </div>
                         ) : (
                           brandResults.map((b) => (
                             <div
@@ -811,7 +880,6 @@ export default function DeviceFormModal({
                   value={form.description}
                   onChange={handleChange}
                   rows="7"
-                  
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
                   placeholder="توضیحات اضافی..."
                 />
@@ -850,7 +918,11 @@ export default function DeviceFormModal({
               disabled={loading}
               className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
             >
-              {loading ? "در حال ذخیره..." : (isEdit ? "ذخیره تغییرات" : "ثبت دستگاه")}
+              {loading
+                ? "در حال ذخیره..."
+                : isEdit
+                  ? "ذخیره تغییرات"
+                  : "ثبت دستگاه"}
             </button>
           </div>
         </form>

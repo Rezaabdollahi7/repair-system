@@ -84,7 +84,8 @@ export default function FilterPanel({
   onClose,
 }) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] = useState(false);
+  const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] =
+    useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [personnelDropdownOpen, setPersonnelDropdownOpen] = useState(false);
 
@@ -160,24 +161,32 @@ export default function FilterPanel({
 
   useEffect(() => {
     if (filters.customer_id && customerResults.length > 0) {
-      const found = customerResults.find(c => String(c.id) === String(filters.customer_id));
+      const found = customerResults.find(
+        (c) => String(c.id) === String(filters.customer_id),
+      );
       if (found) setSelectedCustomer(found);
     }
   }, [customerResults, filters.customer_id]);
 
   useEffect(() => {
     if (filters.personnel_ids && filters.personnel_ids.length > 0) {
-      const missingIds = filters.personnel_ids.filter(id => !selectedPersonnelMap[id]);
+      const missingIds = filters.personnel_ids.filter(
+        (id) => !selectedPersonnelMap[id],
+      );
       if (missingIds.length > 0) {
         missingIds.forEach(async (id) => {
           try {
             const res = await getPersonnel({ search: "", limit: 200 });
             const allPersonnel = res.data?.data || res.data || [];
-            const found = allPersonnel.find(p => p.id === id);
+            const found = allPersonnel.find((p) => p.id === id);
             if (found) {
-              setSelectedPersonnelMap(prev => ({
+              setSelectedPersonnelMap((prev) => ({
                 ...prev,
-                [id]: found.name ?? found.full_name ?? found.username ?? `مسئول #${id}`
+                [id]:
+                  found.name ??
+                  found.full_name ??
+                  found.username ??
+                  `مسئول #${id}`,
               }));
             }
           } catch (error) {
@@ -210,7 +219,10 @@ export default function FilterPanel({
         setStatusDropdownOpen(false);
         setStatusSearch("");
       }
-      if (invoiceStatusRef.current && !invoiceStatusRef.current.contains(e.target)) {
+      if (
+        invoiceStatusRef.current &&
+        !invoiceStatusRef.current.contains(e.target)
+      ) {
         setInvoiceStatusDropdownOpen(false);
         setInvoiceStatusSearch("");
       }
@@ -254,7 +266,7 @@ export default function FilterPanel({
     onChange({ ...filtersRef.current, personnel_ids: updated });
 
     if (current.includes(id)) {
-      setSelectedPersonnelMap(prev => {
+      setSelectedPersonnelMap((prev) => {
         const newMap = { ...prev };
         delete newMap[id];
         return newMap;
@@ -266,7 +278,10 @@ export default function FilterPanel({
     const selected = filters.status || [];
     if (selected.length === 0) return "همه وضعیت‌ها";
     if (selected.length === 1)
-      return STATUS_OPTIONS.find((o) => o.value === selected[0])?.label || selected[0];
+      return (
+        STATUS_OPTIONS.find((o) => o.value === selected[0])?.label ||
+        selected[0]
+      );
     return `${selected.length} وضعیت انتخاب شده`;
   }
 
@@ -274,7 +289,10 @@ export default function FilterPanel({
     const selected = filters.invoice_status || [];
     if (selected.length === 0) return "همه وضعیت‌های فاکتور";
     if (selected.length === 1)
-      return INVOICE_STATUS_OPTIONS.find((o) => o.value === selected[0])?.label || selected[0];
+      return (
+        INVOICE_STATUS_OPTIONS.find((o) => o.value === selected[0])?.label ||
+        selected[0]
+      );
     return `${selected.length} وضعیت فاکتور انتخاب شده`;
   }
 
@@ -306,7 +324,11 @@ export default function FilterPanel({
   const dropdownBtnClass =
     "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-right flex justify-between items-center hover:border-green-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all";
 
-  const SearchInput = ({ value, onChange: onChangeFn, placeholder = "جستجو..." }) => (
+  const SearchInput = ({
+    value,
+    onChange: onChangeFn,
+    placeholder = "جستجو...",
+  }) => (
     <div className="p-2 border-b border-gray-100 relative">
       <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
       <input
@@ -342,7 +364,9 @@ export default function FilterPanel({
               <FunnelIcon className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">فیلترهای پیشرفته</h2>
+              <h2 className="text-lg font-bold text-gray-900">
+                فیلترهای پیشرفته
+              </h2>
               {activeCount > 0 && (
                 <p className="text-xs text-gray-500 mt-0.5">
                   {activeCount} فیلتر فعال
@@ -383,12 +407,20 @@ export default function FilterPanel({
                     onClick={() => setStatusDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span className={filters.status?.length > 0 ? "text-gray-800 font-medium" : "text-gray-400"}>
+                    <span
+                      className={
+                        filters.status?.length > 0
+                          ? "text-gray-800 font-medium"
+                          : "text-gray-400"
+                      }
+                    >
                       {getStatusLabel()}
                     </span>
-                    {statusDropdownOpen
-                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
+                    {statusDropdownOpen ? (
+                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    )}
                   </button>
 
                   {statusDropdownOpen && (
@@ -413,28 +445,50 @@ export default function FilterPanel({
                           </button>
                         )}
                         {filteredStatuses.map((opt) => {
-                          const isSelected = filters.status?.includes(opt.value);
+                          const isSelected = filters.status?.includes(
+                            opt.value,
+                          );
                           return (
                             <button
                               key={opt.value}
                               onClick={() => toggleStatus(opt.value)}
                               className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-green-50" : ""}`}
                             >
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}>
+                              <span
+                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}
+                              >
                                 {isSelected && (
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  <svg
+                                    className="w-3 h-3 text-white"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M5 13l4 4L19 7"
+                                    />
                                   </svg>
                                 )}
                               </span>
-                              <span className={opt.color.split(" ")[0] === "bg-yellow-100" ? "text-yellow-800" : opt.color.split(" ")[1]}>
+                              <span
+                                className={
+                                  opt.color.split(" ")[0] === "bg-yellow-100"
+                                    ? "text-yellow-800"
+                                    : opt.color.split(" ")[1]
+                                }
+                              >
                                 {opt.label}
                               </span>
                             </button>
                           );
                         })}
                         {filteredStatuses.length === 0 && (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">نتیجه‌ای یافت نشد</p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            نتیجه‌ای یافت نشد
+                          </p>
                         )}
                       </div>
                     </div>
@@ -444,19 +498,30 @@ export default function FilterPanel({
 
               {/* وضعیت فاکتور */}
               <div>
-                <SectionTitle icon={DocumentCurrencyDollarIcon} title="وضعیت فاکتور" />
+                <SectionTitle
+                  icon={DocumentCurrencyDollarIcon}
+                  title="وضعیت فاکتور"
+                />
                 <div ref={invoiceStatusRef} className="relative">
                   <button
                     type="button"
                     onClick={() => setInvoiceStatusDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span className={filters.invoice_status?.length > 0 ? "text-gray-800 font-medium" : "text-gray-400"}>
+                    <span
+                      className={
+                        filters.invoice_status?.length > 0
+                          ? "text-gray-800 font-medium"
+                          : "text-gray-400"
+                      }
+                    >
                       {getInvoiceStatusLabel()}
                     </span>
-                    {invoiceStatusDropdownOpen
-                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
+                    {invoiceStatusDropdownOpen ? (
+                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    )}
                   </button>
 
                   {invoiceStatusDropdownOpen && (
@@ -470,7 +535,10 @@ export default function FilterPanel({
                         {filters.invoice_status?.length > 0 && (
                           <button
                             onClick={() => {
-                              onChange({ ...filtersRef.current, invoice_status: [] });
+                              onChange({
+                                ...filtersRef.current,
+                                invoice_status: [],
+                              });
                               setInvoiceStatusDropdownOpen(false);
                               setInvoiceStatusSearch("");
                             }}
@@ -481,26 +549,44 @@ export default function FilterPanel({
                           </button>
                         )}
                         {filteredInvoiceStatuses.map((opt) => {
-                          const isSelected = filters.invoice_status?.includes(opt.value);
+                          const isSelected = filters.invoice_status?.includes(
+                            opt.value,
+                          );
                           return (
                             <button
                               key={opt.value}
                               onClick={() => toggleInvoiceStatus(opt.value)}
                               className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-green-50" : ""}`}
                             >
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}>
+                              <span
+                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}
+                              >
                                 {isSelected && (
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  <svg
+                                    className="w-3 h-3 text-white"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M5 13l4 4L19 7"
+                                    />
                                   </svg>
                                 )}
                               </span>
-                              <span className={opt.color.split(" ")[1]}>{opt.label}</span>
+                              <span className={opt.color.split(" ")[1]}>
+                                {opt.label}
+                              </span>
                             </button>
                           );
                         })}
                         {filteredInvoiceStatuses.length === 0 && (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">نتیجه‌ای یافت نشد</p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            نتیجه‌ای یافت نشد
+                          </p>
                         )}
                       </div>
                     </div>
@@ -517,12 +603,20 @@ export default function FilterPanel({
                     onClick={() => setCustomerDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span className={filters.customer_id ? "text-gray-800 font-medium" : "text-gray-400"}>
+                    <span
+                      className={
+                        filters.customer_id
+                          ? "text-gray-800 font-medium"
+                          : "text-gray-400"
+                      }
+                    >
                       {getCustomerLabel()}
                     </span>
-                    {customerDropdownOpen
-                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
+                    {customerDropdownOpen ? (
+                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    )}
                   </button>
 
                   {customerDropdownOpen && (
@@ -537,7 +631,10 @@ export default function FilterPanel({
                         {filters.customer_id && (
                           <button
                             onClick={() => {
-                              onChange({ ...filtersRef.current, customer_id: "" });
+                              onChange({
+                                ...filtersRef.current,
+                                customer_id: "",
+                              });
                               setSelectedCustomer(null);
                               setCustomerDropdownOpen(false);
                               setCustomerSearch("");
@@ -550,13 +647,18 @@ export default function FilterPanel({
                           </button>
                         )}
                         {searchingCustomers ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">در حال جستجو...</div>
+                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                            در حال جستجو...
+                          </div>
                         ) : customerResults.length > 0 ? (
                           customerResults.map((c) => (
                             <button
                               key={c.id}
                               onClick={() => {
-                                onChange({ ...filtersRef.current, customer_id: c.id });
+                                onChange({
+                                  ...filtersRef.current,
+                                  customer_id: c.id,
+                                });
                                 setSelectedCustomer(c);
                                 setCustomerDropdownOpen(false);
                                 setCustomerSearch("");
@@ -565,13 +667,21 @@ export default function FilterPanel({
                               className={`w-full text-right px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors ${String(filters.customer_id) === String(c.id) ? "bg-green-50 text-green-700 font-medium" : "text-gray-700"}`}
                             >
                               <div className="font-medium">{c.name}</div>
-                              {c.phone && <div className="text-xs text-gray-500 mt-0.5">{c.phone}</div>}
+                              {c.phone && (
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {c.phone}
+                                </div>
+                              )}
                             </button>
                           ))
                         ) : customerSearch ? (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">مشتری‌ای یافت نشد</p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            مشتری‌ای یافت نشد
+                          </p>
                         ) : (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">برای جستجو نام یا شماره تلفن وارد کنید</p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            برای جستجو نام یا شماره تلفن وارد کنید
+                          </p>
                         )}
                       </div>
                     </div>
@@ -591,12 +701,20 @@ export default function FilterPanel({
                     onClick={() => setPersonnelDropdownOpen((p) => !p)}
                     className={dropdownBtnClass}
                   >
-                    <span className={filters.personnel_ids?.length > 0 ? "text-gray-800 font-medium" : "text-gray-400"}>
+                    <span
+                      className={
+                        filters.personnel_ids?.length > 0
+                          ? "text-gray-800 font-medium"
+                          : "text-gray-400"
+                      }
+                    >
                       {getPersonnelLabel()}
                     </span>
-                    {personnelDropdownOpen
-                      ? <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      : <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />}
+                    {personnelDropdownOpen ? (
+                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    )}
                   </button>
 
                   {personnelDropdownOpen && (
@@ -611,7 +729,10 @@ export default function FilterPanel({
                         {filters.personnel_ids?.length > 0 && (
                           <button
                             onClick={() => {
-                              onChange({ ...filtersRef.current, personnel_ids: [] });
+                              onChange({
+                                ...filtersRef.current,
+                                personnel_ids: [],
+                              });
                               setSelectedPersonnelMap({});
                               setPersonnelDropdownOpen(false);
                               setPersonnelSearch("");
@@ -624,18 +745,26 @@ export default function FilterPanel({
                           </button>
                         )}
                         {searchingPersonnel ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">در حال جستجو...</div>
+                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                            در حال جستجو...
+                          </div>
                         ) : personnelResults.length > 0 ? (
                           personnelResults.map((p) => {
-                            const displayName = p.name ?? p.full_name ?? p.username ?? "—";
-                            const isSelected = filters.personnel_ids?.includes(p.id);
+                            const displayName =
+                              p.name ?? p.full_name ?? p.username ?? "—";
+                            const isSelected = filters.personnel_ids?.includes(
+                              p.id,
+                            );
                             return (
                               <button
                                 key={p.id}
                                 onClick={() => {
                                   togglePersonnel(p.id);
                                   if (!isSelected) {
-                                    setSelectedPersonnelMap(prev => ({ ...prev, [p.id]: displayName }));
+                                    setSelectedPersonnelMap((prev) => ({
+                                      ...prev,
+                                      [p.id]: displayName,
+                                    }));
                                   }
                                   setPersonnelSearch("");
                                   setPersonnelResults([]);
@@ -643,23 +772,45 @@ export default function FilterPanel({
                                 }}
                                 className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-purple-50" : ""}`}
                               >
-                                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-purple-600 border-purple-600" : "border-gray-300"}`}>
+                                <span
+                                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-purple-600 border-purple-600" : "border-gray-300"}`}
+                                >
                                   {isSelected && (
-                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    <svg
+                                      className="w-3 h-3 text-white"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={3}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M5 13l4 4L19 7"
+                                      />
                                     </svg>
                                   )}
                                 </span>
-                                <span className={isSelected ? "text-purple-700 font-medium" : "text-gray-700"}>
+                                <span
+                                  className={
+                                    isSelected
+                                      ? "text-purple-700 font-medium"
+                                      : "text-gray-700"
+                                  }
+                                >
                                   {displayName}
                                 </span>
                               </button>
                             );
                           })
                         ) : personnelSearch ? (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">پرسنلی یافت نشد</p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            پرسنلی یافت نشد
+                          </p>
                         ) : (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">برای جستجو نام وارد کنید</p>
+                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                            برای جستجو نام وارد کنید
+                          </p>
                         )}
                       </div>
                     </div>
@@ -673,13 +824,17 @@ export default function FilterPanel({
                 <div className="space-y-3">
                   <PersianDatePicker
                     value={filters.entry_from}
-                    onChange={(val) => onChange({ ...filtersRef.current, entry_from: val })}
+                    onChange={(val) =>
+                      onChange({ ...filtersRef.current, entry_from: val })
+                    }
                     placeholder="از تاریخ..."
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                   <PersianDatePicker
                     value={filters.entry_to}
-                    onChange={(val) => onChange({ ...filtersRef.current, entry_to: val })}
+                    onChange={(val) =>
+                      onChange({ ...filtersRef.current, entry_to: val })
+                    }
                     placeholder="تا تاریخ..."
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />

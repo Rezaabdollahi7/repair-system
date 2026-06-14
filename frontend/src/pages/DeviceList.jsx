@@ -441,7 +441,7 @@ export default function DeviceList() {
                     نوع دستگاه
                   </th>
                   <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
-                    مدل
+                    برند
                   </th>
                   <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     وضعیت دستگاه
@@ -455,12 +455,17 @@ export default function DeviceList() {
                   <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
                     تاریخ خروج
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500  border-l  ">
-                    وضعیت پرداخت
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500    ">
-                    عملیات
-                  </th>
+
+                  {isAtLeast("admin") && (
+                    <>
+                      <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500  border-l  ">
+                        وضعیت پرداخت
+                      </th>
+                      <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500    ">
+                        عملیات
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -486,8 +491,8 @@ export default function DeviceList() {
                         {device.customer_name ?? "مشتری"}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">                      
-                {device.customer_phone}
+                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
+                      {device.customer_phone}
                     </td>
                     <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
                       {device.device_name}
@@ -512,78 +517,83 @@ export default function DeviceList() {
                     <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
                       {formatDate(device.exit_date)}
                     </td>
-                    <td className="px-4 py-3 flex  justify-center border-l border-gray-600">
-                      <InvoiceStatusBadge
-                        device={device}
-                        onToggleNeedsInvoice={handleToggleNeedsInvoice}
-                        isAdmin={isAtLeast("admin")}
-                      />
-                    </td>
 
-                    <td className="px-4 py-3 text-sm text-center ">
-                      <div className="flex gap-2 justify-end items-center">
-                        {isAtLeast("admin") && (
-                          <>
-                            {device.invoice_count > 0 ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openSaleInvoiceDetail(device.sale_invoice_id);
-                                }}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  device.invoice_status === "paid"
-                                    ? "bg-green-50 text-green-600 hover:bg-green-100"
-                                    : "bg-red-50 text-red-600 hover:bg-red-100"
-                                }`}
-                                title={
-                                  device.invoice_status === "paid"
-                                    ? "فاکتور پرداخت شده"
-                                    : "فاکتور پرداخت نشده"
-                                }
-                              >
-                                <DocumentCheckIcon className="w-5 h-5" />
-                              </button>
-                            ) : device.needs_invoice === 0 ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleNeedsInvoice(device.id, 1);
-                                }}
-                                className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                                title=" اگر نیاز به فاکتور دارد - کلیک کنید"
-                              >
-                                <CheckCircleIcon className="w-5 h-5" />
-                              </button>
-                            ) : (
+                    {isAtLeast("admin") && (
+                      <>
+                        <td className="px-4 py-3 flex  justify-center border-l border-gray-600">
+                          <InvoiceStatusBadge
+                            device={device}
+                            onToggleNeedsInvoice={handleToggleNeedsInvoice}
+                            isAdmin={isAtLeast("admin")}
+                          />
+                        </td>
+
+                        <td className="px-4 py-3 text-sm text-center ">
+                          <div className="flex gap-2 justify-end items-center">
+                            {isAtLeast("admin") && (
                               <>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openSaleInvoiceCreate(device.id);
-                                  }}
-                                  className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
-                                  title="ایجاد فاکتور فروش"
-                                >
-                                  <DocumentCurrencyDollarIcon className="w-5 h-5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleNeedsInvoice(device.id, 0);
-                                  }}
-                                  className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                                  title="فاکتور لازم نیست"
-                                >
-                                  <XCircleIcon className="w-5 h-5" />
-                                </button>
+                                {device.invoice_count > 0 ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openSaleInvoiceDetail(
+                                        device.sale_invoice_id,
+                                      );
+                                    }}
+                                    className={`p-2 rounded-lg transition-colors ${
+                                      device.invoice_status === "paid"
+                                        ? "bg-green-50 text-green-600 hover:bg-green-100"
+                                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                                    }`}
+                                    title={
+                                      device.invoice_status === "paid"
+                                        ? "فاکتور پرداخت شده"
+                                        : "فاکتور پرداخت نشده"
+                                    }
+                                  >
+                                    <DocumentCheckIcon className="w-5 h-5" />
+                                  </button>
+                                ) : device.needs_invoice === 0 ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleNeedsInvoice(device.id, 1);
+                                    }}
+                                    className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                                    title=" اگر نیاز به فاکتور دارد - کلیک کنید"
+                                  >
+                                    <CheckCircleIcon className="w-5 h-5" />
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openSaleInvoiceCreate(device.id);
+                                      }}
+                                      className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
+                                      title="ایجاد فاکتور فروش"
+                                    >
+                                      <DocumentCurrencyDollarIcon className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleNeedsInvoice(device.id, 0);
+                                      }}
+                                      className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                      title="فاکتور لازم نیست"
+                                    >
+                                      <XCircleIcon className="w-5 h-5" />
+                                    </button>
+                                  </>
+                                )}
+
+                                <div className="w-px h-8 bg-gray-300 mx-1" />
                               </>
                             )}
 
-                            <div className="w-px h-8 bg-gray-300 mx-1" />
-                          </>
-                        )}
-
-                        {/* <button
+                            {/* <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openDeviceDetail(device.id);
@@ -603,20 +613,22 @@ export default function DeviceList() {
                         >
                           <PencilSquareIcon className="w-5 h-5" />
                         </button> */}
-                        {isAtLeast("admin") && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget(device);
-                            }}
-                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
-                            title="حذف"
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                            {isAtLeast("admin") && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget(device);
+                                }}
+                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                                title="حذف"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -1,4 +1,3 @@
-// src/components/CustomerDetailModal.jsx
 import { useState, useEffect } from "react";
 import {
   getCustomer,
@@ -19,6 +18,8 @@ import {
   PencilIcon,
   TrashIcon,
   XMarkIcon,
+  EnvelopeIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
@@ -32,6 +33,9 @@ const statusColor = {
   repaired: "bg-green-100 text-green-700",
   delivered: "bg-blue-100 text-blue-700",
   unrepairable: "bg-red-100 text-red-700",
+  not_repaired: "bg-red-100 text-red-700",
+  ready_for_pickup: "bg-blue-100 text-blue-700",
+  waiting_for_parts: "bg-orange-100 text-orange-700",
 };
 
 const statusLabel = {
@@ -40,9 +44,10 @@ const statusLabel = {
   repairing: "در حال تعمیر",
   repaired: "تعمیر شد",
   delivered: "تحویل داده شد",
-  unrepairable: "تعمیر نشد",
-  not_repaired: "غیر قابل تعمیر",
+  unrepairable: "غیر قابل تعمیر",
+  not_repaired: "تعمیر نشد",
   ready_for_pickup: "آماده تحویل",
+  waiting_for_parts: "در انتظار قطعه",
 };
 
 function toJalali(dateStr) {
@@ -52,13 +57,13 @@ function toJalali(dateStr) {
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
-    <div className="bg-white rounded-lg shadow p-4 flex items-center gap-4">
-      <div className={`p-3 rounded-full ${color}`}>
-        <Icon className="w-6 h-6" />
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
+      <div className={`p-2 sm:p-3 rounded-full ${color} shrink-0`}>
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
-      <div>
-        <p className="text-sm text-gray-500">{label}</p>
-        <p className="text-xl font-bold text-gray-900">{value}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs sm:text-sm text-gray-500 truncate">{label}</p>
+        <p className="text-base sm:text-xl font-bold text-gray-900">{value}</p>
       </div>
     </div>
   );
@@ -68,61 +73,67 @@ function DeviceTimeline({ devices, openDeviceDetail }) {
   if (!devices.length) {
     return (
       <div className="text-center py-10 text-gray-400">
-        هیچ دستگاهی ثبت نشده
+        <DevicePhoneMobileIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+        <p>هیچ دستگاهی ثبت نشده</p>
       </div>
     );
   }
 
   return (
     <div className="relative">
-      <div className="absolute right-5 top-0 bottom-0 w-0.5 bg-gray-200" />
-      <div className="space-y-4">
-        {devices.map((device) => (
+      {/* خط زمان عمودی - در موبایل مخفی می‌شه */}
+      <div className="hidden sm:block absolute right-5 top-0 bottom-0 w-0.5 bg-gray-200" />
+      <div className="space-y-3 sm:space-y-4">
+        {devices.map((device, index) => (
           <div
             key={device.id}
-            className="relative flex items-start gap-4 pr-12"
+            className="relative flex items-start gap-3 sm:gap-4 pr-6 sm:pr-12"
           >
-            <div className="absolute right-3 mt-1.5 w-5 h-5 rounded-full bg-white border-2 border-blue-400 z-10" />
+            {/* نقطه زمان - در موبایل کوچک‌تر */}
+            <div className="absolute right-2 sm:right-3 mt-2 sm:mt-1.5 w-3 h-3 sm:w-5 sm:h-5 rounded-full bg-white border-2 border-blue-400 z-10 shadow-sm" />
+
+            {/* کارت دستگاه */}
             <button
               onClick={() => openDeviceDetail(device.id)}
-              className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:border-blue-300 hover:shadow transition-all text-right"
+              className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 hover:border-blue-300 hover:shadow-md transition-all text-right group"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {device.device_name}{" "}
-                    <span className="text-gray-500">
-                      {" "}
-                      ( کد پذیرش : {device.id}){" "}
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                    {device.device_name}
+                    <span className="text-gray-400 text-xs mr-1">
+                      (#{device.id})
                     </span>
                   </p>
                   {device.brand && (
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">
                       {device.brand}
                       {device.model && ` · ${device.model}`}
                     </p>
                   )}
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full whitespace-nowrap font-medium ${statusColor[device.status] ?? "bg-gray-100 text-gray-600"}`}
+                  className={`text-xs px-2 py-1 rounded-full whitespace-nowrap font-medium self-start sm:self-center ${statusColor[device.status] ?? "bg-gray-100 text-gray-600"}`}
                 >
                   {statusLabel[device.status] ?? device.status}
                 </span>
               </div>
-              <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-xs text-gray-400">
                 <span className="flex items-center gap-1">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  ورود: {toJalali(device.entry_date)}
+                  <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <span>ورود: {toJalali(device.entry_date)}</span>
                 </span>
                 {device.exit_date && (
                   <span className="flex items-center gap-1">
-                    <CalendarIcon className="w-3.5 h-3.5" />
-                    خروج: {toJalali(device.exit_date)}
+                    <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span>خروج: {toJalali(device.exit_date)}</span>
                   </span>
                 )}
               </div>
+
               {device.description && (
-                <p className="mt-2 text-xs text-gray-500 line-clamp-2">
+                <p className="mt-2 text-xs text-gray-500 line-clamp-2 break-words">
                   {device.description}
                 </p>
               )}
@@ -184,77 +195,109 @@ export default function CustomerDetailModal({
     }
   };
 
+  const handleEdit = () => {
+    onClose();
+    if (onEdit) {
+      onEdit(customerId);
+    } else if (openCustomerEdit) {
+      openCustomerEdit(customerId);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-xl font-bold text-gray-800">جزئیات مشتری</h2>
+        {/* هدر با تم آبی */}
+        <div className="sticky top-0 z-20 bg-white rounded-t-2xl border-b border-blue-100 px-4 sm:px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 p-2 rounded-xl">
+              <UserIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                جزئیات مشتری
+              </h2>
+              {customer && (
+                <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">
+                  عضویت: {toJalali(customer.created_at)}
+                </p>
+              )}
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {loading ? (
             <div className="flex justify-center items-center h-64">
-              <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
+              <LoadingSpinner size="md" text="در حال بارگذاری..." />
             </div>
           ) : customer ? (
-            <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-                      <UserIcon className="w-8 h-8 text-blue-600" />
+            <div className="space-y-4 sm:space-y-6">
+              {/* کارت اطلاعات مشتری */}
+              <div className="bg-gradient-to-r from-blue-50 to-white rounded-2xl shadow-sm border border-blue-100 p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                      <UserIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-lg sm:text-2xl font-bold text-gray-900 break-words">
                         {customer.name}
                       </h2>
-                      <div className="flex items-center gap-2 mt-1 text-gray-500 text-sm">
-                        <PhoneIcon className="w-4 h-4" />
-                        {formatPersianPhone(customer.phone)}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 text-gray-400 text-xs">
-                        <CalendarIcon className="w-3.5 h-3.5" />
-                        <span>عضویت: {toJalali(customer.created_at)}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
+                        <div className="flex items-center gap-1 text-gray-500 text-xs sm:text-sm">
+                          <PhoneIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="break-words">
+                            {formatPersianPhone(customer.phone)}
+                          </span>
+                        </div>
+                        <div className="hidden sm:block text-gray-300">|</div>
+                        <div className="flex items-center gap-1 text-gray-400 text-xs">
+                          <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                          <span>عضویت: {toJalali(customer.created_at)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+
+                  {/* دکمه‌های اقدام - در موبایل زیر اطلاعات */}
+                  <div className="flex gap-2 sm:gap-2 justify-end">
                     <button
-                      onClick={() => {
-                        onClose();
-                        onEdit && onEdit(customerId);
-                      }}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                      onClick={handleEdit}
+                      className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
                     >
-                      <PencilIcon className="w-4 h-4" />
-                      ویرایش
+                      <PencilIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span className="hidden sm:inline">ویرایش</span>
+                      <span className="sm:hidden">ویرایش</span>
                     </button>
                     {isAtLeast("admin") && (
                       <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100"
+                        className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-red-50 text-red-600 text-xs sm:text-sm rounded-xl hover:bg-red-100 transition-colors"
                       >
-                        <TrashIcon className="w-4 h-4" />
-                        حذف
+                        <TrashIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">حذف</span>
+                        <span className="sm:hidden">حذف</span>
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
+              {/* آمار - در موبایل ستونی */}
               {stats && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <StatCard
                     icon={DevicePhoneMobileIcon}
                     label="کل دستگاه‌ها"
@@ -280,10 +323,19 @@ export default function CustomerDetailModal({
                 </div>
               )}
 
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-6">
-                  تاریخچه دستگاه‌ها
-                </h2>
+              {/* تاریخچه دستگاه‌ها */}
+              <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
+                <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-gray-200">
+                  <DevicePhoneMobileIcon className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-800">
+                    تاریخچه دستگاه‌ها
+                  </h2>
+                  {devices.length > 0 && (
+                    <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full mr-2">
+                      {devices.length}
+                    </span>
+                  )}
+                </div>
                 <DeviceTimeline
                   devices={devices}
                   openDeviceDetail={openDeviceDetail}

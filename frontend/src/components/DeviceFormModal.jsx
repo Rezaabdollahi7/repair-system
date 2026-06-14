@@ -1,5 +1,4 @@
-// src/components/DeviceFormModal.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   createDevice,
   updateDevice,
@@ -11,6 +10,7 @@ import {
   getPersonnel,
   getDeviceAssignments,
   setDeviceAssignments,
+  searchCustomers,
 } from "../api";
 import { toast } from "react-hot-toast";
 import ImageUploader from "./ImageUploader";
@@ -59,10 +59,13 @@ export default function DeviceFormModal({
   const [pendingImages, setPendingImages] = useState([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [personnelList, setPersonnelList] = useState([]);
   const [selectedPersonnel, setSelectedPersonnel] = useState([]);
   const [personnelSearch, setPersonnelSearch] = useState("");
   const [showPersonnelDropdown, setShowPersonnelDropdown] = useState(false);
+  
+  const searchTimeoutRef = useRef(null);
 
   const filteredPersonnel = personnelList.filter((p) => {
     const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
@@ -70,17 +73,57 @@ export default function DeviceFormModal({
     return !alreadySelected && displayName.includes(personnelSearch);
   });
 
-  const filteredCustomers = customers.filter(
-    (c) => c.name.includes(customerSearch) || c.phone.includes(customerSearch),
-  );
+  const searchCustomersAPI = useCallback(async (query) => {
+    if (!query || query.trim() === "") {
+      try {
+        const res = await getCustomers({ limit: 20 });
+        setCustomers(res.data?.data || res.data || []);
+      } catch {
+        setCustomers([]);
+      }
+      return;
+    }
+
+    setSearchingCustomers(true);
+    try {
+      const res = await searchCustomers(query);
+      setCustomers(res.data?.data || res.data || []);
+    } catch (error) {
+      console.error("خطا در جستجوی مشتری:", error);
+      setCustomers([]);
+    } finally {
+      setSearchingCustomers(false);
+    }
+  }, []);
+
+  const handleCustomerSearchChange = (value) => {
+    setCustomerSearch(value);
+    setShowDropdown(true);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      searchCustomersAPI(value);
+    }, 300);
+  };
 
   useEffect(() => {
     if (isOpen) {
-      loadCustomers();
       loadPersonnel();
       if (isEdit) loadDevice();
-      else resetForm();
+      else {
+        resetForm();
+        searchCustomersAPI("");
+      }
     }
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, [isOpen, deviceId]);
 
   const resetForm = () => {
@@ -89,15 +132,7 @@ export default function DeviceFormModal({
     setPendingImages([]);
     setSelectedPersonnel([]);
     setCustomerSearch("");
-  };
-
-  const loadCustomers = async () => {
-    try {
-      const res = await getCustomers();
-      setCustomers(res.data.data ?? res.data);
-    } catch {
-      toast.error("خطا در بارگذاری مشتریان");
-    }
+    setCustomers([]);
   };
 
   const loadPersonnel = async () => {
@@ -129,10 +164,18 @@ export default function DeviceFormModal({
         status: deviceRes.data.status || "pending",
         description: deviceRes.data.description || "",
       });
-      if (deviceRes.data.customer_name) {
-        setCustomerSearch(
-          `${deviceRes.data.customer_name} - ${deviceRes.data.customer_phone ?? ""}`,
-        );
+      
+
+      if (deviceRes.data.customer_id) {
+        const customerInfo = `${deviceRes.data.customer_name || ""} ${deviceRes.data.customer_phone ? `- ${deviceRes.data.customer_phone}` : ""}`;
+        setCustomerSearch(customerInfo);
+        if (deviceRes.data.customer_name) {
+          setCustomers([{
+            id: deviceRes.data.customer_id,
+            name: deviceRes.data.customer_name,
+            phone: deviceRes.data.customer_phone || "",
+          }]);
+        }
       }
     } catch {
       toast.error("خطا در بارگذاری دستگاه");
@@ -150,12 +193,12 @@ export default function DeviceFormModal({
     try {
       const res = await createCustomer(newCustomer);
       const created = res.data;
-      await loadCustomers();
       setForm((prev) => ({ ...prev, customer_id: created.id }));
       setShowNewCustomer(false);
       setNewCustomer(INITIAL_CUSTOMER);
       toast.success("مشتری اضافه شد");
       setCustomerSearch(`${created.name} - ${created.phone}`);
+      setCustomers((prev) => [created, ...prev]);
     } catch {
       toast.error("خطا در ثبت مشتری");
     }
@@ -243,38 +286,51 @@ export default function DeviceFormModal({
                   <input
                     placeholder="جستجو نام یا شماره..."
                     value={customerSearch}
-                    onChange={(e) => {
-                      setCustomerSearch(e.target.value);
-                      setShowDropdown(true);
-                    }}
+                    onChange={(e) => handleCustomerSearchChange(e.target.value)}
                     onFocus={() => setShowDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   />
                   {showDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       <div
-                        className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer"
+                        className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
                         onMouseDown={() => {
                           setForm((p) => ({ ...p, customer_id: "" }));
                           setCustomerSearch("");
+                          setShowDropdown(false);
                         }}
                       >
                         بدون مشتری
                       </div>
-                      {filteredCustomers.map((c) => (
-                        <div
-                          key={c.id}
-                          onMouseDown={() => {
-                            setForm((p) => ({ ...p, customer_id: c.id }));
-                            setCustomerSearch(`${c.name} - ${c.phone}`);
-                            setShowDropdown(false);
-                          }}
-                          className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
-                        >
-                          {c.name} - {c.phone}
+                      {searchingCustomers ? (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                          در حال جستجو...
                         </div>
-                      ))}
+                      ) : customers.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                          مشتری‌ای یافت نشد
+                        </div>
+                      ) : (
+                        customers.map((c) => (
+                          <div
+                            key={c.id}
+                            onMouseDown={() => {
+                              setForm((p) => ({ ...p, customer_id: c.id }));
+                              setCustomerSearch(`${c.name} - ${c.phone || ""}`);
+                              setShowDropdown(false);
+                            }}
+                            className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-gray-50"
+                          >
+                            <div className="font-medium">{c.name}</div>
+                            {c.phone && (
+                              <div className="text-xs text-gray-500">
+                                {c.phone}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>

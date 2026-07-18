@@ -1,4 +1,3 @@
-// src/components/RepairInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
 import {
   createRepairInvoice,
@@ -9,6 +8,7 @@ import {
   getServices,
   getTechnicians,
   getSettings,
+  getItems, // ← اضافه شد برای به‌روزرسانی لیست
 } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -22,6 +22,7 @@ import {
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency } from "../utils/formatters";
+import ItemFormModal from "./ItemFormModal"; // ← اضافه شد
 
 export default function RepairInvoiceFormModal({
   isOpen,
@@ -35,6 +36,7 @@ export default function RepairInvoiceFormModal({
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [settings, setSettings] = useState(null);
+  const [showItemModal, setShowItemModal] = useState(false); // ← اضافه شد
 
   const [formData, setFormData] = useState({
     device_id: "",
@@ -151,6 +153,16 @@ export default function RepairInvoiceFormModal({
         .finally(() => setInitialLoading(false));
     }
   }, [isOpen, initialInvoiceId, isEditMode, onClose]);
+
+  // ← تابع جدید برای به‌روزرسانی لیست کالاها بعد از ثبت کالای جدید
+  const refreshItems = async () => {
+    try {
+      const res = await getItems({ limit: 1000 });
+      setItems(res.data?.data || res.data || []);
+    } catch {
+      toast.error("خطا در به‌روزرسانی لیست کالاها");
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -609,6 +621,15 @@ export default function RepairInvoiceFormModal({
                     </h2>
 
                     <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                      {/* ← دکمه جدید "تعریف کالای جدید" */}
+                      <button
+                        type="button"
+                        onClick={() => setShowItemModal(true)}
+                        className="bg-green-100 text-green-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-green-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        تعریف کالای جدید
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleAddItem("inventory")}
@@ -897,6 +918,16 @@ export default function RepairInvoiceFormModal({
           </form>
         </div>
       </div>
+
+      {/* ← مودال ثبت کالا */}
+      <ItemFormModal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        onSuccess={() => {
+          refreshItems();
+          toast.success("کالا اضافه شد و در لیست موجود است");
+        }}
+      />
     </div>
   );
 }

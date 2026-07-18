@@ -14,6 +14,10 @@ package-lock.json
 # Backups
 backups/
 
+#uploads
+backend/src/uploads/devices
+backend/src/uploads/settings
+
 # Build
 dist/
 build/

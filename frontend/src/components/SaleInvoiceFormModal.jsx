@@ -20,6 +20,7 @@ import {
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency } from "../utils/formatters";
+import ItemFormModal from "./ItemFormModal"; // ← اضافه شد
 
 function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({ name: "", phone: "" });
@@ -116,121 +117,7 @@ function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
-function QuickItemModal({ isOpen, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
-    code: "",
-    name: "",
-    unit: "عدد",
-    minStock: 0,
-  });
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
-  };
-
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.code?.trim()) newErrors.code = "کد کالا الزامی است";
-    if (!formData.name?.trim()) newErrors.name = "نام کالا الزامی است";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      const res = await createItem(formData);
-      toast.success("کالا با موفقیت تعریف شد");
-      onSuccess(res.data);
-      onClose();
-      setFormData({ code: "", name: "", unit: "عدد", minStock: 0 });
-    } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در تعریف کالا");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-2 sm:p-4">
-      <div className="bg-white rounded-xl p-4 sm:p-6 w-full max-w-md" dir="rtl">
-        <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">
-          تعریف سریع کالا
-        </h3>
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-2 sm:space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                کد کالا <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="code"
-                value={formData.code}
-                onChange={handleChange}
-                className={`w-full border rounded px-3 py-2 text-sm ${errors.code ? "border-red-500" : "border-gray-300"}`}
-              />
-              {errors.code && (
-                <p className="text-xs text-red-600 mt-1">{errors.code}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                نام کالا <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className={`w-full border rounded px-3 py-2 text-sm ${errors.name ? "border-red-500" : "border-gray-300"}`}
-              />
-              {errors.name && (
-                <p className="text-xs text-red-600 mt-1">{errors.name}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">واحد</label>
-              <select
-                name="unit"
-                value={formData.unit}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-              >
-                <option value="عدد">عدد</option>
-                <option value="متر">متر</option>
-                <option value="کیلوگرم">کیلوگرم</option>
-                <option value="بسته">بسته</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 order-2 sm:order-1"
-            >
-              انصراف
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 order-1 sm:order-2"
-            >
-              {loading ? "در حال ثبت..." : "ثبت"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+// QuickItemModal حذف شد ← به جای آن از ItemFormModal استفاده می‌شود
 
 export default function SaleInvoiceFormModal({
   isOpen,
@@ -245,7 +132,7 @@ export default function SaleInvoiceFormModal({
   const [loadingData, setLoadingData] = useState(true);
   const [errors, setErrors] = useState({});
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [showQuickItemModal, setShowQuickItemModal] = useState(false);
+  const [showItemModal, setShowItemModal] = useState(false); // ← تغییر نام از showQuickItemModal
 
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -298,6 +185,16 @@ export default function SaleInvoiceFormModal({
       toast.error("خطا در دریافت اطلاعات");
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  // ← تابع جدید برای به‌روزرسانی لیست کالاها بعد از ثبت کالای جدید
+  const refreshItems = async () => {
+    try {
+      const res = await getItems({ limit: 1000 });
+      setItems(res.data?.data || res.data || []);
+    } catch {
+      toast.error("خطا در به‌روزرسانی لیست کالاها");
     }
   };
 
@@ -677,13 +574,14 @@ export default function SaleInvoiceFormModal({
                     </h2>
 
                     <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                      {/* ← دکمه "تعریف سریع کالا" حالا ItemFormModal رو باز می‌کند */}
                       <button
                         type="button"
-                        onClick={() => setShowQuickItemModal(true)}
+                        onClick={() => setShowItemModal(true)}
                         className="bg-green-100 text-green-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-green-200 text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                        تعریف سریع کالا
+                        تعریف کالای جدید
                       </button>
                       <button
                         type="button"
@@ -881,6 +779,7 @@ export default function SaleInvoiceFormModal({
         </div>
       </div>
 
+      {/* مودال ثبت سریع مشتری */}
       <QuickCustomerModal
         isOpen={showCustomerModal}
         onClose={() => setShowCustomerModal(false)}
@@ -889,12 +788,15 @@ export default function SaleInvoiceFormModal({
           handleCustomerSelect(newCustomer.id);
         }}
       />
-      <QuickItemModal
-        isOpen={showQuickItemModal}
-        onClose={() => setShowQuickItemModal(false)}
+
+      {/* ← مودال ثبت کالا (جایگزین QuickItemModal) */}
+      <ItemFormModal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
         onSuccess={() => {
-          fetchData();
-          toast.success("کالا اضافه شد");
+          // به‌روزرسانی لیست کالاها بعد از ثبت کالای جدید
+          refreshItems();
+          toast.success("کالا اضافه شد و در لیست موجود است");
         }}
       />
     </div>

@@ -12,6 +12,7 @@ const unitOptions = [
   { value: "بسته", label: "بسته" },
   { value: "کارتن", label: "کارتن" },
   { value: "لیتر", label: "لیتر" },
+  { value: "دستگاه", label: "دستگاه" },
 ];
 
 export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {

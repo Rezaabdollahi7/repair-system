@@ -18,6 +18,7 @@ import {
   ExclamationCircleIcon,
   PrinterIcon,
   CurrencyDollarIcon,
+  DevicePhoneMobileIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency } from "../utils/formatters";
 
@@ -202,7 +203,37 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                     {invoice.note && (
                       <InfoRow label="توضیحات" value={invoice.note} />
                     )}
+
+                    {/* ===== اطلاعات دستگاه - اضافه شد ===== */}
+                    {invoice.device_id && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                          <DevicePhoneMobileIcon className="w-4 h-4 text-blue-600" />
+                          اطلاعات دستگاه
+                        </h4>
+                        <InfoRow
+                          label="نام دستگاه"
+                          value={invoice.device_name || "—"}
+                        />
+                        {invoice.brand && (
+                          <InfoRow label="برند" value={invoice.brand} />
+                        )}
+                        {invoice.model && (
+                          <InfoRow label="مدل" value={invoice.model} />
+                        )}
+                        {invoice.serial_number && (
+                          <InfoRow
+                            label="سریال"
+                            value={invoice.serial_number}
+                          />
+                        )}
+                        {invoice.device_id && (
+                          <InfoRow label="کد پذیرش" value={invoice.device_id} />
+                        )}
+                      </div>
+                    )}
                   </div>
+
                   <div className="bg-white shadow rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
                       پرداخت
@@ -256,6 +287,7 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                     )}
                   </div>
                 </div>
+
                 <div className="lg:col-span-2">
                   <div className="bg-white shadow rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">

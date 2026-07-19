@@ -154,18 +154,24 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                 </div>
 
                 {/* Center: Title */}
-                <h1 className={`font-bold text-blue-700 ${fontSize.title}`}>
-                  فاکتور فروش
-                </h1>
+                <div className="flex flex-col gap-1 items-center justify-center">
+                  <h1 className={`font-bold text-blue-700 ${fontSize.title}`}>
+                    فاکتور فروش
+                  </h1>
+                  <p className="font-semibold">
+                    {" "}
+                    {settings?.company_name || "تعمیرگاه"}
+                  </p>
+                </div>
 
                 {/* Left: Invoice Number & Date */}
                 <div className="text-left">
-                  <p className={`${fontSize.body}`}>
+                  {/* <p className={`${fontSize.body}`}>
                     <span>شماره فاکتور :</span>
                     <span dir="ltr" className="font-mono">
                       {invoice.invoice_number}
                     </span>
-                  </p>
+                  </p> */}
                   <p className={`mt-0.5 ${fontSize.small}`}>
                     <span>تاریخ: </span>
                     <span dir="ltr" className="font-mono">
@@ -188,10 +194,6 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                   مشخصات فروشنده
                 </h3>
                 <div className={`space-y-0.5 ${fontSize.small}`}>
-                  <p className="font-medium">
-                    <span className="font-bold">نام : </span>
-                    {settings?.company_name || "تعمیرگاه"}
-                  </p>
                   {settings?.company_address && (
                     <p className="0 text-justify">
                       <span className="font-bold">آدرس : </span>
@@ -239,11 +241,20 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
 
             {/* ===== ITEMS TABLE ===== */}
             <div className={spacing.section}>
+              {/* سطر شماره فاکتور - بالای جدول */}
+              <div className="flex justify-between items-center border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 mb-3">
+                <span className="font-bold">
+                  شماره فاکتور : {invoice.invoice_number}
+                 </span>
+              </div>
+
               <h3
                 className={`font-medium text-gray-700 mb-1 ${fontSize.heading}`}
               >
                 اقلام فاکتور
               </h3>
+
+              {/* جدول اقلام */}
               <table className="w-full border-collapse border border-gray-300">
                 <thead className="bg-gray-100">
                   <tr>

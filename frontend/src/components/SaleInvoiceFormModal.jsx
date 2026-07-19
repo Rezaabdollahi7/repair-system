@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   createSaleInvoice,
   getItems,
@@ -6,6 +6,7 @@ import {
   createCustomer,
   createItem,
   getDevice,
+  searchCustomers,
 } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -20,7 +21,7 @@ import {
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency } from "../utils/formatters";
-import ItemFormModal from "./ItemFormModal"; // ← اضافه شد
+import ItemFormModal from "./ItemFormModal";
 
 function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({ name: "", phone: "" });
@@ -117,8 +118,6 @@ function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
-// QuickItemModal حذف شد ← به جای آن از ItemFormModal استفاده می‌شود
-
 export default function SaleInvoiceFormModal({
   isOpen,
   onClose,
@@ -130,9 +129,10 @@ export default function SaleInvoiceFormModal({
   const [items, setItems] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [errors, setErrors] = useState({});
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [showItemModal, setShowItemModal] = useState(false); // ← تغییر نام از showQuickItemModal
+  const [showItemModal, setShowItemModal] = useState(false);
 
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -172,12 +172,61 @@ export default function SaleInvoiceFormModal({
     }
   };
 
+  // ===== جستجوی مشتری با دیبونس + محافظت در برابر race condition =====
+  // debounceRef: تایمر تایپ کاربر را نگه می‌دارد تا هر keystroke یک request جدا نسازد
+  const debounceRef = useRef(null);
+  // requestIdRef: شماره‌ی هر درخواست را نگه می‌دارد تا جواب یک درخواست قدیمی
+  // (که دیرتر از یک درخواست جدیدتر برمی‌گردد) نتیجه‌ی تازه را بازنویسی نکند
+  const requestIdRef = useRef(0);
+
+  const runCustomerSearch = useCallback(async (query) => {
+    const currentRequestId = ++requestIdRef.current;
+    setSearchingCustomers(true);
+    try {
+      const res =
+        !query || query.trim() === ""
+          ? await getCustomers({ limit: 50 })
+          : await searchCustomers(query);
+
+      // اگر تا زمان برگشتن این جواب، درخواست جدیدتری ارسال شده،
+      // این جواب قدیمی را نادیده می‌گیریم
+      if (currentRequestId !== requestIdRef.current) return;
+
+      setCustomers(res.data?.data || res.data || []);
+    } catch (error) {
+      if (currentRequestId !== requestIdRef.current) return;
+      console.error("خطا در جستجوی مشتری:", error);
+      toast.error("خطا در جستجوی مشتری");
+    } finally {
+      if (currentRequestId === requestIdRef.current) {
+        setSearchingCustomers(false);
+      }
+    }
+  }, []);
+
+  const handleCustomerSearch = useCallback(
+    (query) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        runCustomerSearch(query);
+      }, 350);
+    },
+    [runCustomerSearch],
+  );
+
+  // پاک‌سازی تایمر هنگام unmount شدن کامپوننت
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const fetchData = async () => {
     setLoadingData(true);
     try {
       const [itemsRes, customersRes] = await Promise.all([
         getItems({ limit: 1000 }),
-        getCustomers(),
+        getCustomers({ limit: 50 }),
       ]);
       setItems(itemsRes.data?.data || itemsRes.data || []);
       setCustomers(customersRes.data?.data || customersRes.data || []);
@@ -188,7 +237,6 @@ export default function SaleInvoiceFormModal({
     }
   };
 
-  // ← تابع جدید برای به‌روزرسانی لیست کالاها بعد از ثبت کالای جدید
   const refreshItems = async () => {
     try {
       const res = await getItems({ limit: 1000 });
@@ -444,7 +492,10 @@ export default function SaleInvoiceFormModal({
                             options={customerOptions}
                             value={formData.customer_id}
                             onChange={handleCustomerSelect}
+                            onSearch={handleCustomerSearch}
+                            onOpen={() => runCustomerSearch("")}
                             placeholder="جستجو و انتخاب مشتری..."
+                            loading={searchingCustomers}
                           />
                         </div>
                         <button
@@ -574,7 +625,6 @@ export default function SaleInvoiceFormModal({
                     </h2>
 
                     <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                      {/* ← دکمه "تعریف سریع کالا" حالا ItemFormModal رو باز می‌کند */}
                       <button
                         type="button"
                         onClick={() => setShowItemModal(true)}
@@ -784,17 +834,16 @@ export default function SaleInvoiceFormModal({
         isOpen={showCustomerModal}
         onClose={() => setShowCustomerModal(false)}
         onSuccess={(newCustomer) => {
-          setCustomers((prev) => [...prev, newCustomer]);
+          setCustomers((prev) => [newCustomer, ...prev]);
           handleCustomerSelect(newCustomer.id);
         }}
       />
 
-      {/* ← مودال ثبت کالا (جایگزین QuickItemModal) */}
+      {/* مودال ثبت کالا */}
       <ItemFormModal
         isOpen={showItemModal}
         onClose={() => setShowItemModal(false)}
         onSuccess={() => {
-          // به‌روزرسانی لیست کالاها بعد از ثبت کالای جدید
           refreshItems();
           toast.success("کالا اضافه شد و در لیست موجود است");
         }}

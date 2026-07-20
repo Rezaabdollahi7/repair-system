@@ -73,6 +73,9 @@ export function ModalProvider({ children }) {
     openModal("saleInvoiceDetail", invoiceId);
   const openSaleInvoiceCreate = (deviceId) =>
     openModal("saleInvoiceCreate", deviceId || null);
+  // ===== تابع جدید برای ویرایش فاکتور فروش =====
+  const openSaleInvoiceEdit = (invoiceId) =>
+    openModal("saleInvoiceEdit", invoiceId);
   const openPurchaseInvoiceDetail = (invoiceId) =>
     openModal("purchaseInvoiceDetail", invoiceId);
   const openPurchaseInvoiceCreate = () =>
@@ -100,6 +103,7 @@ export function ModalProvider({ children }) {
         openItemDetail,
         openSaleInvoiceDetail,
         openSaleInvoiceCreate,
+        openSaleInvoiceEdit, // ← اضافه شد
         openPurchaseInvoiceDetail,
         openPurchaseInvoiceCreate,
         openRepairInvoiceDetail,
@@ -212,6 +216,19 @@ export function ModalProvider({ children }) {
                 onClose={closeModal}
                 onSuccess={closeModal}
                 deviceId={modal.id}
+                zIndex={zIndex}
+              />
+            );
+          // ===== کیس جدید برای ویرایش فاکتور فروش =====
+          case "saleInvoiceEdit":
+            return (
+              <SaleInvoiceFormModal
+                key={`${modal.type}-${modal.id}-${index}`}
+                isOpen={true}
+                onClose={closeModal}
+                onSuccess={closeModal}
+                invoiceId={modal.id}
+                zIndex={zIndex}
               />
             );
           case "purchaseInvoiceDetail":

@@ -10,6 +10,7 @@ import {
   PlusIcon,
   EyeIcon,
   TrashIcon,
+  PencilSquareIcon,
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -78,6 +79,7 @@ export default function SaleInvoiceList() {
   const {
     openSaleInvoiceDetail,
     openSaleInvoiceCreate,
+    openSaleInvoiceEdit,
     openCustomerDetail,
     refreshList,
   } = useModal();
@@ -101,7 +103,6 @@ export default function SaleInvoiceList() {
         const params = { page: currentPage, limit: currentLimit };
         if (searchTerm) params.search = searchTerm;
 
-        // اضافه کردن فیلترها
         if (activeFilters.payment_status?.length > 0) {
           params.payment_status = activeFilters.payment_status.join(",");
         }
@@ -224,31 +225,31 @@ export default function SaleInvoiceList() {
             <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
               <thead className="bg-yellow-300">
                 <tr>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     شماره فاکتور
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     تلفن
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     تاریخ
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     مبلغ کل
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     پرداخت شده
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     مانده
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
                     وضعیت
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500   ">
+                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500">
                     عملیات
                   </th>
                 </tr>
@@ -264,7 +265,7 @@ export default function SaleInvoiceList() {
                         index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm font-mono font-medium  text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-gray-600 group-hover:text-white">
                         {invoice.invoice_number}
                       </td>
                       <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
@@ -274,7 +275,7 @@ export default function SaleInvoiceList() {
                               e.stopPropagation();
                               openCustomerDetail(invoice.customer_id);
                             }}
-                            className="text-blue-600 hover:underline font-medium  group-hover:text-white"
+                            className="text-blue-600 hover:underline font-medium group-hover:text-white"
                           >
                             {invoice.customer_name || "—"}
                           </button>
@@ -300,7 +301,7 @@ export default function SaleInvoiceList() {
                       <td className="px-4 py-3 text-center border-l border-gray-600 flex justify-center">
                         <PaymentStatusBadge status={invoice.payment_status} />
                       </td>
-                      <td className="px-4 py-3 text-sm ">
+                      <td className="px-4 py-3 text-sm">
                         <div className="flex gap-1 justify-center">
                           <button
                             onClick={(e) => {
@@ -312,6 +313,19 @@ export default function SaleInvoiceList() {
                           >
                             <EyeIcon className="w-5 h-5" />
                           </button>
+                          {/* ===== دکمه ویرایش (فقط برای ادمین) ===== */}
+                          {isAtLeast("admin") && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openSaleInvoiceEdit(invoice.id);
+                              }}
+                              className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                              title="ویرایش فاکتور"
+                            >
+                              <PencilSquareIcon className="w-5 h-5" />
+                            </button>
+                          )}
                           {isAtLeast("admin") && (
                             <button
                               onClick={(e) => {

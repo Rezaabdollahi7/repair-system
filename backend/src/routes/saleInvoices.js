@@ -10,5 +10,6 @@ router.get("/:id", saleInvoiceController.getById);
 router.post("/", saleInvoiceController.create);
 router.put("/:id/payment", saleInvoiceController.updatePayment);
 router.delete("/:id", saleInvoiceController.delete);
+router.put("/:id", saleInvoiceController.update);
 
 module.exports = router;

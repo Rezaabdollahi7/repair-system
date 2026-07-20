@@ -123,6 +123,8 @@ export const getSaleInvoices = (params) =>
   api.get("/sale-invoices", { params });
 export const getSaleInvoice = (id) => api.get(`/sale-invoices/${id}`);
 export const createSaleInvoice = (data) => api.post("/sale-invoices", data);
+export const updateSaleInvoice = (id, data) =>
+  api.put(`/sale-invoices/${id}`, data);
 export const updateSaleInvoicePayment = (id, data) =>
   api.put(`/sale-invoices/${id}/payment`, data);
 export const deleteSaleInvoice = (id) => api.delete(`/sale-invoices/${id}`);

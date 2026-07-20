@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import {
   createSaleInvoice,
+  updateSaleInvoice,
+  getSaleInvoice,
   getItems,
   getCustomers,
   createCustomer,
@@ -134,9 +136,12 @@ export default function SaleInvoiceFormModal({
   onClose,
   onSuccess,
   deviceId,
+  invoiceId, // ← اضافه شد (برای حالت ویرایش)
 }) {
+  const isEditMode = Boolean(invoiceId);
   const [loading, setLoading] = useState(false);
   const [loadingDevice, setLoadingDevice] = useState(false);
+  const [loadingInvoice, setLoadingInvoice] = useState(isEditMode);
   const [items, setItems] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -180,6 +185,49 @@ export default function SaleInvoiceFormModal({
       toast.error("خطا در دریافت اطلاعات دستگاه");
     } finally {
       setLoadingDevice(false);
+    }
+  };
+
+  const loadInvoiceData = async (id) => {
+    if (!id) return;
+    setLoadingInvoice(true);
+    try {
+      const res = await getSaleInvoice(id);
+      const invoice = res.data;
+
+      setFormData({
+        customer_id: invoice.customer_id || "",
+        customer_name: invoice.customer_name || "",
+        customer_phone: invoice.customer_phone || "",
+        invoice_date:
+          invoice.invoice_date?.split("T")[0] ||
+          new Date().toISOString().split("T")[0],
+        paid_amount: invoice.paid_amount || 0,
+        note: invoice.note || "",
+        device_id: invoice.device_id || null,
+      });
+
+      // اگر دستگاه داشت، اطلاعات دستگاه رو هم load کن
+      if (invoice.device_id) {
+        loadDeviceInfo(invoice.device_id);
+      }
+
+      // تبدیل آیتم‌های فاکتور به فرمت selectedItems
+      const items = invoice.items.map((item) => ({
+        item_type: item.item_id ? "inventory" : "custom",
+        item_id: item.item_id || "",
+        name: item.item_name || "",
+        quantity: item.quantity || 1,
+        unit: item.item_unit || "عدد",
+        unit_price: item.unit_price || 0,
+      }));
+      setSelectedItems(items);
+    } catch (error) {
+      console.error("خطا در دریافت اطلاعات فاکتور:", error);
+      toast.error("خطا در دریافت اطلاعات فاکتور");
+      onClose();
+    } finally {
+      setLoadingInvoice(false);
     }
   };
 
@@ -234,20 +282,23 @@ export default function SaleInvoiceFormModal({
   useEffect(() => {
     if (isOpen) {
       fetchData();
+      if (isEditMode && invoiceId) {
+        loadInvoiceData(invoiceId);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, invoiceId, isEditMode]);
 
   useEffect(() => {
-    if (isOpen && deviceId) {
+    if (isOpen && deviceId && !isEditMode) {
       loadDeviceInfo(deviceId);
     }
-  }, [isOpen, deviceId]);
+  }, [isOpen, deviceId, isEditMode]);
 
   useEffect(() => {
-    if (isOpen && deviceId) {
+    if (isOpen && deviceId && !isEditMode) {
       setFormData((prev) => ({ ...prev, device_id: deviceId }));
     }
-  }, [isOpen, deviceId]);
+  }, [isOpen, deviceId, isEditMode]);
 
   const customerOptions = customers.map((c) => ({
     value: c.id,
@@ -416,8 +467,16 @@ export default function SaleInvoiceFormModal({
           unit_price: item.unit_price,
         })),
       };
-      await createSaleInvoice(payload);
-      toast.success("فاکتور فروش با موفقیت ثبت شد");
+      console.log("📤 Payload:", JSON.stringify(payload, null, 2));
+
+      if (isEditMode) {
+        await updateSaleInvoice(invoiceId, payload);
+        toast.success("فاکتور فروش با موفقیت ویرایش شد");
+      } else {
+        await createSaleInvoice(payload);
+        toast.success("فاکتور فروش با موفقیت ثبت شد");
+      }
+
       resetForm();
       onSuccess && onSuccess();
       onClose();
@@ -430,6 +489,18 @@ export default function SaleInvoiceFormModal({
 
   if (!isOpen) return null;
 
+  if (loadingInvoice) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-8">
+          <div className="text-center py-4" dir="rtl">
+            در حال بارگذاری فاکتور...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
@@ -440,7 +511,7 @@ export default function SaleInvoiceFormModal({
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
             <CurrencyDollarIcon className="w-5 h-5 text-gray-600" />
-            ثبت فاکتور فروش جدید
+            {isEditMode ? "ویرایش فاکتور فروش" : "ثبت فاکتور فروش جدید"}
             {loadingDevice && (
               <span className="text-xs text-gray-500 mr-2">
                 (در حال بارگذاری اطلاعات دستگاه...)
@@ -861,7 +932,11 @@ export default function SaleInvoiceFormModal({
                 disabled={loading}
                 className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2"
               >
-                {loading ? "در حال ثبت..." : "ثبت فاکتور فروش"}
+                {loading
+                  ? "در حال ثبت..."
+                  : isEditMode
+                    ? "ویرایش فاکتور"
+                    : "ثبت فاکتور فروش"}
               </button>
             </div>
           </form>

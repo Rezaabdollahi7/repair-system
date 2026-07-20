@@ -46,7 +46,27 @@ function updateItemAfterSale(db, itemId, quantity, unitPrice) {
   );
 }
 
-//  تابع کمکی برای گرفتن اطلاعات دستگاه
+// برگرداندن موجودی کالا به انبار
+function returnItemToStock(db, itemId, quantity) {
+  if (!itemId) return;
+  const itemResult = db.exec(`SELECT current_stock FROM items WHERE id = ?`, [
+    itemId,
+  ]);
+  if (!itemResult[0]?.values[0]) return;
+  const currentStock = itemResult[0].values[0][0] || 0;
+  const newStock = currentStock + quantity;
+  db.run(
+    `UPDATE items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [newStock, itemId],
+  );
+  db.run(
+    `INSERT INTO inventory_transactions (item_id, type, quantity, reference_id, reference_type, note) 
+     VALUES (?, 'adjustment', ?, ?, 'sale_invoice', ?)`,
+    [itemId, quantity, null, "برگشت از فاکتور"],
+  );
+}
+
+// تابع کمکی برای گرفتن اطلاعات دستگاه
 function getDeviceInfo(db, deviceId) {
   if (!deviceId) return null;
   const result = db.exec(
@@ -62,6 +82,22 @@ function getDeviceInfo(db, deviceId) {
     };
   }
   return null;
+}
+
+// ===== تابع کمکی برای گرفتن آیتم‌های قبلی فاکتور =====
+function getInvoiceItems(db, invoiceId) {
+  const result = db.exec(
+    `SELECT id, item_id, quantity, name, unit FROM sale_invoice_items WHERE invoice_id = ?`,
+    [invoiceId],
+  );
+  if (!result[0]) return [];
+  return result[0].values.map((row) => ({
+    id: row[0],
+    item_id: row[1],
+    quantity: row[2],
+    name: row[3],
+    unit: row[4],
+  }));
 }
 
 exports.getAll = async (req, res) => {
@@ -234,8 +270,8 @@ exports.getById = async (req, res) => {
         sii.total_price,
         sii.created_at,
         i.code,
-        COALESCE(i.name, sii.name) as item_name,  -- ← اینجا اصلاح شده
-        COALESCE(i.unit, sii.unit) as item_unit,  -- ← اینجا اصلاح شده
+        COALESCE(i.name, sii.name) as item_name,
+        COALESCE(i.unit, sii.unit) as item_unit,
         i.current_stock
        FROM sale_invoice_items sii 
        LEFT JOIN items i ON sii.item_id = i.id 
@@ -307,7 +343,6 @@ exports.create = async (req, res) => {
           });
         }
       } else {
-        // آیتم دلخواه (custom)
         if (!item.name || !item.quantity || item.quantity <= 0) {
           return res
             .status(400)
@@ -351,12 +386,10 @@ exports.create = async (req, res) => {
     const idResult = db.exec("SELECT last_insert_rowid() as id");
     const invoiceId = idResult[0].values[0][0];
 
-    // ===== اصلاح: ذخیره آیتم‌ها با name و unit =====
     for (const item of items) {
       const totalPrice = item.quantity * item.unit_price;
 
       if (item.item_type === "inventory") {
-        // آیتم از انبار
         db.run(
           `INSERT INTO sale_invoice_items 
            (invoice_id, item_id, quantity, unit_price, total_price, name, unit) 
@@ -373,19 +406,18 @@ exports.create = async (req, res) => {
         );
         updateItemAfterSale(db, item.item_id, item.quantity, item.unit_price);
       } else {
-        // آیتم دلخواه (custom)
         db.run(
           `INSERT INTO sale_invoice_items 
            (invoice_id, item_id, quantity, unit_price, total_price, name, unit) 
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             invoiceId,
-            null, // ← item_id = null
+            null,
             item.quantity,
             item.unit_price,
             totalPrice,
-            item.name || "آیتم دلخواه", 
-            item.unit || "عدد", 
+            item.name || "آیتم دلخواه",
+            item.unit || "عدد",
           ],
         );
       }
@@ -438,6 +470,196 @@ exports.updatePayment = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in updatePayment:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ===== تابع UPDATE (ویرایش فاکتور فروش) =====
+exports.update = async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const {
+      customer_id,
+      customer_name,
+      customer_phone,
+      invoice_date,
+      paid_amount,
+      note,
+      items,
+      device_id,
+    } = req.body;
+
+    console.log("📝 Updating invoice:", {
+      id,
+      customer_id,
+      customer_name,
+      customer_phone,
+    });
+
+    // 1. بررسی وجود فاکتور
+    const invoiceCheck = db.exec(`SELECT id FROM sale_invoices WHERE id = ?`, [
+      id,
+    ]);
+    if (!invoiceCheck[0]?.values[0]) {
+      return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+
+    // 2. اعتبارسنجی آیتم‌ها
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "حداقل یک کالا باید انتخاب شود" });
+    }
+
+    // 3. دریافت آیتم‌های قبلی فاکتور
+    const oldItems = getInvoiceItems(db, id);
+    console.log("📦 Old items:", oldItems);
+
+    // 4. برگرداندن موجودی کالاهای قبلی (فقط آیتم‌های انبار)
+    for (const oldItem of oldItems) {
+      if (oldItem.item_id) {
+        console.log(
+          `🔄 Returning stock for item ${oldItem.item_id}: +${oldItem.quantity}`,
+        );
+        returnItemToStock(db, oldItem.item_id, oldItem.quantity);
+      }
+    }
+
+    // 5. اعتبارسنجی موجودی برای آیتم‌های جدید
+    for (const item of items) {
+      if (item.item_type === "inventory") {
+        if (!item.item_id || !item.quantity || item.quantity <= 0) {
+          return res.status(400).json({ error: "مشخصات کالاها ناقص است" });
+        }
+        const stockCheck = db.exec(
+          `SELECT current_stock, name FROM items WHERE id = ?`,
+          [item.item_id],
+        );
+        if (!stockCheck[0]?.values[0]) {
+          return res
+            .status(400)
+            .json({ error: `کالا با شناسه ${item.item_id} یافت نشد` });
+        }
+        const currentStock = stockCheck[0].values[0][0] || 0;
+        const itemName = stockCheck[0].values[0][1];
+        if (currentStock < item.quantity) {
+          return res.status(400).json({
+            error: `موجودی کالای "${itemName}" کافی نیست. موجودی فعلی: ${currentStock}`,
+          });
+        }
+      } else {
+        if (!item.name || !item.quantity || item.quantity <= 0) {
+          return res
+            .status(400)
+            .json({ error: "نام و تعداد آیتم دلخواه الزامی است" });
+        }
+      }
+    }
+
+    // 6. محاسبه مبلغ کل جدید
+    const totalAmount = items.reduce(
+      (sum, item) => sum + item.quantity * item.unit_price,
+      0,
+    );
+
+    // 7. محاسبه وضعیت پرداخت جدید
+    const paymentStatus =
+      paid_amount >= totalAmount
+        ? "paid"
+        : paid_amount > 0
+          ? "partial"
+          : "pending";
+
+    console.log("💰 Total:", totalAmount, "Payment status:", paymentStatus);
+
+    // 8. بروزرسانی فاکتور
+    db.run(
+      `UPDATE sale_invoices SET 
+        customer_id = ?,
+        customer_name = ?,
+        customer_phone = ?,
+        invoice_date = ?,
+        total_amount = ?,
+        paid_amount = ?,
+        payment_status = ?,
+        note = ?,
+        device_id = ?,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        customer_id || null,
+        customer_name || null,
+        customer_phone || null,
+        invoice_date || new Date().toISOString(),
+        totalAmount,
+        paid_amount || 0,
+        paymentStatus,
+        note || null,
+        device_id || null,
+        id,
+      ],
+    );
+
+    // 9. حذف آیتم‌های قبلی فاکتور
+    db.run(`DELETE FROM sale_invoice_items WHERE invoice_id = ?`, [id]);
+
+    // 10. ذخیره آیتم‌های جدید
+    for (const item of items) {
+      const totalPrice = item.quantity * item.unit_price;
+
+      if (item.item_type === "inventory") {
+        db.run(
+          `INSERT INTO sale_invoice_items 
+           (invoice_id, item_id, quantity, unit_price, total_price, name, unit) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            item.item_id,
+            item.quantity,
+            item.unit_price,
+            totalPrice,
+            item.name || null,
+            item.unit || null,
+          ],
+        );
+        // کاهش موجودی جدید
+        updateItemAfterSale(db, item.item_id, item.quantity, item.unit_price);
+      } else {
+        db.run(
+          `INSERT INTO sale_invoice_items 
+           (invoice_id, item_id, quantity, unit_price, total_price, name, unit) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            null,
+            item.quantity,
+            item.unit_price,
+            totalPrice,
+            item.name || "آیتم دلخواه",
+            item.unit || "عدد",
+          ],
+        );
+      }
+    }
+
+    saveDb();
+
+    // 11. برگرداندن فاکتور ویرایش شده
+    const updatedInvoice = await exports.getById(
+      { params: { id } },
+      {
+        json: (data) => data,
+        status: (code) => ({ json: (data) => ({ ...data, statusCode: code }) }),
+      },
+    );
+
+    console.log("✅ Invoice updated successfully");
+
+    res.json({
+      message: "فاکتور با موفقیت ویرایش شد",
+      invoice: updatedInvoice,
+    });
+  } catch (error) {
+    console.error("❌ Error in update:", error);
     res.status(500).json({ error: error.message });
   }
 };

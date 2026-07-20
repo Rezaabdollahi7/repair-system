@@ -4,7 +4,7 @@ const jalaali = require("jalaali-js");
 
 function generateInvoiceNumber(db) {
   const today = jalaali.toJalaali(new Date());
-  const yearShort = String(today.jy - 1000).padStart(3, "0"); // 1405-1000=405 → "405"
+  const yearShort = String(today.jy - 1000).padStart(3, "0");
 
   const result = db.exec(`
     SELECT invoice_number 
@@ -17,7 +17,7 @@ function generateInvoiceNumber(db) {
   let nextNumber = 1;
 
   if (result[0]?.values.length > 0) {
-    const lastNumber = result[0].values[0][0]; // "405-058"
+    const lastNumber = result[0].values[0][0];
     const lastSeq = parseInt(lastNumber.split("-")[1]);
     nextNumber = lastSeq + 1;
   }
@@ -46,6 +46,24 @@ function updateItemAfterSale(db, itemId, quantity, unitPrice) {
   );
 }
 
+//  تابع کمکی برای گرفتن اطلاعات دستگاه
+function getDeviceInfo(db, deviceId) {
+  if (!deviceId) return null;
+  const result = db.exec(
+    `SELECT device_name, brand, model, serial_number FROM devices WHERE id = ?`,
+    [deviceId],
+  );
+  if (result[0]?.values[0]) {
+    return {
+      device_name: result[0].values[0][0],
+      brand: result[0].values[0][1],
+      model: result[0].values[0][2],
+      serial_number: result[0].values[0][3],
+    };
+  }
+  return null;
+}
+
 exports.getAll = async (req, res) => {
   try {
     const db = await getDb();
@@ -63,14 +81,12 @@ exports.getAll = async (req, res) => {
     let baseQuery = `FROM sale_invoices WHERE 1=1`;
     const params = [];
 
-    // جستجو
     if (search && search.trim()) {
       baseQuery += ` AND (customer_name LIKE ? OR customer_phone LIKE ? OR invoice_number LIKE ?)`;
       const term = `%${persianToEnglish(search)}%`;
       params.push(term, term, term);
     }
 
-    // فیلتر وضعیت پرداخت
     if (payment_status && payment_status.trim()) {
       const statuses = payment_status
         .split(",")
@@ -83,7 +99,6 @@ exports.getAll = async (req, res) => {
       }
     }
 
-    // فیلتر بازه تاریخ
     if (date_from && date_from.trim()) {
       baseQuery += ` AND date(invoice_date) >= date(?)`;
       params.push(date_from);
@@ -93,7 +108,6 @@ exports.getAll = async (req, res) => {
       params.push(date_to);
     }
 
-    // فیلتر بازه مبلغ کل - نسخه اصلاح شده
     if (
       amount_from &&
       String(amount_from).trim() !== "" &&
@@ -111,11 +125,9 @@ exports.getAll = async (req, res) => {
       params.push(Number(amount_to));
     }
 
-    // count
     const countResult = db.exec(`SELECT COUNT(*) ${baseQuery}`, params);
     const total = countResult[0]?.values[0][0] || 0;
 
-    // pagination
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = parseInt(limit) || 10;
     const offset = (pageNum - 1) * limitNum;
@@ -126,21 +138,35 @@ exports.getAll = async (req, res) => {
     );
 
     const invoices = result[0]
-      ? result[0].values.map((row) => ({
-          id: row[0],
-          invoice_number: row[1],
-          customer_id: row[2],
-          customer_name: row[3],
-          customer_phone: row[4],
-          invoice_date: row[5],
-          total_amount: row[6],
-          paid_amount: row[7],
-          payment_status: row[8],
-          note: row[9],
-          created_by: row[10],
-          created_at: row[11],
-          updated_at: row[12],
-        }))
+      ? result[0].values.map((row) => {
+          const invoice = {
+            id: row[0],
+            invoice_number: row[1],
+            customer_id: row[2],
+            customer_name: row[3],
+            customer_phone: row[4],
+            invoice_date: row[5],
+            total_amount: row[6],
+            paid_amount: row[7],
+            payment_status: row[8],
+            note: row[9],
+            created_by: row[10],
+            created_at: row[11],
+            updated_at: row[12],
+            device_id: row[13] || null,
+          };
+
+          if (invoice.device_id) {
+            const deviceInfo = getDeviceInfo(db, invoice.device_id);
+            if (deviceInfo) {
+              invoice.device_name = deviceInfo.device_name;
+              invoice.brand = deviceInfo.brand;
+              invoice.model = deviceInfo.model;
+            }
+          }
+
+          return invoice;
+        })
       : [];
 
     res.json({
@@ -160,12 +186,17 @@ exports.getById = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
+
     const invoiceResult = db.exec(`SELECT * FROM sale_invoices WHERE id = ?`, [
       id,
     ]);
-    if (!invoiceResult[0]?.values[0])
+
+    if (!invoiceResult[0]?.values[0]) {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+
     const row = invoiceResult[0].values[0];
+
     const invoice = {
       id: row[0],
       invoice_number: row[1],
@@ -180,11 +211,39 @@ exports.getById = async (req, res) => {
       created_by: row[10],
       created_at: row[11],
       updated_at: row[12],
+      device_id: row[13] || null,
     };
+
+    if (invoice.device_id) {
+      const deviceInfo = getDeviceInfo(db, invoice.device_id);
+      if (deviceInfo) {
+        invoice.device_name = deviceInfo.device_name;
+        invoice.brand = deviceInfo.brand;
+        invoice.model = deviceInfo.model;
+        invoice.serial_number = deviceInfo.serial_number;
+      }
+    }
+
     const itemsResult = db.exec(
-      `SELECT sii.*, i.code, i.name, i.unit, i.current_stock FROM sale_invoice_items sii JOIN items i ON sii.item_id = i.id WHERE sii.invoice_id = ? ORDER BY sii.id`,
+      `SELECT 
+        sii.id,
+        sii.invoice_id,
+        sii.item_id,
+        sii.quantity,
+        sii.unit_price,
+        sii.total_price,
+        sii.created_at,
+        i.code,
+        COALESCE(i.name, sii.name) as item_name,  -- ← اینجا اصلاح شده
+        COALESCE(i.unit, sii.unit) as item_unit,  -- ← اینجا اصلاح شده
+        i.current_stock
+       FROM sale_invoice_items sii 
+       LEFT JOIN items i ON sii.item_id = i.id 
+       WHERE sii.invoice_id = ? 
+       ORDER BY sii.id`,
       [id],
     );
+
     invoice.items = itemsResult[0]
       ? itemsResult[0].values.map((row) => ({
           id: row[0],
@@ -200,8 +259,10 @@ exports.getById = async (req, res) => {
           current_stock: row[10],
         }))
       : [];
+
     res.json(invoice);
   } catch (error) {
+    console.error("Error in getById:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -219,32 +280,39 @@ exports.create = async (req, res) => {
       items,
       device_id,
     } = req.body;
-    if (!items || items.length === 0)
+
+    if (!items || items.length === 0) {
       return res.status(400).json({ error: "حداقل یک کالا باید انتخاب شود" });
+    }
 
     for (const item of items) {
       if (item.item_type === "inventory") {
-        if (!item.item_id || !item.quantity || item.quantity <= 0)
+        if (!item.item_id || !item.quantity || item.quantity <= 0) {
           return res.status(400).json({ error: "مشخصات کالاها ناقص است" });
+        }
         const stockCheck = db.exec(
           `SELECT current_stock, name FROM items WHERE id = ?`,
           [item.item_id],
         );
-        if (!stockCheck[0]?.values[0])
+        if (!stockCheck[0]?.values[0]) {
           return res
             .status(400)
             .json({ error: `کالا با شناسه ${item.item_id} یافت نشد` });
+        }
         const currentStock = stockCheck[0].values[0][0] || 0;
         const itemName = stockCheck[0].values[0][1];
-        if (currentStock < item.quantity)
+        if (currentStock < item.quantity) {
           return res.status(400).json({
             error: `موجودی کالای "${itemName}" کافی نیست. موجودی فعلی: ${currentStock}`,
           });
+        }
       } else {
-        if (!item.name || !item.quantity || item.quantity <= 0)
+        // آیتم دلخواه (custom)
+        if (!item.name || !item.quantity || item.quantity <= 0) {
           return res
             .status(400)
             .json({ error: "نام و تعداد آیتم دلخواه الزامی است" });
+        }
       }
     }
 
@@ -262,8 +330,9 @@ exports.create = async (req, res) => {
 
     db.run(
       `INSERT INTO sale_invoices 
-   (invoice_number, customer_id, customer_name, customer_phone, invoice_date, total_amount, paid_amount, payment_status, note, created_by, device_id)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (invoice_number, customer_id, customer_name, customer_phone, invoice_date, 
+        total_amount, paid_amount, payment_status, note, created_by, device_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         invoiceNumber,
         customer_id || null,
@@ -282,20 +351,43 @@ exports.create = async (req, res) => {
     const idResult = db.exec("SELECT last_insert_rowid() as id");
     const invoiceId = idResult[0].values[0][0];
 
+    // ===== اصلاح: ذخیره آیتم‌ها با name و unit =====
     for (const item of items) {
       const totalPrice = item.quantity * item.unit_price;
-      db.run(
-        `INSERT INTO sale_invoice_items (invoice_id, item_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)`,
-        [
-          invoiceId,
-          item.item_type === "inventory" ? item.item_id : null,
-          item.quantity,
-          item.unit_price,
-          totalPrice,
-        ],
-      );
-      if (item.item_type === "inventory" && item.item_id) {
+
+      if (item.item_type === "inventory") {
+        // آیتم از انبار
+        db.run(
+          `INSERT INTO sale_invoice_items 
+           (invoice_id, item_id, quantity, unit_price, total_price, name, unit) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            invoiceId,
+            item.item_id,
+            item.quantity,
+            item.unit_price,
+            totalPrice,
+            item.name || null,
+            item.unit || null,
+          ],
+        );
         updateItemAfterSale(db, item.item_id, item.quantity, item.unit_price);
+      } else {
+        // آیتم دلخواه (custom)
+        db.run(
+          `INSERT INTO sale_invoice_items 
+           (invoice_id, item_id, quantity, unit_price, total_price, name, unit) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            invoiceId,
+            null, // ← item_id = null
+            item.quantity,
+            item.unit_price,
+            totalPrice,
+            item.name || "آیتم دلخواه", 
+            item.unit || "عدد", 
+          ],
+        );
       }
     }
 
@@ -307,6 +399,7 @@ exports.create = async (req, res) => {
       payment_status: paymentStatus,
     });
   } catch (error) {
+    console.error("Error in create:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -316,12 +409,16 @@ exports.updatePayment = async (req, res) => {
     const db = await getDb();
     const { id } = req.params;
     const { paid_amount } = req.body;
+
     const invoiceResult = db.exec(
       `SELECT total_amount FROM sale_invoices WHERE id = ?`,
       [id],
     );
-    if (!invoiceResult[0]?.values[0])
+
+    if (!invoiceResult[0]?.values[0]) {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+
     const totalAmount = invoiceResult[0].values[0][0];
     const paymentStatus =
       paid_amount >= totalAmount
@@ -329,6 +426,7 @@ exports.updatePayment = async (req, res) => {
         : paid_amount > 0
           ? "partial"
           : "pending";
+
     db.run(
       `UPDATE sale_invoices SET paid_amount = ?, payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [paid_amount, paymentStatus, id],
@@ -339,6 +437,7 @@ exports.updatePayment = async (req, res) => {
       payment_status: paymentStatus,
     });
   } catch (error) {
+    console.error("Error in updatePayment:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -347,12 +446,16 @@ exports.delete = async (req, res) => {
   try {
     const db = await getDb();
     const { id } = req.params;
+
     const itemsResult = db.exec(
       `SELECT item_id, quantity FROM sale_invoice_items WHERE invoice_id = ?`,
       [id],
     );
-    if (!itemsResult[0]?.values.length)
+
+    if (!itemsResult[0]?.values.length) {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+
     for (const row of itemsResult[0].values) {
       const itemId = row[0];
       const quantity = row[1];
@@ -368,15 +471,18 @@ exports.delete = async (req, res) => {
           [newStock, itemId],
         );
         db.run(
-          `INSERT INTO inventory_transactions (item_id, type, quantity, reference_id, reference_type, note) VALUES (?, 'adjustment', ?, ?, 'sale_invoice', ?)`,
+          `INSERT INTO inventory_transactions (item_id, type, quantity, reference_id, reference_type, note) 
+           VALUES (?, 'adjustment', ?, ?, 'sale_invoice', ?)`,
           [itemId, quantity, id, "ابطال فاکتور فروش"],
         );
       }
     }
+
     db.run(`DELETE FROM sale_invoices WHERE id = ?`, [id]);
     saveDb();
     res.json({ message: "فاکتور فروش حذف و موجودی کالاها بازگردانده شد" });
   } catch (error) {
+    console.error("Error in delete:", error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -252,6 +252,45 @@ function initSchema() {
   CREATE INDEX IF NOT EXISTS idx_sale_invoices_date ON sale_invoices(invoice_date);
   CREATE INDEX IF NOT EXISTS idx_sale_invoice_items_invoice ON sale_invoice_items(invoice_id);
 `);
+  try {
+    db.run(`ALTER TABLE sale_invoice_items ADD COLUMN name TEXT`);
+    console.log("✅ ستون name به sale_invoice_items اضافه شد");
+  } catch (e) {
+    // ستون از قبل وجود داره - بی‌خیال
+    console.log("ℹ️ ستون name قبلاً وجود داشت");
+  }
+
+  try {
+    db.run(`ALTER TABLE sale_invoice_items ADD COLUMN unit TEXT`);
+    console.log("✅ ستون unit به sale_invoice_items اضافه شد");
+  } catch (e) {
+    console.log("ℹ️ ستون unit قبلاً وجود داشت");
+  }
+
+  try {
+    db.run(`ALTER TABLE sale_invoice_items ADD COLUMN discount_type TEXT`);
+    console.log("✅ ستون discount_type به sale_invoice_items اضافه شد");
+  } catch (e) {
+    console.log("ℹ️ ستون discount_type قبلاً وجود داشت");
+  }
+
+  try {
+    db.run(
+      `ALTER TABLE sale_invoice_items ADD COLUMN discount_value REAL DEFAULT 0`,
+    );
+    console.log("✅ ستون discount_value به sale_invoice_items اضافه شد");
+  } catch (e) {
+    console.log("ℹ️ ستون discount_value قبلاً وجود داشت");
+  }
+
+  try {
+    db.run(
+      `ALTER TABLE sale_invoice_items ADD COLUMN discount_amount REAL DEFAULT 0`,
+    );
+    console.log("✅ ستون discount_amount به sale_invoice_items اضافه شد");
+  } catch (e) {
+    console.log("ℹ️ ستون discount_amount قبلاً وجود داشت");
+  }
 
   // Settings table
   db.run(`

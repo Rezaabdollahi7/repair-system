@@ -1,4 +1,3 @@
-// src/components/SaleInvoiceDetailModal.jsx
 import { useState, useEffect } from "react";
 import {
   getSaleInvoice,
@@ -19,6 +18,9 @@ import {
   PrinterIcon,
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
+  UserIcon,
+  PhoneIcon,
+  CalendarIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency } from "../utils/formatters";
 
@@ -130,13 +132,17 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-6xl my-8"
+        className="bg-white rounded-xl shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-xl font-bold text-gray-900">فاکتور فروش</h2>
+        {/* هدر */}
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
+            <CurrencyDollarIcon className="w-5 h-5 text-gray-600" />
+            جزئیات فاکتور فروش
+          </h2>
           <button
             onClick={onClose}
             className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
@@ -145,114 +151,267 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           {loading ? (
-            <div className="text-center py-10">در حال بارگذاری...</div>
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center py-10">در حال بارگذاری...</div>
+            </div>
           ) : invoice ? (
             <>
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-mono text-gray-700">
-                    {invoice.invoice_number}
-                  </span>
-                  <PaymentStatusBadge status={invoice.payment_status} />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowPreview(true)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-                  >
-                    <PrinterIcon className="w-4 h-4" />
-                    چاپ
-                  </button>
-                  {isAtLeast("admin") && (
+              {/* هدر اطلاعات فاکتور */}
+              <div className="bg-gradient-to-r from-blue-50 to-white rounded-2xl shadow-sm border border-blue-100 p-4 sm:p-6 mb-4 sm:mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-lg font-mono font-bold text-gray-700">
+                      {invoice.invoice_number}
+                    </span>
+                    <PaymentStatusBadge status={invoice.payment_status} />
+                  </div>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                      onClick={() => setShowPreview(true)}
+                      className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
                     >
-                      <TrashIcon className="w-4 h-4" />
-                      حذف
+                      <PrinterIcon className="w-4 h-4" />
+                      چاپ
                     </button>
-                  )}
+                    {isAtLeast("admin") && (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 text-sm"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        حذف
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 space-y-6">
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      اطلاعات فاکتور
-                    </h3>
-                    <InfoRow
-                      label="شماره فاکتور"
-                      value={invoice.invoice_number}
-                      highlight
-                    />
-                    <InfoRow
-                      label="مشتری"
-                      value={invoice.customer_name || "—"}
-                    />
-                    <InfoRow
-                      label="شماره تماس"
-                      value={invoice.customer_phone || "—"}
-                    />
-                    <InfoRow
-                      label="تاریخ"
-                      value={formatDate(invoice.invoice_date)}
-                    />
-                    {invoice.note && (
-                      <InfoRow label="توضیحات" value={invoice.note} />
-                    )}
+              {/* ===== اطلاعات فاکتور (افقی) ===== */}
+              <div className="bg-white shadow rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-gray-600" />
+                  اطلاعات فاکتور
+                </h3>
 
-                    {/* ===== اطلاعات دستگاه - اضافه شد ===== */}
-                    {invoice.device_id && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                          <DevicePhoneMobileIcon className="w-4 h-4 text-blue-600" />
-                          اطلاعات دستگاه
-                        </h4>
-                        <InfoRow
-                          label="نام دستگاه"
-                          value={invoice.device_name || "—"}
-                        />
-                        {invoice.brand && (
-                          <InfoRow label="برند" value={invoice.brand} />
-                        )}
-                        {invoice.model && (
-                          <InfoRow label="مدل" value={invoice.model} />
-                        )}
-                        {invoice.serial_number && (
-                          <InfoRow
-                            label="سریال"
-                            value={invoice.serial_number}
-                          />
-                        )}
-                        {invoice.device_id && (
-                          <InfoRow label="کد پذیرش" value={invoice.device_id} />
-                        )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      شماره فاکتور
+                    </label>
+                    <p className="text-sm font-medium text-gray-900 font-mono">
+                      {invoice.invoice_number}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      مشتری
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {invoice.customer_name || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      شماره تماس
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {invoice.customer_phone || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      تاریخ
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {formatDate(invoice.invoice_date)}
+                    </p>
+                  </div>
+                </div>
+
+                {invoice.note && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      توضیحات
+                    </label>
+                    <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg">
+                      {invoice.note}
+                    </p>
+                  </div>
+                )}
+
+                {/* اطلاعات دستگاه */}
+                {invoice.device_id && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                      <DevicePhoneMobileIcon className="w-4 h-4 text-blue-600" />
+                      اطلاعات دستگاه
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          نام دستگاه
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {invoice.device_name || "—"}
+                        </p>
+                      </div>
+                      {invoice.brand && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            برند
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {invoice.brand}
+                          </p>
+                        </div>
+                      )}
+                      {invoice.model && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            مدل
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {invoice.model}
+                          </p>
+                        </div>
+                      )}
+                      {invoice.serial_number && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            سریال
+                          </label>
+                          <p className="text-sm text-gray-900 font-mono">
+                            {invoice.serial_number}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== گرید اصلی: اقلام فاکتور (9/12) + خلاصه پرداخت (3/12) ===== */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+                {/* ستون چپ - اقلام فاکتور (9/12) */}
+                <div className="lg:col-span-9">
+                  <div className="bg-white shadow rounded-lg p-3 sm:p-4">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                      <CurrencyDollarIcon className="w-5 h-5 text-gray-600" />
+                      اقلام فاکتور
+                    </h3>
+
+                    {invoice.items?.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 border-2 border-dashed rounded-lg">
+                        <p>هیچ آیتمی در این فاکتور وجود ندارد</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse border border-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="border border-gray-200 px-3 py-2 text-right text-xs font-medium text-gray-500">
+                                کد
+                              </th>
+                              <th className="border border-gray-200 px-3 py-2 text-right text-xs font-medium text-gray-500">
+                                نام
+                              </th>
+                              <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-500">
+                                تعداد
+                              </th>
+                              <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-500">
+                                واحد
+                              </th>
+                              <th className="border border-gray-200 px-3 py-2 text-left text-xs font-medium text-gray-500">
+                                قیمت واحد
+                              </th>
+                              <th className="border border-gray-200 px-3 py-2 text-left text-xs font-medium text-gray-500">
+                                جمع
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {invoice.items?.map((item) => (
+                              <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="border border-gray-200 px-3 py-2 text-sm font-mono text-center">
+                                  {item.item_code || "—"}
+                                </td>
+                                <td className="border border-gray-200 px-3 py-2 text-sm">
+                                  {item.item_id ? (
+                                    <button
+                                      onClick={() => {
+                                        onClose();
+                                        openItemDetail(item.item_id);
+                                      }}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {item.item_name}
+                                    </button>
+                                  ) : (
+                                    item.item_name || "—"
+                                  )}
+                                </td>
+                                <td className="border border-gray-200 px-3 py-2 text-sm text-center">
+                                  {item.quantity}
+                                </td>
+                                <td className="border border-gray-200 px-3 py-2 text-sm text-center text-gray-600">
+                                  {item.item_unit || "—"}
+                                </td>
+                                <td className="border border-gray-200 px-3 py-2 text-sm text-left">
+                                  {formatPersianCurrency(item.unit_price)}
+                                </td>
+                                <td className="border border-gray-200 px-3 py-2 text-sm font-medium text-left">
+                                  {formatPersianCurrency(item.total_price)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50">
+                            <tr>
+                              <td
+                                colSpan={5}
+                                className="border border-gray-200 px-3 py-2 text-left font-medium"
+                              >
+                                جمع کل (ریال):
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2 text-sm font-bold text-left">
+                                {formatPersianCurrency(invoice.total_amount)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
                       </div>
                     )}
                   </div>
+                </div>
 
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      پرداخت
+                {/* ستون راست - خلاصه پرداخت (3/12) */}
+                <div className="lg:col-span-3">
+                  <div className="bg-white shadow rounded-lg p-4 sm:p-6 sticky top-24">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">
+                      خلاصه پرداخت
                     </h3>
-                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                      <div className="flex justify-between mb-2">
-                        <span>جمع کل:</span>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-2 text-sm border-b border-gray-100">
+                        <span className="text-gray-600">جمع کل (ریال):</span>
                         <span className="font-bold">
                           {formatPersianCurrency(invoice.total_amount)}
                         </span>
                       </div>
-                      <div className="flex justify-between mb-2">
-                        <span>دریافت شده:</span>
+
+                      <div className="flex justify-between py-2 text-sm border-b border-gray-100">
                         <span className="text-green-600">
+                          دریافت شده (ریال):
+                        </span>
+                        <span className="font-medium text-green-600">
                           {formatPersianCurrency(invoice.paid_amount)}
                         </span>
                       </div>
-                      <div className="flex justify-between pt-2 border-t">
-                        <span>مانده:</span>
+
+                      <div className="flex justify-between py-2 text-sm font-bold border-t border-gray-200">
+                        <span>مانده (ریال):</span>
                         <span
                           className={
                             invoice.total_amount - invoice.paid_amount > 0
@@ -266,102 +425,31 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                         </span>
                       </div>
                     </div>
+
                     {invoice.payment_status !== "paid" && (
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max={invoice.total_amount}
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          className="flex-1 border rounded-lg px-3 py-2 text-sm"
-                        />
-                        <button
-                          onClick={handlePaymentUpdate}
-                          disabled={updatingPayment}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {updatingPayment ? "..." : "ذخیره"}
-                        </button>
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          بروزرسانی پرداخت (ریال)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max={invoice.total_amount}
+                            value={paymentAmount}
+                            onChange={(e) => setPaymentAmount(e.target.value)}
+                            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                          />
+                          <button
+                            onClick={handlePaymentUpdate}
+                            disabled={updatingPayment}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {updatingPayment ? "..." : "ذخیره"}
+                          </button>
+                        </div>
                       </div>
                     )}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-2">
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      اقلام فاکتور
-                    </h3>
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                            کد
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                            نام
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                            تعداد
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                            واحد
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                            قیمت واحد
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">
-                            جمع
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {invoice.items?.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-4 py-3 text-sm font-mono">
-                              {item.item_code}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <button
-                                onClick={() => {
-                                  onClose();
-                                  openItemDetail(item.item_id);
-                                }}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {item.item_name}
-                              </button>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {item.quantity}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">
-                              {item.item_unit}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {formatPersianCurrency(item.unit_price)}
-                            </td>
-                            <td className="px-4 py-3 text-sm font-medium">
-                              {formatPersianCurrency(item.total_price)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-gray-50">
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="px-4 py-3 text-left font-medium"
-                          >
-                            جمع کل:
-                          </td>
-                          <td className="px-4 py-3 text-sm font-bold">
-                            {formatPersianCurrency(invoice.total_amount)} ریال
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
                   </div>
                 </div>
               </div>

@@ -59,20 +59,20 @@ export default function StockReport() {
   const getStockStatusBadge = (status) => {
     if (status === "critical") {
       return (
-        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-100 text-red-800 rounded-full text-xs">
+        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-danger-soft text-danger rounded-full text-xs">
           اتمام موجودی
         </span>
       );
     }
     if (status === "low") {
       return (
-        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-warning-soft text-warning rounded-full text-xs">
           کم‌موجود
         </span>
       );
     }
     return (
-      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 rounded-full text-xs">
+      <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-success-soft text-success rounded-full text-xs">
         موجودی کافی
       </span>
     );
@@ -81,22 +81,22 @@ export default function StockReport() {
   return (
     <div dir="rtl" className="px-2 sm:px-0 mx-auto">
       <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex gap-2 items-center">
-          <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+        <h1 className="text-xl sm:text-2xl font-bold text-text-primary flex gap-2 items-center">
+          <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
           گزارش موجودی انبار
         </h1>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+      <div className="bg-surface shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-end">
           <div className="w-full sm:w-auto">
-            <label className="block text-xs text-gray-600 mb-1">
+            <label className="block text-xs text-text-secondary mb-1">
               دسته‌بندی
             </label>
             <select
               value={filters.categoryId}
               onChange={(e) => handleFilterChange("categoryId", e.target.value)}
-              className="w-full sm:w-auto border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full sm:w-auto border border-border rounded-lg px-3 py-2 text-sm bg-surface text-text-primary"
             >
               <option value="">همه</option>
               {categories.map((cat) => (
@@ -114,16 +114,16 @@ export default function StockReport() {
                 onChange={(e) =>
                   handleFilterChange("lowStockOnly", e.target.checked)
                 }
-                className="w-4 h-4 text-blue-600"
+                className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
               />
-              <span className="text-xs sm:text-sm text-gray-700">
+              <span className="text-xs sm:text-sm text-text-primary">
                 فقط کالاهای کم‌موجود
               </span>
             </label>
           </div>
           <button
             onClick={applyFilters}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm w-full sm:w-auto"
+            className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover text-sm w-full sm:w-auto"
           >
             اعمال فیلتر
           </button>
@@ -132,27 +132,27 @@ export default function StockReport() {
 
       {report && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-white rounded-lg shadow p-3 sm:p-4">
-            <p className="text-xs sm:text-sm text-gray-600">کل کالاها</p>
-            <p className="text-lg sm:text-2xl font-bold">
+          <div className="bg-surface rounded-lg shadow p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-text-secondary">کل کالاها</p>
+            <p className="text-lg sm:text-2xl font-bold text-text-primary">
               {report.summary.total_items}
             </p>
           </div>
-          <div className="bg-yellow-50 rounded-lg shadow p-3 sm:p-4 border border-yellow-200">
-            <p className="text-xs sm:text-sm text-yellow-700">کم‌موجود</p>
-            <p className="text-lg sm:text-2xl font-bold text-yellow-800">
+          <div className="bg-warning-soft rounded-lg shadow p-3 sm:p-4 border border-warning-soft">
+            <p className="text-xs sm:text-sm text-warning">کم‌موجود</p>
+            <p className="text-lg sm:text-2xl font-bold text-warning">
               {report.summary.low_stock_count}
             </p>
           </div>
-          <div className="bg-red-50 rounded-lg shadow p-3 sm:p-4 border border-red-200">
-            <p className="text-xs sm:text-sm text-red-700">اتمام موجودی</p>
-            <p className="text-lg sm:text-2xl font-bold text-red-800">
+          <div className="bg-danger-soft rounded-lg shadow p-3 sm:p-4 border border-danger-soft">
+            <p className="text-xs sm:text-sm text-danger">اتمام موجودی</p>
+            <p className="text-lg sm:text-2xl font-bold text-danger">
               {report.summary.critical_count}
             </p>
           </div>
-          <div className="bg-blue-50 rounded-lg shadow p-3 sm:p-4 border border-blue-200">
-            <p className="text-xs sm:text-sm text-blue-700">ارزش کل موجودی</p>
-            <p className="text-base sm:text-xl font-bold text-blue-800 break-words">
+          <div className="bg-primary-soft rounded-lg shadow p-3 sm:p-4 border border-primary-soft">
+            <p className="text-xs sm:text-sm text-primary">ارزش کل موجودی</p>
+            <p className="text-base sm:text-xl font-bold text-primary break-words">
               {formatPersianCurrency(report.summary.total_inventory_value)} ریال
             </p>
           </div>
@@ -160,64 +160,64 @@ export default function StockReport() {
       )}
 
       {loading ? (
-        <div className="text-center py-10 text-sm sm:text-base">
+        <div className="text-center py-10 text-sm sm:text-base text-text-secondary">
           در حال بارگذاری...
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
-          <table className="min-w-[720px] sm:min-w-full divide-y divide-gray-200">
-            <thead className="bg-yellow-300">
+        <div className="bg-surface shadow rounded-lg overflow-hidden overflow-x-auto">
+          <table className="min-w-[720px] sm:min-w-full divide-y divide-border">
+            <thead className="bg-primary-soft">
               <tr>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
                   کد
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
                   نام کالا
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
                   دسته‌بندی
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
                   موجودی
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
                   حداقل
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500  border-l text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
                   وضعیت
                 </th>
-                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center  font-semibold text-black border-b border-gray-500   text-xs sm:text-sm">
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border text-xs sm:text-sm">
                   ارزش موجودی
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border">
               {report?.data.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono text-center border-l border-gray-600 ">
+                <tr key={item.id} className="hover:bg-surface-alt">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono text-center border-l border-border text-text-primary">
                     {item.code}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-gray-600 ">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-border">
                     <button
                       onClick={() => openItemDetail(item.id)}
-                      className="text-blue-600 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       {item.name}
                     </button>
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 text-center border-l border-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-text-secondary text-center border-l border-border">
                     {item.category_name || "—"}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-center border-l border-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-center border-l border-border text-text-primary">
                     {item.current_stock} {item.unit}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 text-center border-l border-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-text-secondary text-center border-l border-border">
                     {item.min_stock} {item.unit}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-center border-l border-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-center border-l border-border">
                     {getStockStatusBadge(item.stock_status)}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center  border-gray-600">
+                  <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-border text-text-primary">
                     {formatPersianCurrency(
                       item.current_stock * item.avg_purchase_price,
                     )}{" "}

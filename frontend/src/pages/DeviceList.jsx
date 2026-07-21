@@ -38,14 +38,17 @@ function useDebounce(value, delay = 400) {
 function InvoiceStatusBadge({ device }) {
   const getInvoiceStatus = () => {
     if (device.needs_invoice === 0) {
-      return { label: "فاکتور نیاز ندارد", color: "bg-blue-100 text-blue-800" };
+      return {
+        label: "فاکتور نیاز ندارد",
+        color: "bg-primary-soft text-primary",
+      };
     }
     if (device.invoice_count > 0) {
       return device.invoice_status === "paid"
-        ? { label: "پرداخت شده", color: "bg-green-100 text-green-800" }
-        : { label: "پرداخت نشده", color: "bg-red-100 text-red-800" };
+        ? { label: "پرداخت شده", color: "bg-success-soft text-success" }
+        : { label: "پرداخت نشده", color: "bg-danger-soft text-danger" };
     }
-    return { label: "فاکتور ندارد", color: "bg-yellow-100 text-yellow-800" };
+    return { label: "فاکتور ندارد", color: "bg-warning-soft text-warning" };
   };
 
   const status = getInvoiceStatus();
@@ -65,33 +68,42 @@ function StatusBadge({ status, onStatusChange }) {
   const map = {
     pending: {
       label: "در انتظار بررسی",
-      color: "bg-yellow-100 text-yellow-800",
+      color: "bg-warning-soft text-warning",
     },
-    diagnosing: { label: "در حال بررسی", color: "bg-cyan-100 text-cyan-800" },
+    diagnosing: {
+      label: "در حال بررسی",
+      color: "bg-primary-soft text-primary",
+    },
     waiting_for_parts: {
       label: "در انتظار قطعه",
-      color: "bg-orange-100 text-orange-800",
+      color: "bg-warning-soft text-warning",
     },
     repairing: {
       label: "در حال تعمیر",
-      color: "bg-purple-100 text-purple-800",
+      color: "bg-primary-soft text-primary",
     },
-    repaired: { label: "تعمیر شده", color: "bg-gray-100 text-gray-800" },
+    repaired: {
+      label: "تعمیر شده",
+      color: "bg-surface-alt text-text-secondary",
+    },
     delivered: {
       label: "تحویل داده شده",
-      color: "bg-green-100 text-green-800",
+      color: "bg-success-soft text-success",
     },
     ready_for_pickup: {
       label: "آماده تحویل",
-      color: "bg-blue-100 text-blue-800",
+      color: "bg-primary-soft text-primary",
     },
-    unrepairable: { label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
-    not_repaired: { label: "تعمیر نشد", color: "bg-orange-100 text-red-800" },
+    unrepairable: {
+      label: "غیرقابل تعمیر",
+      color: "bg-danger-soft text-danger",
+    },
+    not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
   };
 
   const current = map[status] || {
     label: status,
-    color: "bg-gray-100 text-gray-600",
+    color: "bg-surface-alt text-text-secondary",
   };
 
   return (
@@ -107,7 +119,7 @@ function StatusBadge({ status, onStatusChange }) {
             e.stopPropagation();
             setShowModal(true);
           }}
-          className="p-0.5 rounded-full text-gray-400 hover:text-blue-600 group-hover:text-white hover:bg-blue-50 transition-colors"
+          className="p-0.5 rounded-full text-text-secondary hover:text-primary group-hover:text-text-inverse hover:opacity-80 transition-colors"
           title="تغییر وضعیت"
         >
           <ArrowsRightLeftIcon className="size-5" />
@@ -121,12 +133,14 @@ function StatusBadge({ status, onStatusChange }) {
           onClick={() => setShowModal(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
+            className="bg-surface rounded-xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
             dir="rtl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900">تغییر وضعیت</h3>
+            <div className="p-4 border-b border-border">
+              <h3 className="text-sm font-bold text-text-primary">
+                تغییر وضعیت
+              </h3>
             </div>
             <div className="p-2">
               {Object.entries(map).map(([key, val]) => (
@@ -139,7 +153,7 @@ function StatusBadge({ status, onStatusChange }) {
                   className={`w-full text-right px-4 py-3 rounded-lg text-sm font-medium transition-colors mb-1 ${
                     key === status
                       ? `${val.color} ring-2 ring-inset`
-                      : "text-gray-700 hover:bg-gray-50"
+                      : "text-text-primary hover:bg-surface-alt"
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -163,10 +177,10 @@ function StatusBadge({ status, onStatusChange }) {
                 </button>
               ))}
             </div>
-            <div className="p-2 border-t border-gray-100">
+            <div className="p-2 border-t border-border">
               <button
                 onClick={() => setShowModal(false)}
-                className="w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                className="w-full px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-alt rounded-lg transition-colors"
               >
                 انصراف
               </button>
@@ -185,11 +199,11 @@ function formatDate(dateStr) {
 
 function AssigneeBadge({ assignees }) {
   if (!assignees || assignees.length === 0) {
-    return <span className="text-gray-400 text-xs">—</span>;
+    return <span className="text-text-secondary text-xs">—</span>;
   }
   if (assignees.length === 1) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary">
         {assignees[0].name}
       </span>
     );
@@ -197,7 +211,7 @@ function AssigneeBadge({ assignees }) {
   return (
     <span
       title={assignees.map((a) => a.name).join("، ")}
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-800 cursor-help"
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary cursor-help"
     >
       مشترک ({assignees.length} نفر)
     </span>
@@ -362,26 +376,26 @@ export default function DeviceList() {
     <div dir="rtl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex gap-2">
-          <WrenchScrewdriverIcon className="w-6 h-6 text-gray-600" />
+        <h1 className="text-2xl font-bold text-text-primary flex gap-2">
+          <WrenchScrewdriverIcon className="w-6 h-6 text-text-secondary" />
           دستگاه‌ها
         </h1>
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="flex-1 sm:flex-none bg-success text-text-inverse px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm hover:opacity-80"
           >
             <FunnelIcon className="w-5 h-5" />
             <span>فیلترها</span>
             {activeFilterCount > 0 && (
-              <span className="bg-white text-green-600 text-xs font-bold rounded-full  py-1 px-2.5 flex items-center">
+              <span className="bg-surface text-success text-xs font-bold rounded-full  py-1 px-2.5 flex items-center">
                 {activeFilterCount}
               </span>
             )}
           </button>
           <button
             onClick={() => openDeviceEdit(null)}
-            className="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="flex-1 sm:flex-none bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 transition-colors shadow-sm"
           >
             <PlusIcon className="w-5 h-5" />
             ثبت دستگاه جدید
@@ -395,7 +409,7 @@ export default function DeviceList() {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس..."
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
         />
         <FilterPanel
           isOpen={filterOpen}
@@ -417,90 +431,90 @@ export default function DeviceList() {
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : devices.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-text-secondary">
           {searchInput
             ? `نتیجه‌ای برای "${searchInput}" یافت نشد`
             : "هیچ دستگاهی ثبت نشده"}
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-surface shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1400px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-yellow-300">
+            <table className="min-w-[1400px] lg:min-w-full divide-y divide-border">
+              <thead className="bg-primary-soft">
                 <tr>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     شماره پذیرش
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     شماره تماس
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     نوع دستگاه
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     برند
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     وضعیت دستگاه
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تعمیرکار
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تاریخ ثبت
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تاریخ خروج
                   </th>
 
                   {isAtLeast("admin") && (
                     <>
-                      <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500  border-l  ">
+                      <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                         وضعیت پرداخت
                       </th>
-                      <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500    ">
+                      <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
                         عملیات
                       </th>
                     </>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {devices.map((device, index) => (
                   <tr
                     key={device.id}
                     onClick={() => openDeviceEdit(device.id)}
-                    className={`hover:bg-gray-500 hover:text-white transition-colors hover:cursor-pointer group ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
+                    className={`hover:bg-primary hover:text-text-inverse transition-colors hover:cursor-pointer group ${
+                      index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 font-mono">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border font-mono text-text-primary group-hover:text-text-inverse">
                       {device.id}
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           openCustomerDetail(device.customer_id);
                         }}
-                        className="text-blue-600 group-hover:text-white hover:underline font-medium"
+                        className="text-primary group-hover:text-text-inverse hover:underline font-medium"
                       >
                         {device.customer_name ?? "مشتری"}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
                       {device.customer_phone}
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-primary group-hover:text-text-inverse">
                       {device.device_name}
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-primary group-hover:text-text-inverse">
                       {device.brand ?? "—"}
                     </td>
-                    <td className="px-4 py-3 border-l border-gray-600">
+                    <td className="px-4 py-3 border-l border-border">
                       <StatusBadge
                         status={device.status}
                         onStatusChange={(newStatus) =>
@@ -508,19 +522,19 @@ export default function DeviceList() {
                         }
                       />
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse">
                       <AssigneeBadge assignees={device.assignees} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
                       {formatDate(device.entry_date)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 ">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
                       {formatDate(device.exit_date)}
                     </td>
 
                     {isAtLeast("admin") && (
                       <>
-                        <td className="px-4 py-3 flex  justify-center border-l border-gray-600">
+                        <td className="px-4 py-3 flex  justify-center border-l border-border">
                           <InvoiceStatusBadge
                             device={device}
                             onToggleNeedsInvoice={handleToggleNeedsInvoice}
@@ -528,7 +542,7 @@ export default function DeviceList() {
                           />
                         </td>
 
-                        <td className="px-4 py-3 text-sm text-center ">
+                        <td className="px-4 py-3 text-sm text-center">
                           <div className="flex gap-2 justify-end items-center">
                             {isAtLeast("admin") && (
                               <>
@@ -542,8 +556,8 @@ export default function DeviceList() {
                                     }}
                                     className={`p-2 rounded-lg transition-colors ${
                                       device.invoice_status === "paid"
-                                        ? "bg-green-50 text-green-600 hover:bg-green-100"
-                                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                                        ? "bg-success-soft text-success hover:opacity-80"
+                                        : "bg-danger-soft text-danger hover:opacity-80"
                                     }`}
                                     title={
                                       device.invoice_status === "paid"
@@ -559,7 +573,7 @@ export default function DeviceList() {
                                       e.stopPropagation();
                                       handleToggleNeedsInvoice(device.id, 1);
                                     }}
-                                    className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                                    className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                                     title=" اگر نیاز به فاکتور دارد - کلیک کنید"
                                   >
                                     <CheckCircleIcon className="w-5 h-5" />
@@ -571,7 +585,7 @@ export default function DeviceList() {
                                         e.stopPropagation();
                                         openSaleInvoiceCreate(device.id);
                                       }}
-                                      className="p-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
+                                      className="p-2 rounded-lg bg-warning-soft text-warning hover:opacity-80 transition-colors"
                                       title="ایجاد فاکتور فروش"
                                     >
                                       <DocumentCurrencyDollarIcon className="w-5 h-5" />
@@ -581,7 +595,7 @@ export default function DeviceList() {
                                         e.stopPropagation();
                                         handleToggleNeedsInvoice(device.id, 0);
                                       }}
-                                      className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                      className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                                       title="فاکتور لازم نیست"
                                     >
                                       <XCircleIcon className="w-5 h-5" />
@@ -589,7 +603,7 @@ export default function DeviceList() {
                                   </>
                                 )}
 
-                                <div className="w-px h-8 bg-gray-300 mx-1" />
+                                <div className="w-px h-8 bg-border mx-1" />
                               </>
                             )}
 
@@ -598,7 +612,7 @@ export default function DeviceList() {
                             e.stopPropagation();
                             openDeviceDetail(device.id);
                           }}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                           title="مشاهده جزئیات"
                         >
                           <EyeIcon className="w-5 h-5" />
@@ -608,7 +622,7 @@ export default function DeviceList() {
                             e.stopPropagation();
                             openDeviceEdit(device.id);
                           }}
-                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                          className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="w-5 h-5" />
@@ -619,7 +633,7 @@ export default function DeviceList() {
                                   e.stopPropagation();
                                   setDeleteTarget(device);
                                 }}
-                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                                className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
                                 title="حذف"
                               >
                                 <TrashIcon className="w-5 h-5" />

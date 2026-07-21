@@ -130,14 +130,14 @@ export default function PersonnelList() {
   return (
     <div dir="rtl">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <UserGroupIcon className="w-6 h-6 text-gray-600" />
+        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+          <UserGroupIcon className="w-6 h-6 text-text-secondary" />
           مدیریت پرسنل
         </h1>
         {canManage && (
           <button
             onClick={() => openPersonnelEdit(null)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
           >
             <PlusIcon className="w-5 h-5" />
             افزودن پرسنل
@@ -151,7 +151,7 @@ export default function PersonnelList() {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="جستجو در نام، نام کاربری، تلفن..."
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
         />
       </div>
 
@@ -160,78 +160,78 @@ export default function PersonnelList() {
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : personnel.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-text-secondary">
           {searchInput ? "نتیجه‌ای یافت نشد" : "پرسنلی ثبت نشده است"}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="bg-surface rounded-xl shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[700px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-yellow-300">
+            <table className="min-w-[700px] lg:min-w-full divide-y divide-border">
+              <thead className="bg-primary-soft">
                 <tr>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     نام
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     نام کاربری
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     نقش
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تلفن
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     وضعیت
                   </th>
                   {canManage && (
-                    <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                    <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                       عملیات
                     </th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {personnel.map((person, index) => (
                   <tr
                     key={person.id}
-                    className={`hover:bg-gray-500 group transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                    className={`hover:bg-primary group transition-colors ${index % 2 === 0 ? "bg-surface" : "bg-surface-alt"}`}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-center border-l border-gray-600">
-                      <div className="flex items-center justify-center gap-3 ">
-                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm ">
+                    <td className="px-4 py-3 whitespace-nowrap text-center border-l border-border">
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-sm">
                           {person.full_name?.charAt(0)}
                         </div>
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-white">
+                        <span className="text-sm font-medium text-text-primary group-hover:text-text-inverse">
                           {person.full_name}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-l border-gray-600 font-mono group-hover:text-white">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-l border-border font-mono group-hover:text-text-inverse text-text-primary">
                       {person.username}
                     </td>
-                    <td className=" py-3 whitespace-nowrap flex items-center justify-center border-l border-gray-600">
+                    <td className="py-3 whitespace-nowrap flex items-center justify-center border-l border-border">
                       <span
                         className={`mt-2.5 px-2 py-1 text-xs font-medium rounded-full items-center justify-center ${
                           person.role_name === "super_admin"
-                            ? "bg-purple-100 text-purple-700"
+                            ? "bg-primary-soft text-primary"
                             : person.role_name === "admin"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700"
+                              ? "bg-primary-soft text-primary"
+                              : "bg-surface-alt text-text-primary"
                         }`}
                       >
                         {person.role_label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 border-l border-gray-600 group-hover:text-white text-center">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary border-l border-border group-hover:text-text-inverse text-center">
                       {formatPersianPhone(person.phone)}
                     </td>
-                    <td className="px-4 py-4.5 whitespace-nowrap border-l border-gray-600 flex items-center justify-center">
+                    <td className="px-4 py-4.5 whitespace-nowrap border-l border-border flex items-center justify-center">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full  ${
+                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
                           person.is_active
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                            ? "bg-success-soft text-success"
+                            : "bg-danger-soft text-danger"
                         }`}
                       >
                         {person.is_active ? (
@@ -252,7 +252,7 @@ export default function PersonnelList() {
                           ) && (
                             <button
                               onClick={() => openPersonnelEdit(person.id)}
-                              className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                              className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
                               title="ویرایش"
                             >
                               <PencilSquareIcon className="size-5.5" />
@@ -266,7 +266,7 @@ export default function PersonnelList() {
                             ) && (
                               <button
                                 onClick={() => setToggleTarget(person)}
-                                className={`p-2 rounded-lg transition-colors ${person.is_active ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
+                                className={`p-2 rounded-lg transition-colors ${person.is_active ? "bg-warning-soft text-warning hover:opacity-80" : "bg-success-soft text-success hover:opacity-80"}`}
                                 title={
                                   person.is_active
                                     ? "غیرفعال‌سازی"
@@ -283,7 +283,7 @@ export default function PersonnelList() {
                           {canDelete && person.id !== user?.id && (
                             <button
                               onClick={() => setDeleteTarget(person)}
-                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                              className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
                               title="حذف"
                             >
                               <TrashIcon className="size-5.5" />

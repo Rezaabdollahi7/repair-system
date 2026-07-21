@@ -14,6 +14,7 @@ import {
   DocumentIcon,
 } from "@heroicons/react/24/solid";
 import { getBaseUrl } from "../utils/helpers";
+import ThemeSwitcher from "../components/ThemeSwitcher";
 
 function ImageUploadBox({ label, imagePath, type, onUpload }) {
   const [uploading, setUploading] = useState(false);
@@ -38,10 +39,10 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label className="block text-sm font-medium text-text-primary mb-2">
         {label}
       </label>
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 text-center">
+      <div className="border-2 border-dashed border-border rounded-lg p-3 sm:p-4 text-center">
         {imagePath ? (
           <div className="space-y-2">
             <img
@@ -49,13 +50,13 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
               alt={label}
               className="max-h-32 mx-auto object-contain"
             />
-            <p className="text-xs text-gray-500">تصویر آپلود شده</p>
+            <p className="text-xs text-text-secondary">تصویر آپلود شده</p>
           </div>
         ) : (
-          <PhotoIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-400 mb-2" />
+          <PhotoIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-text-secondary mb-2" />
         )}
         <label className="cursor-pointer inline-block mt-2">
-          <span className="bg-blue-50 text-blue-700 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm hover:bg-blue-100 transition">
+          <span className="bg-primary-soft text-primary px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm hover:opacity-80 transition">
             {uploading ? "در حال آپلود..." : "انتخاب تصویر"}
           </span>
           <input
@@ -66,7 +67,7 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
             className="hidden"
           />
         </label>
-        <p className="text-xs text-gray-400 mt-1">PNG, JPG تا ۵MB</p>
+        <p className="text-xs text-text-secondary mt-1">PNG, JPG تا ۵MB</p>
       </div>
     </div>
   );
@@ -76,18 +77,20 @@ function ToggleSwitch({ label, description, checked, onChange }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
       <div>
-        <span className="text-sm font-medium text-gray-700">{label}</span>
-        {description && <p className="text-xs text-gray-500">{description}</p>}
+        <span className="text-sm font-medium text-text-primary">{label}</span>
+        {description && (
+          <p className="text-xs text-text-secondary">{description}</p>
+        )}
       </div>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
-          checked ? "bg-blue-600" : "bg-gray-300"
+          checked ? "bg-primary" : "bg-border"
         }`}
       >
         <span
-          className={`inline-block size-4 transform rounded-full bg-white transition-transform ${
+          className={`inline-block size-4 transform rounded-full bg-surface transition-transform ${
             checked ? "-translate-x-1" : "-translate-x-6"
           }`}
         />
@@ -97,10 +100,10 @@ function ToggleSwitch({ label, description, checked, onChange }) {
 }
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, isAtLeast } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("company");
+  const [activeTab, setActiveTab] = useState("ui"); // ← تب پیش‌فرض "تنظیمات ظاهری"
   const [settings, setSettings] = useState({
     company_name: "",
     company_address: "",
@@ -131,40 +134,50 @@ export default function Settings() {
     sale_invoice_footer_text: "با تشکر از اعتماد شما",
   });
 
-  if (user?.role !== "super_admin") {
+  const isSuperAdmin = user?.role === "super_admin";
+
+  // بررسی دسترسی - فقط ادمین‌ها (admin و super_admin) می‌توانند وارد شوند
+  if (!isAtLeast("admin")) {
     return <Navigate to="/dashboard" replace />;
   }
 
   useEffect(() => {
-    getSettings()
-      .then((res) => {
-        const data = res.data;
-        setSettings({
-          ...data,
-          sale_invoice_show_logo: data.sale_invoice_show_logo === 1,
-          sale_invoice_show_company_info:
-            data.sale_invoice_show_company_info === 1,
-          sale_invoice_show_email: data.sale_invoice_show_email === 1,
-          sale_invoice_show_website: data.sale_invoice_show_website === 1,
-          sale_invoice_show_device_info:
-            data.sale_invoice_show_device_info === 1,
-          sale_invoice_show_customer_phone:
-            data.sale_invoice_show_customer_phone === 1,
-          sale_invoice_show_discount: data.sale_invoice_show_discount === 1,
-          sale_invoice_show_tax: data.sale_invoice_show_tax === 1,
-          sale_invoice_show_stamp: data.sale_invoice_show_stamp === 1,
-          sale_invoice_show_signature: data.sale_invoice_show_signature === 1,
-          sale_invoice_show_warranty: data.sale_invoice_show_warranty === 1,
-          sale_invoice_show_technician: data.sale_invoice_show_technician === 1,
+    // فقط سوپر ادمین تنظیمات را دریافت کند (کاربران عادی نیازی ندارند)
+    if (isSuperAdmin) {
+      getSettings()
+        .then((res) => {
+          const data = res.data;
+          setSettings({
+            ...data,
+            sale_invoice_show_logo: data.sale_invoice_show_logo === 1,
+            sale_invoice_show_company_info:
+              data.sale_invoice_show_company_info === 1,
+            sale_invoice_show_email: data.sale_invoice_show_email === 1,
+            sale_invoice_show_website: data.sale_invoice_show_website === 1,
+            sale_invoice_show_device_info:
+              data.sale_invoice_show_device_info === 1,
+            sale_invoice_show_customer_phone:
+              data.sale_invoice_show_customer_phone === 1,
+            sale_invoice_show_discount: data.sale_invoice_show_discount === 1,
+            sale_invoice_show_tax: data.sale_invoice_show_tax === 1,
+            sale_invoice_show_stamp: data.sale_invoice_show_stamp === 1,
+            sale_invoice_show_signature: data.sale_invoice_show_signature === 1,
+            sale_invoice_show_warranty: data.sale_invoice_show_warranty === 1,
+            sale_invoice_show_technician:
+              data.sale_invoice_show_technician === 1,
+          });
+        })
+        .catch(() => {
+          toast.error("خطا در دریافت تنظیمات");
+        })
+        .finally(() => {
+          setLoading(false);
         });
-      })
-      .catch(() => {
-        toast.error("خطا در دریافت تنظیمات");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+    } else {
+      // برای کاربران عادی، فقط تنظیمات ظاهری را نمایش می‌دهیم
+      setLoading(false);
+    }
+  }, [isSuperAdmin]);
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -184,6 +197,10 @@ export default function Settings() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      toast.error("شما مجوز ذخیره تنظیمات را ندارید");
+      return;
+    }
     setSaving(true);
 
     try {
@@ -224,26 +241,43 @@ export default function Settings() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64" dir="rtl">
-        <div className="text-gray-500">در حال بارگذاری...</div>
+        <div className="text-text-secondary">در حال بارگذاری...</div>
       </div>
     );
   }
 
+  // تعریف تب‌ها بر اساس نقش کاربر
   const tabs = [
-    { id: "company", label: "اطلاعات شرکت", icon: BuildingOfficeIcon },
-    { id: "images", label: "تصاویر", icon: PhotoIcon },
-    { id: "invoice", label: "پیش‌فرض فاکتور", icon: DocumentTextIcon },
-    { id: "template", label: "قالب فاکتور فروش", icon: Cog6ToothIcon },
+    { id: "ui", label: "تنظیمات ظاهری", icon: Cog6ToothIcon },
+    // فقط سوپر ادمین به این تب‌ها دسترسی دارد
+    ...(isSuperAdmin
+      ? [
+          { id: "company", label: "اطلاعات شرکت", icon: BuildingOfficeIcon },
+          { id: "images", label: "تصاویر", icon: PhotoIcon },
+          { id: "invoice", label: "پیش‌فرض فاکتور", icon: DocumentTextIcon },
+          { id: "template", label: "قالب فاکتور فروش", icon: Cog6ToothIcon },
+        ]
+      : []),
   ];
+
+  // اگر تب فعال در لیست تب‌ها نباشد، به "ui" تغییر دهید
+  if (!tabs.some((tab) => tab.id === activeTab)) {
+    setActiveTab("ui");
+  }
 
   return (
     <div dir="rtl" className="px-2 sm:px-4 mx-auto">
-      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 flex gap-2 items-center">
-        <Cog6ToothIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+      <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-4 sm:mb-6 flex gap-2 items-center">
+        <Cog6ToothIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
         تنظیمات
+        {!isSuperAdmin && (
+          <span className="text-sm font-normal text-text-secondary mr-2">
+            (دسترسی محدود - فقط تنظیمات ظاهری)
+          </span>
+        )}
       </h1>
 
-      <div className="border-b border-gray-200 mb-4 sm:mb-6 overflow-x-auto">
+      <div className="border-b border-border mb-4 sm:mb-6 overflow-x-auto">
         <nav className="flex gap-3 sm:gap-6 min-w-max">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -253,8 +287,8 @@ export default function Settings() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors ${
                   activeTab === tab.id
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-text-secondary hover:text-text-primary"
                 }`}
               >
                 <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -268,16 +302,24 @@ export default function Settings() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-        {activeTab === "company" && (
-          <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <BuildingOfficeIcon className="w-5 h-5 text-gray-600" />
+        {/* تب تنظیمات ظاهری - برای همه قابل مشاهده است */}
+        {activeTab === "ui" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <ThemeSwitcher />
+          </div>
+        )}
+
+        {/* تب‌های زیر فقط برای سوپر ادمین قابل مشاهده هستند */}
+        {isSuperAdmin && activeTab === "company" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <BuildingOfficeIcon className="w-5 h-5 text-text-secondary" />
               اطلاعات شرکت
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   نام شرکت/تعمیرگاه
                 </label>
                 <input
@@ -285,13 +327,13 @@ export default function Settings() {
                   name="company_name"
                   value={settings.company_name || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                   placeholder="مثلاً: تعمیرگاه تخصصی الکترونیک"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   شماره تماس
                 </label>
                 <input
@@ -299,13 +341,13 @@ export default function Settings() {
                   name="company_phone"
                   value={settings.company_phone || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                   placeholder="مثلاً: 021-12345678, 09123456789"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   آدرس
                 </label>
                 <textarea
@@ -313,13 +355,13 @@ export default function Settings() {
                   value={settings.company_address || ""}
                   onChange={handleChange}
                   rows="2"
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                   placeholder="آدرس کامل تعمیرگاه..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   ایمیل
                 </label>
                 <input
@@ -327,13 +369,13 @@ export default function Settings() {
                   name="company_email"
                   value={settings.company_email || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                   placeholder="info@example.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   وب‌سایت
                 </label>
                 <input
@@ -341,7 +383,7 @@ export default function Settings() {
                   name="company_website"
                   value={settings.company_website || ""}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                   placeholder="www.example.com"
                 />
               </div>
@@ -349,10 +391,10 @@ export default function Settings() {
           </div>
         )}
 
-        {activeTab === "images" && (
-          <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <PhotoIcon className="w-5 h-5 text-gray-600" />
+        {isSuperAdmin && activeTab === "images" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <PhotoIcon className="w-5 h-5 text-text-secondary" />
               تصاویر
             </h2>
 
@@ -379,16 +421,16 @@ export default function Settings() {
           </div>
         )}
 
-        {activeTab === "invoice" && (
-          <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <DocumentTextIcon className="w-5 h-5 text-gray-600" />
+        {isSuperAdmin && activeTab === "invoice" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <DocumentTextIcon className="w-5 h-5 text-text-secondary" />
               تنظیمات پیش‌فرض فاکتور
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   پیشوند شماره فاکتور
                 </label>
                 <input
@@ -396,12 +438,12 @@ export default function Settings() {
                   name="invoice_prefix"
                   value={settings.invoice_prefix || "INV-"}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   نرخ مالیات پیش‌فرض (%)
                 </label>
                 <input
@@ -412,12 +454,12 @@ export default function Settings() {
                   min="0"
                   max="100"
                   step="0.5"
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   مدت گارانتی پیش‌فرض (ماه)
                 </label>
                 <input
@@ -426,13 +468,13 @@ export default function Settings() {
                   value={settings.default_warranty_months || 3}
                   onChange={handleChange}
                   min="0"
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                 />
               </div>
             </div>
 
             <div className="mt-3 sm:mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-text-primary mb-2">
                 متن ثابت پایین فاکتور (برای فاکتور تعمیر)
               </label>
               <textarea
@@ -440,30 +482,30 @@ export default function Settings() {
                 value={settings.invoice_footer_text || ""}
                 onChange={handleChange}
                 rows="2"
-                className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                 placeholder="مثلاً: با تشکر از اعتماد شما - تحویل گرفته شد"
               />
             </div>
           </div>
         )}
 
-        {activeTab === "template" && (
-          <div className="bg-white shadow rounded-lg p-4 sm:p-6 overflow-x-auto">
-            <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <Cog6ToothIcon className="w-5 h-5 text-gray-600" />
+        {isSuperAdmin && activeTab === "template" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6 overflow-x-auto">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <Cog6ToothIcon className="w-5 h-5 text-text-secondary" />
               قالب فاکتور فروش
             </h2>
 
             <div className="space-y-4 sm:space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   اندازه کاغذ
                 </label>
                 <select
                   name="sale_invoice_paper_size"
                   value={settings.sale_invoice_paper_size || "A5"}
                   onChange={handleChange}
-                  className="w-full sm:w-64 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm bg-white"
+                  className="w-full sm:w-64 border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                 >
                   <option value="A4">A4 - حرفه‌ای (کامل)</option>
                   <option value="A5">A5 - نیمه‌حرفه‌ای (متوسط)</option>
@@ -472,10 +514,10 @@ export default function Settings() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                <h3 className="text-sm font-medium text-text-primary mb-3">
                   بخش‌های قابل نمایش
                 </h3>
-                <div className="space-y-1 border border-gray-200 rounded-lg divide-y divide-gray-200">
+                <div className="space-y-1 border border-border rounded-lg divide-y divide-border">
                   <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش لوگو"
@@ -588,12 +630,12 @@ export default function Settings() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                <h3 className="text-sm font-medium text-text-primary mb-3">
                   متون سفارشی
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-text-primary mb-2">
                       متن بالای فاکتور
                     </label>
                     <textarea
@@ -601,12 +643,12 @@ export default function Settings() {
                       value={settings.sale_invoice_header_text || ""}
                       onChange={handleChange}
                       rows="2"
-                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                       placeholder="متن دلخواه برای بالای فاکتور..."
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-text-primary mb-2">
                       متن پایین فاکتور
                     </label>
                     <textarea
@@ -617,7 +659,7 @@ export default function Settings() {
                       }
                       onChange={handleChange}
                       rows="2"
-                      className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm"
+                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                       placeholder="متن دلخواه برای پایین فاکتور..."
                     />
                   </div>
@@ -627,16 +669,19 @@ export default function Settings() {
           </div>
         )}
 
-        <div className="flex justify-center">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
-          >
-            <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-            {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
-          </button>
-        </div>
+        {/* دکمه ذخیره - فقط برای سوپر ادمین نمایش داده شود */}
+        {isSuperAdmin && (
+          <div className="flex justify-center">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
+            >
+              <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+              {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

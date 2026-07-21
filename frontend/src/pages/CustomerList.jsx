@@ -93,13 +93,13 @@ export default function CustomerList() {
   return (
     <div dir="rtl">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <UserIcon className="w-6 h-6 inline-block text-gray-600" />
+        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+          <UserIcon className="w-6 h-6 inline-block text-text-secondary" />
           مشتریان
         </h1>
         <button
           onClick={() => openCustomerEdit(null)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
           افزودن مشتری
@@ -112,7 +112,7 @@ export default function CustomerList() {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="جستجو بر اساس نام یا شماره تماس..."
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
         />
       </div>
 
@@ -121,50 +121,50 @@ export default function CustomerList() {
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : customers.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-text-secondary">
           {searchInput
             ? `نتیجه‌ای برای "${searchInput}" یافت نشد`
             : "هیچ مشتری‌ای ثبت نشده"}
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-surface shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[600px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-yellow-300">
+            <table className="min-w-[600px] lg:min-w-full divide-y divide-border">
+              <thead className="bg-primary-soft">
                 <tr>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     نام
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     شماره تماس
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تعداد دستگاه
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     عملیات
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {customers.map((c, index) => (
                   <tr
                     key={c.id}
                     onClick={() => openCustomerDetail(c.id)}
-                    className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
+                    className={`hover:bg-primary transition-colors cursor-pointer group ${
+                      index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm font-medium text-center border-l border-gray-600">
-                      <span className="text-blue-600 font-medium group-hover:text-white ">
+                    <td className="px-4 py-3 text-sm font-medium text-center border-l border-border">
+                      <span className="text-primary font-medium group-hover:text-text-inverse">
                         {c.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600 group-hover:text-white ">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse">
                       {formatPersianPhone(c.phone)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                    <td className="px-4 py-3 text-sm text-center border-l border-border">
+                      <span className="bg-primary-soft text-primary px-2 py-1 rounded-full text-xs">
                         {c.device_count ?? 0} دستگاه
                       </span>
                     </td>
@@ -175,7 +175,7 @@ export default function CustomerList() {
                             e.stopPropagation();
                             openCustomerDetail(c.id);
                           }}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                           title="مشاهده جزئیات"
                         >
                           <EyeIcon className="w-5 h-5" />
@@ -185,7 +185,7 @@ export default function CustomerList() {
                             e.stopPropagation();
                             openCustomerEdit(c.id);
                           }}
-                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                          className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="w-5 h-5" />
@@ -196,7 +196,7 @@ export default function CustomerList() {
                               e.stopPropagation();
                               setDeleteTarget(c);
                             }}
-                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
                             title="حذف"
                           >
                             <TrashIcon className="w-5 h-5" />

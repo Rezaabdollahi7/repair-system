@@ -35,26 +35,30 @@ function StatusBadge({ status }) {
   const map = {
     draft: {
       label: "پیش‌نویس",
-      color: "bg-gray-100 text-gray-800",
+      color: "bg-surface-alt text-text-primary",
       icon: DocumentTextIcon,
     },
     issued: {
       label: "صادر شده",
-      color: "bg-blue-100 text-blue-800",
+      color: "bg-primary-soft text-primary",
       icon: CheckCircleIcon,
     },
     paid: {
       label: "پرداخت شده",
-      color: "bg-green-100 text-green-800",
+      color: "bg-success-soft text-success",
       icon: CheckCircleIcon,
     },
     cancelled: {
       label: "ابطال شده",
-      color: "bg-red-100 text-red-800",
+      color: "bg-danger-soft text-danger",
       icon: XCircleIcon,
     },
   };
-  const s = map[status] || { label: status, color: "bg-gray-100", icon: null };
+  const s = map[status] || {
+    label: status,
+    color: "bg-surface-alt",
+    icon: null,
+  };
   const Icon = s.icon;
   return (
     <span
@@ -70,21 +74,21 @@ function PaymentStatusBadge({ status }) {
   const map = {
     paid: {
       label: "پرداخت شده",
-      color: "bg-green-100 text-green-800",
+      color: "bg-success-soft text-success",
       icon: CheckCircleIcon,
     },
     partial: {
       label: "پرداخت ناقص",
-      color: "bg-yellow-100 text-yellow-800",
+      color: "bg-warning-soft text-warning",
       icon: ExclamationCircleIcon,
     },
     pending: {
       label: "در انتظار",
-      color: "bg-orange-100 text-orange-800",
+      color: "bg-warning-soft text-warning",
       icon: ClockIcon,
     },
   };
-  const s = map[status] || { label: status, color: "bg-gray-100" };
+  const s = map[status] || { label: status, color: "bg-surface-alt" };
   const Icon = s.icon;
   return (
     <span
@@ -163,13 +167,13 @@ export default function RepairInvoiceList() {
   return (
     <div dir="rtl">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <WrenchScrewdriverIcon className="w-6 h-6 text-gray-600" />
+        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+          <WrenchScrewdriverIcon className="w-6 h-6 text-text-secondary" />
           فاکتورهای تعمیر
         </h1>
         <button
           onClick={() => openRepairInvoiceCreate()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
         >
           <PlusIcon className="w-5 h-5" />
           فاکتور جدید
@@ -178,19 +182,19 @@ export default function RepairInvoiceList() {
 
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex-1 min-w-[250px] relative">
-          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="جستجو در شماره فاکتور، مشتری یا دستگاه..."
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-full pr-10 pl-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white"
+          className="border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
         >
           {statusOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -204,7 +208,7 @@ export default function RepairInvoiceList() {
               setSearchInput("");
               setStatusFilter("");
             }}
-            className="text-sm text-gray-600 hover:text-gray-900 underline"
+            className="text-sm text-text-secondary hover:text-text-primary underline"
           >
             پاک کردن فیلترها
           </button>
@@ -216,50 +220,50 @@ export default function RepairInvoiceList() {
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : invoices.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-text-secondary">
           {searchInput || statusFilter
             ? "نتیجه‌ای یافت نشد"
             : "هیچ فاکتور تعمیری ثبت نشده"}
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-surface shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] lg:min-w-full  divide-y divide-gray-200">
-              <thead className="bg-yellow-300">
+            <table className="min-w-[1200px] lg:min-w-full divide-y divide-border">
+              <thead className="bg-primary-soft">
                 <tr>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     شماره فاکتور
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     دستگاه
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تاریخ
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مبلغ کل
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     پرداخت شده
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مانده
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     وضعیت
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     پرداخت
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500   ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
                     عملیات
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {invoices.map((invoice, index) => {
                   const remaining = invoice.total_amount - invoice.paid_amount;
                   const canEdit = invoice.status === "draft";
@@ -267,33 +271,33 @@ export default function RepairInvoiceList() {
                     <tr
                       key={invoice.id}
                       onClick={() => openRepairInvoiceDetail(invoice.id)}
-                      className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
-                        index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
+                      className={`hover:bg-primary transition-colors cursor-pointer group ${
+                        index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm font-mono font-medium  text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
                         {invoice.invoice_number}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                      <td className="px-4 py-3 text-sm text-center border-l border-border">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openDeviceDetail(invoice.device_id);
                           }}
-                          className="text-blue-600 hover:underline font-medium  group-hover:text-white "
+                          className="text-primary hover:underline font-medium group-hover:text-text-inverse"
                         >
                           {invoice.device_name}{" "}
                           {invoice.brand && `(${invoice.brand})`}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-sm text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse text-text-primary">
                         {invoice.customer_id ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               openCustomerDetail(invoice.customer_id);
                             }}
-                            className="text-blue-600 hover:underline font-medium group-hover:text-white "
+                            className="text-primary hover:underline font-medium group-hover:text-text-inverse"
                           >
                             {invoice.customer_name || "—"}
                           </button>
@@ -301,22 +305,22 @@ export default function RepairInvoiceList() {
                           invoice.customer_name || "—"
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                         {formatDate(invoice.invoice_date)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
                         {formatPersianCurrency(invoice.total_amount)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-green-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-success text-center border-l border-border group-hover:text-text-inverse">
                         {formatPersianCurrency(invoice.paid_amount)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-red-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-danger text-center border-l border-border group-hover:text-text-inverse">
                         {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-center border-l border-gray-600 group-hover:text-white ">
+                      <td className="px-4 py-3 text-center border-l border-border group-hover:text-text-inverse">
                         <StatusBadge status={invoice.status} />
                       </td>
-                      <td className="px-4 py-3 text-center border-l border-gray-600 group-hover:text-white ">
+                      <td className="px-4 py-3 text-center border-l border-border group-hover:text-text-inverse">
                         <PaymentStatusBadge status={invoice.payment_status} />
                       </td>
                       <td className="px-4 py-3 text-sm">
@@ -326,7 +330,7 @@ export default function RepairInvoiceList() {
                               e.stopPropagation();
                               openRepairInvoiceDetail(invoice.id);
                             }}
-                            className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                            className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                             title="جزئیات"
                           >
                             <EyeIcon className="w-5 h-5" />
@@ -337,7 +341,7 @@ export default function RepairInvoiceList() {
                                 e.stopPropagation();
                                 openRepairInvoiceEdit(invoice.id);
                               }}
-                              className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                              className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
                               title="ویرایش"
                             >
                               <PencilSquareIcon className="w-5 h-5" />
@@ -349,7 +353,7 @@ export default function RepairInvoiceList() {
                                 e.stopPropagation();
                                 setDeleteTarget(invoice);
                               }}
-                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                              className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
                               title="حذف"
                             >
                               <TrashIcon className="w-5 h-5" />

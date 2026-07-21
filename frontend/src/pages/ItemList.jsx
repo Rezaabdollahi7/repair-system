@@ -32,20 +32,20 @@ function useDebounce(value, delay = 400) {
 function StockBadge({ current, min }) {
   if (current === 0) {
     return (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 mx-auto">
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-danger-soft text-danger mx-auto">
         اتمام موجودی
       </span>
     );
   }
   if (current <= min) {
     return (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mx-auto">
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-warning-soft text-warning mx-auto">
         کم‌موجود ({current})
       </span>
     );
   }
   return (
-    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mx-auto">
+    <span className="px-2 py-1 rounded-full text-xs font-medium bg-success-soft text-success mx-auto">
       موجود ({current})
     </span>
   );
@@ -177,21 +177,21 @@ export default function ItemList() {
     <div dir="rtl">
       {/* Header - responsive */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <CubeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+        <h1 className="text-xl sm:text-2xl font-bold text-text-primary flex items-center gap-2">
+          <CubeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
           مدیریت کالاها
         </h1>
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="bg-indigo-100 text-indigo-700 px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-indigo-200 flex items-center gap-1 flex-1 sm:gap-2 text-sm"
+            className="bg-primary-soft text-primary px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:opacity-80 flex items-center gap-1 flex-1 sm:gap-2 text-sm"
           >
             <FolderPlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="lg:text-base">دسته‌بندی‌ها</span>
           </button>
           <button
             onClick={() => openItemEdit(null)}
-            className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 flex items-center gap-1 sm:gap-2 text-sm flex-1 sm:flex-none justify-center"
+            className="bg-primary text-text-inverse px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-primary-hover flex items-center gap-1 sm:gap-2 text-sm flex-1 sm:flex-none justify-center"
           >
             <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="lg:text-base">کالای جدید</span>
@@ -201,13 +201,13 @@ export default function ItemList() {
 
       <div className="mb-4 space-y-3">
         <div className="relative">
-          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="جستجو در کد، نام یا توضیحات..."
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pr-10 pl-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
           />
         </div>
 
@@ -215,7 +215,7 @@ export default function ItemList() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
           >
             <option value="">همه دسته‌بندی‌ها</option>
             {categories.map((cat) => (
@@ -230,15 +230,17 @@ export default function ItemList() {
               type="checkbox"
               checked={showLowStockOnly}
               onChange={(e) => setShowLowStockOnly(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
             />
-            <span className="text-sm text-gray-700">فقط کالاهای کم‌موجود</span>
+            <span className="text-sm text-text-primary">
+              فقط کالاهای کم‌موجود
+            </span>
           </label>
 
           {(searchInput || selectedCategory || showLowStockOnly) && (
             <button
               onClick={handleClearFilters}
-              className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4"
+              className="text-sm text-text-secondary hover:text-text-primary underline underline-offset-4"
             >
               پاک کردن فیلترها
             </button>
@@ -247,10 +249,10 @@ export default function ItemList() {
       </div>
 
       {!loading && items.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600">
+        <div className="mb-4 text-sm text-text-secondary">
           {total > 0 && <span>تعداد کل کالاها: {total} عدد</span>}
           {showLowStockOnly && (
-            <span className="mr-4 text-yellow-700">
+            <span className="mr-4 text-warning">
               تعداد کالاهای کم‌موجود: {items.length} عدد
             </span>
           )}
@@ -262,76 +264,76 @@ export default function ItemList() {
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-text-secondary">
           {searchInput || selectedCategory || showLowStockOnly
             ? "نتیجه‌ای یافت نشد"
             : "هیچ کالایی ثبت نشده"}
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-surface shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-yellow-300">
+            <table className="min-w-[1200px] lg:min-w-full divide-y divide-border">
+              <thead className="bg-primary-soft">
                 <tr>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     کد کالا
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     نام کالا
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     دسته‌بندی
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     واحد
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     وضعیت موجودی
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     حداقل موجودی
                   </th>
-                  <th className="px-4 py-3 text-center  font-semibold text-black border-b border-gray-500  border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     قیمت میانگین (ریال)
                   </th>
-                  <th className="px-4 py-3 text-center   font-semibold text-black border-b border-gray-500  ">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
                     عملیات
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {items.map((item, index) => (
                   <tr
                     key={item.id}
                     onClick={() => openItemDetail(item.id)}
-                    className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
+                    className={`hover:bg-primary transition-colors cursor-pointer group ${
+                      index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm font-mono font-medium  text-center border-l border-gray-600 group-hover:text-white">
+                    <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
                       {item.code || "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900  text-center border-l border-gray-600 ">
-                      <span className="text-blue-600 font-medium group-hover:text-white">
+                    <td className="px-4 py-3 text-sm font-medium text-text-primary text-center border-l border-border">
+                      <span className="text-primary font-medium group-hover:text-text-inverse">
                         {item.name}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                    <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                       {item.categoryName || "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                    <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                       {item.unit}
                     </td>
-                    <td className="px-4 py-3 text-center border-l border-gray-600">
+                    <td className="px-4 py-3 text-center border-l border-border">
                       <StockBadge
                         current={item.currentStock || 0}
                         min={item.minStock || 0}
                       />
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                    <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                       {item.minStock || 0}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                    <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                       {item.avgPurchasePrice
                         ? formatPersianCurrency(item.avgPurchasePrice)
                         : "—"}
@@ -343,7 +345,7 @@ export default function ItemList() {
                             e.stopPropagation();
                             openItemDetail(item.id);
                           }}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                           title="مشاهده جزئیات"
                         >
                           <EyeIcon className="size-5.5" />
@@ -353,7 +355,7 @@ export default function ItemList() {
                             e.stopPropagation();
                             openItemEdit(item.id);
                           }}
-                          className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                          className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="size-5.5" />
@@ -364,7 +366,7 @@ export default function ItemList() {
                               e.stopPropagation();
                               setDeleteTarget(item);
                             }}
-                            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
                             title="حذف"
                           >
                             <TrashIcon className="size-5.5" />

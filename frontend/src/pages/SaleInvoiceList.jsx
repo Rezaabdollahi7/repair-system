@@ -32,24 +32,30 @@ function useDebounce(value, delay = 400) {
 }
 
 function PaymentStatusBadge({ status }) {
+  // رنگ‌های وضعیت به success/warning/danger وصل شدن، نه primary،
+  // چون این‌ها معنای ثابت دارن (پرداخت‌شده = همیشه سبز) و نباید
+  // با تغییر تم رنگ برند عوض بشن
   const map = {
     paid: {
       label: "پرداخت شده",
-      color: "bg-green-100 text-green-800",
+      color: "bg-success-soft text-success",
       icon: CheckCircleIcon,
     },
     partial: {
       label: "پرداخت ناقص",
-      color: "bg-yellow-100 text-yellow-800",
+      color: "bg-warning-soft text-warning",
       icon: ExclamationCircleIcon,
     },
     pending: {
       label: "در انتظار پرداخت",
-      color: "bg-orange-100 text-orange-800",
+      color: "bg-danger-soft text-danger",
       icon: ClockIcon,
     },
   };
-  const s = map[status] || { label: status, color: "bg-gray-100" };
+  const s = map[status] || {
+    label: status,
+    color: "bg-surface-alt text-text-secondary",
+  };
   const Icon = s.icon;
   return (
     <span
@@ -151,28 +157,28 @@ export default function SaleInvoiceList() {
 
   return (
     <div dir="rtl">
-      {/* هدر با دکمه فیلتر سبز */}
+      {/* هدر */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <CurrencyDollarIcon className="w-6 h-6 text-gray-600" />
+        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+          <CurrencyDollarIcon className="w-6 h-6 text-text-secondary" />
           فاکتورهای فروش
         </h1>
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="flex-1 sm:flex-none bg-success hover:opacity-90 text-text-inverse px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
           >
             <FunnelIcon className="w-5 h-5" />
             <span>فیلترها</span>
             {activeFilterCount > 0 && (
-              <span className="bg-white text-green-600 text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px]">
+              <span className="bg-surface text-success text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px]">
                 {activeFilterCount}
               </span>
             )}
           </button>
           <button
             onClick={() => openSaleInvoiceCreate()}
-            className="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="flex-1 sm:flex-none bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 transition-colors shadow-sm"
           >
             <PlusIcon className="w-5 h-5" />
             فاکتور جدید
@@ -183,13 +189,13 @@ export default function SaleInvoiceList() {
       {/* جستجو */}
       <div className="mb-4">
         <div className="relative">
-          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="جستجو در شماره فاکتور، نام مشتری یا تلفن..."
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-full pr-10 pl-4 py-2 border border-border rounded-lg text-sm bg-surface text-text-primary"
           />
         </div>
       </div>
@@ -214,91 +220,93 @@ export default function SaleInvoiceList() {
           <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
         </div>
       ) : invoices.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-text-secondary">
           {searchInput || activeFilterCount > 0
             ? "نتیجه‌ای یافت نشد"
             : "هیچ فاکتور فروشی ثبت نشده"}
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-surface shadow rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] lg:min-w-full divide-y divide-gray-200">
-              <thead className="bg-yellow-300">
+            <table className="min-w-[1200px] lg:min-w-full divide-y divide-border">
+              <thead className="bg-primary-soft">
                 <tr>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     شماره فاکتور
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مشتری
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تلفن
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تاریخ
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مبلغ کل
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     پرداخت شده
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     مانده
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500 border-l">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     وضعیت
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-black border-b border-gray-500">
+                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
                     عملیات
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {invoices.map((invoice, index) => {
                   const remaining = invoice.total_amount - invoice.paid_amount;
                   return (
                     <tr
                       key={invoice.id}
                       onClick={() => openSaleInvoiceDetail(invoice.id)}
-                      className={`hover:bg-gray-500 transition-colors cursor-pointer group ${
-                        index % 2 === 0 ? "bg-white" : "bg-gray-200/50"
+                      className={`hover:bg-primary transition-colors cursor-pointer group ${
+                        index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-border text-text-primary group-hover:text-text-inverse">
                         {invoice.invoice_number}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center border-l border-gray-600">
+                      <td className="px-4 py-3 text-sm text-center border-l border-border">
                         {invoice.customer_id ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               openCustomerDetail(invoice.customer_id);
                             }}
-                            className="text-blue-600 hover:underline font-medium group-hover:text-white"
+                            className="text-primary hover:underline font-medium group-hover:text-text-inverse"
                           >
                             {invoice.customer_name || "—"}
                           </button>
                         ) : (
-                          invoice.customer_name || "—"
+                          <span className="text-text-primary group-hover:text-text-inverse">
+                            {invoice.customer_name || "—"}
+                          </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                         {formatPersianPhone(invoice.customer_phone)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                         {formatDate(invoice.invoice_date)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-border text-text-primary group-hover:text-text-inverse">
                         {formatPersianCurrency(invoice.total_amount)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-green-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-success text-center border-l border-border group-hover:text-text-inverse">
                         {formatPersianCurrency(invoice.paid_amount)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-red-600 text-center border-l border-gray-600 group-hover:text-white">
+                      <td className="px-4 py-3 text-sm text-danger text-center border-l border-border group-hover:text-text-inverse">
                         {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-center border-l border-gray-600 flex justify-center">
+                      <td className="px-4 py-3 text-center border-l border-border flex justify-center">
                         <PaymentStatusBadge status={invoice.payment_status} />
                       </td>
                       <td className="px-4 py-3 text-sm">
@@ -308,19 +316,19 @@ export default function SaleInvoiceList() {
                               e.stopPropagation();
                               openSaleInvoiceDetail(invoice.id);
                             }}
-                            className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                            className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                             title="مشاهده جزئیات"
                           >
                             <EyeIcon className="w-5 h-5" />
                           </button>
-                          {/* ===== دکمه ویرایش (فقط برای ادمین) ===== */}
+                          {/* دکمه ویرایش - فقط برای ادمین */}
                           {isAtLeast("admin") && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openSaleInvoiceEdit(invoice.id);
                               }}
-                              className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                              className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
                               title="ویرایش فاکتور"
                             >
                               <PencilSquareIcon className="w-5 h-5" />
@@ -332,7 +340,7 @@ export default function SaleInvoiceList() {
                                 e.stopPropagation();
                                 setDeleteTarget(invoice);
                               }}
-                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                              className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
                               title="حذف"
                             >
                               <TrashIcon className="w-5 h-5" />

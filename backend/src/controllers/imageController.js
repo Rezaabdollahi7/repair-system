@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
+const sharp = require("sharp");
 const { getDb, saveDb, UPLOADS_DIR } = require("../config/database");
 
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -8,25 +9,20 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // ─── Multer Config ────────────────────────────────────────────────────────────
+// از memoryStorage استفاده می‌کنیم چون فایل رو مستقیم با sharp پردازش می‌کنیم
+// و نیازی به نوشتن فایل خام روی دیسک نیست
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    }
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (req, file, cb) => {
-    const deviceId = req.params.id;
-    const ext = path.extname(file.originalname).toLowerCase();
-    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    cb(null, `${deviceId}-temp-${unique}${ext}`);
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("فقط فایل تصویری مجاز است"));
+    }
+    cb(null, true);
+  },
 });
 
 function queryOne(db, sql, params = []) {
@@ -72,11 +68,6 @@ async function uploadImages(req, res) {
     ]);
 
     if (!device) {
-      if (req.files) {
-        req.files.forEach((f) => {
-          if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-        });
-      }
       return res.status(404).json({ error: "دستگاه یافت نشد" });
     }
 
@@ -84,50 +75,60 @@ async function uploadImages(req, res) {
       return res.status(400).json({ error: "فایلی آپلود نشده" });
     }
 
-    const lastImage = queryOne(
-      db,
-      "SELECT filename FROM device_images WHERE device_id = ? ORDER BY sort_order DESC LIMIT 1",
-      [deviceId],
-    );
-
-    let nextNumber = 1;
-    if (lastImage && lastImage.filename) {
-      const match = lastImage.filename.match(/-(\d+)\.[^.]+$/);
-      if (match) nextNumber = parseInt(match[1]) + 1;
-    }
-
     const inserted = [];
 
     for (let idx = 0; idx < req.files.length; idx++) {
-      const file = req.files[idx];
-      const ext = path.extname(file.originalname).toLowerCase();
-      const sortOrder = nextNumber + idx;
-      const newFilename = `${deviceId}-${sortOrder}${ext}`;
-      const newPath = path.join(UPLOADS_DIR, newFilename);
+      const file = req.files[idx]; // { buffer, originalname, mimetype, ... } از memoryStorage
 
-      if (!fs.existsSync(file.path)) {
-        console.error("❌ Source file not found:", file.path);
+      // ===== نکته مهم برای جلوگیری از race condition =====
+      // به‌جای اینکه با یه SELECT بفهمیم "شماره بعدی" چیه (که وقتی چند
+      // آپلود همزمان/موازی برای یه دستگاه بیاد، ممکنه دو تا request همزمان
+      // همون شماره رو بخونن و روی فایل همدیگه overwrite کنن)، اول یه ردیف
+      // خام رزرو می‌کنیم تا id اتوانکریمنت یکتا بگیریم. این id چون از
+      // AUTOINCREMENT میاد، تحت هیچ شرایطی (even با درخواست‌های موازی)
+      // تکراری نمیشه. بعد اسم فایل رو بر پایه همین id یکتا می‌سازیم.
+      db.run(
+        `INSERT INTO device_images (device_id, filename, filepath, sort_order)
+         VALUES (?, '', '', 0)`,
+        [deviceId],
+      );
+      const reserved = queryOne(db, "SELECT last_insert_rowid() as id", []);
+      const imageId = reserved ? reserved.id : null;
+
+      if (!imageId) {
+        console.error("❌ رزرو id برای عکس ناموفق بود");
         continue;
       }
 
-      fs.mkdirSync(path.dirname(newPath), { recursive: true });
+      const newFilename = `${deviceId}-${imageId}.webp`;
+      const newPath = path.join(UPLOADS_DIR, newFilename);
 
-      fs.renameSync(file.path, newPath);
+      try {
+        // فقط تبدیل فرمت - بدون resize و بدون rotate
+        // quality: 92 => عملاً بدون افت کیفیت قابل مشاهده، حجم به‌طور محسوسی کمتر
+        await sharp(file.buffer).webp({ quality: 92 }).toFile(newPath);
+      } catch (convErr) {
+        console.error(`❌ خطا در تبدیل عکس ${file.originalname}:`, convErr);
+        // چون ردیف رزرو شده دیگه معتبر نیست، پاکش می‌کنیم
+        db.run(`DELETE FROM device_images WHERE id = ?`, [imageId]);
+        continue;
+      }
 
       db.run(
-        `INSERT INTO device_images (device_id, filename, filepath, sort_order)
-         VALUES (?, ?, ?, ?)`,
-        [deviceId, newFilename, newPath, sortOrder],
+        `UPDATE device_images SET filename = ?, filepath = ?, sort_order = ? WHERE id = ?`,
+        [newFilename, newPath, imageId, imageId],
       );
 
-      const lastId = queryOne(db, "SELECT last_insert_rowid() as id", []);
-
       inserted.push({
-        id: lastId ? lastId.id : null,
+        id: imageId,
         device_id: deviceId,
         filename: newFilename,
-        sort_order: sortOrder,
+        sort_order: imageId,
       });
+    }
+
+    if (inserted.length === 0) {
+      return res.status(500).json({ error: "هیچ عکسی پردازش نشد" });
     }
 
     saveDb();
@@ -138,12 +139,6 @@ async function uploadImages(req, res) {
     });
   } catch (error) {
     console.error("Upload error:", error);
-
-    if (req.files) {
-      req.files.forEach((f) => {
-        if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-      });
-    }
     res.status(500).json({ error: "خطا در آپلود عکس" });
   }
 }
@@ -224,7 +219,6 @@ async function deleteDeviceImages(deviceId) {
     console.error("Delete device images error:", error);
   }
 }
-
 
 exports.quickSale = async (req, res) => {
   try {

@@ -893,8 +893,6 @@ export default function DeviceFormModal({
             <ImageUploader
               deviceId={isEdit ? deviceId : null}
               existingImages={images}
-              pendingFiles={pendingImages}
-              onPendingChange={setPendingImages}
               onDeleteExisting={(imageId) =>
                 setImages((imgs) => imgs.filter((i) => i.id !== imageId))
               }

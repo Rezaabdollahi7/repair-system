@@ -14,16 +14,16 @@ export default function ConfirmModal({
 }) {
   const variantStyles = {
     danger: {
-      icon: "text-red-600 bg-red-100",
-      button: "bg-red-600 hover:bg-red-700 text-white",
+      icon: "text-danger bg-danger-soft",
+      button: "bg-danger hover:bg-danger-hover text-text-inverse",
     },
     warning: {
-      icon: "text-yellow-600 bg-yellow-100",
-      button: "bg-yellow-600 hover:bg-yellow-700 text-white",
+      icon: "text-warning bg-warning-soft",
+      button: "bg-warning hover:opacity-80 text-text-inverse",
     },
     info: {
-      icon: "text-blue-600 bg-blue-100",
-      button: "bg-blue-600 hover:bg-blue-700 text-white",
+      icon: "text-primary bg-primary-soft",
+      button: "bg-primary hover:bg-primary-hover text-text-inverse",
     },
   };
 
@@ -32,14 +32,17 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-md shadow-xl" dir="rtl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div
+        className="bg-surface rounded-lg w-full max-w-md shadow-xl"
+        dir="rtl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h3 className="text-lg font-bold text-text-primary">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -52,17 +55,19 @@ export default function ConfirmModal({
               <ExclamationTriangleIcon className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-gray-700 text-sm leading-relaxed">{message}</p>
+              <p className="text-text-primary text-sm leading-relaxed">
+                {message}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 justify-end p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+        <div className="flex gap-3 justify-end p-4 border-t border-border bg-surface-alt rounded-b-lg">
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50"
           >
             {cancelText}
           </button>

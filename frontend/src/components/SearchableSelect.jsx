@@ -60,32 +60,36 @@ export default function SearchableSelect({
         type="button"
         onClick={handleToggle}
         disabled={disabled}
-        className={`w-full border rounded-lg px-3 py-2 text-sm bg-white text-right flex justify-between items-center ${
-          error ? "border-red-500" : "border-gray-300"
-        } ${disabled ? "bg-gray-100 cursor-not-allowed" : "hover:border-blue-400"}`}
+        className={`w-full border rounded-lg px-3 py-2 text-sm bg-surface text-right flex justify-between items-center ${
+          error ? "border-danger" : "border-border"
+        } ${disabled ? "bg-surface-alt cursor-not-allowed" : "hover:border-primary"}`}
       >
-        <span className={selectedOption ? "text-gray-800" : "text-gray-400"}>
+        <span
+          className={
+            selectedOption ? "text-text-primary" : "text-text-secondary"
+          }
+        >
           {selectedOption?.label || placeholder}
-          {required && <span className="text-red-500 mr-1">*</span>}
+          {required && <span className="text-danger mr-1">*</span>}
         </span>
         {isOpen ? (
-          <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+          <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
         ) : (
-          <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+          <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-          <div className="p-2 border-b border-gray-100">
+        <div className="absolute z-50 mt-1 w-full bg-surface border border-border rounded-lg shadow-lg">
+          <div className="p-2 border-b border-border">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
               <input
                 type="text"
                 placeholder="جستجو..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-sm pr-8 pl-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="w-full text-sm pr-8 pl-2 py-1.5 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary bg-surface text-text-primary"
                 autoFocus
               />
             </div>
@@ -93,11 +97,11 @@ export default function SearchableSelect({
 
           <div className="max-h-60 overflow-y-auto">
             {loading ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-400">
+              <div className="px-3 py-4 text-center text-sm text-text-secondary">
                 در حال بارگذاری...
               </div>
             ) : filteredOptions.length === 0 ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-400">
+              <div className="px-3 py-4 text-center text-sm text-text-secondary">
                 نتیجه‌ای یافت نشد
               </div>
             ) : (
@@ -110,15 +114,15 @@ export default function SearchableSelect({
                     setIsOpen(false);
                     setSearch("");
                   }}
-                  className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-50 transition-colors border-b border-b-gray-200 ${
+                  className={`w-full text-right px-3 py-2 text-sm hover:bg-surface-alt transition-colors border-b border-b-border ${
                     value === opt.value
-                      ? "bg-blue-50 text-blue-700 font-medium"
-                      : "text-gray-700"
+                      ? "bg-primary-soft text-primary font-medium"
+                      : "text-text-primary"
                   }`}
                 >
                   {opt.label}
                   {opt.subLabel && (
-                    <span className="text-xs text-gray-500 block mt-1">
+                    <span className="text-xs text-text-secondary block mt-1">
                       {opt.subLabel}
                     </span>
                   )}
@@ -129,7 +133,7 @@ export default function SearchableSelect({
         </div>
       )}
 
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>
   );
 }

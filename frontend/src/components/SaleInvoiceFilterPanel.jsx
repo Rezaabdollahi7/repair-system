@@ -1,3 +1,4 @@
+// src/components/SaleInvoiceFilterPanel.jsx
 import { useState, useRef, useEffect } from "react";
 import {
   FunnelIcon,
@@ -12,16 +13,16 @@ import {
 import PersianDatePicker from "./PersianDatePicker";
 
 const PAYMENT_STATUS_OPTIONS = [
-  { value: "paid", label: "پرداخت شده", color: "bg-green-100 text-green-700" },
+  { value: "paid", label: "پرداخت شده", color: "bg-success-soft text-success" },
   {
     value: "partial",
     label: "پرداخت ناقص",
-    color: "bg-yellow-100 text-yellow-700",
+    color: "bg-warning-soft text-warning",
   },
   {
     value: "pending",
     label: "در انتظار پرداخت",
-    color: "bg-orange-100 text-orange-700",
+    color: "bg-warning-soft text-warning",
   },
 ];
 
@@ -81,19 +82,19 @@ export default function SaleInvoiceFilterPanel({
   );
 
   const dropdownBtnClass =
-    "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-right flex justify-between items-center hover:border-green-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all";
+    "w-full border border-border rounded-xl px-3 py-2.5 text-sm bg-surface text-right flex justify-between items-center hover:border-success hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-success transition-all";
 
   const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-3 pb-2 ">
-      <Icon className="size-6 text-green-600" />
-      <span className="text-sm font-semibold text-gray-700">{title}</span>
+    <div className="flex items-center gap-2 mb-3 pb-2">
+      <Icon className="size-6 text-success" />
+      <span className="text-sm font-semibold text-text-primary">{title}</span>
     </div>
   );
 
   const ClearButton = ({ onClick, multi }) => (
     <button
       onClick={onClick}
-      className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+      className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
     >
       <XCircleIcon className="w-3.5 h-3.5" />
       {multi ? "پاک کردن انتخاب‌ها" : "پاک کردن انتخاب"}
@@ -105,21 +106,21 @@ export default function SaleInvoiceFilterPanel({
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
         {/* هدر */}
-        <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-200 px-4 sm:px-6 py-4 flex justify-between items-center">
+        <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-border px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-green-100 p-2 rounded-xl">
-              <FunnelIcon className="w-5 h-5 text-green-600" />
+            <div className="bg-success-soft p-2 rounded-xl">
+              <FunnelIcon className="w-5 h-5 text-success" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-text-primary">
                 فیلترهای پیشرفته
               </h2>
               {activeCount > 0 && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-text-secondary mt-0.5">
                   {activeCount} فیلتر فعال
                 </p>
               )}
@@ -129,7 +130,7 @@ export default function SaleInvoiceFilterPanel({
             {activeCount > 0 && (
               <button
                 onClick={onClear}
-                className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
+                className="px-3 py-1.5 text-sm text-danger hover:bg-danger-soft rounded-lg transition-colors flex items-center gap-1"
               >
                 <XMarkIcon className="w-4 h-4" />
                 پاک کردن همه
@@ -137,7 +138,7 @@ export default function SaleInvoiceFilterPanel({
             )}
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -159,28 +160,28 @@ export default function SaleInvoiceFilterPanel({
                   <span
                     className={
                       filters.payment_status?.length > 0
-                        ? "text-gray-800 font-medium"
-                        : "text-gray-400"
+                        ? "text-text-primary font-medium"
+                        : "text-text-secondary"
                     }
                   >
                     {getPaymentStatusLabel()}
                   </span>
                   {paymentStatusDropdownOpen ? (
-                    <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
                   ) : (
-                    <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
                   )}
                 </button>
 
                 {paymentStatusDropdownOpen && (
-                  <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                    <div className="p-2 border-b border-gray-100 relative">
+                  <div className="absolute z-50 mt-2 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
+                    <div className="p-2 border-b border-border relative">
                       <input
                         type="text"
                         placeholder="جستجو..."
                         value={paymentStatusSearch}
                         onChange={(e) => setPaymentStatusSearch(e.target.value)}
-                        className="w-full text-sm pr-3 pl-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="w-full text-sm pr-3 pl-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                         autoFocus
                       />
                     </div>
@@ -203,20 +204,20 @@ export default function SaleInvoiceFilterPanel({
                           <button
                             key={opt.value}
                             onClick={() => togglePaymentStatus(opt.value)}
-                            className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                              isSelected ? "bg-green-50" : ""
+                            className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${
+                              isSelected ? "bg-success-soft" : ""
                             }`}
                           >
                             <span
                               className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
                                 isSelected
-                                  ? "bg-green-600 border-green-600"
-                                  : "border-gray-300"
+                                  ? "bg-success border-success"
+                                  : "border-border"
                               }`}
                             >
                               {isSelected && (
                                 <svg
-                                  className="w-3 h-3 text-white"
+                                  className="w-3 h-3 text-text-inverse"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -230,14 +231,12 @@ export default function SaleInvoiceFilterPanel({
                                 </svg>
                               )}
                             </span>
-                            <span className={opt.color.split(" ")[1]}>
-                              {opt.label}
-                            </span>
+                            <span className={opt.color}>{opt.label}</span>
                           </button>
                         );
                       })}
                       {filteredPaymentStatuses.length === 0 && (
-                        <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                        <p className="px-3 py-4 text-xs text-text-secondary text-center">
                           نتیجه‌ای یافت نشد
                         </p>
                       )}
@@ -255,13 +254,13 @@ export default function SaleInvoiceFilterPanel({
                   value={filters.date_from}
                   onChange={(val) => onChange({ ...filters, date_from: val })}
                   placeholder="از تاریخ..."
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                 />
                 <PersianDatePicker
                   value={filters.date_to}
                   onChange={(val) => onChange({ ...filters, date_to: val })}
                   placeholder="تا تاریخ..."
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                 />
               </div>
             </div>
@@ -271,7 +270,7 @@ export default function SaleInvoiceFilterPanel({
               <SectionTitle icon={CurrencyDollarIcon} title="بازه مبلغ کل" />
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">
+                  <label className="block text-xs text-text-secondary mb-1">
                     از مبلغ (ریال)
                   </label>
                   <input
@@ -288,11 +287,11 @@ export default function SaleInvoiceFilterPanel({
                     min="0"
                     step="10000"
                     placeholder="حداقل مبلغ"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">
+                  <label className="block text-xs text-text-secondary mb-1">
                     تا مبلغ (ریال)
                   </label>
                   <input
@@ -307,7 +306,7 @@ export default function SaleInvoiceFilterPanel({
                     min="0"
                     step="10000"
                     placeholder="حداکثر مبلغ"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                   />
                 </div>
               </div>
@@ -316,16 +315,16 @@ export default function SaleInvoiceFilterPanel({
         </div>
 
         {/* فوتر */}
-        <div className="sticky bottom-0 bg-gray-50 rounded-b-2xl border-t border-gray-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-end gap-3">
+        <div className="sticky bottom-0 bg-surface-alt rounded-b-2xl border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors"
+            className="px-4 py-2 border border-border rounded-xl text-text-primary hover:bg-surface-alt transition-colors"
           >
             بستن
           </button>
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-sm"
+            className="px-6 py-2 bg-success text-text-inverse rounded-xl hover:bg-success-hover transition-colors shadow-sm"
           >
             اعمال فیلترها
           </button>

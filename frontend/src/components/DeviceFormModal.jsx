@@ -1,3 +1,4 @@
+// src/components/DeviceFormModal.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   createDevice,
@@ -49,43 +50,47 @@ const STATUS_OPTIONS = [
   {
     value: "pending",
     label: "در انتظار بررسی",
-    color: "bg-yellow-100 text-yellow-800",
+    color: "bg-warning-soft text-warning",
   },
   {
     value: "diagnosing",
     label: "در حال بررسی",
-    color: "bg-cyan-100 text-cyan-800",
+    color: "bg-primary-soft text-primary",
   },
   {
     value: "waiting_for_parts",
     label: "در انتظار قطعه",
-    color: "bg-orange-100 text-orange-800",
+    color: "bg-warning-soft text-warning",
   },
   {
     value: "repairing",
     label: "در حال تعمیر",
-    color: "bg-purple-100 text-purple-800",
+    color: "bg-primary-soft text-primary",
   },
-  { value: "repaired", label: "تعمیر شده", color: "bg-gray-100 text-gray-800" },
+  {
+    value: "repaired",
+    label: "تعمیر شده",
+    color: "bg-surface-alt text-text-secondary",
+  },
   {
     value: "ready_for_pickup",
     label: "آماده تحویل",
-    color: "bg-blue-100 text-blue-800",
+    color: "bg-primary-soft text-primary",
   },
   {
     value: "delivered",
     label: "تحویل داده شده",
-    color: "bg-green-100 text-green-800",
+    color: "bg-success-soft text-success",
   },
   {
     value: "unrepairable",
     label: "غیرقابل تعمیر",
-    color: "bg-red-100 text-red-800",
+    color: "bg-danger-soft text-danger",
   },
   {
     value: "not_repaired",
     label: "تعمیر نشد",
-    color: "bg-orange-100 text-red-800",
+    color: "bg-warning-soft text-danger",
   },
 ];
 
@@ -167,11 +172,9 @@ export default function DeviceFormModal({
     }
     setSearchingDeviceNames(true);
     try {
-      // از API موجود برای جستجوی دستگاه‌ها استفاده می‌کنیم
       const { getDevices } = await import("../api");
       const res = await getDevices({ search: query, limit: 20 });
       const devices = res.data?.data || res.data || [];
-      // استخراج نام‌های unique دستگاه
       const uniqueNames = [
         ...new Map(devices.map((d) => [d.device_name, d])).values(),
       ];
@@ -195,7 +198,6 @@ export default function DeviceFormModal({
       const { getDevices } = await import("../api");
       const res = await getDevices({ search: query, limit: 20 });
       const devices = res.data?.data || res.data || [];
-      // استخراج برندهای unique
       const uniqueBrands = [
         ...new Map(
           devices.filter((d) => d.brand).map((d) => [d.brand, d]),
@@ -398,9 +400,9 @@ export default function DeviceFormModal({
   };
 
   const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-blue-100">
-      <Icon className="size-5 text-blue-600" />
-      <span className="text-sm font-semibold text-gray-700">{title}</span>
+    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-primary-soft">
+      <Icon className="size-5 text-primary" />
+      <span className="text-sm font-semibold text-text-primary">{title}</span>
     </div>
   );
 
@@ -409,24 +411,24 @@ export default function DeviceFormModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-8"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-8"
         dir="rtl"
       >
-        {/* هدر با تم آبی */}
-        <div className="sticky top-0 bg-white rounded-t-2xl border-b border-blue-100 px-4 sm:px-6 py-4 flex justify-between items-center">
+        {/* هدر */}
+        <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-100 p-2 rounded-xl">
-              <WrenchScrewdriverIcon className="w-5 h-5 text-blue-600" />
+            <div className="bg-primary-soft p-2 rounded-xl">
+              <WrenchScrewdriverIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-text-primary">
                 {isEdit ? `ویرایش دستگاه #${deviceId}` : "ثبت دستگاه جدید"}
               </h2>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -452,12 +454,12 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowCustomerDropdown(false), 200)
                       }
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-text-primary"
                     />
                     {showCustomerDropdown && (
-                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-56 overflow-y-auto">
                         <div
-                          className="px-3 py-2.5 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
+                          className="px-3 py-2.5 text-sm text-text-secondary hover:bg-surface-alt cursor-pointer border-b border-border"
                           onMouseDown={() => {
                             setForm((p) => ({ ...p, customer_id: "" }));
                             setCustomerSearch("");
@@ -468,7 +470,7 @@ export default function DeviceFormModal({
                           بدون مشتری
                         </div>
                         {searchingCustomers ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                          <div className="px-3 py-4 text-sm text-text-secondary text-center">
                             در حال جستجو...
                           </div>
                         ) : customerResults.length > 0 ? (
@@ -483,22 +485,24 @@ export default function DeviceFormModal({
                                 );
                                 setShowCustomerDropdown(false);
                               }}
-                              className="px-3 py-2.5 text-sm hover:bg-blue-50 cursor-pointer border-b border-gray-50"
+                              className="px-3 py-2.5 text-sm hover:bg-primary-soft cursor-pointer border-b border-border"
                             >
-                              <div className="font-medium">{c.name}</div>
+                              <div className="font-medium text-text-primary">
+                                {c.name}
+                              </div>
                               {c.phone && (
-                                <div className="text-xs text-gray-500 mt-0.5">
+                                <div className="text-xs text-text-secondary mt-0.5">
                                   {c.phone}
                                 </div>
                               )}
                             </div>
                           ))
                         ) : customerSearch ? (
-                          <div className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <div className="px-3 py-4 text-xs text-text-secondary text-center">
                             مشتری‌ای یافت نشد
                           </div>
                         ) : (
-                          <div className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <div className="px-3 py-4 text-xs text-text-secondary text-center">
                             برای جستجو نام یا شماره تلفن وارد کنید
                           </div>
                         )}
@@ -508,21 +512,21 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewCustomer(true)}
-                    className="px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-sm bg-primary-soft text-primary rounded-xl hover:opacity-80 transition-colors whitespace-nowrap"
                   >
                     + جدید
                   </button>
                 </div>
 
                 {showNewCustomer && (
-                  <div className="p-4 bg-blue-50 rounded-xl space-y-3 border border-blue-200">
+                  <div className="p-4 bg-primary-soft rounded-xl space-y-3 border border-primary-soft">
                     <input
                       placeholder="نام مشتری *"
                       value={newCustomer.name}
                       onChange={(e) =>
                         setNewCustomer((p) => ({ ...p, name: e.target.value }))
                       }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     <input
                       placeholder="شماره تلفن *"
@@ -530,20 +534,20 @@ export default function DeviceFormModal({
                       onChange={(e) =>
                         setNewCustomer((p) => ({ ...p, phone: e.target.value }))
                       }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddCustomer}
-                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="px-4 py-2 text-sm bg-primary text-text-inverse rounded-lg hover:bg-primary-hover"
                       >
                         ثبت مشتری
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewCustomer(false)}
-                        className="px-4 py-2 text-sm bg-gray-200 rounded-lg hover:bg-gray-300"
+                        className="px-4 py-2 text-sm bg-surface-alt rounded-lg hover:bg-surface-alt text-text-primary"
                       >
                         انصراف
                       </button>
@@ -569,12 +573,12 @@ export default function DeviceFormModal({
                     onBlur={() =>
                       setTimeout(() => setShowPersonnelDropdown(false), 150)
                     }
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   />
                   {showPersonnelDropdown && (
-                    <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
                       {filteredPersonnel.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-gray-400">
+                        <div className="px-3 py-2 text-sm text-text-secondary">
                           {personnelList.length === 0
                             ? "پرسنلی ثبت نشده"
                             : "موردی یافت نشد"}
@@ -584,11 +588,11 @@ export default function DeviceFormModal({
                           <div
                             key={person.id}
                             onMouseDown={() => handleSelectPersonnel(person)}
-                            className="px-3 py-2.5 text-sm hover:bg-blue-50 cursor-pointer flex items-center justify-between"
+                            className="px-3 py-2.5 text-sm hover:bg-primary-soft cursor-pointer flex items-center justify-between text-text-primary"
                           >
                             <span>{person.name}</span>
                             {person.username && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-text-secondary">
                                 @{person.username}
                               </span>
                             )}
@@ -603,13 +607,13 @@ export default function DeviceFormModal({
                     {selectedPersonnel.map((person) => (
                       <span
                         key={person.id}
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full"
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-primary-soft text-primary text-sm rounded-full"
                       >
                         {person.name}
                         <button
                           type="button"
                           onClick={() => handleRemovePersonnel(person.id)}
-                          className="text-blue-500 hover:text-blue-800 font-bold leading-none"
+                          className="text-primary hover:opacity-80 font-bold leading-none"
                         >
                           ×
                         </button>
@@ -627,8 +631,8 @@ export default function DeviceFormModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* نام دستگاه */}
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
-                  نام دستگاه <span className="text-red-500">*</span>
+                <label className="block font-medium text-text-primary mb-1.5">
+                  نام دستگاه <span className="text-danger">*</span>
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -644,12 +648,12 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowDeviceNameDropdown(false), 200)
                       }
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     {showDeviceNameDropdown && deviceNameResults.length > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {searchingDeviceNames ? (
-                          <div className="px-3 py-2 text-sm text-gray-400">
+                          <div className="px-3 py-2 text-sm text-text-secondary">
                             در حال جستجو...
                           </div>
                         ) : (
@@ -664,7 +668,7 @@ export default function DeviceFormModal({
                                 setDeviceNameSearch(d.device_name);
                                 setShowDeviceNameDropdown(false);
                               }}
-                              className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                              className="px-3 py-2 text-sm hover:bg-primary-soft cursor-pointer text-text-primary"
                             >
                               {d.device_name}
                             </div>
@@ -676,33 +680,33 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewDeviceName(true)}
-                    className="px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-sm bg-primary-soft text-primary rounded-xl hover:opacity-80 transition-colors whitespace-nowrap"
                   >
                     + جدید
                   </button>
                 </div>
                 {showNewDeviceName && (
-                  <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="mt-2 p-3 bg-primary-soft rounded-xl border border-primary-soft">
                     <input
                       placeholder="نام دستگاه جدید"
                       value={newDeviceName.name}
                       onChange={(e) =>
                         setNewDeviceName({ name: e.target.value })
                       }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2"
+                      className="w-full border border-border rounded-lg px-3 py-2 text-sm mb-2 bg-surface text-text-primary"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddDeviceName}
-                        className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg"
+                        className="px-3 py-1.5 text-sm bg-primary text-text-inverse rounded-lg hover:bg-primary-hover"
                       >
                         ثبت
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewDeviceName(false)}
-                        className="px-3 py-1.5 text-sm bg-gray-200 rounded-lg"
+                        className="px-3 py-1.5 text-sm bg-surface-alt rounded-lg text-text-primary"
                       >
                         انصراف
                       </button>
@@ -713,7 +717,7 @@ export default function DeviceFormModal({
 
               {/* برند */}
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
+                <label className="block font-medium text-text-primary mb-1.5">
                   برند
                 </label>
                 <div className="flex gap-2">
@@ -730,12 +734,12 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowBrandDropdown(false), 200)
                       }
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     {showBrandDropdown && brandResults.length > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {searchingBrands ? (
-                          <div className="px-3 py-2 text-sm text-gray-400">
+                          <div className="px-3 py-2 text-sm text-text-secondary">
                             در حال جستجو...
                           </div>
                         ) : (
@@ -747,7 +751,7 @@ export default function DeviceFormModal({
                                 setBrandSearch(b.brand);
                                 setShowBrandDropdown(false);
                               }}
-                              className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                              className="px-3 py-2 text-sm hover:bg-primary-soft cursor-pointer text-text-primary"
                             >
                               {b.brand}
                             </div>
@@ -759,31 +763,31 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewBrand(true)}
-                    className="px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-sm bg-primary-soft text-primary rounded-xl hover:opacity-80 transition-colors whitespace-nowrap"
                   >
                     + جدید
                   </button>
                 </div>
                 {showNewBrand && (
-                  <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="mt-2 p-3 bg-primary-soft rounded-xl border border-primary-soft">
                     <input
                       placeholder="برند جدید"
                       value={newBrand.name}
                       onChange={(e) => setNewBrand({ name: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2"
+                      className="w-full border border-border rounded-lg px-3 py-2 text-sm mb-2 bg-surface text-text-primary"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddBrand}
-                        className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg"
+                        className="px-3 py-1.5 text-sm bg-primary text-text-inverse rounded-lg hover:bg-primary-hover"
                       >
                         ثبت
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewBrand(false)}
-                        className="px-3 py-1.5 text-sm bg-gray-200 rounded-lg"
+                        className="px-3 py-1.5 text-sm bg-surface-alt rounded-lg text-text-primary"
                       >
                         انصراف
                       </button>
@@ -794,7 +798,7 @@ export default function DeviceFormModal({
 
               {/* مدل */}
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
+                <label className="block font-medium text-text-primary mb-1.5">
                   مدل
                 </label>
                 <input
@@ -802,20 +806,20 @@ export default function DeviceFormModal({
                   value={form.model}
                   onChange={handleChange}
                   placeholder="مثال: Galaxy S21"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 />
               </div>
 
               {/* سریال */}
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
+                <label className="block font-medium text-text-primary mb-1.5">
                   سریال
                 </label>
                 <input
                   name="serial_number"
                   value={form.serial_number}
                   onChange={handleChange}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 />
               </div>
             </div>
@@ -826,8 +830,8 @@ export default function DeviceFormModal({
             <SectionTitle icon={CalendarIcon} title="تاریخ‌ها" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
-                  تاریخ ورود <span className="text-red-500">*</span>
+                <label className="block font-medium text-text-primary mb-1.5">
+                  تاریخ ورود <span className="text-danger">*</span>
                 </label>
                 <PersianDatePicker
                   value={form.entry_date}
@@ -837,7 +841,7 @@ export default function DeviceFormModal({
                 />
               </div>
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
+                <label className="block font-medium text-text-primary mb-1.5">
                   تاریخ خروج
                 </label>
                 <PersianDatePicker
@@ -855,14 +859,14 @@ export default function DeviceFormModal({
             <SectionTitle icon={CheckBadgeIcon} title="وضعیت و توضیحات" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
+                <label className="block font-medium text-text-primary mb-1.5">
                   وضعیت
                 </label>
                 <select
                   name="status"
                   value={form.status}
                   onChange={handleChange}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -872,7 +876,7 @@ export default function DeviceFormModal({
                 </select>
               </div>
               <div>
-                <label className="block font-medium text-gray-700 mb-1.5">
+                <label className="block font-medium text-text-primary mb-1.5">
                   توضیحات
                 </label>
                 <textarea
@@ -880,7 +884,7 @@ export default function DeviceFormModal({
                   value={form.description}
                   onChange={handleChange}
                   rows="7"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   placeholder="توضیحات تعمیرکار ..."
                 />
               </div>
@@ -903,18 +907,18 @@ export default function DeviceFormModal({
           </div>
 
           {/* دکمه‌های اقدام */}
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+              className="w-full sm:w-auto px-6 py-2.5 bg-surface-alt text-text-primary rounded-xl hover:bg-surface-alt transition-colors"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+              className="w-full sm:w-auto px-6 py-2.5 bg-primary text-text-inverse rounded-xl hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
             >
               {loading
                 ? "در حال ذخیره..."

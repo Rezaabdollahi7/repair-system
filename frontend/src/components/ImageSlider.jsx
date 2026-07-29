@@ -43,13 +43,13 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
           e.stopPropagation();
           onClose();
         }}
-        className="absolute top-4 left-4 text-white bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center transition-colors z-10"
+        className="absolute top-4 left-4 text-text-inverse bg-surface/10 hover:bg-surface/20 rounded-full w-10 h-10 flex items-center justify-center transition-colors z-10"
       >
         <XMarkIcon className="w-6 h-6" />
       </button>
 
       {/* شمارنده */}
-      <div className="absolute top-4 right-4 text-white/70 text-sm bg-black/40 px-3 py-1 rounded-full z-10">
+      <div className="absolute top-4 right-4 text-text-inverse/70 text-sm bg-black/40 px-3 py-1 rounded-full z-10">
         {current + 1} / {images.length}
       </div>
 
@@ -64,7 +64,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
               e.stopPropagation();
               prev();
             }}
-            className="absolute right-2 text-white bg-white/10 hover:bg-white/25 rounded-full w-12 h-12 flex items-center justify-center text-2xl transition-colors z-10"
+            className="absolute right-2 text-text-inverse bg-surface/10 hover:bg-surface/25 rounded-full w-12 h-12 flex items-center justify-center text-2xl transition-colors z-10"
             type="button"
           >
             <ChevronRightIcon className="w-6 h-6" />
@@ -84,7 +84,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
               e.stopPropagation();
               next();
             }}
-            className="absolute left-2 text-white bg-white/10 hover:bg-white/25 rounded-full w-12 h-12 flex items-center justify-center text-2xl transition-colors z-10"
+            className="absolute left-2 text-text-inverse bg-surface/10 hover:bg-surface/25 rounded-full w-12 h-12 flex items-center justify-center text-2xl transition-colors z-10"
             type="button"
           >
             <ChevronLeftIcon className="w-6 h-6" />
@@ -108,7 +108,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
               type="button"
               className={`flex-shrink-0 rounded-md overflow-hidden border-2 transition-all ${
                 i === current
-                  ? "border-white scale-105"
+                  ? "border-text-inverse scale-105"
                   : "border-transparent opacity-50 hover:opacity-80"
               }`}
             >
@@ -122,7 +122,9 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
         </div>
       )}
 
-      <p className="mt-3 text-white/40 text-xs">{images[current].filename}</p>
+      <p className="mt-3 text-text-inverse/40 text-xs">
+        {images[current].filename}
+      </p>
     </div>
   );
 }

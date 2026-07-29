@@ -1,3 +1,4 @@
+// src/components/DeviceDetailModal.jsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -22,30 +23,30 @@ import LoadingSpinner from "./LoadingSpinner";
 import { getImageUrl } from "../utils/helpers";
 
 const STATUS_MAP = {
-  pending: { label: "در انتظار بررسی", color: "bg-yellow-100 text-yellow-800" },
-  diagnosing: { label: "در حال بررسی", color: "bg-cyan-100 text-cyan-800" },
+  pending: { label: "در انتظار بررسی", color: "bg-warning-soft text-warning" },
+  diagnosing: { label: "در حال بررسی", color: "bg-primary-soft text-primary" },
   waiting_for_parts: {
     label: "در انتظار قطعه",
-    color: "bg-orange-100 text-orange-800",
+    color: "bg-warning-soft text-warning",
   },
-  repairing: { label: "در حال تعمیر", color: "bg-purple-100 text-purple-800" },
-  repaired: { label: "تعمیر شده", color: "bg-green-100 text-green-800" },
-  delivered: { label: "تحویل داده شده", color: "bg-green-100 text-green-800" },
-  unrepairable: { label: "غیرقابل تعمیر", color: "bg-red-100 text-red-800" },
+  repairing: { label: "در حال تعمیر", color: "bg-primary-soft text-primary" },
+  repaired: { label: "تعمیر شده", color: "bg-success-soft text-success" },
+  delivered: { label: "تحویل داده شده", color: "bg-success-soft text-success" },
+  unrepairable: { label: "غیرقابل تعمیر", color: "bg-danger-soft text-danger" },
   ready_for_pickup: {
     label: "آماده تحویل",
-    color: "bg-blue-100 text-blue-800",
+    color: "bg-primary-soft text-primary",
   },
-  not_repaired: { label: "تعمیر نشد", color: "bg-orange-100 text-red-800" },
+  not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
 };
 
 function InfoRow({ label, value }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-100 pb-2 sm:pb-3 mb-2 sm:mb-3 last:border-0">
-      <span className="text-xs sm:text-sm text-gray-500 mb-1 sm:mb-0">
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-border pb-2 sm:pb-3 mb-2 sm:mb-3 last:border-0">
+      <span className="text-xs sm:text-sm text-text-secondary mb-1 sm:mb-0">
         {label}
       </span>
-      <span className="text-sm sm:text-base text-gray-800 font-medium break-words">
+      <span className="text-sm sm:text-base text-text-primary font-medium break-words">
         {value || "—"}
       </span>
     </div>
@@ -54,13 +55,13 @@ function InfoRow({ label, value }) {
 
 function SectionTitle({ icon: Icon, title, count }) {
   return (
-    <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-2 border-b border-blue-100">
-      <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-      <span className="text-sm sm:text-base font-semibold text-gray-700">
+    <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-2 border-b border-primary-soft">
+      <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+      <span className="text-sm sm:text-base font-semibold text-text-primary">
         {title}
       </span>
       {count !== undefined && (
-        <span className="bg-blue-100 text-blue-600 text-xs px-1.5 sm:px-2 py-0.5 rounded-full mr-1">
+        <span className="bg-primary-soft text-primary text-xs px-1.5 sm:px-2 py-0.5 rounded-full mr-1">
           {count}
         </span>
       )}
@@ -135,21 +136,21 @@ export default function DeviceDetailModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
-        {/* هدر با تم آبی */}
-        <div className="sticky top-0 bg-white rounded-t-2xl border-b border-blue-100 px-4 sm:px-6 py-4 flex justify-between items-center">
+        {/* هدر */}
+        <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-100 p-2 rounded-xl">
-              <DevicePhoneMobileIcon className="w-5 h-5 text-blue-600" />
+            <div className="bg-primary-soft p-2 rounded-xl">
+              <DevicePhoneMobileIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-gray-900">
+              <h2 className="text-base sm:text-lg font-bold text-text-primary">
                 جزئیات دستگاه
               </h2>
               {device && (
-                <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">
+                <p className="text-xs text-text-secondary mt-0.5 hidden sm:block">
                   شماره پذیرش: {device.id}
                 </p>
               )}
@@ -157,7 +158,7 @@ export default function DeviceDetailModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -171,65 +172,73 @@ export default function DeviceDetailModal({
             </div>
           ) : device ? (
             <div className="space-y-4 sm:space-y-6">
-              {/* کارت اطلاعات اصلی - در موبایل ستونی */}
-              <div className="bg-gradient-to-r from-blue-50 to-white rounded-2xl p-4 sm:p-6">
+              {/* کارت اطلاعات اصلی */}
+              <div className="bg-gradient-to-r from-primary-soft to-surface rounded-2xl p-4 sm:p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">شماره پذیرش</p>
-                    <p className="text-lg sm:text-xl font-bold text-blue-600 font-mono">
+                    <p className="text-xs text-text-secondary mb-1">
+                      شماره پذیرش
+                    </p>
+                    <p className="text-lg sm:text-xl font-bold text-primary font-mono">
                       {device.id}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">تاریخ پذیرش</p>
-                    <p className="text-sm sm:text-base text-gray-800 font-medium flex items-center gap-1">
-                      <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
+                    <p className="text-xs text-text-secondary mb-1">
+                      تاریخ پذیرش
+                    </p>
+                    <p className="text-sm sm:text-base text-text-primary font-medium flex items-center gap-1">
+                      <CalendarIcon className="w-3.5 h-3.5 text-text-secondary" />
                       {formatDate(device.entry_date)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">تاریخ تحویل</p>
-                    <p className="text-sm sm:text-base text-gray-800 font-medium flex items-center gap-1">
-                      <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
+                    <p className="text-xs text-text-secondary mb-1">
+                      تاریخ تحویل
+                    </p>
+                    <p className="text-sm sm:text-base text-text-primary font-medium flex items-center gap-1">
+                      <CalendarIcon className="w-3.5 h-3.5 text-text-secondary" />
                       {formatDate(device.exit_date)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">وضعیت</p>
+                    <p className="text-xs text-text-secondary mb-1">وضعیت</p>
                     <span
-                      className={`inline-block px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium ${STATUS_MAP[device.status]?.color || "bg-gray-100 text-gray-800"}`}
+                      className={`inline-block px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium ${STATUS_MAP[device.status]?.color || "bg-surface-alt text-text-secondary"}`}
                     >
                       {STATUS_MAP[device.status]?.label || device.status}
                     </span>
                   </div>
                 </div>
 
-                {/* مسئولین - در موبایل با wrapping بهتر */}
-                <div className="mt-4 pt-4 border-t border-blue-100">
-                  <p className="text-xs text-gray-500 mb-2">مسئولین تعمیر</p>
+                {/* مسئولین */}
+                <div className="mt-4 pt-4 border-t border-primary-soft">
+                  <p className="text-xs text-text-secondary mb-2">
+                    مسئولین تعمیر
+                  </p>
                   {device.assignees && device.assignees.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {device.assignees.map((person) => (
                         <span
                           key={person.id}
-                          className="px-2 py-1 sm:px-3 sm:py-2 bg-purple-100 text-purple-700 rounded-full text-xs sm:text-sm font-medium"
+                          className="px-2 py-1 sm:px-3 sm:py-2 bg-primary-soft text-primary rounded-full text-xs sm:text-sm font-medium"
                         >
                           {person.name || person.username}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-400 text-xs sm:text-sm">
+                    <p className="text-text-secondary text-xs sm:text-sm">
                       مسئولی تعیین نشده
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* اطلاعات دستگاه و مشتری - گرید ریسپانسیو */}
+              {/* اطلاعات دستگاه و مشتری */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* اطلاعات دستگاه */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5">
+                <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5">
                   <SectionTitle icon={TagIcon} title="اطلاعات دستگاه" />
                   <div className="space-y-1">
                     <InfoRow label="نوع دستگاه" value={device.device_name} />
@@ -240,7 +249,7 @@ export default function DeviceDetailModal({
                 </div>
 
                 {/* اطلاعات مشتری */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5">
+                <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5">
                   <SectionTitle icon={UserIcon} title="اطلاعات مشتری" />
                   <div className="space-y-1">
                     <InfoRow label="نام مشتری" value={device.customer_name} />
@@ -248,20 +257,20 @@ export default function DeviceDetailModal({
                   </div>
                 </div>
 
-                {/* توضیحات - عرض کامل */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5 md:col-span-2">
+                {/* توضیحات */}
+                <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
                   <SectionTitle
                     icon={ClipboardDocumentListIcon}
                     title="توضیحات"
                   />
-                  <p className="text-sm sm:text-base text-gray-700 leading-relaxed break-words">
+                  <p className="text-sm sm:text-base text-text-primary leading-relaxed break-words">
                     {device.description || "—"}
                   </p>
                 </div>
 
-                {/* عکس‌ها - عرض کامل */}
+                {/* عکس‌ها */}
                 {images.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5 md:col-span-2">
+                  <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
                     <SectionTitle
                       icon={PhotoIcon}
                       title="عکس‌های دستگاه"
@@ -279,7 +288,7 @@ export default function DeviceDetailModal({
                               "/uploads/devices/" + img.filename,
                             )}
                             alt={img.filename}
-                            className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-lg border border-gray-200 group-hover:border-blue-400 group-hover:shadow-md transition-all"
+                            className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-lg border border-border group-hover:border-primary group-hover:shadow-md transition-all"
                           />
                         </div>
                       ))}
@@ -292,9 +301,9 @@ export default function DeviceDetailModal({
         </div>
 
         {/* فوتر با دکمه‌های اقدام */}
-        <div className="sticky bottom-0 bg-gray-50 rounded-b-2xl border-t border-gray-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div className="sticky bottom-0 bg-surface-alt rounded-b-2xl border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
           {device && (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs text-gray-400 order-2 sm:order-1">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs text-text-secondary order-2 sm:order-1">
               <span className="flex items-center gap-1">
                 <CalendarIcon className="w-3 h-3" />
                 ثبت: {formatDate(device.created_at)}
@@ -308,7 +317,7 @@ export default function DeviceDetailModal({
           <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
             <button
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors text-sm"
+              className="flex-1 sm:flex-none px-4 py-2 border border-border rounded-xl text-text-primary hover:bg-surface-alt transition-colors text-sm"
             >
               بستن
             </button>
@@ -317,7 +326,7 @@ export default function DeviceDetailModal({
                 onClose();
                 onEdit && onEdit(deviceId);
               }}
-              className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1 shadow-sm"
+              className="flex-1 sm:flex-none px-4 py-2 bg-primary text-text-inverse rounded-xl hover:bg-primary-hover transition-colors text-sm flex items-center justify-center gap-1 shadow-sm"
             >
               <PencilSquareIcon className="w-4 h-4" />
               ویرایش
@@ -325,7 +334,7 @@ export default function DeviceDetailModal({
             {isAtLeast("admin") && (
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="flex-1 sm:flex-none px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors text-sm flex items-center justify-center gap-1"
+                className="flex-1 sm:flex-none px-4 py-2 bg-danger text-text-inverse rounded-xl hover:bg-danger-hover transition-colors text-sm flex items-center justify-center gap-1"
               >
                 <TrashIcon className="w-4 h-4" />
                 حذف

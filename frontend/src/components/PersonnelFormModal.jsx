@@ -97,19 +97,22 @@ export default function PersonnelFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" dir="rtl">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div
+        className="bg-surface rounded-xl shadow-xl w-full max-w-md"
+        dir="rtl"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <UserGroupIcon className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-primary-soft rounded-lg">
+              <UserGroupIcon className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900">
+            <h2 className="text-lg font-bold text-text-primary">
               {isEdit ? "ویرایش پرسنل" : "افزودن پرسنل جدید"}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -117,8 +120,8 @@ export default function PersonnelFormModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              نام و نام خانوادگی <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              نام و نام خانوادگی <span className="text-danger">*</span>
             </label>
             <input
               type="text"
@@ -126,14 +129,14 @@ export default function PersonnelFormModal({
               value={form.full_name}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
               placeholder="مثال: علی محمدی"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              نام کاربری <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              نام کاربری <span className="text-danger">*</span>
             </label>
             <input
               type="text"
@@ -141,20 +144,20 @@ export default function PersonnelFormModal({
               value={form.username}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary font-mono"
               placeholder="مثال: ali_tech"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-text-primary mb-1">
               رمز عبور{" "}
               {isEdit ? (
-                <span className="text-gray-400 font-normal">
+                <span className="text-text-secondary font-normal">
                   (خالی = بدون تغییر)
                 </span>
               ) : (
-                <span className="text-red-500">*</span>
+                <span className="text-danger">*</span>
               )}
             </label>
             <input
@@ -163,7 +166,7 @@ export default function PersonnelFormModal({
               value={form.password}
               onChange={handleChange}
               required={!isEdit}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
               placeholder={
                 isEdit ? "برای تغییر رمز وارد کنید" : "حداقل ۶ کاراکتر"
               }
@@ -171,7 +174,7 @@ export default function PersonnelFormModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-text-primary mb-1">
               شماره تلفن
             </label>
             <input
@@ -179,20 +182,20 @@ export default function PersonnelFormModal({
               name="phone"
               value={form.phone}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
               placeholder="مثال: 09123456789"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              نقش <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              نقش <span className="text-danger">*</span>
             </label>
             <select
               name="role_id"
               value={form.role_id}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
             >
               {allowedRoles.map((role) => (
                 <option key={role.id} value={role.id}>
@@ -206,7 +209,7 @@ export default function PersonnelFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+              className="flex-1 bg-primary text-text-inverse py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm font-medium"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -217,7 +220,7 @@ export default function PersonnelFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              className="flex-1 bg-surface-alt text-text-primary py-2 rounded-lg hover:bg-surface-alt text-sm font-medium"
             >
               انصراف
             </button>

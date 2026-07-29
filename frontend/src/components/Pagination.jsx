@@ -1,4 +1,4 @@
-// frontend/src/components/Pagination.jsx
+// src/components/Pagination.jsx
 export default function Pagination({
   page,
   totalPages,
@@ -13,10 +13,10 @@ export default function Pagination({
   const to = Math.min(page * limit, total);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-sm text-gray-600">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-sm text-text-secondary">
       {/* نمایش بازه */}
       <span>
-        نمایش {to}–{from}  از {total} دستگاه
+        نمایش {to}–{from} از {total} دستگاه
       </span>
 
       {/* دکمه‌های صفحه‌بندی */}
@@ -24,33 +24,33 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(1)}
           disabled={page === 1}
-          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100 transition"
+          className="px-2 py-1 rounded border border-border disabled:opacity-40 hover:bg-surface-alt transition"
         >
           «
         </button>
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
-          className="px-3 py-1 rounded border disabled:opacity-40 hover:bg-gray-100 transition"
+          className="px-3 py-1 rounded border border-border disabled:opacity-40 hover:bg-surface-alt transition"
         >
           بعدی
         </button>
 
-        <span className="px-3 py-1 rounded border bg-blue-50 text-blue-700 font-medium">
+        <span className="px-3 py-1 rounded border border-border bg-primary-soft text-primary font-medium">
           {page} / {totalPages}
         </span>
 
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
-          className="px-3 py-1 rounded border disabled:opacity-40 hover:bg-gray-100 transition"
+          className="px-3 py-1 rounded border border-border disabled:opacity-40 hover:bg-surface-alt transition"
         >
           قبلی
         </button>
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={page === totalPages}
-          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100 transition"
+          className="px-2 py-1 rounded border border-border disabled:opacity-40 hover:bg-surface-alt transition"
         >
           »
         </button>
@@ -60,7 +60,7 @@ export default function Pagination({
       <select
         value={limit}
         onChange={(e) => onLimitChange(Number(e.target.value))}
-        className="border rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        className="border border-border rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
       >
         {[5, 10, 20, 50].map((n) => (
           <option key={n} value={n}>

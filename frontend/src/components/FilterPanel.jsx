@@ -1,3 +1,4 @@
+// src/components/FilterPanel.jsx
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   FunnelIcon,
@@ -21,43 +22,47 @@ const STATUS_OPTIONS = [
   {
     value: "pending",
     label: "در انتظار بررسی",
-    color: "bg-yellow-100 text-yellow-800",
+    color: "bg-warning-soft text-warning",
   },
   {
     value: "diagnosing",
     label: "در حال بررسی",
-    color: "bg-cyan-100 text-cyan-800",
+    color: "bg-primary-soft text-primary",
   },
   {
     value: "waiting_for_parts",
     label: "در انتظار قطعه",
-    color: "bg-orange-100 text-orange-800",
+    color: "bg-warning-soft text-warning",
   },
   {
     value: "repairing",
     label: "در حال تعمیر",
-    color: "bg-purple-100 text-purple-800",
+    color: "bg-primary-soft text-primary",
   },
-  { value: "repaired", label: "تعمیر شده", color: "bg-gray-100 text-gray-800" },
+  {
+    value: "repaired",
+    label: "تعمیر شده",
+    color: "bg-surface-alt text-text-secondary",
+  },
   {
     value: "delivered",
     label: "تحویل داده شده",
-    color: "bg-green-100 text-green-800",
+    color: "bg-success-soft text-success",
   },
   {
     value: "ready_for_pickup",
     label: "آماده تحویل",
-    color: "bg-blue-100 text-blue-800",
+    color: "bg-primary-soft text-primary",
   },
   {
     value: "unrepairable",
     label: "غیرقابل تعمیر",
-    color: "bg-red-100 text-red-800",
+    color: "bg-danger-soft text-danger",
   },
   {
     value: "not_repaired",
     label: "تعمیر نشد",
-    color: "bg-orange-100 text-red-800",
+    color: "bg-warning-soft text-danger",
   },
 ];
 
@@ -65,14 +70,18 @@ const INVOICE_STATUS_OPTIONS = [
   {
     value: "no_invoice",
     label: "فاکتور ندارد",
-    color: "bg-gray-100 text-gray-700",
+    color: "bg-surface-alt text-text-secondary",
   },
-  { value: "paid", label: "پرداخت شده", color: "bg-green-100 text-green-700" },
-  { value: "unpaid", label: "پرداخت نشده", color: "bg-red-100 text-red-700" },
+  { value: "paid", label: "پرداخت شده", color: "bg-success-soft text-success" },
+  {
+    value: "unpaid",
+    label: "پرداخت نشده",
+    color: "bg-danger-soft text-danger",
+  },
   {
     value: "not_needed",
     label: "نیاز به فاکتور ندارد",
-    color: "bg-blue-100 text-blue-700",
+    color: "bg-primary-soft text-primary",
   },
 ];
 
@@ -322,30 +331,30 @@ export default function FilterPanel({
   );
 
   const dropdownBtnClass =
-    "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-right flex justify-between items-center hover:border-green-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all";
+    "w-full border border-border rounded-xl px-3 py-2.5 text-sm bg-surface text-right flex justify-between items-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-success transition-all";
 
   const SearchInput = ({
     value,
     onChange: onChangeFn,
     placeholder = "جستجو...",
   }) => (
-    <div className="p-2 border-b border-gray-100 relative">
-      <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+    <div className="p-2 border-b border-border relative">
+      <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
       <input
         type="text"
         placeholder={placeholder}
         value={value}
         onChange={onChangeFn}
-        className="w-full text-sm pr-8 pl-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+        className="w-full text-sm pr-8 pl-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
         autoFocus
       />
     </div>
   );
 
   const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-2 border-gray-200">
-      <Icon className="size-6 text-green-600" />
-      <span className="text-sm font-semibold text-gray-700">{title}</span>
+    <div className="flex items-center gap-2 mb-2 border-border">
+      <Icon className="size-6 text-success" />
+      <span className="text-sm font-semibold text-text-primary">{title}</span>
     </div>
   );
 
@@ -354,21 +363,21 @@ export default function FilterPanel({
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
         {/* هدر */}
-        <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-200 px-4 sm:px-6 py-4 flex justify-between items-center">
+        <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-border px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-green-100 p-2 rounded-xl">
-              <FunnelIcon className="w-5 h-5 text-green-600" />
+            <div className="bg-success-soft p-2 rounded-xl">
+              <FunnelIcon className="w-5 h-5 text-success" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-text-primary">
                 فیلترهای پیشرفته
               </h2>
               {activeCount > 0 && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-text-secondary mt-0.5">
                   {activeCount} فیلتر فعال
                 </p>
               )}
@@ -378,7 +387,7 @@ export default function FilterPanel({
             {activeCount > 0 && (
               <button
                 onClick={onClear}
-                className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
+                className="px-3 py-1.5 text-sm text-danger hover:bg-danger-soft rounded-lg transition-colors flex items-center gap-1"
               >
                 <XMarkIcon className="w-4 h-4" />
                 پاک کردن همه
@@ -386,7 +395,7 @@ export default function FilterPanel({
             )}
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -410,27 +419,26 @@ export default function FilterPanel({
                     <span
                       className={
                         filters.status?.length > 0
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
+                          ? "text-text-primary font-medium"
+                          : "text-text-secondary"
                       }
                     >
                       {getStatusLabel()}
                     </span>
                     {statusDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     )}
                   </button>
 
                   {statusDropdownOpen && (
-                    <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute z-50 mt-2 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
                       <SearchInput
                         value={statusSearch}
                         onChange={(e) => setStatusSearch(e.target.value)}
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {/* ─── FIX: از filtersRef.current استفاده می‌شه ─── */}
                         {filters.status?.length > 0 && (
                           <button
                             onClick={() => {
@@ -438,7 +446,7 @@ export default function FilterPanel({
                               setStatusDropdownOpen(false);
                               setStatusSearch("");
                             }}
-                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                            className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
                           >
                             <XCircleIcon className="w-3.5 h-3.5" />
                             پاک کردن انتخاب‌ها
@@ -452,14 +460,14 @@ export default function FilterPanel({
                             <button
                               key={opt.value}
                               onClick={() => toggleStatus(opt.value)}
-                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-green-50" : ""}`}
+                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-success-soft" : ""}`}
                             >
                               <span
-                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}
+                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-success border-success" : "border-border"}`}
                               >
                                 {isSelected && (
                                   <svg
-                                    className="w-3 h-3 text-white"
+                                    className="w-3 h-3 text-text-inverse"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -473,20 +481,12 @@ export default function FilterPanel({
                                   </svg>
                                 )}
                               </span>
-                              <span
-                                className={
-                                  opt.color.split(" ")[0] === "bg-yellow-100"
-                                    ? "text-yellow-800"
-                                    : opt.color.split(" ")[1]
-                                }
-                              >
-                                {opt.label}
-                              </span>
+                              <span className={opt.color}>{opt.label}</span>
                             </button>
                           );
                         })}
                         {filteredStatuses.length === 0 && (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <p className="px-3 py-4 text-xs text-text-secondary text-center">
                             نتیجه‌ای یافت نشد
                           </p>
                         )}
@@ -511,27 +511,26 @@ export default function FilterPanel({
                     <span
                       className={
                         filters.invoice_status?.length > 0
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
+                          ? "text-text-primary font-medium"
+                          : "text-text-secondary"
                       }
                     >
                       {getInvoiceStatusLabel()}
                     </span>
                     {invoiceStatusDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     )}
                   </button>
 
                   {invoiceStatusDropdownOpen && (
-                    <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute z-50 mt-2 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
                       <SearchInput
                         value={invoiceStatusSearch}
                         onChange={(e) => setInvoiceStatusSearch(e.target.value)}
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {/* ─── FIX ─── */}
                         {filters.invoice_status?.length > 0 && (
                           <button
                             onClick={() => {
@@ -542,7 +541,7 @@ export default function FilterPanel({
                               setInvoiceStatusDropdownOpen(false);
                               setInvoiceStatusSearch("");
                             }}
-                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                            className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
                           >
                             <XCircleIcon className="w-3.5 h-3.5" />
                             پاک کردن انتخاب‌ها
@@ -556,14 +555,14 @@ export default function FilterPanel({
                             <button
                               key={opt.value}
                               onClick={() => toggleInvoiceStatus(opt.value)}
-                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-green-50" : ""}`}
+                              className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-success-soft" : ""}`}
                             >
                               <span
-                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-green-600 border-green-600" : "border-gray-300"}`}
+                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-success border-success" : "border-border"}`}
                               >
                                 {isSelected && (
                                   <svg
-                                    className="w-3 h-3 text-white"
+                                    className="w-3 h-3 text-text-inverse"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -577,14 +576,12 @@ export default function FilterPanel({
                                   </svg>
                                 )}
                               </span>
-                              <span className={opt.color.split(" ")[1]}>
-                                {opt.label}
-                              </span>
+                              <span className={opt.color}>{opt.label}</span>
                             </button>
                           );
                         })}
                         {filteredInvoiceStatuses.length === 0 && (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <p className="px-3 py-4 text-xs text-text-secondary text-center">
                             نتیجه‌ای یافت نشد
                           </p>
                         )}
@@ -606,28 +603,27 @@ export default function FilterPanel({
                     <span
                       className={
                         filters.customer_id
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
+                          ? "text-text-primary font-medium"
+                          : "text-text-secondary"
                       }
                     >
                       {getCustomerLabel()}
                     </span>
                     {customerDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     )}
                   </button>
 
                   {customerDropdownOpen && (
-                    <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute z-50 mt-2 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
                       <SearchInput
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
                         placeholder="نام یا شماره تلفن..."
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {/* ─── FIX ─── */}
                         {filters.customer_id && (
                           <button
                             onClick={() => {
@@ -640,14 +636,14 @@ export default function FilterPanel({
                               setCustomerSearch("");
                               setCustomerResults([]);
                             }}
-                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                            className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
                           >
                             <XCircleIcon className="w-3.5 h-3.5" />
                             پاک کردن انتخاب
                           </button>
                         )}
                         {searchingCustomers ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                          <div className="px-3 py-4 text-sm text-text-secondary text-center">
                             در حال جستجو...
                           </div>
                         ) : customerResults.length > 0 ? (
@@ -664,22 +660,22 @@ export default function FilterPanel({
                                 setCustomerSearch("");
                                 setCustomerResults([]);
                               }}
-                              className={`w-full text-right px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors ${String(filters.customer_id) === String(c.id) ? "bg-green-50 text-green-700 font-medium" : "text-gray-700"}`}
+                              className={`w-full text-right px-3 py-2.5 text-sm hover:bg-surface-alt transition-colors ${String(filters.customer_id) === String(c.id) ? "bg-success-soft text-success font-medium" : "text-text-primary"}`}
                             >
                               <div className="font-medium">{c.name}</div>
                               {c.phone && (
-                                <div className="text-xs text-gray-500 mt-0.5">
+                                <div className="text-xs text-text-secondary mt-0.5">
                                   {c.phone}
                                 </div>
                               )}
                             </button>
                           ))
                         ) : customerSearch ? (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <p className="px-3 py-4 text-xs text-text-secondary text-center">
                             مشتری‌ای یافت نشد
                           </p>
                         ) : (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <p className="px-3 py-4 text-xs text-text-secondary text-center">
                             برای جستجو نام یا شماره تلفن وارد کنید
                           </p>
                         )}
@@ -704,28 +700,27 @@ export default function FilterPanel({
                     <span
                       className={
                         filters.personnel_ids?.length > 0
-                          ? "text-gray-800 font-medium"
-                          : "text-gray-400"
+                          ? "text-text-primary font-medium"
+                          : "text-text-secondary"
                       }
                     >
                       {getPersonnelLabel()}
                     </span>
                     {personnelDropdownOpen ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
                     )}
                   </button>
 
                   {personnelDropdownOpen && (
-                    <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute z-50 mt-2 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden">
                       <SearchInput
                         value={personnelSearch}
                         onChange={(e) => setPersonnelSearch(e.target.value)}
                         placeholder="نام یا نام کاربری..."
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {/* ─── FIX ─── */}
                         {filters.personnel_ids?.length > 0 && (
                           <button
                             onClick={() => {
@@ -738,14 +733,14 @@ export default function FilterPanel({
                               setPersonnelSearch("");
                               setPersonnelResults([]);
                             }}
-                            className="w-full text-right px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1 transition-colors"
+                            className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
                           >
                             <XCircleIcon className="w-3.5 h-3.5" />
                             پاک کردن انتخاب‌ها
                           </button>
                         )}
                         {searchingPersonnel ? (
-                          <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                          <div className="px-3 py-4 text-sm text-text-secondary text-center">
                             در حال جستجو...
                           </div>
                         ) : personnelResults.length > 0 ? (
@@ -770,14 +765,14 @@ export default function FilterPanel({
                                   setPersonnelResults([]);
                                   setPersonnelDropdownOpen(false);
                                 }}
-                                className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors ${isSelected ? "bg-purple-50" : ""}`}
+                                className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-primary-soft" : ""}`}
                               >
                                 <span
-                                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-purple-600 border-purple-600" : "border-gray-300"}`}
+                                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}
                                 >
                                   {isSelected && (
                                     <svg
-                                      className="w-3 h-3 text-white"
+                                      className="w-3 h-3 text-text-inverse"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -794,8 +789,8 @@ export default function FilterPanel({
                                 <span
                                   className={
                                     isSelected
-                                      ? "text-purple-700 font-medium"
-                                      : "text-gray-700"
+                                      ? "text-primary font-medium"
+                                      : "text-text-primary"
                                   }
                                 >
                                   {displayName}
@@ -804,11 +799,11 @@ export default function FilterPanel({
                             );
                           })
                         ) : personnelSearch ? (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <p className="px-3 py-4 text-xs text-text-secondary text-center">
                             پرسنلی یافت نشد
                           </p>
                         ) : (
-                          <p className="px-3 py-4 text-xs text-gray-400 text-center">
+                          <p className="px-3 py-4 text-xs text-text-secondary text-center">
                             برای جستجو نام وارد کنید
                           </p>
                         )}
@@ -828,7 +823,7 @@ export default function FilterPanel({
                       onChange({ ...filtersRef.current, entry_from: val })
                     }
                     placeholder="از تاریخ..."
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                   />
                   <PersianDatePicker
                     value={filters.entry_to}
@@ -836,7 +831,7 @@ export default function FilterPanel({
                       onChange({ ...filtersRef.current, entry_to: val })
                     }
                     placeholder="تا تاریخ..."
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
                   />
                 </div>
               </div>
@@ -845,16 +840,16 @@ export default function FilterPanel({
         </div>
 
         {/* فوتر */}
-        <div className="sticky bottom-0 bg-gray-50 rounded-b-2xl border-t border-gray-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-end gap-3">
+        <div className="sticky bottom-0 bg-surface-alt rounded-b-2xl border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors"
+            className="px-4 py-2 border border-border rounded-xl text-text-primary hover:bg-surface-alt transition-colors"
           >
             بستن
           </button>
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-sm"
+            className="px-6 py-2 bg-success text-text-inverse rounded-xl hover:bg-success-hover transition-colors shadow-sm"
           >
             اعمال فیلترها
           </button>

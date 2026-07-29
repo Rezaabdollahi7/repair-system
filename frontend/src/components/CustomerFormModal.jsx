@@ -55,19 +55,22 @@ export default function CustomerFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" dir="rtl">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div
+        className="bg-surface rounded-xl shadow-xl w-full max-w-md"
+        dir="rtl"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <UserIcon className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-primary-soft rounded-lg">
+              <UserIcon className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900">
+            <h2 className="text-lg font-bold text-text-primary">
               {isEdit ? "ویرایش مشتری" : "افزودن مشتری جدید"}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -75,33 +78,33 @@ export default function CustomerFormModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              نام <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              نام <span className="text-danger">*</span>
             </label>
             <div className="relative">
-              <UserIcon className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
+              <UserIcon className="absolute right-3 top-2.5 w-4 h-4 text-text-secondary" />
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="نام کامل مشتری"
-                className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pr-9 pl-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              شماره تماس <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              شماره تماس <span className="text-danger">*</span>
             </label>
             <div className="relative">
-              <PhoneIcon className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
+              <PhoneIcon className="absolute right-3 top-2.5 w-4 h-4 text-text-secondary" />
               <input
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="09xxxxxxxxx"
-                className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pr-9 pl-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 dir="ltr"
               />
             </div>
@@ -111,7 +114,7 @@ export default function CustomerFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 py-2 bg-primary text-text-inverse text-sm font-medium rounded-lg hover:bg-primary-hover disabled:opacity-50"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -122,7 +125,7 @@ export default function CustomerFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              className="flex-1 py-2 bg-surface-alt text-text-primary text-sm font-medium rounded-lg hover:bg-surface-alt"
             >
               انصراف
             </button>

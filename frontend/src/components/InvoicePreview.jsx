@@ -41,32 +41,34 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
   const baseUrl = getBaseUrl();
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div
-        className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-surface rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
         dir="rtl"
       >
         {/* Header - no-print */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 no-print">
-          <h3 className="text-lg font-bold">پیش‌نمایش فاکتور</h3>
+        <div className="flex items-center justify-between p-4 border-b border-border no-print">
+          <h3 className="text-lg font-bold text-text-primary">
+            پیش‌نمایش فاکتور
+          </h3>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 text-sm"
+              className="px-3 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover flex items-center gap-1 text-sm"
             >
               <PrinterIcon className="w-4 h-4" />
               چاپ
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-sm"
+              className="px-3 py-2 bg-success text-text-inverse rounded-lg hover:bg-success-hover flex items-center gap-1 text-sm"
             >
               <ArrowDownTrayIcon className="w-4 h-4" />
               PDF
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -75,9 +77,9 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
 
         {/* Invoice Content - Printable */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div ref={printRef} className="bg-white p-6">
+          <div ref={printRef} className="bg-surface p-6">
             {/* Company Header */}
-            <div className="border-b-2 border-gray-300 pb-4 mb-6">
+            <div className="border-b-2 border-border pb-4 mb-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   {settings?.company_logo && (
@@ -88,34 +90,34 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                     />
                   )}
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">
+                    <h2 className="text-xl font-bold text-text-primary">
                       {settings?.company_name || "تعمیرگاه"}
                     </h2>
                     {settings?.company_address && (
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-text-secondary mt-1">
                         {settings.company_address}
                       </p>
                     )}
                     {settings?.company_phone && (
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-text-secondary">
                         تلفن: {settings.company_phone}
                       </p>
                     )}
                     {settings?.company_email && (
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-text-secondary">
                         ایمیل: {settings.company_email}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="text-left">
-                  <h1 className="text-2xl font-bold text-blue-700 mb-2">
+                  <h1 className="text-2xl font-bold text-primary mb-2">
                     فاکتور تعمیر
                   </h1>
-                  <p className="text-lg font-mono font-medium">
+                  <p className="text-lg font-mono font-medium text-text-primary">
                     {invoice.invoice_number}
                   </p>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-text-secondary mt-1">
                     تاریخ: {formatDate(invoice.invoice_date)}
                   </p>
                 </div>
@@ -124,47 +126,59 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
 
             {/* Customer & Device Info */}
             <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-medium text-gray-700 mb-3 pb-2 border-b border-gray-200">
+              <div className="border border-border rounded-lg p-4">
+                <h3 className="font-medium text-text-primary mb-3 pb-2 border-b border-border">
                   اطلاعات مشتری
                 </h3>
                 <div className="space-y-1">
                   <p>
-                    <span className="text-gray-600">نام:</span>{" "}
-                    <span className="font-medium">
+                    <span className="text-text-secondary">نام:</span>{" "}
+                    <span className="font-medium text-text-primary">
                       {invoice.customer_name || "—"}
                     </span>
                   </p>
                   <p>
-                    <span className="text-gray-600">شماره تماس:</span>{" "}
-                    {invoice.customer_phone || "—"}
+                    <span className="text-text-secondary">شماره تماس:</span>{" "}
+                    <span className="text-text-primary">
+                      {invoice.customer_phone || "—"}
+                    </span>
                   </p>
                 </div>
               </div>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-medium text-gray-700 mb-3 pb-2 border-b border-gray-200">
+              <div className="border border-border rounded-lg p-4">
+                <h3 className="font-medium text-text-primary mb-3 pb-2 border-b border-border">
                   اطلاعات دستگاه
                 </h3>
                 <div className="space-y-1">
                   <p>
-                    <span className="text-gray-600">شماره پذیرش:</span>{" "}
-                    <span className="font-mono">{invoice.device_id}</span>
+                    <span className="text-text-secondary">شماره پذیرش:</span>{" "}
+                    <span className="font-mono text-text-primary">
+                      {invoice.device_id}
+                    </span>
                   </p>
                   <p>
-                    <span className="text-gray-600">دستگاه:</span>{" "}
-                    <span className="font-medium">{invoice.device_name}</span>
+                    <span className="text-text-secondary">دستگاه:</span>{" "}
+                    <span className="font-medium text-text-primary">
+                      {invoice.device_name}
+                    </span>
                   </p>
                   <p>
-                    <span className="text-gray-600">برند:</span>{" "}
-                    {invoice.brand || "—"}
+                    <span className="text-text-secondary">برند:</span>{" "}
+                    <span className="text-text-primary">
+                      {invoice.brand || "—"}
+                    </span>
                   </p>
                   <p>
-                    <span className="text-gray-600">مدل:</span>{" "}
-                    {invoice.model || "—"}
+                    <span className="text-text-secondary">مدل:</span>{" "}
+                    <span className="text-text-primary">
+                      {invoice.model || "—"}
+                    </span>
                   </p>
                   <p>
-                    <span className="text-gray-600">سریال:</span>{" "}
-                    {invoice.serial_number || "—"}
+                    <span className="text-text-secondary">سریال:</span>{" "}
+                    <span className="text-text-primary">
+                      {invoice.serial_number || "—"}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -172,26 +186,28 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
 
             {/* Items Table */}
             <div className="mb-6">
-              <h3 className="font-medium text-gray-700 mb-3">اقلام فاکتور</h3>
-              <table className="w-full border-collapse border border-gray-300">
-                <thead className="bg-gray-100">
+              <h3 className="font-medium text-text-primary mb-3">
+                اقلام فاکتور
+              </h3>
+              <table className="w-full border-collapse border border-border">
+                <thead className="bg-surface-alt">
                   <tr>
-                    <th className="border border-gray-300 px-3 py-2 text-sm text-right">
+                    <th className="border border-border px-3 py-2 text-sm text-right text-text-primary">
                       #
                     </th>
-                    <th className="border border-gray-300 px-3 py-2 text-sm text-right">
+                    <th className="border border-border px-3 py-2 text-sm text-right text-text-primary">
                       شرح
                     </th>
-                    <th className="border border-gray-300 px-3 py-2 text-sm text-center">
+                    <th className="border border-border px-3 py-2 text-sm text-center text-text-primary">
                       تعداد
                     </th>
-                    <th className="border border-gray-300 px-3 py-2 text-sm text-center">
+                    <th className="border border-border px-3 py-2 text-sm text-center text-text-primary">
                       واحد
                     </th>
-                    <th className="border border-gray-300 px-3 py-2 text-sm text-left">
+                    <th className="border border-border px-3 py-2 text-sm text-left text-text-primary">
                       قیمت واحد
                     </th>
-                    <th className="border border-gray-300 px-3 py-2 text-sm text-left">
+                    <th className="border border-border px-3 py-2 text-sm text-left text-text-primary">
                       جمع
                     </th>
                   </tr>
@@ -199,36 +215,36 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                 <tbody>
                   {invoice.items?.map((item, index) => (
                     <tr key={item.id}>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-center">
+                      <td className="border border-border px-3 py-2 text-sm text-center text-text-primary">
                         {index + 1}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm">
+                      <td className="border border-border px-3 py-2 text-sm text-text-primary">
                         {item.name}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-center">
+                      <td className="border border-border px-3 py-2 text-sm text-center text-text-primary">
                         {item.quantity}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-center">
+                      <td className="border border-border px-3 py-2 text-sm text-center text-text-primary">
                         {item.unit}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-left">
+                      <td className="border border-border px-3 py-2 text-sm text-left text-text-primary">
                         {formatPersianCurrency(item.unit_price)}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-left font-medium">
+                      <td className="border border-border px-3 py-2 text-sm text-left font-medium text-text-primary">
                         {formatPersianCurrency(item.total_price)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-gray-50">
+                <tfoot className="bg-surface-alt">
                   <tr>
                     <td
                       colSpan={5}
-                      className="border border-gray-300 px-3 py-2 text-sm text-left"
+                      className="border border-border px-3 py-2 text-sm text-left text-text-primary"
                     >
                       جمع کل:
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-sm text-left font-medium">
+                    <td className="border border-border px-3 py-2 text-sm text-left font-medium text-text-primary">
                       {formatPersianCurrency(invoice.subtotal)}
                     </td>
                   </tr>
@@ -236,11 +252,11 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                     <tr>
                       <td
                         colSpan={5}
-                        className="border border-gray-300 px-3 py-2 text-sm text-left"
+                        className="border border-border px-3 py-2 text-sm text-left text-text-primary"
                       >
                         تخفیف:
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-left text-red-600">
+                      <td className="border border-border px-3 py-2 text-sm text-left text-danger">
                         ({formatPersianCurrency(invoice.discount_amount)})
                       </td>
                     </tr>
@@ -249,11 +265,11 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                     <tr>
                       <td
                         colSpan={5}
-                        className="border border-gray-300 px-3 py-2 text-sm text-left"
+                        className="border border-border px-3 py-2 text-sm text-left text-text-primary"
                       >
                         مالیات (%{invoice.tax_rate}):
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm text-left">
+                      <td className="border border-border px-3 py-2 text-sm text-left text-text-primary">
                         {formatPersianCurrency(invoice.tax_amount)}
                       </td>
                     </tr>
@@ -261,11 +277,11 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                   <tr className="font-bold">
                     <td
                       colSpan={5}
-                      className="border border-gray-300 px-3 py-2 text-sm text-left"
+                      className="border border-border px-3 py-2 text-sm text-left text-text-primary"
                     >
                       مبلغ قابل پرداخت:
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-sm text-left text-blue-700">
+                    <td className="border border-border px-3 py-2 text-sm text-left text-primary">
                       {formatPersianCurrency(invoice.total_amount)} ریال
                     </td>
                   </tr>
@@ -276,26 +292,28 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
             {/* Warranty & Notes */}
             <div className="grid grid-cols-2 gap-6 mb-6">
               <div>
-                <h3 className="font-medium text-gray-700 mb-2"> گارانتی</h3>
-                <p className="text-sm">
+                <h3 className="font-medium text-text-primary mb-2">گارانتی</h3>
+                <p className="text-sm text-text-primary">
                   {invoice.warranty_months > 0
                     ? `${invoice.warranty_months} ماه (تا تاریخ ${formatDate(invoice.warranty_until)})`
                     : "بدون گارانتی"}
                 </p>
                 {invoice.technician_name && (
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-text-secondary mt-1">
                     تعمیرکار: {invoice.technician_name}
                   </p>
                 )}
               </div>
               <div>
-                <h3 className="font-medium text-gray-700 mb-2"> توضیحات</h3>
-                <p className="text-sm">{invoice.notes || "—"}</p>
+                <h3 className="font-medium text-text-primary mb-2">توضیحات</h3>
+                <p className="text-sm text-text-primary">
+                  {invoice.notes || "—"}
+                </p>
               </div>
             </div>
 
             {/* Footer with Stamp & Signature */}
-            <div className="border-t-2 border-gray-300 pt-6 mt-6">
+            <div className="border-t-2 border-border pt-6 mt-6">
               <div className="flex items-end justify-between">
                 <div className="text-center space-y-2">
                   {settings?.signature_image && (
@@ -305,7 +323,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                       className="h-16 w-auto object-contain mx-auto"
                     />
                   )}
-                  <p className="text-sm text-gray-600">امضا </p>
+                  <p className="text-sm text-text-secondary">امضا</p>
                 </div>
                 <div className="text-center space-y-2">
                   {settings?.stamp_image && (
@@ -315,13 +333,13 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                       className="h-20 w-auto object-contain mx-auto"
                     />
                   )}
-                  <p className="text-sm text-gray-600">مهر شرکت</p>
+                  <p className="text-sm text-text-secondary">مهر شرکت</p>
                 </div>
               </div>
 
               {settings?.invoice_footer_text && (
                 <div className="mt-6 text-center">
-                  <p className="text-sm text-gray-500 italic">
+                  <p className="text-sm text-text-secondary italic">
                     {settings.invoice_footer_text}
                   </p>
                 </div>

@@ -23,12 +23,11 @@ export default function LoadingSpinner({
         {[0, 40, 80, 120, 160, 200].map((delay, index) => (
           <div
             key={index}
-            className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"
+            className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"
             style={{
               animationDuration: "1.5s",
               animationDelay: `${delay}ms`,
               opacity: 1 - index * 0.12,
-              borderTopColor: `rgba(37, 99, 235, ${1 - index * 0.12})`,
             }}
           />
         ))}
@@ -36,7 +35,11 @@ export default function LoadingSpinner({
 
       {/* Text */}
       {text && (
-        <p className={`text-gray-500 font-medium mt-4 ${textSizes[size]}`}>{text}</p>
+        <p
+          className={`text-text-secondary font-medium mt-4 ${textSizes[size]}`}
+        >
+          {text}
+        </p>
       )}
     </div>
   );

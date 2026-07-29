@@ -51,6 +51,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               unit: item.unit || "عدد",
               minStock: item.minStock || 0,
               description: item.description || "",
+              currentStock: item.currentStock || 0,
             });
           })
           .catch(() => {
@@ -156,17 +157,17 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8"
+        className="bg-surface rounded-xl shadow-xl w-full max-w-3xl my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <CubeIcon className="w-5 h-5 text-gray-600" />
+        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+          <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+            <CubeIcon className="w-5 h-5 text-text-secondary" />
             {isEditMode ? `ویرایش کالا #${itemId}` : "ثبت کالای جدید"}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -176,8 +177,8 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* کد کالا */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                کد کالا <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                کد کالا <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
@@ -185,18 +186,18 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 value={formData.code}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full border rounded-lg px-4 py-2 text-sm ${errors.code ? "border-red-500" : "border-gray-300"}`}
+                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.code ? "border-danger" : "border-border"}`}
                 placeholder="مثلاً: CAP-1000-16"
               />
               {errors.code && (
-                <p className="mt-1 text-xs text-red-600">{errors.code}</p>
+                <p className="mt-1 text-xs text-danger">{errors.code}</p>
               )}
             </div>
 
             {/* نام کالا */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                نام کالا <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                نام کالا <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
@@ -204,17 +205,17 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 value={formData.name}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full border rounded-lg px-4 py-2 text-sm ${errors.name ? "border-red-500" : "border-gray-300"}`}
+                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.name ? "border-danger" : "border-border"}`}
                 placeholder="مثلاً: خازن ۱۰۰۰ میکروفاراد ۱۶ ولت"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-600">{errors.name}</p>
+                <p className="mt-1 text-xs text-danger">{errors.name}</p>
               )}
             </div>
 
             {/* دسته‌بندی */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-text-primary mb-2">
                 دسته‌بندی
               </label>
               <select
@@ -222,7 +223,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 value={formData.categoryId}
                 onChange={handleChange}
                 disabled={loading}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white"
+                className="w-full border border-border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary"
               >
                 <option value="">بدون دسته‌بندی</option>
                 {categories.map((cat) => (
@@ -235,15 +236,15 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
 
             {/* واحد */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                واحد شمارش <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                واحد شمارش <span className="text-danger">*</span>
               </label>
               <select
                 name="unit"
                 value={formData.unit}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full border rounded-lg px-4 py-2 text-sm bg-white ${errors.unit ? "border-red-500" : "border-gray-300"}`}
+                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.unit ? "border-danger" : "border-border"}`}
               >
                 {unitOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -252,13 +253,13 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 ))}
               </select>
               {errors.unit && (
-                <p className="mt-1 text-xs text-red-600">{errors.unit}</p>
+                <p className="mt-1 text-xs text-danger">{errors.unit}</p>
               )}
             </div>
 
             {/* حداقل موجودی */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-text-primary mb-2">
                 حداقل موجودی (هشدار)
               </label>
               <input
@@ -269,12 +270,12 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                 disabled={loading}
                 min="0"
                 step="1"
-                className={`w-full border rounded-lg px-4 py-2 text-sm ${errors.minStock ? "border-red-500" : "border-gray-300"}`}
+                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.minStock ? "border-danger" : "border-border"}`}
               />
               {errors.minStock && (
-                <p className="mt-1 text-xs text-red-600">{errors.minStock}</p>
+                <p className="mt-1 text-xs text-danger">{errors.minStock}</p>
               )}
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-text-secondary">
                 وقتی موجودی به این عدد برسد، هشدار کم‌موجودی نمایش داده می‌شود
               </p>
             </div>
@@ -282,7 +283,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
             {/* موجودی اولیه - فقط در حالت ایجاد */}
             {!isEditMode && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   موجودی اولیه
                 </label>
                 <input
@@ -293,14 +294,14 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
                   disabled={loading}
                   min="0"
                   step="1"
-                  className={`w-full border rounded-lg px-4 py-2 text-sm ${errors.initialStock ? "border-red-500" : "border-gray-300"}`}
+                  className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.initialStock ? "border-danger" : "border-border"}`}
                 />
                 {errors.initialStock && (
-                  <p className="mt-1 text-xs text-red-600">
+                  <p className="mt-1 text-xs text-danger">
                     {errors.initialStock}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-text-secondary">
                   اگر از قبل موجودی دارید، تعداد را وارد کنید
                 </p>
               </div>
@@ -308,14 +309,14 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
 
             {/* موجودی فعلی - فقط در حالت ویرایش */}
             {isEditMode && (
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="bg-surface-alt p-4 rounded-lg border border-border">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   موجودی فعلی
                 </label>
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-2xl font-bold text-text-primary">
                   {formData.currentStock || 0} {formData.unit}
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-text-secondary">
                   برای تغییر موجودی از بخش فاکتور خرید یا فروش استفاده کنید
                 </p>
               </div>
@@ -324,7 +325,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
 
           {/* توضیحات */}
           <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               توضیحات
             </label>
             <textarea
@@ -333,7 +334,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               onChange={handleChange}
               disabled={loading}
               rows="3"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+              className="w-full border border-border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary"
               placeholder="توضیحات اضافی درباره کالا..."
             />
           </div>
@@ -343,14 +344,14 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50"
             >
               {loading
                 ? "در حال ذخیره..."

@@ -183,7 +183,7 @@ export default function ImageUploader({
     !deviceId && queue.some((i) => i.status === "queued");
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+    <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
       {(existingImages.length > 0 || queue.length > 0) && (
         <div className="grid grid-cols-3 gap-3">
           {/* عکس‌های از قبل ذخیره‌شده */}
@@ -200,7 +200,7 @@ export default function ImageUploader({
                   e.stopPropagation();
                   handleDelete(img.id);
                 }}
-                className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2 left-2 bg-danger text-text-inverse text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <TrashIcon className="w-5 h-5" />
               </button>
@@ -218,7 +218,7 @@ export default function ImageUploader({
               />
 
               {/* اورلی وضعیت */}
-              <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1 bg-black/45 text-white text-center px-2">
+              <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1 bg-black/45 text-text-inverse text-center px-2">
                 {item.status === "queued" && (
                   <>
                     <ClockIcon className="w-5 h-5" />
@@ -234,9 +234,9 @@ export default function ImageUploader({
                     <span className="text-[11px]">
                       در حال آپلود... {item.progress}%
                     </span>
-                    <div className="w-4/5 h-1 bg-white/30 rounded-full overflow-hidden">
+                    <div className="w-4/5 h-1 bg-surface/30 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-white transition-all"
+                        className="h-full bg-surface transition-all"
                         style={{ width: `${item.progress}%` }}
                       />
                     </div>
@@ -251,12 +251,12 @@ export default function ImageUploader({
                 )}
 
                 {item.status === "done" && (
-                  <CheckCircleIcon className="w-7 h-7 text-green-400" />
+                  <CheckCircleIcon className="w-7 h-7 text-success" />
                 )}
 
                 {item.status === "error" && (
                   <>
-                    <ExclamationTriangleIcon className="w-5 h-5 text-red-400" />
+                    <ExclamationTriangleIcon className="w-5 h-5 text-danger" />
                     <span className="text-[10px] leading-tight">
                       {item.error || "خطا در آپلود"}
                     </span>
@@ -264,7 +264,7 @@ export default function ImageUploader({
                       <button
                         type="button"
                         onClick={() => retryUpload(item)}
-                        className="bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 text-[10px]"
+                        className="bg-surface/20 hover:bg-surface/30 rounded px-2 py-0.5 text-[10px] text-text-inverse"
                       >
                         تلاش مجدد
                       </button>
@@ -278,7 +278,7 @@ export default function ImageUploader({
                 <button
                   type="button"
                   onClick={() => removeQueueItem(item)}
-                  className="absolute top-2 left-2 bg-red-500 text-white text-xs p-1 rounded"
+                  className="absolute top-2 left-2 bg-danger text-text-inverse text-xs p-1 rounded"
                   title="حذف"
                 >
                   <TrashIcon className="w-4 h-4" />
@@ -293,7 +293,7 @@ export default function ImageUploader({
         <button
           type="button"
           onClick={() => inputRef.current.click()}
-          className="px-4 py-2 flex gap-2 justify-center items-center bg-gray-100 rounded-lg hover:bg-gray-200"
+          className="px-4 py-2 flex gap-2 justify-center items-center bg-surface-alt rounded-lg hover:bg-surface-alt"
         >
           <PhotoIcon className="w-5 h-5" />
           <span>انتخاب عکس</span>
@@ -310,7 +310,7 @@ export default function ImageUploader({
       </div>
 
       {!deviceId && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-text-secondary">
           {hasQueuedWaitingForDevice
             ? "عکس‌ها انتخاب شدند. پس از ذخیره‌ی دستگاه، خودکار و در پس‌زمینه آپلود می‌شوند."
             : "بعد از ثبت دستگاه می‌توانید عکس‌ها را آپلود کنید"}

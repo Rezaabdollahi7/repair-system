@@ -108,18 +108,21 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg" dir="rtl">
+      <div
+        className="bg-surface rounded-xl shadow-xl w-full max-w-lg"
+        dir="rtl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <FolderPlusIcon className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-lg font-bold text-gray-900">
+            <FolderPlusIcon className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold text-text-primary">
               مدیریت دسته‌بندی‌ها
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -134,12 +137,12 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="نام دسته‌بندی جدید..."
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
             />
             <button
               onClick={handleAdd}
               disabled={adding || !newName.trim()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1 text-sm"
+              className="px-4 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-1 text-sm"
             >
               <PlusIcon className="w-4 h-4" />
               افزودن
@@ -148,11 +151,11 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
 
           {/* List */}
           {loading ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-text-secondary">
               در حال بارگذاری...
             </div>
           ) : categories.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-text-secondary">
               هیچ دسته‌بندی وجود ندارد
             </div>
           ) : (
@@ -160,7 +163,7 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
               {categories.map((cat) => (
                 <div
                   key={cat.id}
-                  className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-2 hover:bg-surface-alt rounded-lg"
                 >
                   {editTarget?.id === cat.id ? (
                     <div className="flex gap-2 flex-1">
@@ -169,13 +172,13 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
+                        className="flex-1 border border-border rounded px-2 py-1 text-sm bg-surface text-text-primary"
                         autoFocus
                       />
                       <button
                         onClick={handleEdit}
                         disabled={editing}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                        className="px-3 py-1 bg-success text-text-inverse rounded text-xs hover:opacity-80"
                       >
                         ذخیره
                       </button>
@@ -184,28 +187,30 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
                           setEditTarget(null);
                           setEditName("");
                         }}
-                        className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                        className="px-3 py-1 bg-surface-alt text-text-primary rounded text-xs hover:bg-surface-alt"
                       >
                         انصراف
                       </button>
                     </div>
                   ) : (
                     <>
-                      <span className="text-sm text-gray-700">{cat.name}</span>
+                      <span className="text-sm text-text-primary">
+                        {cat.name}
+                      </span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
                             setEditTarget(cat);
                             setEditName(cat.name);
                           }}
-                          className="p-1.5 rounded text-green-600 hover:bg-green-50 transition"
+                          className="p-1.5 rounded text-success hover:opacity-80 transition"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteTarget(cat)}
-                          className="p-1.5 rounded text-red-600 hover:bg-red-50 transition"
+                          className="p-1.5 rounded text-danger hover:opacity-80 transition"
                           title="حذف"
                         >
                           <TrashIcon className="w-4 h-4" />
@@ -219,10 +224,10 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
           )}
         </div>
 
-        <div className="flex justify-end p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+        <div className="flex justify-end p-4 border-t border-border bg-surface-alt rounded-b-xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt"
           >
             بستن
           </button>

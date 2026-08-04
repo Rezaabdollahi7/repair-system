@@ -1,0 +1,42 @@
+# Local development stack for Dofixo.
+# Currently Postgres only (roadmap 0.1); backend, frontend and a MinIO
+# object-storage mock are added later in roadmap 0.6.
+#
+#   docker compose up -d      start
+#   docker compose ps         check health
+#   docker compose down       stop, keep data
+#   docker compose down -v    stop and wipe the database volume
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: dofixo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dofixo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dofixo}
+      POSTGRES_DB: ${POSTGRES_DB:-dofixo_dev}
+      # Persian text is stored in this database. UTF8 is already the image
+      # default; stating it keeps the assumption visible. Collation is left at
+      # the image default so local dev matches a stock managed instance.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - dofixo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # 0.6 will gate the backend on this with depends_on / service_healthy,
+      # so the check must prove the database accepts connections, not just
+      # that the container process is up.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-dofixo} -d ${POSTGRES_DB:-dofixo_dev}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  dofixo_pgdata:

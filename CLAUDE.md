@@ -161,8 +161,8 @@ business features**. Payment integration is the last phase and is explicitly out
 - **helmet** — HTTP security headers
 - **express-rate-limit** — rate limiting
 - **Docker** — containerization for dev and prod
-- **Testing** — Jest is already a dependency; for phase one, focus on **unit tests for
-  controllers/services**. Integration tests can come later.
+- **Testing** — Jest is **not installed yet**; roadmap task 0.5 adds it. For phase one, focus on
+  **unit tests for controllers/services**. Integration tests can come later.
 - **Prisma + PostgreSQL** — replacing sql.js/SQLite (and the unused knex dependency)
 
 ## Working Conventions

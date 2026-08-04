@@ -89,6 +89,10 @@ business features**. Payment integration is the last phase and is explicitly out
 - Isolation is done via a `workspaceId` column on every tenant-scoped table.
 - **Postgres Row-Level Security (RLS)** enforces isolation at the database level, in addition to
   application-level filtering — defense in depth. Every query must set/scope by `workspaceId`.
+  - Application-level filtering is implemented via a **Prisma Client Extension** (not Prisma
+    Middleware — `prisma.$use()` is deprecated as of Prisma 6 and must not be used). The extension
+    and RLS are two independent layers: forgetting one still leaves the other as a safety net, but
+    neither should be skipped.
 - Expected scale: ~500 tenants (workspaces), up to ~1,000 devices each. Design with this scale in
   mind (e.g., composite indexes that lead with `workspaceId`), but don't over-engineer beyond it.
 

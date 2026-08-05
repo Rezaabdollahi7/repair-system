@@ -103,3 +103,20 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
 - If a task is ambiguous or a decision is needed that isn't already answered in `CLAUDE.md`, ask
   before proceeding rather than guessing — especially for anything touching auth, tenancy
   isolation, or data deletion.
+
+
+## 10. Network commands — run manually
+
+Because of local VPN interference, commands that hit the network (npm/pnpm install,
+npm view/npm outdated, docker pull, docker run against a registry, git fetch/clone
+over https) are unreliable when run directly by you and may hang or time out.
+
+From now on, whenever a task needs one of these, don't run it yourself — instead,
+print the exact command in a code block and ask me to run it in my own terminal and
+paste back the output. Wait for that output before continuing. This does not apply
+to commands that only touch the local filesystem or an already-running local
+container (e.g. `docker compose ps`, `docker compose exec`, `git status`, `git diff`,
+`git commit` after approval) — those you can keep running yourself as usual.
+
+Commit this rule to RULES.md now, then apply it going forward: cancel the background
+npm view task and give me the five commands to run myself.

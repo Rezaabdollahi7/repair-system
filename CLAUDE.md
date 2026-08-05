@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Dofixo**  is a repair-shop management SaaS application, aimed at small repair
+**Dofixo** is a repair-shop management SaaS application, aimed at small repair
 workshops (home appliances, mobile phones, laptops, etc.) in Iran. It lets a shop register devices
 brought in for repair, manage customers, staff, inventory, and purchase/sale/repair invoices, and
 track profitability.
@@ -133,7 +133,7 @@ business features**. Payment integration is the last phase and is explicitly out
 
 ### Database migration
 
-- Moving from SQLite/sql.js to **PostgreSQL via Prisma** 
+- Moving from SQLite/sql.js to **PostgreSQL via Prisma**
 - Existing data does **not** need to be preserved — the DB can be wiped and recreated.
 - New Prisma schema should be **modeled after the current SQLite schema's shape/entities**, not
   redesigned from scratch — add `workspaceId` and related SaaS fields on top of the existing model.
@@ -182,3 +182,6 @@ business features**. Payment integration is the last phase and is explicitly out
   don't over-explain concepts he's already demonstrated familiarity with.
 - Favor readable, complete code over terse snippets — write out full files/functions rather than
   partial diffs described in prose, unless explicitly asked for a smaller patch.
+- `src/app.ts` — Express app assembly (middleware, routes); exported without
+  listening, so tests can mount it via supertest
+- `src/server.ts` — entrypoint: binds the port and starts the backup scheduler

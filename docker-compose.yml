@@ -1,11 +1,10 @@
 # Local development stack for Dofixo.
-# Currently Postgres only (roadmap 0.1); backend, frontend and a MinIO
-# object-storage mock are added later in roadmap 0.6.
 #
-#   docker compose up -d      start
-#   docker compose ps         check health
-#   docker compose down       stop, keep data
-#   docker compose down -v    stop and wipe the database volume
+#   docker compose up -d --build   start (rebuild images if Dockerfiles changed)
+#   docker compose ps              check health
+#   docker compose logs -f backend
+#   docker compose down            stop, keep data
+#   docker compose down -v         stop and wipe the database volume
 
 services:
   postgres:
@@ -25,9 +24,6 @@ services:
     volumes:
       - dofixo_pgdata:/var/lib/postgresql/data
     healthcheck:
-      # 0.6 will gate the backend on this with depends_on / service_healthy,
-      # so the check must prove the database accepts connections, not just
-      # that the container process is up.
       test:
         [
           "CMD-SHELL",
@@ -37,6 +33,57 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: dofixo-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        # Waits for pg_isready above, not just "container started" — Postgres
+        # can take a moment past process-start before it accepts connections.
+        condition: service_healthy
+    environment:
+      # Overrides backend/.env's DATABASE_URL (which points at localhost for
+      # running the API directly on the host, outside Docker). Inside this
+      # compose network "postgres" is the service's DNS name, not localhost.
+      # dotenv's config() never overwrites a variable process.env already
+      # has, so this wins over whatever is in the bind-mounted .env file
+      # without needing to edit or delete that file.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dofixo}:${POSTGRES_PASSWORD:-dofixo}@postgres:5432/${POSTGRES_DB:-dofixo_dev}?schema=public
+      PORT: ${BACKEND_PORT:-5001}
+      # No reverse proxy in local dev — see the comment on this var in
+      # backend/.env.example.
+      TRUST_PROXY: "0"
+    ports:
+      - "${BACKEND_PORT:-5001}:5001"
+    volumes:
+      - ./backend:/app
+      # Anonymous volume: shadows the bind mount at this one path so the
+      # container keeps the node_modules it installed for itself (linux)
+      # instead of whatever host OS/arch you ran `pnpm install` under. Without
+      # this, native deps like sharp fail to load inside the container.
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: dofixo-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # ASSUMPTION: frontend/src/api/index.js reads this. Confirm/adjust once
+      # that file is checked — see the note above this compose file.
+      VITE_API_URL: http://localhost:${BACKEND_PORT:-5001}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   dofixo_pgdata:

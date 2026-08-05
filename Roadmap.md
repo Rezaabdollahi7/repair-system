@@ -17,7 +17,7 @@ Groundwork that everything else depends on. No business logic changes yet.
 - [x] 0.3 Add ESLint/Prettier config consistent across backend + frontend (if not already present)
 - [x] 0.4 Add `helmet` and `express-rate-limit` to the Express app (basic config, not tuned yet)
 - [x] 0.5 Set up Jest test runner for the backend with a first smoke test (e.g. health check endpoint)
-- [ ] 0.6 Set up Docker Compose for local dev: backend, frontend, Postgres, (optional) local S3-compatible mock (e.g. MinIO) for object storage testing
+- [x] 0.6 Set up Docker Compose for local dev: backend, frontend, Postgres, (optional) local S3-compatible mock (e.g. MinIO) for object storage testing
 - [ ] 0.7 Remove the unused `knex` dependency
 
 ## Phase 1 — Database Migration: SQLite → PostgreSQL (single-tenant, no SaaS yet)

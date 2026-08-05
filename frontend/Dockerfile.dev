@@ -1,0 +1,23 @@
+# Development-only image. Installs deps once at build time; the actual
+# source is bind-mounted by docker-compose.yml so Vite's HMR sees host edits
+# live. This image is never used for production (see roadmap 7.2).
+FROM node:26-alpine
+
+WORKDIR /app
+
+RUN npm install -g pnpm@10.10.0
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 5173
+
+# pnpm exec bypasses the "dev" npm script entirely, avoiding an issue where
+# the `--` separator meant to forward args through the script was instead
+# passed to vite literally (visible in `pnpm dev -- --host 0.0.0.0` logging
+# as "vite -- --host 0.0.0.0"), which silently made vite ignore --host and
+# bind to the container's loopback only — unreachable through the port
+# mapping in docker-compose.yml.
+CMD ["pnpm", "exec", "vite", "--host", "0.0.0.0"]

@@ -32,5 +32,11 @@ module.exports = tseslint.config(
     },
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
   },
+  {
+    files: ["**/__tests__/**/*.ts", "**/*.test.ts"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.jest },
+    },
+  },
   prettier,
 );

@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "lint": "eslint .",
@@ -33,16 +34,21 @@
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "tsx": "^4.23.5",
-    "@types/node": "^26.1.2",
-    "@types/express": "^5.0.6",
-    "@types/cors": "^2.8.19",
-    "eslint": "^9.39.4",
     "@eslint/js": "^9.39.4",
-    "typescript-eslint": "^8.66.0",
-    "globals": "^17.4.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.9.6"
+    "globals": "^17.4.0",
+    "jest": "^30.4.2",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.12",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0"
   }
 }

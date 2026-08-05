@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Database / backups
+*.db
+*.sqlite
+*.sqlite3
+backend/backups/
+
+# Uploads
+backend/src/uploads/devices/
+backend/src/uploads/settings/
+
+# Lockfiles
+pnpm-lock.yaml
+
+# Generated
+CHANGELOG.md
+
+# Pending a full-project reformat, done as its own reviewed step (not part of
+# task 0.3) rather than mixed into config-only changes.
+backend/src/controllers/categoryController.js
+backend/src/controllers/serviceController.js
+backend/src/routes/customers.js
+frontend/src/main.jsx
+frontend/src/components/ThemeSwitcher.jsx

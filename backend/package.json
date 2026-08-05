@@ -7,7 +7,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "lint": "eslint .",
+    "format": "prettier --ignore-path ../.prettierignore --write .",
+    "format:check": "prettier --ignore-path ../.prettierignore --check ."
   },
   "keywords": [],
   "author": "",
@@ -33,6 +36,12 @@
     "tsx": "^4.23.5",
     "@types/node": "^26.1.2",
     "@types/express": "^5.0.6",
-    "@types/cors": "^2.8.19"
+    "@types/cors": "^2.8.19",
+    "eslint": "^9.39.4",
+    "@eslint/js": "^9.39.4",
+    "typescript-eslint": "^8.66.0",
+    "globals": "^17.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6"
   }
 }

@@ -2,10 +2,9 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import path from "path";
 import "dotenv/config";
-
-const { getDb } = require("./config/database");
-const { startBackupScheduler } = require("./jobs/backupScheduler");
-const routes = require("./routes");
+import { getDb } from "./config/database";
+import { startBackupScheduler } from "./jobs/backupScheduler";
+import routes from "./routes";
 
 const app = express();
 const PORT = process.env.PORT || 5001;

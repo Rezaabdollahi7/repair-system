@@ -199,7 +199,7 @@ repair-management-system/
 │ │ │ └── backupScheduler.js # بکاپ خودکار هفتگی
 │ │ ├── utils/ # توابع کمکی
 │ │ ├── scripts/ # اسکریپت‌های کاربردی
-│ │ └── server.js # نقطه ورود سرور Express
+│ │ └── server.ts # نقطه ورود سرور Express
 │ ├── uploads/ # فایل‌های آپلود شده
 │ │ ├── devices/ # تصاویر دستگاه‌ها
 │ │ └── settings/ # لوگو، مهر، امضا
@@ -256,8 +256,8 @@ echo "VITE_API_URL=http://localhost:5001" > .env
 
 ```bash
 # ترمینال ۱ - بک‌اند
-cd backend/src
-node server.js
+cd backend
+npm run dev
 # سرور روی http://localhost:5001 راه‌اندازی می‌شود
 
 # ترمینال ۲ - فرانت‌اند
@@ -289,8 +289,8 @@ npm run dev
 VITE_API_URL=http://192.168.1.150:5001
 
 # ۳. بک‌اند را اجرا کنید
-cd backend/src
-node server.js
+cd backend
+npm run dev
 
 # ۴. فرانت‌اند را اجرا کنید (قابل دسترس در شبکه)
 cd frontend

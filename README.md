@@ -200,7 +200,7 @@ repair-management-system/
 │ │ │ └── backupScheduler.js # Weekly auto-backup
 │ │ ├── utils/ # Helper functions
 │ │ ├── scripts/ # Utility scripts
-│ │ └── server.js # Express server entry
+│ │ └── server.ts # Express server entry
 │ ├── uploads/ # Uploaded files
 │ │ ├── devices/ # Device images
 │ │ └── settings/ # Logo, stamp, signature
@@ -260,8 +260,8 @@ echo "VITE_API_URL=http://localhost:5001" > .env
 
 ```bash
 # Terminal 1 - Backend
-cd backend/src
-node server.js
+cd backend
+npm run dev
 # Server starts at http://localhost:5001
 
 # Terminal 2 - Frontend
@@ -293,8 +293,8 @@ To make the application accessible to your team on the local network:
 VITE_API_URL=http://192.168.1.150:5001
 
 # 3. Start backend
-cd backend/src
-node server.js
+cd backend
+npm run dev
 
 # 4. Start frontend (accessible to network)
 cd frontend

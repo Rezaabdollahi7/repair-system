@@ -13,7 +13,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 Groundwork that everything else depends on. No business logic changes yet.
 
 - [x] 0.1 Set up local PostgreSQL (via Docker Compose) for development
-- [ ] 0.2 Add TypeScript to the backend (`tsconfig.json`, build/dev scripts, convert `server.js` entrypoint first)
+- [x] 0.2 Add TypeScript to the backend (`tsconfig.json`, build/dev scripts, convert `server.js` entrypoint first)
 - [ ] 0.3 Add ESLint/Prettier config consistent across backend + frontend (if not already present)
 - [ ] 0.4 Add `helmet` and `express-rate-limit` to the Express app (basic config, not tuned yet)
 - [ ] 0.5 Set up Jest test runner for the backend with a first smoke test (e.g. health check endpoint)

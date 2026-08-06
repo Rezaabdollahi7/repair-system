@@ -1,3 +1,10 @@
+// The login rate-limit test below fires ten real requests through the
+// controller. Mocked so a unit test doesn't depend on a live database.
+jest.mock("../lib/prisma", () => ({
+  __esModule: true,
+  default: { user: { findUnique: jest.fn().mockResolvedValue(null) } },
+}));
+
 import request from "supertest";
 import app from "../app";
 

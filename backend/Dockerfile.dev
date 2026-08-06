@@ -20,4 +20,9 @@ COPY . .
 
 EXPOSE 5001
 
-CMD ["pnpm", "dev"]
+# Generated at start rather than build time: the client lands in
+# /app/src/generated, which the bind mount in docker-compose.yml shadows, so
+# anything generated during build would be hidden. The query engine binary
+# itself lives in node_modules and stays linux-native via the anonymous
+# volume.
+CMD ["sh", "-c", "pnpm exec prisma generate && pnpm dev"]

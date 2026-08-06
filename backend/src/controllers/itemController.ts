@@ -16,6 +16,7 @@ import type {
   QuickPurchaseBody,
   QuickSaleBody,
 } from "../schemas/item";
+import { buildInvoiceNumber, todayRange } from "../utils/invoiceNumber";
 
 const itemInclude = {
   category: { select: { name: true } },
@@ -58,25 +59,6 @@ function paginate<T>(data: T[], total: number, page: number, limit: number) {
     limit,
     totalPages: Math.ceil(total / limit),
   };
-}
-
-/**
- * Builds the day window used for the daily invoice counter. UTC rather than
- * local time, matching the date string in the invoice number itself, which
- * comes from toISOString().
- */
-function todayRange(): { gte: Date; lt: Date } {
-  const now = new Date();
-  const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-  return { gte: start, lt: end };
-}
-
-function todayStamp(): string {
-  return new Date().toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 // GET /api/items
@@ -444,8 +426,7 @@ export const quickPurchase = async (req: Request, res: Response) => {
       const todayCount = await tx.purchaseInvoice.count({
         where: { invoiceDate: todayRange() },
       });
-      const number = `PUR-${todayStamp()}-${String(todayCount + 1).padStart(3, "0")}`;
-
+      const number = buildInvoiceNumber("PUR", todayCount);
       const invoice = await tx.purchaseInvoice.create({
         data: {
           invoiceNumber: number,
@@ -536,8 +517,7 @@ export const quickSale = async (req: Request, res: Response) => {
       const todayCount = await tx.saleInvoice.count({
         where: { invoiceDate: todayRange() },
       });
-      const number = `SAL-${todayStamp()}-${String(todayCount + 1).padStart(3, "0")}`;
-
+      const number = buildInvoiceNumber("SAL", todayCount);
       const invoice = await tx.saleInvoice.create({
         data: {
           invoiceNumber: number,

@@ -19,6 +19,7 @@ Groundwork that everything else depends on. No business logic changes yet.
 - [x] 0.5 Set up Jest test runner for the backend with a first smoke test (e.g. health check endpoint)
 - [x] 0.6 Set up Docker Compose for local dev: backend, frontend, Postgres, (optional) local S3-compatible mock (e.g. MinIO) for object storage testing
 - [x] 0.7 Remove the unused `knex` dependency
+- [x] 0.8 Add `zod` and a reusable request-validation middleware (body/params/query), so every controller rewritten in phase 1 validates input from the start rather than being revisited later
 
 ## Phase 1 — Database Migration: SQLite → PostgreSQL (single-tenant, no SaaS yet)
 

@@ -104,7 +104,6 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   before proceeding rather than guessing — especially for anything touching auth, tenancy
   isolation, or data deletion.
 
-
 ## 10. Network commands — run manually
 
 Because of local VPN interference, commands that hit the network (npm/pnpm install,
@@ -117,6 +116,12 @@ paste back the output. Wait for that output before continuing. This does not app
 to commands that only touch the local filesystem or an already-running local
 container (e.g. `docker compose ps`, `docker compose exec`, `git status`, `git diff`,
 `git commit` after approval) — those you can keep running yourself as usual.
+
+- After installing any dependency on the host, the affected container must be
+  rebuilt with `docker compose up -d --build --renew-anon-volumes <service>`.
+  A plain restart or even `--build` alone won't do: the anonymous volume that
+  shadows /app/node_modules survives container recreation, so the container
+  keeps the dependency set from whenever its image was first built.
 
 Commit this rule to RULES.md now, then apply it going forward: cancel the background
 npm view task and give me the five commands to run myself.

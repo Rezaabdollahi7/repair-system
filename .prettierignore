@@ -21,6 +21,7 @@ pnpm-lock.yaml
 
 # Generated
 CHANGELOG.md
+backend/src/generated/
 
 # Pending a full-project reformat, done as its own reviewed step (not part of
 # task 0.3) rather than mixed into config-only changes.

@@ -26,7 +26,7 @@ Goal: get onto Prisma + Postgres while the app is still functionally single-tena
 the DB migration risk from the multi-tenancy risk.
 
 - [x] 1.1 Design the initial Prisma schema, modeled on the current SQLite schema's entities (Device, Customer, Personnel, Item, Category, PurchaseInvoice, SaleInvoice, RepairInvoice, InvoiceItem, Settings, Backup, etc.)
-- [ ] 1.2 Run `prisma migrate dev` to generate the initial migration against local Postgres
+- [x] 1.2 Run `prisma migrate dev` to generate the initial migration against local Postgres
 - [ ] 1.3 Rewrite each controller's data-access calls to use Prisma Client instead of sql.js queries (one resource at a time: devices → customers → personnel → items → invoices → reports → settings)
 - [ ] 1.4 Rewrite `backupHelper.js` / `backupScheduler.js` for Postgres (e.g. `pg_dump`-based backups instead of SQLite file copy)
 - [ ] 1.5 Update `importFromExcel.js` / `importDeviceImages.js` / `resetAdmin.js` scripts for the new DB layer

@@ -5,7 +5,15 @@ const prettier = require("eslint-config-prettier");
 
 module.exports = tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "backups/**", "src/uploads/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "backups/**",
+      "src/uploads/**",
+      // Prisma Client output. Generated from schema.prisma, gitignored, and
+      // not ours to lint.
+      "src/generated/**",
+    ],
   },
   {
     files: ["**/*.js"],

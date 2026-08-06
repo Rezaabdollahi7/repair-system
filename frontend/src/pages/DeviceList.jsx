@@ -37,7 +37,7 @@ function useDebounce(value, delay = 400) {
 
 function InvoiceStatusBadge({ device }) {
   const getInvoiceStatus = () => {
-    if (device.needs_invoice === 0) {
+    if (!device.needs_invoice) {
       return {
         label: "فاکتور نیاز ندارد",
         color: "bg-primary-soft text-primary",
@@ -364,7 +364,7 @@ export default function DeviceList() {
   const handleToggleNeedsInvoice = async (deviceId, value) => {
     try {
       await updateDevice(deviceId, { needs_invoice: value });
-      toast.success(value === 0 ? "فاکتور لازم نیست" : "آماده برای فاکتور");
+      toast.success(value ? "آماده برای فاکتور" : "فاکتور لازم نیست");
       fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
@@ -567,11 +567,11 @@ export default function DeviceList() {
                                   >
                                     <DocumentCheckIcon className="w-5 h-5" />
                                   </button>
-                                ) : device.needs_invoice === 0 ? (
+                                ) : !device.needs_invoice ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleToggleNeedsInvoice(device.id, 1);
+                                      handleToggleNeedsInvoice(device.id, true);
                                     }}
                                     className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                                     title=" اگر نیاز به فاکتور دارد - کلیک کنید"
@@ -593,7 +593,7 @@ export default function DeviceList() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleToggleNeedsInvoice(device.id, 0);
+                                        handleToggleNeedsInvoice(device.id, false);
                                       }}
                                       className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                                       title="فاکتور لازم نیست"

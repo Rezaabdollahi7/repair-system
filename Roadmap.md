@@ -32,6 +32,7 @@ the DB migration risk from the multi-tenancy risk.
 - [ ] 1.4 Rewrite `backupHelper.js` / `backupScheduler.js` for Postgres (e.g. `pg_dump`-based backups instead of SQLite file copy)
 - [ ] 1.5 Update `importFromExcel.js` / `importDeviceImages.js` / `resetAdmin.js` scripts for the new DB layer
 - [ ] 1.6 Confirm the full app (frontend included) works end-to-end against Postgres locally, single-tenant, before moving to Phase 2
+- [ ] 1.7 Unify invoice numbering: have all three invoice types (purchase, sale, repair) take their prefix from `settings.invoice_prefix` instead of the current mix of hardcoded prefixes (`PUR-`, `SAL-`) and settings-driven ones (repair only), so each workspace controls its own numbering in phase 2
 
 ## Phase 2 — Multi-Tenancy
 

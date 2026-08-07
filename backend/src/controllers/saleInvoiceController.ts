@@ -14,6 +14,7 @@ import type {
   SaleInvoicePaymentBody,
   SaleInvoiceUpdateBody,
 } from "../schemas/saleInvoice";
+import { dateFilter } from "../utils/dateRange";
 
 const deviceSelect = {
   device: {
@@ -95,11 +96,9 @@ export const getAll = async (req: Request, res: Response) => {
       where.paymentStatus = { in: query.payment_status };
     }
 
-    if (query.date_from || query.date_to) {
-      where.invoiceDate = {
-        ...(query.date_from ? { gte: query.date_from } : {}),
-        ...(query.date_to ? { lte: query.date_to } : {}),
-      };
+    const invoiceDate = dateFilter(query.date_from, query.date_to);
+    if (invoiceDate) {
+      where.invoiceDate = invoiceDate;
     }
 
     if (query.amount_from !== undefined || query.amount_to !== undefined) {

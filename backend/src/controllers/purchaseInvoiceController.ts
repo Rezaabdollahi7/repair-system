@@ -13,6 +13,7 @@ import type {
   PurchaseInvoiceListQuery,
   PurchaseInvoicePaymentBody,
 } from "../schemas/purchaseInvoice";
+import { dateFilter } from "../utils/dateRange";
 
 function toInvoiceResponse(invoice: PurchaseInvoice) {
   return {
@@ -46,11 +47,9 @@ export const getAll = async (req: Request, res: Response) => {
       };
     }
 
-    if (query.from_date || query.to_date) {
-      where.invoiceDate = {
-        ...(query.from_date ? { gte: query.from_date } : {}),
-        ...(query.to_date ? { lte: query.to_date } : {}),
-      };
+    const invoiceDate = dateFilter(query.from_date, query.to_date);
+    if (invoiceDate) {
+      where.invoiceDate = invoiceDate;
     }
 
     const [total, invoices] = await Promise.all([

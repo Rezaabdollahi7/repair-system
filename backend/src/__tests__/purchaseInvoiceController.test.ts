@@ -116,21 +116,25 @@ describe("purchaseInvoiceController.getAll", () => {
     });
   });
 
-  it("combines both ends of a date range into one filter", async () => {
+  it("includes invoices recorded during the day the range ends on", async () => {
     db.purchaseInvoice.count.mockResolvedValue(0);
     db.purchaseInvoice.findMany.mockResolvedValue([]);
 
     const from = new Date("2026-01-01T00:00:00.000Z");
-    const to = new Date("2026-02-01T00:00:00.000Z");
+    const to = new Date("2026-01-31T00:00:00.000Z");
 
     await controller.getAll(
       mockRequest({ query: { ...listQuery, from_date: from, to_date: to } }),
       mockResponse(),
     );
 
-    expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
-      invoiceDate: { gte: from, lte: to },
-    });
+    // A bare lte on the parsed date stops at midnight and drops everything
+    // recorded on the 31st itself.
+    const filter = db.purchaseInvoice.findMany.mock.calls[0][0].where
+      .invoiceDate as { gte: Date; lte: Date };
+    expect(filter.gte).toEqual(from);
+    expect(filter.lte.getUTCDate()).toBe(31);
+    expect(filter.lte.getUTCHours()).toBe(23);
   });
 });
 

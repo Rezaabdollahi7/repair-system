@@ -178,6 +178,23 @@ describe("saleInvoiceController.getAll", () => {
     });
   });
 
+  it("includes invoices recorded during the day the range ends on", async () => {
+    db.saleInvoice.count.mockResolvedValue(0);
+    db.saleInvoice.findMany.mockResolvedValue([]);
+
+    const to = new Date("2026-01-31T00:00:00.000Z");
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, date_to: to } }),
+      mockResponse(),
+    );
+
+    const filter = db.saleInvoice.findMany.mock.calls[0][0].where
+      .invoiceDate as { lte: Date };
+    expect(filter.lte.getUTCDate()).toBe(31);
+    expect(filter.lte.getUTCHours()).toBe(23);
+  });
+
   it("combines both ends of an amount range into one filter", async () => {
     db.saleInvoice.count.mockResolvedValue(0);
     db.saleInvoice.findMany.mockResolvedValue([]);

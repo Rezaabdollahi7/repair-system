@@ -4,7 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import path from "path";
 import "dotenv/config";
-import { getDb } from "./config/database";
+import prisma from "./lib/prisma";
 import routes from "./routes";
 
 const app = express();
@@ -67,8 +67,19 @@ app.use("/api", apiLimiter);
 app.use("/api", routes);
 
 app.get("/api/health", async (req: Request, res: Response) => {
-  await getDb();
-  res.json({ status: "OK", message: "Server is running", db: "connected" });
+  try {
+    // A real round trip rather than just reporting the process is alive:
+    // until now this checked the sql.js file, so it answered "connected"
+    // while saying nothing at all about Postgres.
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: "OK", message: "Server is running", db: "connected" });
+  } catch {
+    res.status(503).json({
+      status: "ERROR",
+      message: "Server is running",
+      db: "disconnected",
+    });
+  }
 });
 
 export default app;

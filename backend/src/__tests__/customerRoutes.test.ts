@@ -1,3 +1,10 @@
+jest.mock("../lib/prisma", () => ({
+  __esModule: true,
+  default: {
+    $queryRaw: jest.fn().mockResolvedValue([{ "?column?": 1 }]),
+  },
+}));
+
 import request from "supertest";
 import app from "../app";
 

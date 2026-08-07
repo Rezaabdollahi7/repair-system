@@ -3,15 +3,8 @@
  * time, matching the date stamp in the number itself — which means the
  * counter resets at 03:30 Tehran time. Existing behaviour, preserved.
  */
-export function todayRange(): { gte: Date; lt: Date } {
-  const now = new Date();
-  const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-  return { gte: start, lt: end };
-}
+import { todayRange } from "./dateRange";
+export { todayRange };
 
 export function todayStamp(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, "");

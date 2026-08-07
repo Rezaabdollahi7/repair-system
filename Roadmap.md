@@ -29,8 +29,9 @@ the DB migration risk from the multi-tenancy risk.
 - [x] 1.1 Design the initial Prisma schema, modeled on the current SQLite schema's entities (Device, Customer, Personnel, Item, Category, PurchaseInvoice, SaleInvoice, RepairInvoice, InvoiceItem, Settings, Backup, etc.)
 - [x] 1.2 Run `prisma migrate dev` to generate the initial migration against local Postgres
 - [ ] 1.3 Rewrite each controller's data-access calls to use Prisma Client instead of sql.js queries (one resource at a time: devices → customers → personnel → items → invoices → reports → settings)
-- [ ] 1.4 Rewrite `backupHelper.js` / `backupScheduler.js` for Postgres (e.g. `pg_dump`-based backups instead of SQLite file copy)
-- [ ] 1.5 Update `importFromExcel.js` / `importDeviceImages.js` / `resetAdmin.js` scripts for the new DB layer
+- [ ] 1.4 Disable the sql.js-based backup feature: the controller copies a SQLite file that is no longer the source of truth, so its endpoints return 501 with a Persian explanation rather than producing a worthless file. Removes `backupScheduler` (weekly cron) — durability becomes a platform guarantee, not something each workshop arranges. Real backups are rebuilt in phase 5, once workspaceId (phase 2) and object storage (phase 4) exist.
+- [ ] 1.5a Update `resetAdmin.js` and `importFromExcel.js` for Prisma
+- [ ] 1.5b Update `importDeviceImages.js` — deferred to phase 4, since it writes to the image store that object storage replaces
 - [ ] 1.6 Confirm the full app (frontend included) works end-to-end against Postgres locally, single-tenant, before moving to Phase 2
 - [ ] 1.7 Unify invoice numbering: have all three invoice types (purchase, sale, repair) take their prefix from `settings.invoice_prefix` instead of the current mix of hardcoded prefixes (`PUR-`, `SAL-`) and settings-driven ones (repair only), so each workspace controls its own numbering in phase 2
 
@@ -73,11 +74,18 @@ Goal: move device/settings photos off local disk onto ArvanCloud object storage.
 - [ ] 4.4 Update `imageController.js` / `ImageUploader.jsx` / `ImageSlider.jsx` to work with object storage URLs instead of local paths
 - [ ] 4.5 Update backup logic: workspace-level backups should include a way to reference/export the tenant's own images from object storage
 
-## Phase 5 — Backups (Platform-level + Per-Tenant)
+## Phase 5 — Backups & Data Export
 
-- [ ] 5.1 Full-database backup job (Postgres, all tenants) — scheduled, managed by platform owner only
-- [ ] 5.2 Per-tenant "export my data" feature: customers, devices, items, invoices for the requesting workspace only (respecting RLS/workspaceId scoping)
-- [ ] 5.3 Update `BackupList.jsx` page to reflect the new backup model (platform backups vs. tenant self-service export, depending on the logged-in user's role)
+Split deliberately: platform durability is the operator's concern and lives
+outside the app; data export is a customer-facing feature scoped to one
+workspace.
+
+- [ ] 5.1 Check whether ParsPack's managed Postgres offers automated backups. If it does, configure and document it rather than building our own.
+- [ ] 5.2 (only if 5.1 says no) Scheduled `pg_dump` on the database server, compressed and encrypted, shipped to ArvanCloud. Runs as a cron on the host — deliberately not an app feature, so a broken app can't take the backups with it. Retention: 7 daily, 4 weekly, 3 monthly.
+- [ ] 5.3 Per-workspace data export: customers, devices, items and invoices as an Excel workbook plus a zip of that workspace's device images. Generated on demand, scoped by workspaceId, never a SQL dump — a dump is unreadable to a workshop owner and risks leaking schema or other tenants' rows.
+- [ ] 5.4 Rework `BackupList.jsx` into an export page: request an export, see past exports, download. No restore button.
+- [ ] 5.5 Write an operator runbook for restoring a single workspace from a platform dump. A manual, support-mediated procedure rather than a feature — selectively replacing one tenant's rows in a shared schema while others are live is too dangerous to expose.
+- [ ] 5.6 Fineti import: give `importFromExcel` and `importDeviceImages` a `--workspace-id` parameter so they can onboard a customer migrating from Fineti. Stays an operator-run script; wrap it in an admin UI only if it turns out to be frequent.
 
 ## Phase 6 — Testing
 

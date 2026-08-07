@@ -180,12 +180,4 @@ export const getServices = () => api.get("/services");
 export const getTechnicians = () =>
   api.get("/personnel", { params: { role: "technician" } });
 
-// Backups
-export const getBackups = () => api.get("/backups");
-export const createBackup = (data) => api.post("/backups", data);
-export const downloadBackup = (id) =>
-  api.get(`/backups/${id}/download`, { responseType: "blob" });
-export const restoreBackup = (id) => api.post(`/backups/${id}/restore`);
-export const deleteBackup = (id) => api.delete(`/backups/${id}`);
-
 export default api;

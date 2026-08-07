@@ -54,11 +54,11 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
 
   const baseUrl = getBaseUrl();
   const showLogo = settings?.sale_invoice_show_logo !== 0;
-  const showEmail = settings?.sale_invoice_show_email === 1;
-  const showWebsite = settings?.sale_invoice_show_website === 1;
-  const showCustomerPhone = settings?.sale_invoice_show_customer_phone === 1;
-  const showSignature = settings?.sale_invoice_show_signature === 1;
-  const showStamp = settings?.sale_invoice_show_stamp === 1;
+  const showEmail = Boolean(settings?.sale_invoice_show_email);
+  const showWebsite = Boolean(settings?.sale_invoice_show_website);
+  const showCustomerPhone = Boolean(settings?.sale_invoice_show_customer_phone);
+  const showSignature = Boolean(settings?.sale_invoice_show_signature);
+  const showStamp = Boolean(settings?.sale_invoice_show_stamp);
 
   const paperSize = settings?.sale_invoice_paper_size || "A5";
 

@@ -149,22 +149,32 @@ export default function Settings() {
           const data = res.data;
           setSettings({
             ...data,
-            sale_invoice_show_logo: data.sale_invoice_show_logo === 1,
-            sale_invoice_show_company_info:
-              data.sale_invoice_show_company_info === 1,
-            sale_invoice_show_email: data.sale_invoice_show_email === 1,
-            sale_invoice_show_website: data.sale_invoice_show_website === 1,
-            sale_invoice_show_device_info:
-              data.sale_invoice_show_device_info === 1,
-            sale_invoice_show_customer_phone:
-              data.sale_invoice_show_customer_phone === 1,
-            sale_invoice_show_discount: data.sale_invoice_show_discount === 1,
-            sale_invoice_show_tax: data.sale_invoice_show_tax === 1,
-            sale_invoice_show_stamp: data.sale_invoice_show_stamp === 1,
-            sale_invoice_show_signature: data.sale_invoice_show_signature === 1,
-            sale_invoice_show_warranty: data.sale_invoice_show_warranty === 1,
-            sale_invoice_show_technician:
-              data.sale_invoice_show_technician === 1,
+            sale_invoice_show_logo: Boolean(data.sale_invoice_show_logo),
+            sale_invoice_show_company_info: Boolean(
+              data.sale_invoice_show_company_info,
+            ),
+            sale_invoice_show_email: Boolean(data.sale_invoice_show_email),
+            sale_invoice_show_website: Boolean(data.sale_invoice_show_website),
+            sale_invoice_show_device_info: Boolean(
+              data.sale_invoice_show_device_info,
+            ),
+            sale_invoice_show_customer_phone: Boolean(
+              data.sale_invoice_show_customer_phone,
+            ),
+            sale_invoice_show_discount: Boolean(
+              data.sale_invoice_show_discount,
+            ),
+            sale_invoice_show_tax: Boolean(data.sale_invoice_show_tax),
+            sale_invoice_show_stamp: Boolean(data.sale_invoice_show_stamp),
+            sale_invoice_show_signature: Boolean(
+              data.sale_invoice_show_signature,
+            ),
+            sale_invoice_show_warranty: Boolean(
+              data.sale_invoice_show_warranty,
+            ),
+            sale_invoice_show_technician: Boolean(
+              data.sale_invoice_show_technician,
+            ),
           });
         })
         .catch(() => {

@@ -43,7 +43,10 @@ const repairInvoiceBodySchema = z.object({
   customer_name: optionalText,
   customer_phone: optionalText,
   invoice_date: z.coerce.date().optional(),
-  due_date: z.coerce.date().nullable().optional(),
+  due_date: z.preprocess(
+    (value) => (value === "" ? null : value),
+    z.coerce.date().nullable().optional(),
+  ),
   discount_type: discountType,
   discount_value: z.coerce.number().min(0).default(0),
   tax_rate: z.coerce.number().min(0).max(100).default(0),

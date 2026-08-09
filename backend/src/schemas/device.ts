@@ -51,7 +51,14 @@ const flexibleBoolean = z
   .union([z.boolean(), z.literal(0), z.literal(1)])
   .transform((value) => Boolean(value));
 
-const optionalDate = z.coerce.date().nullable().optional();
+// Empty strings are treated as absent before coercion: the date inputs
+// submit "" when cleared, and z.coerce.date() turns that into an Invalid
+// Date rather than null.
+const optionalDate = z.preprocess(
+  (value) => (value === "" ? null : value),
+  z.coerce.date().nullable().optional(),
+);
+
 const optionalText = z
   .string()
   .trim()

@@ -26,7 +26,10 @@ export const purchaseInvoiceCreateSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value || null),
-  invoice_date: z.coerce.date().optional(),
+  invoice_date: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.date().nullable().optional(),
+  ),
   paid_amount: z.coerce.number().min(0).default(0),
   note: z
     .string()

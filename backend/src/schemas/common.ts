@@ -17,5 +17,7 @@ export type IdParam = z.infer<typeof idParamSchema>;
  */
 export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(10),
+  // Ceiling raised from 100: the invoice forms fetch whole lists to populate
+  // their dropdowns, and 100 silently rejected those requests.
+  limit: z.coerce.number().int().positive().max(1000).default(10),
 });

@@ -55,7 +55,10 @@ const saleInvoiceBodySchema = z.object({
   customer_name: optionalText,
   customer_phone: optionalText,
   device_id: z.coerce.number().int().positive().nullable().optional(),
-  invoice_date: z.coerce.date().optional(),
+  invoice_date: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.date().nullable().optional(),
+  ),
   paid_amount: z.coerce.number().min(0).default(0),
   note: optionalText,
   items: z.array(saleInvoiceLineSchema).min(1, "حداقل یک کالا باید انتخاب شود"),

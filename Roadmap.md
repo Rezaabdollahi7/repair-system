@@ -30,8 +30,7 @@ the DB migration risk from the multi-tenancy risk.
 - [x] 1.2 Run `prisma migrate dev` to generate the initial migration against local Postgres
 - [x] 1.3 Rewrite each controller's data-access calls to use Prisma Client instead of sql.js queries (one resource at a time: devices → customers → personnel → items → invoices → reports → settings)
 - [x] 1.4 Disable the sql.js-based backup feature: the controller copies a SQLite file that is no longer the source of truth, so its endpoints return 501 with a Persian explanation rather than producing a worthless file. Removes `backupScheduler` (weekly cron) — durability becomes a platform guarantee, not something each workshop arranges. Real backups are rebuilt in phase 5, once workspaceId (phase 2) and object storage (phase 4) exist.
-- [x] 1.5a Update `resetAdmin.js` and `importFromExcel.js` for Prisma
-- [x] 1.5b Update `importDeviceImages.js` — deferred to phase 4, since it writes to the image store that object storage replaces
+- [x] 1.5 Remove the sql.js-based one-off scripts. `importFromExcel` returns in 5.6 and `importDeviceImages` in phase 4, from git history; `resetAdmin` does not return — it only knew one hardcoded username, which stops existing once each workspace has its own super admin
 - [x] 1.6 Confirm the full app (frontend included) works end-to-end against Postgres locally, single-tenant, before moving to Phase 2
 - [x] 1.7 Unify invoice numbering: have all three invoice types (purchase, sale, repair) take their prefix from `settings.invoice_prefix` instead of the current mix of hardcoded prefixes (`PUR-`, `SAL-`) and settings-driven ones (repair only), so each workspace controls its own numbering in phase 2
 
@@ -43,8 +42,8 @@ Goal: introduce `Workspace` as a first-class concept and isolate all tenant data
 - [x] 2.2 Add `workspaceId` foreign key to every tenant-scoped table (Device, Customer, Personnel, Item, Category, all Invoice types, Settings, Backup)
 - [ ] 2.3 Write the Postgres Row-Level Security (RLS) policies: enable RLS on each tenant-scoped table, policy restricting rows to `current_setting('app.workspace_id')`
 - [ ] 2.4 Add a Prisma middleware / query wrapper that sets `app.workspace_id` per request (e.g. via `SET LOCAL` in a transaction) so RLS is actually enforced, not just app-level filtering
-- [ ] 2.5 Update every controller to scope queries by the authenticated user's `workspaceId` (belt-and-suspenders alongside RLS)
-- [ ] 2.6 Add composite indexes leading with `workspaceId` on hot tables (Device, Invoices) for query performance at the ~500 tenants / ~1,000 devices each scale
+- [x] 2.5 Update every controller to scope queries by the authenticated user's `workspaceId` (belt-and-suspenders alongside RLS)
+- [x] 2.6 Add composite indexes leading with `workspaceId` on hot tables (Device, Invoices) for query performance at the ~500 tenants / ~1,000 devices each scale
 - [ ] 2.7 Write unit tests confirming cross-tenant data access is impossible (e.g. workspace A's token cannot read workspace B's devices)
 - [ ] 2.8 Unify invoice numbering across all three invoice types, with the counter held on the Workspace row rather than derived from COUNT — atomic, per-workspace, and free of the race the current daily count has. Prefix comes from settings, as repair invoices already do. (Moved from 1.7: it needs Workspace to exist first.)
 
@@ -54,7 +53,7 @@ Goal: move from a single hardcoded/admin-seeded login to self-serve workspace cr
 token handling.
 
 - [ ] 3.1 Build the "create workspace" sign-up flow: user submits phone number + password + workspace name → creates `Workspace` + `Personnel` record (role = super admin) in one transaction
-- [ ] 3.2 Enforce workspace name/slug uniqueness and phone number uniqueness (globally, since phone is the username)
+- [ ] 3.2 Enforce phone number uniqueness globally, since phone is the username. Workspace names are deliberately not unique — two shops in different cities may share one
 - [ ] 3.3 Implement access token (JWT, ~15 min expiry, payload: `userId`, `workspaceId`, `role`) issuance on login
 - [ ] 3.4 Implement `RefreshToken` model + issuance (~30 day expiry, stored server-side, revocable) delivered as httpOnly cookie
 - [ ] 3.5 Implement `/auth/refresh` endpoint (rotate refresh token, issue new access token)
@@ -111,7 +110,7 @@ workspace.
 Not being built yet — sequenced last on purpose. Revisit together when ready.
 
 - [ ] 8.1 Add `Subscription` model (workspace, plan, status, startedAt, expiresAt)
-- [ ] 8.2 Implement 7-day free trial assignment on workspace creation
+- [ ] 8.2 Implement 1 month free trial assignment on workspace creation
 - [ ] 8.3 Implement read-only enforcement once a subscription/trial lapses (middleware that blocks writes but allows reads)
 - [ ] 8.4 Zibal payment gateway integration (checkout, callback/webhook, plan activation)
 - [ ] 8.5 Plan selection UI (monthly / 3-month / 6-month / annual — same features, different price/duration)

@@ -62,7 +62,10 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   and if you do diverge, say why.
 - **No dead code.** Don't leave commented-out old implementations "just in case" — Git history is
   the safety net, not the file itself.
-- **Validate all external input.** Once Zod is introduced (Phase 0), every new/modified Express
+- **Validate all external input.** Every new/modified Express route handler must
+  validate `req.body`/`req.params`/`req.query` with a Zod schema via the
+  `validate()` middleware before using the data. Handlers read from `req.valid`,
+  not from `req.body` directly.
   route handler must validate `req.body`/`req.params`/`req.query` with a Zod schema before using
   the data.
 - **Never trust the client for `workspaceId` or `role`.** These must always come from the verified
@@ -78,7 +81,10 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   duplicate", not "// loop over items").
 - **No silent failures.** Every `catch` block must either handle the error meaningfully or
   re-throw/log it — never an empty catch block.
-- **Full, readable output.** When Claude Code makes a change, prefer showing/writing complete
+- **Full, readable output.** Prefer writing complete functions or files, so the
+  code stays easy to review. The exception is a large file receiving many small
+  edits: there, showing each change as "from → to" is less error-prone to apply
+  than re-sending six hundred lines.
   functions or files over partial fragments, so the code stays easy to review and reason about.
 
 ## 7. Security checklist (apply throughout, not just Phase 2/3)
@@ -123,5 +129,7 @@ container (e.g. `docker compose ps`, `docker compose exec`, `git status`, `git d
   shadows /app/node_modules survives container recreation, so the container
   keeps the dependency set from whenever its image was first built.
 
-Commit this rule to RULES.md now, then apply it going forward: cancel the background
-npm view task and give me the five commands to run myself.
+- After deleting or renaming a source file the running container has loaded,
+  restart the service with `docker compose restart backend`. tsx watch's module
+  resolution gets stuck on the removed path and doesn't recover; the resulting
+  error usually points at the new file and is misleading.

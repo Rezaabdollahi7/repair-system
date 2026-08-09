@@ -24,12 +24,17 @@ function mockResponse() {
   return res;
 }
 
+// Settings are one row per workspace now, keyed on workspaceId rather than
+// the hardcoded id 1 the single-tenant version used.
+const WORKSPACE_ID = 1;
+
 function mockRequest(
   valid: Record<string, unknown> = {},
   file?: { filename: string },
 ) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
     file,
   } as unknown as Request;
 }
@@ -37,6 +42,7 @@ function mockRequest(
 function settingsRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
+    workspaceId: WORKSPACE_ID,
     companyName: "تعمیرگاه",
     companyAddress: null,
     companyPhone: null,
@@ -75,6 +81,16 @@ beforeEach(() => {
 });
 
 describe("settingsController.getSettings", () => {
+  it("reads the row belonging to the caller's workspace", async () => {
+    db.settings.findUnique.mockResolvedValue(settingsRow());
+
+    await controller.getSettings(mockRequest(), mockResponse());
+
+    expect(db.settings.findUnique).toHaveBeenCalledWith({
+      where: { workspaceId: WORKSPACE_ID },
+    });
+  });
+
   it("returns the display flags as real booleans", async () => {
     db.settings.findUnique.mockResolvedValue(settingsRow());
 
@@ -112,7 +128,7 @@ describe("settingsController.getSettings", () => {
 });
 
 describe("settingsController.updateSettings", () => {
-  it("leaves absent fields untouched", async () => {
+  it("updates the caller's own row, not a hardcoded one", async () => {
     db.settings.update.mockResolvedValue(settingsRow());
 
     await controller.updateSettings(
@@ -121,7 +137,7 @@ describe("settingsController.updateSettings", () => {
     );
 
     expect(db.settings.update).toHaveBeenCalledWith({
-      where: { id: 1 },
+      where: { workspaceId: WORKSPACE_ID },
       data: { companyName: "تعمیرگاه رضا" },
     });
   });
@@ -194,8 +210,9 @@ describe("settingsController.uploadImage", () => {
       res,
     );
 
-    expect(db.settings.update.mock.calls[0][0].data).toEqual({
-      companyLogo: "/uploads/settings/logo-1.png",
+    expect(db.settings.update).toHaveBeenCalledWith({
+      where: { workspaceId: WORKSPACE_ID },
+      data: { companyLogo: "/uploads/settings/logo-1.png" },
     });
     expect(res.json).toHaveBeenCalledWith({
       message: "تصویر با موفقیت آپلود شد",

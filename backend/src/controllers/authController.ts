@@ -25,6 +25,7 @@ type UserWithRole = Prisma.UserGetPayload<{ include: typeof userWithRole }>;
 function toUserResponse(user: UserWithRole) {
   return {
     id: user.id,
+    workspace_id: user.workspaceId,
     full_name: user.fullName,
     username: user.username,
     phone: user.phone,
@@ -66,11 +67,13 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "حساب کاربری غیرفعال است" });
     }
 
-    // Token shape is unchanged for now; phase 3 adds workspaceId and shortens
-    // the expiry alongside refresh tokens.
+    // Token shape gains workspaceId here rather than in phase 3: every
+    // tenant-scoped query needs it, and reading it from the database on each
+    // request is exactly the round-trip the design set out to avoid.
     const token = jwt.sign(
       {
         id: user.id,
+        workspaceId: user.workspaceId,
         username: user.username,
         role: user.role.name,
         isActive: user.isActive,

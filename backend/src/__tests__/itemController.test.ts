@@ -8,7 +8,7 @@ jest.mock("../lib/prisma", () => {
     purchaseInvoiceItem: { create: jest.fn() },
     saleInvoice: { count: jest.fn(), create: jest.fn() },
     saleInvoiceItem: { create: jest.fn() },
-    item: { update: jest.fn() },
+    item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
   };
 
@@ -18,11 +18,14 @@ jest.mock("../lib/prisma", () => {
       item: {
         count: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
+        // findFirst rather than findUnique: the controller pairs id with
+        // workspaceId now, which findUnique can't express.
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
+
       inventoryTransaction: { count: jest.fn(), findMany: jest.fn() },
       purchaseInvoice: { findMany: jest.fn() },
       // Runs the callback against the same mocks the assertions inspect.
@@ -61,10 +64,15 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock always supplies one, even
+// when a test doesn't care which user acted.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}, actorId?: number) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
-    user: actorId === undefined ? undefined : { id: actorId },
+    user: { id: actorId ?? null, workspaceId: WORKSPACE_ID },
   } as unknown as Request;
 }
 
@@ -133,7 +141,10 @@ describe("itemController.getAll", () => {
       mockResponse(),
     );
 
-    expect(db.item.findMany.mock.calls[0][0].where).toEqual({ categoryId: 3 });
+    expect(db.item.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      categoryId: 3,
+    });
   });
 });
 
@@ -196,6 +207,7 @@ describe("itemController.searchForInvoice", () => {
     );
 
     expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
       isActive: true,
       currentStock: { gt: 0 },
     });
@@ -229,7 +241,7 @@ describe("itemController.getTransactions", () => {
   const query = { page: 1, limit: 20 };
 
   it("returns 404 for an unknown item", async () => {
-    db.item.findUnique.mockResolvedValue(null);
+    db.item.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.getTransactions(
@@ -241,7 +253,7 @@ describe("itemController.getTransactions", () => {
   });
 
   it("resolves purchase invoice numbers for referencing rows", async () => {
-    db.item.findUnique.mockResolvedValue({ id: 1 });
+    db.item.findFirst.mockResolvedValue({ id: 1 });
     db.inventoryTransaction.count.mockResolvedValue(2);
     db.inventoryTransaction.findMany.mockResolvedValue([
       {
@@ -285,7 +297,7 @@ describe("itemController.getTransactions", () => {
   });
 
   it("skips the invoice lookup when nothing references one", async () => {
-    db.item.findUnique.mockResolvedValue({ id: 1 });
+    db.item.findFirst.mockResolvedValue({ id: 1 });
     db.inventoryTransaction.count.mockResolvedValue(0);
     db.inventoryTransaction.findMany.mockResolvedValue([]);
 
@@ -316,6 +328,7 @@ describe("itemController.create", () => {
     await controller.create(mockRequest({ body }), res);
 
     expect(db.item.create.mock.calls[0][0].data).toMatchObject({
+      workspaceId: WORKSPACE_ID,
       code: "C-100",
       sellPrice: 1500,
       categoryId: 2,
@@ -338,7 +351,7 @@ describe("itemController.create", () => {
 
 describe("itemController.update", () => {
   it("leaves absent fields untouched", async () => {
-    db.item.findUnique.mockResolvedValue({ id: 1 });
+    db.item.findFirst.mockResolvedValue({ id: 1 });
     db.item.update.mockResolvedValue(itemRow());
 
     await controller.update(
@@ -350,7 +363,7 @@ describe("itemController.update", () => {
   });
 
   it("disconnects the category when categoryId is null", async () => {
-    db.item.findUnique.mockResolvedValue({ id: 1 });
+    db.item.findFirst.mockResolvedValue({ id: 1 });
     db.item.update.mockResolvedValue(itemRow());
 
     await controller.update(
@@ -364,7 +377,7 @@ describe("itemController.update", () => {
   });
 
   it("returns 404 without attempting the update", async () => {
-    db.item.findUnique.mockResolvedValue(null);
+    db.item.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -379,7 +392,7 @@ describe("itemController.update", () => {
 
 describe("itemController.remove", () => {
   it("refuses when the item appears on an invoice, not just in transactions", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       _count: {
         transactions: 0,
         purchaseInvoiceItems: 1,
@@ -395,7 +408,7 @@ describe("itemController.remove", () => {
   });
 
   it("deletes an item nothing references", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       _count: {
         transactions: 0,
         purchaseInvoiceItems: 0,
@@ -420,7 +433,7 @@ describe("itemController.quickPurchase", () => {
   });
 
   it("returns 404 for an unknown item", async () => {
-    db.item.findUnique.mockResolvedValue(null);
+    db.item.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.quickPurchase(
@@ -434,7 +447,7 @@ describe("itemController.quickPurchase", () => {
 
   it("recalculates the weighted average purchase price", async () => {
     // 20 units at 1000 plus 10 at 2000 = 40000 over 30 units.
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 20,
       avgPurchasePrice: decimal(1000),
     });
@@ -451,7 +464,7 @@ describe("itemController.quickPurchase", () => {
   });
 
   it("records the ledger entry against the invoice and the acting user", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 0,
       avgPurchasePrice: decimal(0),
     });
@@ -474,7 +487,7 @@ describe("itemController.quickPurchase", () => {
   });
 
   it("does everything inside one transaction", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 0,
       avgPurchasePrice: decimal(0),
     });
@@ -497,7 +510,7 @@ describe("itemController.quickSale", () => {
   });
 
   it("refuses to sell more than is in stock", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 3,
       sellPrice: decimal(1500),
       avgPurchasePrice: decimal(1000),
@@ -514,7 +527,7 @@ describe("itemController.quickSale", () => {
   });
 
   it("sells at the item's sale price", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 10,
       sellPrice: decimal(1500),
       avgPurchasePrice: decimal(1000),
@@ -532,7 +545,7 @@ describe("itemController.quickSale", () => {
   });
 
   it("falls back to the purchase price when no sale price is set", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 10,
       sellPrice: decimal(0),
       avgPurchasePrice: decimal(1000),
@@ -550,7 +563,7 @@ describe("itemController.quickSale", () => {
   });
 
   it("records the stock movement as a negative quantity", async () => {
-    db.item.findUnique.mockResolvedValue({
+    db.item.findFirst.mockResolvedValue({
       currentStock: 10,
       sellPrice: decimal(1500),
       avgPurchasePrice: decimal(1000),

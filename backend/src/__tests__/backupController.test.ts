@@ -16,7 +16,14 @@ function mockResponse() {
   return res;
 }
 
-const request = {} as Request;
+// list() reads workspaceIdOf(req), which throws without a workspace on the
+// token. The four disabled endpoints never reach the database, but they take
+// the same request shape.
+const WORKSPACE_ID = 1;
+
+const request = {
+  user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
+} as unknown as Request;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -31,6 +38,16 @@ describe("backupController.list", () => {
 
     expect(res.json).toHaveBeenCalledWith([]);
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it("scopes the listing to the caller's workspace", async () => {
+    db.backup.findMany.mockResolvedValue([]);
+
+    await controller.list(request, mockResponse());
+
+    expect(db.backup.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+    });
   });
 
   it("converts the BigInt size to a number", async () => {

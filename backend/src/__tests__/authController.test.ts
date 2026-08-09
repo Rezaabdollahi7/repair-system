@@ -21,13 +21,17 @@ function mockResponse() {
   return res;
 }
 
+const WORKSPACE_ID = 1;
+
 function mockRequest(
   valid: Record<string, unknown> = {},
   actor?: { id: number },
 ) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
-    user: actor,
+    // login runs before authentication, but me and changePassword read the
+    // token's user — and every account belongs to a workspace.
+    user: actor ? { ...actor, workspaceId: WORKSPACE_ID } : undefined,
   } as unknown as Request;
 }
 
@@ -41,6 +45,7 @@ beforeAll(async () => {
 function userRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
+    workspaceId: WORKSPACE_ID,
     fullName: "سوپر ادمین",
     username: "superadmin",
     password: passwordHash,
@@ -99,8 +104,11 @@ describe("authController.login", () => {
     const { token } = res.json.mock.calls[0][0];
     const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
 
+    // workspaceId travels in the token so every tenant-scoped query can read
+    // it without a database round-trip.
     expect(payload).toMatchObject({
       id: 1,
+      workspaceId: WORKSPACE_ID,
       username: "superadmin",
       role: "super_admin",
       isActive: true,
@@ -117,6 +125,7 @@ describe("authController.login", () => {
     expect(user).not.toHaveProperty("password");
     expect(user).toMatchObject({
       id: 1,
+      workspace_id: WORKSPACE_ID,
       full_name: "سوپر ادمین",
       is_active: true,
       role: "super_admin",

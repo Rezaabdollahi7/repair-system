@@ -28,19 +28,19 @@ the DB migration risk from the multi-tenancy risk.
 
 - [x] 1.1 Design the initial Prisma schema, modeled on the current SQLite schema's entities (Device, Customer, Personnel, Item, Category, PurchaseInvoice, SaleInvoice, RepairInvoice, InvoiceItem, Settings, Backup, etc.)
 - [x] 1.2 Run `prisma migrate dev` to generate the initial migration against local Postgres
-- [ ] 1.3 Rewrite each controller's data-access calls to use Prisma Client instead of sql.js queries (one resource at a time: devices → customers → personnel → items → invoices → reports → settings)
-- [ ] 1.4 Disable the sql.js-based backup feature: the controller copies a SQLite file that is no longer the source of truth, so its endpoints return 501 with a Persian explanation rather than producing a worthless file. Removes `backupScheduler` (weekly cron) — durability becomes a platform guarantee, not something each workshop arranges. Real backups are rebuilt in phase 5, once workspaceId (phase 2) and object storage (phase 4) exist.
-- [ ] 1.5a Update `resetAdmin.js` and `importFromExcel.js` for Prisma
-- [ ] 1.5b Update `importDeviceImages.js` — deferred to phase 4, since it writes to the image store that object storage replaces
-- [ ] 1.6 Confirm the full app (frontend included) works end-to-end against Postgres locally, single-tenant, before moving to Phase 2
-- [ ] 1.7 Unify invoice numbering: have all three invoice types (purchase, sale, repair) take their prefix from `settings.invoice_prefix` instead of the current mix of hardcoded prefixes (`PUR-`, `SAL-`) and settings-driven ones (repair only), so each workspace controls its own numbering in phase 2
+- [x] 1.3 Rewrite each controller's data-access calls to use Prisma Client instead of sql.js queries (one resource at a time: devices → customers → personnel → items → invoices → reports → settings)
+- [x] 1.4 Disable the sql.js-based backup feature: the controller copies a SQLite file that is no longer the source of truth, so its endpoints return 501 with a Persian explanation rather than producing a worthless file. Removes `backupScheduler` (weekly cron) — durability becomes a platform guarantee, not something each workshop arranges. Real backups are rebuilt in phase 5, once workspaceId (phase 2) and object storage (phase 4) exist.
+- [x] 1.5a Update `resetAdmin.js` and `importFromExcel.js` for Prisma
+- [x] 1.5b Update `importDeviceImages.js` — deferred to phase 4, since it writes to the image store that object storage replaces
+- [x] 1.6 Confirm the full app (frontend included) works end-to-end against Postgres locally, single-tenant, before moving to Phase 2
+- [x] 1.7 Unify invoice numbering: have all three invoice types (purchase, sale, repair) take their prefix from `settings.invoice_prefix` instead of the current mix of hardcoded prefixes (`PUR-`, `SAL-`) and settings-driven ones (repair only), so each workspace controls its own numbering in phase 2
 
 ## Phase 2 — Multi-Tenancy
 
 Goal: introduce `Workspace` as a first-class concept and isolate all tenant data by `workspaceId`.
 
-- [ ] 2.1 Add `Workspace` model to Prisma schema (id, unique name/slug, createdAt, subscription-related fields stubbed for later)
-- [ ] 2.2 Add `workspaceId` foreign key to every tenant-scoped table (Device, Customer, Personnel, Item, Category, all Invoice types, Settings, Backup)
+- [x] 2.1 Add `Workspace` model to Prisma schema (id, unique name/slug, createdAt, subscription-related fields stubbed for later)
+- [x] 2.2 Add `workspaceId` foreign key to every tenant-scoped table (Device, Customer, Personnel, Item, Category, all Invoice types, Settings, Backup)
 - [ ] 2.3 Write the Postgres Row-Level Security (RLS) policies: enable RLS on each tenant-scoped table, policy restricting rows to `current_setting('app.workspace_id')`
 - [ ] 2.4 Add a Prisma middleware / query wrapper that sets `app.workspace_id` per request (e.g. via `SET LOCAL` in a transaction) so RLS is actually enforced, not just app-level filtering
 - [ ] 2.5 Update every controller to scope queries by the authenticated user's `workspaceId` (belt-and-suspenders alongside RLS)

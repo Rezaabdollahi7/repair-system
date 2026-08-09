@@ -7,7 +7,9 @@ jest.mock("../lib/prisma", () => ({
   default: {
     category: {
       findMany: jest.fn(),
-      findUnique: jest.fn(),
+      // findFirst rather than findUnique: the controller pairs id with
+      // workspaceId now, which findUnique can't express.
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -24,9 +26,14 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock has to supply one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
   } as unknown as Request;
 }
 
@@ -67,11 +74,20 @@ describe("categoryController.getAll", () => {
       },
     ]);
   });
+  it("only lists the caller's own workspace", async () => {
+    db.category.findMany.mockResolvedValue([]);
+
+    await controller.getAll(mockRequest(), mockResponse());
+
+    expect(db.category.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
 });
 
 describe("categoryController.getById", () => {
   it("returns 404 for an unknown category", async () => {
-    db.category.findUnique.mockResolvedValue(null);
+    db.category.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.getById(mockRequest({ params: { id: 9 } }), res);
@@ -106,7 +122,11 @@ describe("categoryController.create", () => {
     );
 
     expect(db.category.create).toHaveBeenCalledWith({
-      data: { name: "قطعات برد", description: null },
+      data: {
+        name: "قطعات برد",
+        description: null,
+        workspaceId: WORKSPACE_ID,
+      },
     });
     expect(res.status).toHaveBeenCalledWith(201);
   });
@@ -114,7 +134,7 @@ describe("categoryController.create", () => {
 
 describe("categoryController.update", () => {
   it("returns 404 without attempting the update", async () => {
-    db.category.findUnique.mockResolvedValue(null);
+    db.category.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -130,7 +150,7 @@ describe("categoryController.update", () => {
   });
 
   it("reports a duplicate name as 400", async () => {
-    db.category.findUnique.mockResolvedValue({ id: 1 });
+    db.category.findFirst.mockResolvedValue({ id: 1 });
     db.category.update.mockRejectedValue(duplicateError);
 
     const res = mockResponse();
@@ -148,7 +168,7 @@ describe("categoryController.update", () => {
 
 describe("categoryController.remove", () => {
   it("refuses to delete a category that still has items", async () => {
-    db.category.findUnique.mockResolvedValue({ _count: { items: 3 } });
+    db.category.findFirst.mockResolvedValue({ _count: { items: 3 } });
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 1 } }), res);
@@ -161,7 +181,7 @@ describe("categoryController.remove", () => {
   });
 
   it("returns 404 for an unknown category", async () => {
-    db.category.findUnique.mockResolvedValue(null);
+    db.category.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
@@ -170,7 +190,7 @@ describe("categoryController.remove", () => {
   });
 
   it("deletes an empty category", async () => {
-    db.category.findUnique.mockResolvedValue({ _count: { items: 0 } });
+    db.category.findFirst.mockResolvedValue({ _count: { items: 0 } });
     db.category.delete.mockResolvedValue(categoryRow());
 
     const res = mockResponse();

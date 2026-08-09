@@ -1,7 +1,6 @@
-// Modeled on the existing SQLite schema in src/config/database.js — same
-// entities and shape, not a redesign (see CLAUDE.md). workspaceId and the
-// SaaS fields are deliberately absent: they arrive in phase 2, so the DB
-// migration risk stays isolated from the multi-tenancy risk.
+// Modeled on the existing SQLite schema in the pre-migration codebase — same
+// entities and shape, not a redesign (see CLAUDE.md), with workspaceId added
+// on top in phase 2.
 
 generator client {
   provider = "prisma-client"
@@ -12,19 +11,9 @@ datasource db {
   provider = "postgresql"
 }
 
-enum WorkspaceStatus {
-  trial
-  active
-  expired
-
-  @@map("workspace_status")
-}
-
-// Enums are used only where the current code proves the value set is closed:
-// the CHECK constraint in the old SQLite schema, and the validStatuses array
-// in repairInvoiceController. Other status-like columns stay String until
-// their controllers are read in task 1.3 — guessing a set here would turn a
-// missed value into a runtime failure.
+// Enums are used only where the value set is provably closed: the CHECK
+// constraint the old SQLite schema already had, and the validStatuses array
+// in repairInvoiceController.
 
 enum InventoryTransactionType {
   purchase
@@ -43,8 +32,56 @@ enum RepairInvoiceStatus {
   @@map("repair_invoice_status")
 }
 
+enum WorkspaceStatus {
+  trial
+  active
+  expired
+
+  @@map("workspace_status")
+}
+
+// ── Tenancy ──────────────────────────────────────────────────
+
+// A repair shop. No slug: the app is served from one shared domain, so a
+// workspace is only ever identified by the id carried in the caller's token.
+model Workspace {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // One expiresAt covers both the trial and a paid period: the question
+  // asked of it is always "may this workspace still be written to".
+  status    WorkspaceStatus @default(trial)
+  expiresAt DateTime?       @map("expires_at")
+
+  users                 User[]
+  customers             Customer[]
+  devices               Device[]
+  deviceImages          DeviceImage[]
+  deviceAssignments     DeviceAssignment[]
+  categories            Category[]
+  items                 Item[]
+  inventoryTransactions InventoryTransaction[]
+  purchaseInvoices      PurchaseInvoice[]
+  purchaseInvoiceItems  PurchaseInvoiceItem[]
+  saleInvoices          SaleInvoice[]
+  saleInvoiceItems      SaleInvoiceItem[]
+  services              Service[]
+  repairInvoices        RepairInvoice[]
+  repairInvoiceItems    RepairInvoiceItem[]
+  repairInvoicePayments RepairInvoicePayment[]
+  settings              Settings?
+  backups               Backup[]
+
+  @@index([status])
+  @@map("workspaces")
+}
+
 // ── Auth & people ────────────────────────────────────────────
 
+// Not tenant-scoped: the three roles are reference data shared by every
+// workspace, not something a shop owns or can change.
 model Role {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -57,18 +94,22 @@ model Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  fullName  String   @map("full_name")
-  username  String   @unique
-  password  String
-  phone     String?
-  avatar    String?
-  roleId    Int      @map("role_id")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  fullName    String   @map("full_name")
+  // Globally unique, not per workspace: the username is a phone number, and
+  // one person's number identifies one account across the platform.
+  username    String   @unique
+  password    String
+  phone       String?
+  avatar      String?
+  roleId      Int      @map("role_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   devicesAssigned        Device[]               @relation("DeviceTechnician")
   assignmentsReceived    DeviceAssignment[]     @relation("AssignmentTechnician")
@@ -81,6 +122,7 @@ model User {
   repairInvoicePayments  RepairInvoicePayment[]
   backups                Backup[]
 
+  @@index([workspaceId])
   @@index([roleId])
   @@map("users")
 }
@@ -88,21 +130,28 @@ model User {
 // ── Customers & devices ──────────────────────────────────────
 
 model Customer {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phone     String?
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  name        String
+  phone       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   devices        Device[]
   saleInvoices   SaleInvoice[]
   repairInvoices RepairInvoice[]
 
-  @@index([phone])
+  // Leads with workspaceId so the index serves the scoped query the
+  // application always issues.
+  @@index([workspaceId, name])
+  @@index([workspaceId, phone])
   @@map("customers")
 }
 
 model Device {
   id           Int       @id @default(autoincrement())
+  workspaceId  Int       @map("workspace_id")
   customerId   Int?      @map("customer_id")
   personnelId  Int?      @map("personnel_id")
   deviceName   String    @map("device_name")
@@ -117,6 +166,7 @@ model Device {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // SetNull rather than Cascade: a repair history should survive deleting
   // the customer or the technician who handled it.
   customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -127,38 +177,46 @@ model Device {
   repairInvoices RepairInvoice[]
   saleInvoices   SaleInvoice[]
 
+  @@index([workspaceId, id(sort: Desc)])
+  @@index([workspaceId, status])
+  @@index([workspaceId, entryDate])
   @@index([customerId])
   @@index([personnelId])
-  @@index([status])
   @@map("devices")
 }
 
 model DeviceImage {
-  id        Int      @id @default(autoincrement())
-  deviceId  Int      @map("device_id")
-  filename  String
-  filepath  String
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  deviceId    Int      @map("device_id")
+  filename    String
+  filepath    String
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId])
   @@index([deviceId])
   @@map("device_images")
 }
 
 model DeviceAssignment {
   id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
   deviceId    Int      @map("device_id")
   personnelId Int      @map("personnel_id")
   assignedAt  DateTime @default(now()) @map("assigned_at")
   assignedBy  Int?     @map("assigned_by")
 
-  device    Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  personnel User   @relation("AssignmentTechnician", fields: [personnelId], references: [id], onDelete: Cascade)
-  author    User?  @relation("AssignmentAuthor", fields: [assignedBy], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  personnel User      @relation("AssignmentTechnician", fields: [personnelId], references: [id], onDelete: Cascade)
+  author    User?     @relation("AssignmentAuthor", fields: [assignedBy], references: [id], onDelete: SetNull)
 
   @@unique([deviceId, personnelId])
+  @@index([workspaceId])
   @@index([personnelId])
   @@map("device_assignments")
 }
@@ -167,26 +225,31 @@ model DeviceAssignment {
 
 model Category {
   id          Int      @id @default(autoincrement())
-  name        String   @unique
+  workspaceId Int      @map("workspace_id")
+  name        String
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   items Item[]
 
+  // Unique within a workspace rather than globally: one shop naming a
+  // category shouldn't stop every other shop from using that name.
+  @@unique([workspaceId, name])
   @@map("categories")
 }
 
 model Item {
   id               Int      @id @default(autoincrement())
+  workspaceId      Int      @map("workspace_id")
   categoryId       Int?     @map("category_id")
   name             String
-  code             String?  @unique
+  code             String?
   unit             String   @default("عدد")
   minStock         Int      @default(0) @map("min_stock")
   currentStock     Int      @default(0) @map("current_stock")
-  // Rial amounts are whole numbers, but an average is not — hence 2 decimals
-  // here while the plain price/total columns stay at 0.
   avgPurchasePrice Decimal  @default(0) @map("avg_purchase_price") @db.Decimal(18, 2)
   sellPrice        Decimal  @default(0) @map("sell_price") @db.Decimal(18, 0)
   description      String?
@@ -194,35 +257,39 @@ model Item {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   transactions         InventoryTransaction[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
   saleInvoiceItems     SaleInvoiceItem[]
 
+  @@unique([workspaceId, code])
+  @@index([workspaceId, code])
+  @@index([workspaceId, name])
   @@index([categoryId])
-  @@index([name])
   @@map("items")
 }
 
 model InventoryTransaction {
   id            Int                      @id @default(autoincrement())
+  workspaceId   Int                      @map("workspace_id")
   itemId        Int                      @map("item_id")
-  // Preserves the CHECK constraint the SQLite schema already enforced.
   type          InventoryTransactionType
   quantity      Int
   unitPrice     Decimal                  @default(0) @map("unit_price") @db.Decimal(18, 0)
-  // Polymorphic pointer (reference_type says which table). No FK in SQLite
-  // either, so it stays a bare column rather than a broken relation.
+  // Polymorphic pointer (referenceType says which table), so no FK.
   referenceId   Int?                     @map("reference_id")
   referenceType String?                  @map("reference_type")
   note          String?
   createdBy     Int?                     @map("created_by")
   createdAt     DateTime                 @default(now()) @map("created_at")
 
-  item   Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  author User? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId, createdAt(sort: Desc)])
   @@index([itemId])
   @@index([createdBy])
   @@map("inventory_transactions")
@@ -232,7 +299,8 @@ model InventoryTransaction {
 
 model PurchaseInvoice {
   id            Int      @id @default(autoincrement())
-  invoiceNumber String   @unique @map("invoice_number")
+  workspaceId   Int      @map("workspace_id")
+  invoiceNumber String   @map("invoice_number")
   supplierName  String?  @map("supplier_name")
   invoiceDate   DateTime @default(now()) @map("invoice_date")
   totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
@@ -243,28 +311,34 @@ model PurchaseInvoice {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  author User?                 @relation(fields: [createdBy], references: [id], onDelete: SetNull)
-  items  PurchaseInvoiceItem[]
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
-  @@index([invoiceDate])
+  items PurchaseInvoiceItem[]
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, invoiceDate(sort: Desc)])
   @@index([createdBy])
   @@map("purchase_invoices")
 }
 
 model PurchaseInvoiceItem {
-  id         Int      @id @default(autoincrement())
-  invoiceId  Int      @map("invoice_id")
-  itemId     Int      @map("item_id")
-  quantity   Int
-  unitPrice  Decimal  @map("unit_price") @db.Decimal(18, 0)
-  totalPrice Decimal  @map("total_price") @db.Decimal(18, 0)
-  createdAt  DateTime @default(now()) @map("created_at")
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  invoiceId   Int      @map("invoice_id")
+  itemId      Int      @map("item_id")
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(18, 0)
+  totalPrice  Decimal  @map("total_price") @db.Decimal(18, 0)
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  invoice PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  // Restrict, not SetNull: an item that appears on a historical invoice
-  // shouldn't be deletable, or the invoice total stops being explainable.
-  item    Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // Restrict, not SetNull: an item on a historical invoice shouldn't be
+  // deletable, or the invoice total stops being explainable.
+  item      Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
 
+  @@index([workspaceId])
   @@index([invoiceId])
   @@index([itemId])
   @@map("purchase_invoice_items")
@@ -274,10 +348,11 @@ model PurchaseInvoiceItem {
 
 model SaleInvoice {
   id            Int      @id @default(autoincrement())
-  invoiceNumber String   @unique @map("invoice_number")
+  workspaceId   Int      @map("workspace_id")
+  invoiceNumber String   @map("invoice_number")
   customerId    Int?     @map("customer_id")
-  // Denormalized copies kept from the current schema: they preserve what the
-  // invoice said at the time even if the customer record changes later.
+  // Denormalized copies: they preserve what the invoice said at the time
+  // even if the customer record changes later.
   customerName  String?  @map("customer_name")
   customerPhone String?  @map("customer_phone")
   deviceId      Int?     @map("device_id")
@@ -290,15 +365,16 @@ model SaleInvoice {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  // device_id was added by a bare ALTER TABLE with no FK; promoted to a real
-  // relation here.
-  device   Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  author   User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  device    Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   items SaleInvoiceItem[]
 
-  @@index([invoiceDate])
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([workspaceId, paymentStatus])
   @@index([customerId])
   @@index([deviceId])
   @@index([createdBy])
@@ -307,6 +383,7 @@ model SaleInvoice {
 
 model SaleInvoiceItem {
   id             Int      @id @default(autoincrement())
+  workspaceId    Int      @map("workspace_id")
   invoiceId      Int      @map("invoice_id")
   itemId         Int?     @map("item_id")
   name           String?
@@ -314,16 +391,16 @@ model SaleInvoiceItem {
   quantity       Int
   unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 0)
   discountType   String?  @map("discount_type")
-  // Holds either a percentage or a rial amount depending on discountType,
-  // so it needs the wider precision of an amount rather than a rate.
   discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
   totalPrice     Decimal  @map("total_price") @db.Decimal(18, 0)
   createdAt      DateTime @default(now()) @map("created_at")
 
-  invoice SaleInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  item    Item?       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   SaleInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  item      Item?       @relation(fields: [itemId], references: [id], onDelete: Restrict)
 
+  @@index([workspaceId])
   @@index([invoiceId])
   @@index([itemId])
   @@map("sale_invoice_items")
@@ -331,11 +408,9 @@ model SaleInvoiceItem {
 
 // ── Services ─────────────────────────────────────────────────
 
-// This table was created lazily at runtime by serviceController.js, which
-// also seeded four default rows. Declared properly here; the seeding moves
-// to a seed script in task 1.3.
 model Service {
   id           Int      @id @default(autoincrement())
+  workspaceId  Int      @map("workspace_id")
   name         String
   description  String?
   defaultPrice Decimal  @default(0) @map("default_price") @db.Decimal(18, 0)
@@ -345,7 +420,9 @@ model Service {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  @@index([isActive, sortOrder])
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive, sortOrder])
   @@map("services")
 }
 
@@ -353,7 +430,8 @@ model Service {
 
 model RepairInvoice {
   id             Int                 @id @default(autoincrement())
-  invoiceNumber  String              @unique @map("invoice_number")
+  workspaceId    Int                 @map("workspace_id")
+  invoiceNumber  String              @map("invoice_number")
   deviceId       Int                 @map("device_id")
   customerId     Int?                @map("customer_id")
   customerName   String?             @map("customer_name")
@@ -378,8 +456,9 @@ model RepairInvoice {
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
 
-  // Restrict: device_id is NOT NULL, so a repair invoice without its device
-  // would be meaningless.
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Restrict: deviceId is NOT NULL, so an invoice without its device would
+  // be meaningless.
   device     Device    @relation(fields: [deviceId], references: [id], onDelete: Restrict)
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   technician User?     @relation("RepairInvoiceTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
@@ -388,9 +467,10 @@ model RepairInvoice {
   items    RepairInvoiceItem[]
   payments RepairInvoicePayment[]
 
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([workspaceId, status])
   @@index([deviceId])
-  @@index([status])
-  @@index([invoiceDate])
   @@index([customerId])
   @@index([technicianId])
   @@index([createdBy])
@@ -399,14 +479,11 @@ model RepairInvoice {
 
 model RepairInvoiceItem {
   id             Int      @id @default(autoincrement())
+  workspaceId    Int      @map("workspace_id")
   invoiceId      Int      @map("invoice_id")
   itemType       String   @map("item_type")
-  // Deliberately NOT a relation: repairInvoiceController only resolves
-  // item_id against the items table when item_type === "inventory"; for
-  // other types it stores whatever id the client sent, which for services
-  // points at the services table. SQLite declared an FK here but never
-  // enforced it (the foreign_keys pragma is off), so Postgres would reject
-  // inserts that work today.
+  // Deliberately NOT a relation: itemType distinguishes parts from services,
+  // so this column may point at either items or services.
   itemId         Int?     @map("item_id")
   name           String
   description    String?
@@ -420,14 +497,17 @@ model RepairInvoiceItem {
   sortOrder      Int      @default(0) @map("sort_order")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  invoice RepairInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   RepairInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId])
   @@index([invoiceId])
   @@map("repair_invoice_items")
 }
 
 model RepairInvoicePayment {
   id              Int      @id @default(autoincrement())
+  workspaceId     Int      @map("workspace_id")
   invoiceId       Int      @map("invoice_id")
   amount          Decimal  @db.Decimal(18, 0)
   paymentMethod   String   @default("cash") @map("payment_method")
@@ -437,9 +517,11 @@ model RepairInvoicePayment {
   createdBy       Int?     @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  invoice RepairInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  author  User?         @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   RepairInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  author    User?         @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([invoiceId])
   @@index([createdBy])
   @@map("repair_invoice_payments")
@@ -447,9 +529,11 @@ model RepairInvoicePayment {
 
 // ── Settings & backups ───────────────────────────────────────
 
-// Single-row table (id = 1) today. Becomes one row per workspace in phase 2.
+// One row per workspace, enforced by the unique workspaceId — each shop
+// controls its own invoice appearance and defaults.
 model Settings {
   id                    Int     @id @default(autoincrement())
+  workspaceId           Int     @unique @map("workspace_id")
   companyName           String? @map("company_name")
   companyAddress        String? @map("company_address")
   companyPhone          String? @map("company_phone")
@@ -482,44 +566,24 @@ model Settings {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@map("settings")
 }
 
 model Backup {
   id              Int      @id @default(autoincrement())
+  workspaceId     Int      @map("workspace_id")
   filename        String
   sizeBytes       BigInt   @default(0) @map("size_bytes")
   includesUploads Boolean  @default(false) @map("includes_uploads")
   createdBy       Int?     @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  author User? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([createdBy])
   @@map("backups")
-}
-
-// ── Tenancy ──────────────────────────────────────────────────
-
-// A repair shop. Nothing references it yet — task 2.2 adds workspaceId to
-// the tenant-scoped tables.
-//
-// No slug: the app is served from one shared domain, so a workspace is only
-// ever identified by the id carried in the caller's token. A URL-safe name
-// would have nothing to do.
-model Workspace {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Subscription state. Plans differ only in price and duration, so the plan
-  // itself lives on the Subscription record added in phase 8 — what matters
-  // here is whether the workspace may currently be written to.
-  status    WorkspaceStatus @default(trial)
-  // Both the trial and a paid period end here; whichever is current.
-  expiresAt DateTime?       @map("expires_at")
-
-  @@index([status])
-  @@map("workspaces")
 }

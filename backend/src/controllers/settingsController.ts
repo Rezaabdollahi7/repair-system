@@ -7,14 +7,11 @@ import type { Prisma, Settings } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { errorMessage } from "../utils/errors";
 import type { SettingsUpdateBody, UploadTypeParam } from "../schemas/settings";
+import { workspaceIdOf } from "../utils/workspace";
 
 export const SETTINGS_UPLOADS_DIR = path.join(__dirname, "../uploads/settings");
 
 fs.mkdirSync(SETTINGS_UPLOADS_DIR, { recursive: true });
-
-// The settings table holds a single row. It becomes one row per workspace in
-// phase 2.
-const SETTINGS_ID = 1;
 
 // diskStorage rather than memoryStorage: unlike device photos these aren't
 // converted, so there's nothing to gain from holding them in memory first.
@@ -77,8 +74,11 @@ function toSettingsResponse(settings: Settings) {
 // GET /api/settings — unauthenticated, so an invoice can render its header.
 export const getSettings = async (req: Request, res: Response) => {
   try {
+    // Keyed on workspaceId, which is unique on this table — one row per
+    // workspace, replacing the single hardcoded row of the single-tenant
+    // version.
     const settings = await prisma.settings.findUnique({
-      where: { id: SETTINGS_ID },
+      where: { workspaceId: workspaceIdOf(req) },
     });
 
     if (!settings) {
@@ -184,7 +184,7 @@ export const updateSettings = async (req: Request, res: Response) => {
     }
 
     const settings = await prisma.settings.update({
-      where: { id: SETTINGS_ID },
+      where: { workspaceId: workspaceIdOf(req) },
       data,
     });
 
@@ -215,7 +215,7 @@ export const uploadImage = async (req: Request, res: Response) => {
     const filePath = `/uploads/settings/${file.filename}`;
 
     await prisma.settings.update({
-      where: { id: SETTINGS_ID },
+      where: { workspaceId: workspaceIdOf(req) },
       data: { [IMAGE_COLUMNS[type]]: filePath },
     });
 

@@ -5,6 +5,7 @@ import { ValidatedRequest } from "../middleware/validate";
 import { dateFilter, monthRange, todayRange } from "../utils/dateRange";
 import { errorMessage } from "../utils/errors";
 import type { DateRangeQuery, StockReportQuery } from "../schemas/report";
+import { workspaceIdOf } from "../utils/workspace";
 
 type StockStatus = "critical" | "low" | "good";
 
@@ -19,7 +20,10 @@ export const getStockReport = async (req: Request, res: Response) => {
   try {
     const query = (req as ValidatedRequest).valid.query as StockReportQuery;
 
-    const where: Prisma.ItemWhereInput = { isActive: true };
+    const where: Prisma.ItemWhereInput = {
+      isActive: true,
+      workspaceId: workspaceIdOf(req),
+    };
     if (query.categoryId !== undefined) {
       where.categoryId = query.categoryId;
     }
@@ -86,7 +90,10 @@ export const getPurchaseReport = async (req: Request, res: Response) => {
     const invoiceDate = dateFilter(from_date, to_date);
 
     const invoices = await prisma.purchaseInvoice.findMany({
-      where: invoiceDate ? { invoiceDate } : {},
+      where: {
+        workspaceId: workspaceIdOf(req),
+        ...(invoiceDate ? { invoiceDate } : {}),
+      },
       orderBy: { invoiceDate: "desc" },
       include: { items: { select: { quantity: true } } },
     });
@@ -132,7 +139,10 @@ export const getSaleReport = async (req: Request, res: Response) => {
     const invoiceDate = dateFilter(from_date, to_date);
 
     const invoices = await prisma.saleInvoice.findMany({
-      where: invoiceDate ? { invoiceDate } : {},
+      where: {
+        workspaceId: workspaceIdOf(req),
+        ...(invoiceDate ? { invoiceDate } : {}),
+      },
       orderBy: { invoiceDate: "desc" },
       include: { items: { select: { quantity: true } } },
     });
@@ -177,12 +187,14 @@ export const getProfitReport = async (req: Request, res: Response) => {
       .query as DateRangeQuery;
 
     const invoiceDate = dateFilter(from_date, to_date);
+    const workspaceId = workspaceIdOf(req);
 
     // Custom sale lines carry no item_id and so no known cost — the old
     // query's inner join excluded them, and they stay excluded here.
     const grouped = await prisma.saleInvoiceItem.groupBy({
       by: ["itemId"],
       where: {
+        workspaceId,
         itemId: { not: null },
         ...(invoiceDate ? { invoice: { invoiceDate } } : {}),
       },
@@ -195,7 +207,7 @@ export const getProfitReport = async (req: Request, res: Response) => {
 
     const items = itemIds.length
       ? await prisma.item.findMany({
-          where: { id: { in: itemIds } },
+          where: { id: { in: itemIds }, workspaceId },
           select: {
             id: true,
             name: true,
@@ -255,13 +267,14 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const today = todayRange();
     const month = monthRange();
+    const workspaceId = workspaceIdOf(req);
 
-    // Typed rather than `as const`: the latter produces readonly arrays,
-    // which Prisma's filter types don't accept.
     const issuedOrPaid: Prisma.RepairInvoiceWhereInput = {
+      workspaceId,
       status: { in: ["issued", "paid"] },
     };
     const awaitingPayment: Prisma.RepairInvoiceWhereInput = {
+      workspaceId,
       status: "issued",
       paymentStatus: { in: ["pending", "partial"] },
     };
@@ -287,7 +300,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       repairingDevices,
       devicesByStatus,
     ] = await Promise.all([
-      prisma.repairInvoice.count({ where: { invoiceDate: today } }),
+      prisma.repairInvoice.count({
+        where: { workspaceId, invoiceDate: today },
+      }),
       prisma.repairInvoice.aggregate({
         where: { invoiceDate: today, ...issuedOrPaid },
         _sum: { totalAmount: true },
@@ -299,52 +314,53 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       prisma.repairInvoice.count({ where: awaitingPayment }),
       prisma.repairInvoice.aggregate({
         where: awaitingPayment,
-        // SUM(total - paid) isn't expressible, but the difference of the two
-        // sums is the same figure.
         _sum: { totalAmount: true, paidAmount: true },
       }),
-      prisma.item.count({ where: { isActive: true } }),
+      prisma.item.count({ where: { workspaceId, isActive: true } }),
       prisma.item.findMany({
-        where: { isActive: true },
+        where: { workspaceId, isActive: true },
         select: { currentStock: true, minStock: true },
       }),
       prisma.purchaseInvoice.aggregate({
-        where: { invoiceDate: today },
+        where: { workspaceId, invoiceDate: today },
         _sum: { totalAmount: true },
       }),
       prisma.saleInvoice.aggregate({
-        where: { invoiceDate: today },
+        where: { workspaceId, invoiceDate: today },
         _sum: { totalAmount: true },
       }),
       prisma.purchaseInvoice.aggregate({
-        where: { invoiceDate: month },
+        where: { workspaceId, invoiceDate: month },
         _sum: { totalAmount: true },
       }),
       prisma.saleInvoice.aggregate({
-        where: { invoiceDate: month },
+        where: { workspaceId, invoiceDate: month },
         _sum: { totalAmount: true },
       }),
       prisma.inventoryTransaction.findMany({
+        where: { workspaceId },
         orderBy: { createdAt: "desc" },
         take: 10,
         include: { item: { select: { name: true, code: true } } },
       }),
       prisma.saleInvoiceItem.groupBy({
         by: ["itemId"],
-        where: { itemId: { not: null } },
+        where: { workspaceId, itemId: { not: null } },
         _sum: { quantity: true, totalPrice: true },
         orderBy: { _sum: { totalPrice: "desc" } },
         take: 5,
       }),
-      prisma.device.count(),
-      prisma.device.count({ where: { createdAt: today } }),
+      prisma.device.count({ where: { workspaceId } }),
+      prisma.device.count({ where: { workspaceId, createdAt: today } }),
       prisma.device.count({
         where: {
+          workspaceId,
           status: { in: ["diagnosing", "repairing", "waiting_for_parts"] },
         },
       }),
       prisma.device.groupBy({
         by: ["status"],
+        where: { workspaceId },
         _count: { status: true },
         orderBy: { _count: { status: "desc" } },
       }),
@@ -358,7 +374,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
     const topItemRecords = topItemIds.length
       ? await prisma.item.findMany({
-          where: { id: { in: topItemIds } },
+          where: { id: { in: topItemIds }, workspaceId },
           select: { id: true, name: true, code: true },
         })
       : [];

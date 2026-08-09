@@ -7,7 +7,9 @@ import prisma from "../lib/prisma";
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
   default: {
-    device: { findUnique: jest.fn() },
+    // findFirst rather than findUnique: the controller pairs id with
+    // workspaceId now, which findUnique can't express.
+    device: { findFirst: jest.fn() },
     deviceImage: {
       aggregate: jest.fn(),
       create: jest.fn(),
@@ -44,9 +46,14 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock has to supply one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}, files?: unknown[]) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
     files,
   } as unknown as Request;
 }
@@ -61,7 +68,7 @@ beforeEach(() => {
 
 describe("imageController.uploadImages", () => {
   it("returns 404 for an unknown device", async () => {
-    db.device.findUnique.mockResolvedValue(null);
+    db.device.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.uploadImages(
@@ -74,7 +81,7 @@ describe("imageController.uploadImages", () => {
   });
 
   it("returns 400 when no file was sent", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
 
     const res = mockResponse();
     await controller.uploadImages(mockRequest({ params: { id: 1 } }, []), res);
@@ -83,7 +90,7 @@ describe("imageController.uploadImages", () => {
   });
 
   it("continues numbering sort_order from the highest existing value", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: 4 } });
     db.deviceImage.create.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) =>
@@ -106,7 +113,7 @@ describe("imageController.uploadImages", () => {
   });
 
   it("starts at 1 when the device has no images yet", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     db.deviceImage.create.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) =>
@@ -123,7 +130,7 @@ describe("imageController.uploadImages", () => {
   });
 
   it("stores a path relative to the uploads root", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     db.deviceImage.create.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) =>
@@ -136,13 +143,15 @@ describe("imageController.uploadImages", () => {
       mockResponse(),
     );
 
-    const { filename, filepath } = db.deviceImage.create.mock.calls[0][0].data;
+    const { filename, filepath, workspaceId } =
+      db.deviceImage.create.mock.calls[0][0].data;
     expect(filename).toMatch(/\.webp$/);
     expect(filepath).toBe(`devices/${filename}`);
+    expect(workspaceId).toBe(WORKSPACE_ID);
   });
 
   it("writes no row when the conversion fails", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     mockedSharp.mockReturnValue({
       webp: () => ({ toFile: jest.fn().mockRejectedValue(new Error("bad")) }),
@@ -170,7 +179,9 @@ describe("imageController.deleteImage", () => {
     );
 
     expect(db.deviceImage.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 5, deviceId: 1 } }),
+      expect.objectContaining({
+        where: { id: 5, deviceId: 1, workspaceId: WORKSPACE_ID },
+      }),
     );
     expect(res.status).toHaveBeenCalledWith(404);
   });
@@ -201,9 +212,29 @@ describe("imageController.deleteDeviceImages", () => {
     ]);
     (fs.rmSync as jest.Mock).mockImplementation(() => undefined);
 
-    await controller.deleteDeviceImages(1);
+    await controller.deleteDeviceImages(1, WORKSPACE_ID);
 
+    expect(db.deviceImage.findMany.mock.calls[0][0].where).toEqual({
+      deviceId: 1,
+      workspaceId: WORKSPACE_ID,
+    });
     expect(fs.rmSync).toHaveBeenCalledTimes(2);
     expect(db.deviceImage.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("imageController.getImages", () => {
+  it("scopes the listing to the caller's workspace", async () => {
+    db.deviceImage.findMany.mockResolvedValue([]);
+
+    await controller.getImages(
+      mockRequest({ params: { id: 1 } }),
+      mockResponse(),
+    );
+
+    expect(db.deviceImage.findMany.mock.calls[0][0].where).toEqual({
+      deviceId: 1,
+      workspaceId: WORKSPACE_ID,
+    });
   });
 });

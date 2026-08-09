@@ -8,7 +8,9 @@ jest.mock("../lib/prisma", () => ({
     customer: {
       count: jest.fn(),
       findMany: jest.fn(),
-      findUnique: jest.fn(),
+      // findFirst rather than findUnique: the controller pairs id with
+      // workspaceId now, which findUnique can't express.
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       deleteMany: jest.fn(),
@@ -31,11 +33,14 @@ function mockResponse() {
   return res;
 }
 
-// Handlers read from req.valid, which validate() populates upstream, so the
-// tests supply it directly rather than running the middleware.
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock has to supply one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
   } as unknown as Request;
 }
 
@@ -72,6 +77,7 @@ describe("customerController.getAll", () => {
     expect(db.customer.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          workspaceId: WORKSPACE_ID,
           OR: [
             { name: { contains: "رضا", mode: "insensitive" } },
             { phone: { contains: "رضا", mode: "insensitive" } },
@@ -98,7 +104,7 @@ describe("customerController.getAll", () => {
 
 describe("customerController.getOne", () => {
   it("returns 404 when the customer does not exist", async () => {
-    db.customer.findUnique.mockResolvedValue(null);
+    db.customer.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.getOne(mockRequest({ params: { id: 9 } }), res);
@@ -108,7 +114,7 @@ describe("customerController.getOne", () => {
   });
 
   it("serializes the customer into snake_case", async () => {
-    db.customer.findUnique.mockResolvedValue({
+    db.customer.findFirst.mockResolvedValue({
       id: 1,
       name: "رضا",
       phone: null,
@@ -167,6 +173,19 @@ describe("customerController.getStats", () => {
       avg_repair_days: null,
     });
   });
+  it("counts only devices in the caller's workspace", async () => {
+    db.device.findMany.mockResolvedValue([]);
+
+    await controller.getStats(
+      mockRequest({ params: { id: 1 } }),
+      mockResponse(),
+    );
+
+    expect(db.device.findMany.mock.calls[0][0].where).toEqual({
+      customerId: 1,
+      workspaceId: WORKSPACE_ID,
+    });
+  });
 });
 
 describe("customerController.create", () => {
@@ -185,7 +204,7 @@ describe("customerController.create", () => {
     );
 
     expect(db.customer.create).toHaveBeenCalledWith({
-      data: { name: "رضا", phone: null },
+      data: { name: "رضا", phone: null, workspaceId: WORKSPACE_ID },
     });
     expect(res.status).toHaveBeenCalledWith(201);
   });
@@ -193,7 +212,7 @@ describe("customerController.create", () => {
 
 describe("customerController.update", () => {
   it("returns 404 without attempting the update", async () => {
-    db.customer.findUnique.mockResolvedValue(null);
+    db.customer.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -213,6 +232,9 @@ describe("customerController.remove", () => {
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 99 } }), res);
 
+    expect(db.customer.deleteMany).toHaveBeenCalledWith({
+      where: { id: 99, workspaceId: WORKSPACE_ID },
+    });
     expect(res.json).toHaveBeenCalledWith({ success: true });
   });
 });

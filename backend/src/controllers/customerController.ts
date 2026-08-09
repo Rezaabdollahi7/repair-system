@@ -7,6 +7,7 @@ import { errorMessage } from "../utils/errors";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
 import type { CustomerBody, CustomerListQuery } from "../schemas/customer";
+import { workspaceIdOf } from "../utils/workspace";
 
 // GET /api/customers
 export const getAll = async (req: Request, res: Response) => {
@@ -14,7 +15,9 @@ export const getAll = async (req: Request, res: Response) => {
     const { search, page, limit } = (req as ValidatedRequest).valid
       .query as CustomerListQuery;
 
-    const where: Prisma.CustomerWhereInput = {};
+    const where: Prisma.CustomerWhereInput = {
+      workspaceId: workspaceIdOf(req),
+    };
     if (search) {
       const term = persianToEnglish(search);
       // SQLite's LIKE was case-insensitive for ASCII by default; Postgres's
@@ -63,7 +66,11 @@ export const getOne = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const customer = await prisma.customer.findUnique({ where: { id } });
+    // Scoped by workspace as well as id: without it, an id from another
+    // workspace would resolve.
+    const customer = await prisma.customer.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
+    });
     if (!customer) {
       return res.status(404).json({ error: "مشتری یافت نشد" });
     }
@@ -80,7 +87,7 @@ export const getDevices = async (req: Request, res: Response) => {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
     const devices = await prisma.device.findMany({
-      where: { customerId: id },
+      where: { customerId: id, workspaceId: workspaceIdOf(req) },
       orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
       select: {
         id: true,
@@ -114,7 +121,7 @@ export const getStats = async (req: Request, res: Response) => {
     // leaving RLS as the only guard. One customer holds at most a few hundred
     // devices, so loading them is cheap.
     const devices = await prisma.device.findMany({
-      where: { customerId: id },
+      where: { customerId: id, workspaceId: workspaceIdOf(req) },
       select: { status: true, entryDate: true, exitDate: true },
     });
 
@@ -154,7 +161,9 @@ export const create = async (req: Request, res: Response) => {
   try {
     const data = (req as ValidatedRequest).valid.body as CustomerBody;
 
-    const customer = await prisma.customer.create({ data });
+    const customer = await prisma.customer.create({
+      data: { ...data, workspaceId: workspaceIdOf(req) },
+    });
 
     res.status(201).json(serialize(customer));
   } catch (error) {
@@ -169,13 +178,17 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const data = valid.body as CustomerBody;
 
-    const existing = await prisma.customer.findUnique({ where: { id } });
+    const workspaceId = workspaceIdOf(req);
+
+    const existing = await prisma.customer.findFirst({
+      where: { id, workspaceId },
+      select: { id: true },
+    });
     if (!existing) {
       return res.status(404).json({ error: "مشتری یافت نشد" });
     }
 
     const customer = await prisma.customer.update({ where: { id }, data });
-
     res.json(serialize(customer));
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
@@ -191,7 +204,9 @@ export const remove = async (req: Request, res: Response) => {
     // { success: true } even for an id that no longer existed, and delete()
     // throws P2025 instead. Detaching the customer's devices is no longer
     // done by hand — the schema's onDelete: SetNull does it.
-    await prisma.customer.deleteMany({ where: { id } });
+    await prisma.customer.deleteMany({
+      where: { id, workspaceId: workspaceIdOf(req) },
+    });
 
     res.json({ success: true });
   } catch (error) {

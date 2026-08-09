@@ -11,6 +11,7 @@ import type {
   DeviceListQuery,
   DeviceUpdateBody,
 } from "../schemas/device";
+import { workspaceIdOf } from "../utils/workspace";
 
 // One query shape reused by every handler, so the response never depends on
 // which endpoint produced it.
@@ -134,8 +135,9 @@ export const getAll = async (req: Request, res: Response) => {
     const query = (req as ValidatedRequest).valid.query as DeviceListQuery;
     const { page, limit } = query;
 
-    const conditions: Prisma.DeviceWhereInput[] = [];
-
+    const conditions: Prisma.DeviceWhereInput[] = [
+      { workspaceId: workspaceIdOf(req) },
+    ];
     if (query.search) {
       conditions.push({ OR: buildSearchFilter(query.search) });
     }
@@ -175,8 +177,8 @@ export const getAll = async (req: Request, res: Response) => {
       }
     }
 
-    const where: Prisma.DeviceWhereInput =
-      conditions.length > 0 ? { AND: conditions } : {};
+    // Always at least the workspace condition now, so no empty-where branch.
+    const where: Prisma.DeviceWhereInput = { AND: conditions };
 
     // include rather than a query per device: the old handler ran one
     // assignee lookup for every row, so a page of ten cost eleven queries.
@@ -208,8 +210,10 @@ export const getOne = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const device = await prisma.device.findUnique({
-      where: { id },
+    // findFirst rather than findUnique: the id alone would resolve a device
+    // belonging to another workspace.
+    const device = await prisma.device.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       include: deviceInclude,
     });
 
@@ -230,6 +234,7 @@ export const create = async (req: Request, res: Response) => {
 
     const device = await prisma.device.create({
       data: {
+        workspaceId: workspaceIdOf(req),
         customerId: body.customer_id ?? null,
         deviceName: body.device_name,
         brand: body.brand,
@@ -256,8 +261,8 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as DeviceUpdateBody;
 
-    const existing = await prisma.device.findUnique({
-      where: { id },
+    const existing = await prisma.device.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true },
     });
     if (!existing) {
@@ -304,8 +309,8 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const device = await prisma.device.findUnique({
-      where: { id },
+    const device = await prisma.device.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true, _count: { select: { repairInvoices: true } } },
     });
 
@@ -325,7 +330,7 @@ export const remove = async (req: Request, res: Response) => {
 
     // Files first: the deviceImage rows go with the device via cascade, and
     // once they're gone there's nothing left pointing at the files on disk.
-    await deleteDeviceImages(id);
+    await deleteDeviceImages(id, workspaceIdOf(req));
 
     await prisma.device.delete({ where: { id } });
 

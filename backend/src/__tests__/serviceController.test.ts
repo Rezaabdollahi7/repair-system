@@ -7,7 +7,9 @@ jest.mock("../lib/prisma", () => ({
   default: {
     service: {
       findMany: jest.fn(),
-      findUnique: jest.fn(),
+      // findFirst rather than findUnique: the controller pairs id with
+      // workspaceId now, which findUnique can't express.
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       deleteMany: jest.fn(),
@@ -28,15 +30,21 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock has to supply one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
   } as unknown as Request;
 }
 
 function serviceRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
+    workspaceId: WORKSPACE_ID,
     name: "دستمزد تعمیر",
     description: "هزینه تعمیر دستگاه",
     defaultPrice: decimal(500000),
@@ -54,14 +62,14 @@ beforeEach(() => {
 });
 
 describe("serviceController.getAll", () => {
-  it("returns only active services, ordered by sort order then name", async () => {
+  it("returns only active services from the caller's workspace", async () => {
     db.service.findMany.mockResolvedValue([serviceRow()]);
 
     const res = mockResponse();
     await controller.getAll(mockRequest(), res);
 
     expect(db.service.findMany).toHaveBeenCalledWith({
-      where: { isActive: true },
+      where: { isActive: true, workspaceId: WORKSPACE_ID },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
     expect(res.json).toHaveBeenCalledWith([
@@ -96,6 +104,7 @@ describe("serviceController.create", () => {
     );
 
     expect(db.service.create.mock.calls[0][0].data).toEqual({
+      workspaceId: WORKSPACE_ID,
       name: "دستمزد تعمیر",
       description: null,
       defaultPrice: 500000,
@@ -106,8 +115,8 @@ describe("serviceController.create", () => {
 });
 
 describe("serviceController.update", () => {
-  it("returns 404 without attempting the update", async () => {
-    db.service.findUnique.mockResolvedValue(null);
+  it("returns 404 for a service in another workspace", async () => {
+    db.service.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -115,12 +124,16 @@ describe("serviceController.update", () => {
       res,
     );
 
+    expect(db.service.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
     expect(res.status).toHaveBeenCalledWith(404);
     expect(db.service.update).not.toHaveBeenCalled();
   });
 
   it("leaves price and unit untouched when only the name is sent", async () => {
-    db.service.findUnique.mockResolvedValue({ id: 1 });
+    db.service.findFirst.mockResolvedValue({ id: 1 });
     db.service.update.mockResolvedValue(serviceRow());
 
     await controller.update(
@@ -133,8 +146,8 @@ describe("serviceController.update", () => {
     });
   });
 
-  it("accepts 0 as a deactivating value for is_active", async () => {
-    db.service.findUnique.mockResolvedValue({ id: 1 });
+  it("accepts false as a deactivating value for is_active", async () => {
+    db.service.findFirst.mockResolvedValue({ id: 1 });
     db.service.update.mockResolvedValue(serviceRow({ isActive: false }));
 
     await controller.update(
@@ -155,6 +168,9 @@ describe("serviceController.remove", () => {
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
 
+    expect(db.service.deleteMany).toHaveBeenCalledWith({
+      where: { id: 9, workspaceId: WORKSPACE_ID },
+    });
     expect(res.status).toHaveBeenCalledWith(404);
   });
 

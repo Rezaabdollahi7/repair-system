@@ -8,6 +8,8 @@ jest.mock("../lib/prisma", () => ({
   default: {
     user: {
       findMany: jest.fn(),
+      // findUnique stays for the global username check; findFirst is what
+      // the workspace-scoped lookups use.
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -30,19 +32,24 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock always supplies one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(
   valid: Record<string, unknown> = {},
   actor?: { id: number; role: string },
 ) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
-    user: actor,
+    user: { ...actor, workspaceId: WORKSPACE_ID },
   } as unknown as Request;
 }
 
 function userRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 3,
+    workspaceId: WORKSPACE_ID,
     fullName: "علی",
     username: "ali",
     phone: "0912",
@@ -73,6 +80,7 @@ describe("personnelController.getAll", () => {
     expect(res.json).toHaveBeenCalledWith([
       {
         id: 3,
+        workspace_id: WORKSPACE_ID,
         full_name: "علی",
         username: "ali",
         phone: "0912",
@@ -87,6 +95,16 @@ describe("personnelController.getAll", () => {
     ]);
   });
 
+  it("lists only the caller's own workspace", async () => {
+    db.user.findMany.mockResolvedValue([]);
+
+    await controller.getAll(mockRequest({ query: {} }), mockResponse());
+
+    expect(db.user.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
   it("filters by role name when asked", async () => {
     db.user.findMany.mockResolvedValue([]);
 
@@ -96,6 +114,7 @@ describe("personnelController.getAll", () => {
     );
 
     expect(db.user.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
       role: { name: "technician" },
     });
   });
@@ -119,6 +138,24 @@ describe("personnelController.getAll", () => {
     expect(db.user.findMany.mock.calls[0][0].select).not.toHaveProperty(
       "password",
     );
+  });
+});
+
+describe("personnelController.getOne", () => {
+  it("returns 404 for a user in another workspace", async () => {
+    db.user.findFirst.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await controller.getOne(
+      mockRequest({ params: { id: 9 } }, superAdmin),
+      res,
+    );
+
+    expect(db.user.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 });
 
@@ -168,7 +205,9 @@ describe("personnelController.create", () => {
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  it("rejects a duplicate username with 409", async () => {
+  it("rejects a username taken anywhere on the platform", async () => {
+    // Checked without a workspace filter on purpose: the username is a phone
+    // number, and one number means one account across every workspace.
     db.role.findUnique.mockResolvedValue({ name: "technician" });
     db.user.findUnique.mockResolvedValue({ id: 9 });
 
@@ -179,22 +218,24 @@ describe("personnelController.create", () => {
     expect(db.user.create).not.toHaveBeenCalled();
   });
 
-  it("hashes the password before storing it", async () => {
+  it("hashes the password and stamps the caller's workspace", async () => {
     db.role.findUnique.mockResolvedValue({ name: "technician" });
     db.user.findUnique.mockResolvedValue(null);
     db.user.create.mockResolvedValue(userRow());
 
     await controller.create(mockRequest({ body }, superAdmin), mockResponse());
 
-    const stored = db.user.create.mock.calls[0][0].data.password;
+    const { password: stored, workspaceId } =
+      db.user.create.mock.calls[0][0].data;
     expect(stored).not.toBe("secret123");
     expect(await bcrypt.compare("secret123", stored)).toBe(true);
+    expect(workspaceId).toBe(WORKSPACE_ID);
   });
 });
 
 describe("personnelController.update", () => {
   it("returns 404 for an unknown user", async () => {
-    db.user.findUnique.mockResolvedValue(null);
+    db.user.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -210,8 +251,11 @@ describe("personnelController.update", () => {
   });
 
   it("allows a user to keep their own username", async () => {
-    db.user.findUnique.mockResolvedValue({ id: 3 });
-    db.user.findFirst.mockResolvedValue(null);
+    // First findFirst resolves the user itself; the second checks the
+    // username against other accounts.
+    db.user.findFirst
+      .mockResolvedValueOnce({ id: 3 })
+      .mockResolvedValueOnce(null);
     db.user.update.mockResolvedValue(userRow());
 
     const res = mockResponse();
@@ -220,7 +264,7 @@ describe("personnelController.update", () => {
       res,
     );
 
-    expect(db.user.findFirst).toHaveBeenCalledWith(
+    expect(db.user.findFirst).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: { username: "ali", id: { not: 3 } },
       }),
@@ -229,7 +273,7 @@ describe("personnelController.update", () => {
   });
 
   it("leaves absent fields untouched", async () => {
-    db.user.findUnique.mockResolvedValue({ id: 3 });
+    db.user.findFirst.mockResolvedValue({ id: 3 });
     db.user.update.mockResolvedValue(userRow());
 
     await controller.update(
@@ -241,7 +285,7 @@ describe("personnelController.update", () => {
   });
 
   it("stops an admin from promoting someone to admin", async () => {
-    db.user.findUnique.mockResolvedValue({ id: 3 });
+    db.user.findFirst.mockResolvedValue({ id: 3 });
     db.role.findUnique.mockResolvedValue({ name: "admin" });
 
     const res = mockResponse();
@@ -255,7 +299,7 @@ describe("personnelController.update", () => {
   });
 
   it("refuses to change the caller's own role", async () => {
-    db.user.findUnique.mockResolvedValue({ id: 1 });
+    db.user.findFirst.mockResolvedValue({ id: 1 });
 
     const res = mockResponse();
     await controller.update(
@@ -268,7 +312,7 @@ describe("personnelController.update", () => {
   });
 
   it("still lets a super admin change someone else's role", async () => {
-    db.user.findUnique.mockResolvedValue({ id: 3 });
+    db.user.findFirst.mockResolvedValue({ id: 3 });
     db.role.findUnique.mockResolvedValue({ name: "technician" });
     db.user.update.mockResolvedValue(userRow());
 
@@ -292,11 +336,27 @@ describe("personnelController.toggleActive", () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(db.user.findUnique).not.toHaveBeenCalled();
+    expect(db.user.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a user in another workspace", async () => {
+    db.user.findFirst.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await controller.toggleActive(
+      mockRequest({ params: { id: 9 } }, superAdmin),
+      res,
+    );
+
+    expect(db.user.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
   it("stops an admin from deactivating a super admin", async () => {
-    db.user.findUnique.mockResolvedValue({
+    db.user.findFirst.mockResolvedValue({
       isActive: true,
       role: { name: "super_admin" },
     });
@@ -312,7 +372,7 @@ describe("personnelController.toggleActive", () => {
   });
 
   it("flips the flag and reports it as a boolean", async () => {
-    db.user.findUnique.mockResolvedValue({
+    db.user.findFirst.mockResolvedValue({
       isActive: true,
       role: { name: "technician" },
     });
@@ -347,8 +407,8 @@ describe("personnelController.remove", () => {
     expect(db.user.delete).not.toHaveBeenCalled();
   });
 
-  it("returns 404 for an unknown user", async () => {
-    db.user.findUnique.mockResolvedValue(null);
+  it("returns 404 for a user in another workspace", async () => {
+    db.user.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.remove(
@@ -356,12 +416,15 @@ describe("personnelController.remove", () => {
       res,
     );
 
+    expect(db.user.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.user.delete).not.toHaveBeenCalled();
   });
 
   it("deletes the user and lets the schema detach their records", async () => {
-    db.user.findUnique.mockResolvedValue({ id: 3 });
+    db.user.findFirst.mockResolvedValue({ id: 3 });
     db.user.delete.mockResolvedValue({ id: 3 });
 
     const res = mockResponse();

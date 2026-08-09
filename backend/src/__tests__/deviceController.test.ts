@@ -9,7 +9,9 @@ jest.mock("../lib/prisma", () => ({
     device: {
       count: jest.fn(),
       findMany: jest.fn(),
-      findUnique: jest.fn(),
+      // findFirst rather than findUnique: the controller pairs id with
+      // workspaceId now, which findUnique can't express.
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -30,9 +32,14 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock has to supply one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
   } as unknown as Request;
 }
 
@@ -115,8 +122,9 @@ describe("deviceController.getAll", () => {
       mockResponse(),
     );
 
+    // AND[0] is the workspace condition now; the search alternatives follow.
     const where = db.device.findMany.mock.calls[0][0].where;
-    expect(where.AND[0].OR).toContainEqual({ id: 12 });
+    expect(where.AND[1].OR).toContainEqual({ id: 12 });
   });
 
   it("omits the id filter for a non-numeric search term", async () => {
@@ -128,7 +136,7 @@ describe("deviceController.getAll", () => {
       mockResponse(),
     );
 
-    const alternatives = db.device.findMany.mock.calls[0][0].where.AND[0].OR;
+    const alternatives = db.device.findMany.mock.calls[0][0].where.AND[1].OR;
     expect(alternatives.some((f: object) => "id" in f)).toBe(false);
   });
 
@@ -158,7 +166,7 @@ describe("deviceController.getAll", () => {
     );
 
     const where = db.device.findMany.mock.calls[0][0].where;
-    expect(where.AND[0].OR).toEqual([
+    expect(where.AND[1].OR).toEqual([
       { needsInvoice: true, saleInvoices: { none: {} } },
     ]);
   });
@@ -174,7 +182,7 @@ describe("deviceController.getAll", () => {
       mockResponse(),
     );
 
-    expect(db.device.findMany.mock.calls[0][0].where.AND[0].OR).toEqual([
+    expect(db.device.findMany.mock.calls[0][0].where.AND[1].OR).toEqual([
       { saleInvoices: { some: { paymentStatus: "paid" } } },
       { needsInvoice: false },
     ]);
@@ -205,11 +213,22 @@ describe("deviceController.getAll", () => {
       "assignments",
     );
   });
+
+  it("scopes every list to the caller's workspace", async () => {
+    db.device.count.mockResolvedValue(0);
+    db.device.findMany.mockResolvedValue([]);
+
+    await controller.getAll(mockRequest({ query: baseQuery }), mockResponse());
+
+    expect(db.device.findMany.mock.calls[0][0].where.AND[0]).toEqual({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
 });
 
 describe("deviceController.getOne", () => {
   it("returns 404 for an unknown device", async () => {
-    db.device.findUnique.mockResolvedValue(null);
+    db.device.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.getOne(mockRequest({ params: { id: 9 } }), res);
@@ -220,7 +239,7 @@ describe("deviceController.getOne", () => {
 
 describe("deviceController.update", () => {
   it("leaves absent fields untouched", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.device.update.mockResolvedValue(deviceRow());
 
     await controller.update(
@@ -234,7 +253,7 @@ describe("deviceController.update", () => {
   });
 
   it("disconnects the customer when customer_id is null", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.device.update.mockResolvedValue(deviceRow());
 
     await controller.update(
@@ -248,7 +267,7 @@ describe("deviceController.update", () => {
   });
 
   it("returns 404 without attempting the update", async () => {
-    db.device.findUnique.mockResolvedValue(null);
+    db.device.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -263,7 +282,7 @@ describe("deviceController.update", () => {
 
 describe("deviceController.remove", () => {
   it("refuses to delete a device that has repair invoices", async () => {
-    db.device.findUnique.mockResolvedValue({
+    db.device.findFirst.mockResolvedValue({
       id: 1,
       _count: { repairInvoices: 2 },
     });
@@ -277,7 +296,7 @@ describe("deviceController.remove", () => {
   });
 
   it("removes image files before deleting the device", async () => {
-    db.device.findUnique.mockResolvedValue({
+    db.device.findFirst.mockResolvedValue({
       id: 1,
       _count: { repairInvoices: 0 },
     });
@@ -286,7 +305,7 @@ describe("deviceController.remove", () => {
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 1 } }), res);
 
-    expect(deleteDeviceImages).toHaveBeenCalledWith(1);
+    expect(deleteDeviceImages).toHaveBeenCalledWith(1, WORKSPACE_ID);
     expect(db.device.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     expect(res.json).toHaveBeenCalledWith({
       message: "دستگاه و عکس‌های آن حذف شد",
@@ -294,11 +313,27 @@ describe("deviceController.remove", () => {
   });
 
   it("returns 404 for an unknown device", async () => {
-    db.device.findUnique.mockResolvedValue(null);
+    db.device.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe("deviceController.create", () => {
+  it("stamps the caller's workspace on the new device", async () => {
+    db.device.create.mockResolvedValue(deviceRow());
+
+    await controller.create(
+      mockRequest({ body: { device_name: "یخچال", status: "pending" } }),
+      mockResponse(),
+    );
+
+    expect(db.device.create.mock.calls[0][0].data).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+      deviceName: "یخچال",
+    });
   });
 });

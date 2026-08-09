@@ -10,7 +10,9 @@ jest.mock("../lib/prisma", () => {
       delete: jest.fn(),
     },
     purchaseInvoiceItem: { create: jest.fn() },
-    item: { findUniqueOrThrow: jest.fn(), update: jest.fn() },
+    // findFirstOrThrow rather than findUniqueOrThrow: the controller pairs
+    // the item id with workspaceId now, which findUnique can't express.
+    item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
   };
 
@@ -20,7 +22,7 @@ jest.mock("../lib/prisma", () => {
       purchaseInvoice: {
         count: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
       },
       item: { findMany: jest.fn() },
@@ -55,16 +57,22 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock always supplies one, even
+// when a test doesn't care which user acted.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}, actorId?: number) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
-    user: actorId === undefined ? undefined : { id: actorId },
+    user: { id: actorId ?? null, workspaceId: WORKSPACE_ID },
   } as unknown as Request;
 }
 
 function invoiceRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 5,
+    workspaceId: WORKSPACE_ID,
     invoiceNumber: "PUR-20260806-001",
     supplierName: "تأمین‌کننده",
     invoiceDate: new Date("2026-08-06T00:00:00.000Z"),
@@ -102,6 +110,17 @@ describe("purchaseInvoiceController.getAll", () => {
     });
   });
 
+  it("scopes the listing to the caller's workspace", async () => {
+    db.purchaseInvoice.count.mockResolvedValue(0);
+    db.purchaseInvoice.findMany.mockResolvedValue([]);
+
+    await controller.getAll(mockRequest({ query: listQuery }), mockResponse());
+
+    expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
   it("filters by supplier name case-insensitively", async () => {
     db.purchaseInvoice.count.mockResolvedValue(0);
     db.purchaseInvoice.findMany.mockResolvedValue([]);
@@ -112,6 +131,7 @@ describe("purchaseInvoiceController.getAll", () => {
     );
 
     expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
       supplierName: { contains: "پارس", mode: "insensitive" },
     });
   });
@@ -139,17 +159,21 @@ describe("purchaseInvoiceController.getAll", () => {
 });
 
 describe("purchaseInvoiceController.getById", () => {
-  it("returns 404 for an unknown invoice", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue(null);
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.getById(mockRequest({ params: { id: 9 } }), res);
 
+    expect(db.purchaseInvoice.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
   it("flattens each line's item into code, name and unit", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue({
+    db.purchaseInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
       items: [
         {
@@ -210,9 +234,19 @@ describe("purchaseInvoiceController.create", () => {
     expect(db.$transaction).not.toHaveBeenCalled();
   });
 
+  it("treats an item from another workspace as missing", async () => {
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.create(mockRequest({ body }, 3), mockResponse());
+
+    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
   it("derives the total from the lines and marks it paid", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
       currentStock: 0,
       avgPurchasePrice: decimal(0),
     });
@@ -220,6 +254,7 @@ describe("purchaseInvoiceController.create", () => {
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
     expect(db.__tx.purchaseInvoice.create.mock.calls[0][0].data).toMatchObject({
+      workspaceId: WORKSPACE_ID,
       totalAmount: 30000,
       paidAmount: 30000,
       paymentStatus: "paid",
@@ -227,9 +262,25 @@ describe("purchaseInvoiceController.create", () => {
     });
   });
 
+  it("counts only its own workspace's invoices when numbering", async () => {
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: 0,
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.create(mockRequest({ body }, 3), mockResponse());
+
+    // Numbering is per workspace, so one shop's invoices can't advance
+    // another's counter.
+    expect(db.__tx.purchaseInvoice.count.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
   it("marks a part payment as partial", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
       currentStock: 0,
       avgPurchasePrice: decimal(0),
     });
@@ -247,7 +298,7 @@ describe("purchaseInvoiceController.create", () => {
   it("recalculates the weighted average purchase price", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     // 5 units at 1000 plus 10 at 3000 = 35000 over 15 units.
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
       currentStock: 5,
       avgPurchasePrice: decimal(1000),
     });
@@ -262,7 +313,7 @@ describe("purchaseInvoiceController.create", () => {
 
   it("links the ledger entry to the invoice", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
       currentStock: 0,
       avgPurchasePrice: decimal(0),
     });
@@ -272,6 +323,7 @@ describe("purchaseInvoiceController.create", () => {
     expect(
       db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
     ).toMatchObject({
+      workspaceId: WORKSPACE_ID,
       itemId: 2,
       type: "purchase",
       quantity: 10,
@@ -283,7 +335,7 @@ describe("purchaseInvoiceController.create", () => {
 
   it("builds each line's stock on the one before it", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findUniqueOrThrow
+    db.__tx.item.findFirstOrThrow
       .mockResolvedValueOnce({ currentStock: 0, avgPurchasePrice: decimal(0) })
       .mockResolvedValueOnce({
         currentStock: 10,
@@ -314,7 +366,7 @@ describe("purchaseInvoiceController.create", () => {
 
   it("does everything inside one transaction", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
       currentStock: 0,
       avgPurchasePrice: decimal(0),
     });
@@ -326,8 +378,8 @@ describe("purchaseInvoiceController.create", () => {
 });
 
 describe("purchaseInvoiceController.updatePayment", () => {
-  it("returns 404 for an unknown invoice", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue(null);
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.updatePayment(
@@ -335,12 +387,16 @@ describe("purchaseInvoiceController.updatePayment", () => {
       res,
     );
 
+    expect(db.purchaseInvoice.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
     expect(res.status).toHaveBeenCalledWith(404);
     expect(db.purchaseInvoice.update).not.toHaveBeenCalled();
   });
 
   it("recomputes the status from the new amount", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue({
+    db.purchaseInvoice.findFirst.mockResolvedValue({
       totalAmount: decimal(30000),
     });
     db.purchaseInvoice.update.mockResolvedValue(invoiceRow());
@@ -363,8 +419,8 @@ describe("purchaseInvoiceController.updatePayment", () => {
 });
 
 describe("purchaseInvoiceController.remove", () => {
-  it("returns 404 for an unknown invoice", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue(null);
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
@@ -376,7 +432,7 @@ describe("purchaseInvoiceController.remove", () => {
   it("deletes an invoice that has no lines", async () => {
     // The old handler read the lines first and treated an empty result as
     // "not found", so such an invoice could never be removed.
-    db.purchaseInvoice.findUnique.mockResolvedValue({
+    db.purchaseInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
       items: [],
     });
@@ -393,11 +449,11 @@ describe("purchaseInvoiceController.remove", () => {
   });
 
   it("reverses the stock each line added", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue({
+    db.purchaseInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
       items: [{ itemId: 2, quantity: 10 }],
     });
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({ currentStock: 25 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 25 });
 
     await controller.remove(
       mockRequest({ params: { id: 5 } }, 3),
@@ -410,6 +466,7 @@ describe("purchaseInvoiceController.remove", () => {
     expect(
       db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
     ).toMatchObject({
+      workspaceId: WORKSPACE_ID,
       type: "adjustment",
       quantity: -10,
       referenceId: 5,
@@ -418,11 +475,11 @@ describe("purchaseInvoiceController.remove", () => {
   });
 
   it("clamps the reversal at zero when the stock was already sold on", async () => {
-    db.purchaseInvoice.findUnique.mockResolvedValue({
+    db.purchaseInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
       items: [{ itemId: 2, quantity: 10 }],
     });
-    db.__tx.item.findUniqueOrThrow.mockResolvedValue({ currentStock: 4 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 4 });
 
     await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
 

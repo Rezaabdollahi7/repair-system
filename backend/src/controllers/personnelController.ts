@@ -12,11 +12,13 @@ import type {
   PersonnelListQuery,
   PersonnelUpdateBody,
 } from "../schemas/personnel";
+import { workspaceIdOf } from "../utils/workspace";
 
 // Never selects the password column, so a hash can't leak into a response by
 // accident the way `SELECT *` would allow.
 const personnelSelect = {
   id: true,
+  workspaceId: true,
   fullName: true,
   username: true,
   phone: true,
@@ -35,6 +37,7 @@ type PersonnelRow = Prisma.UserGetPayload<{ select: typeof personnelSelect }>;
 function toPersonnelResponse(user: PersonnelRow) {
   return {
     id: user.id,
+    workspace_id: user.workspaceId,
     full_name: user.fullName,
     username: user.username,
     phone: user.phone,
@@ -68,7 +71,7 @@ export const getAll = async (req: Request, res: Response) => {
   try {
     const query = (req as ValidatedRequest).valid.query as PersonnelListQuery;
 
-    const where: Prisma.UserWhereInput = {};
+    const where: Prisma.UserWhereInput = { workspaceId: workspaceIdOf(req) };
 
     if (query.search) {
       const term = persianToEnglish(query.search);
@@ -102,8 +105,10 @@ export const getOne = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const user = await prisma.user.findUnique({
-      where: { id },
+    // findFirst rather than findUnique: the id alone would resolve a user
+    // belonging to another workspace.
+    const user = await prisma.user.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: personnelSelect,
     });
 
@@ -152,6 +157,7 @@ export const create = async (req: Request, res: Response) => {
 
     const user = await prisma.user.create({
       data: {
+        workspaceId: workspaceIdOf(req),
         fullName: body.full_name,
         username: body.username,
         password: await bcrypt.hash(body.password, 10),
@@ -175,8 +181,8 @@ export const update = async (req: Request, res: Response) => {
     const body = valid.body as PersonnelUpdateBody;
     const actor = (req as AuthenticatedRequest).user;
 
-    const existing = await prisma.user.findUnique({
-      where: { id },
+    const existing = await prisma.user.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true },
     });
     if (!existing) {
@@ -259,8 +265,8 @@ export const toggleActive = async (req: Request, res: Response) => {
         .json({ error: "نمی‌توانید حساب خود را غیرفعال کنید" });
     }
 
-    const target = await prisma.user.findUnique({
-      where: { id },
+    const target = await prisma.user.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { isActive: true, role: { select: { name: true } } },
     });
     if (!target) {
@@ -296,8 +302,8 @@ export const remove = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "نمی‌توانید حساب خود را حذف کنید" });
     }
 
-    const existing = await prisma.user.findUnique({
-      where: { id },
+    const existing = await prisma.user.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true },
     });
     if (!existing) {

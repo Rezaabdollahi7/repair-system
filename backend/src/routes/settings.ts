@@ -10,9 +10,10 @@ import {
 
 const router = express.Router();
 
-// Unauthenticated, so an invoice can render the shop's header. Worth
-// revisiting in phase 2, when settings become per-workspace.
-router.get("/", ctrl.getSettings);
+// Authenticated now: with settings per workspace, "which shop's settings"
+// has no answer without a token. It was public so an invoice could render
+// its header, but every caller of it is already behind a login.
+router.get("/", authenticate, ctrl.getSettings);
 
 router.put(
   "/",

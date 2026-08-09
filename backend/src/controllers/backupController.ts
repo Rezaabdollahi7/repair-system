@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { errorMessage } from "../utils/errors";
+import { workspaceIdOf } from "../utils/workspace";
 
 /**
  * The old implementation zipped the SQLite file, which is no longer the
@@ -23,6 +24,7 @@ export const list = async (req: Request, res: Response) => {
     // Still a real query: the table survives into phase 5, and an empty list
     // renders as "no backups yet" rather than an error page.
     const backups = await prisma.backup.findMany({
+      where: { workspaceId: workspaceIdOf(req) },
       orderBy: { createdAt: "desc" },
       include: { author: { select: { fullName: true } } },
     });

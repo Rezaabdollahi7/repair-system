@@ -5,6 +5,7 @@ import { ValidatedRequest } from "../middleware/validate";
 import { errorMessage } from "../utils/errors";
 import type { IdParam } from "../schemas/common";
 import type { ServiceCreateBody, ServiceUpdateBody } from "../schemas/service";
+import { workspaceIdOf } from "../utils/workspace";
 
 /**
  * snake_case, matching what this endpoint has always returned. Deliberately
@@ -29,7 +30,7 @@ export const getAll = async (req: Request, res: Response) => {
     // on every call. Both now live in the schema and prisma/seed.ts, so this
     // is a plain read.
     const services = await prisma.service.findMany({
-      where: { isActive: true },
+      where: { isActive: true, workspaceId: workspaceIdOf(req) },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
@@ -46,6 +47,7 @@ export const create = async (req: Request, res: Response) => {
 
     const service = await prisma.service.create({
       data: {
+        workspaceId: workspaceIdOf(req),
         name: body.name,
         description: body.description,
         defaultPrice: body.default_price,
@@ -69,8 +71,10 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as ServiceUpdateBody;
 
-    const existing = await prisma.service.findUnique({
-      where: { id },
+    // findFirst rather than findUnique: the id alone would resolve a service
+    // belonging to another workspace.
+    const existing = await prisma.service.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true },
     });
     if (!existing) {
@@ -107,8 +111,9 @@ export const remove = async (req: Request, res: Response) => {
     // P2025, matching the old handler's unconditional success. Repair invoice
     // lines copy the service name and price at the time they're written, so
     // removing a service doesn't disturb existing invoices.
-    const deleted = await prisma.service.deleteMany({ where: { id } });
-
+    const deleted = await prisma.service.deleteMany({
+      where: { id, workspaceId: workspaceIdOf(req) },
+    });
     if (deleted.count === 0) {
       return res.status(404).json({ error: "خدمت یافت نشد" });
     }

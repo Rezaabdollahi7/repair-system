@@ -15,6 +15,7 @@ import type {
   SaleInvoiceUpdateBody,
 } from "../schemas/saleInvoice";
 import { dateFilter } from "../utils/dateRange";
+import { workspaceIdOf } from "../utils/workspace";
 
 const deviceSelect = {
   device: {
@@ -81,7 +82,9 @@ export const getAll = async (req: Request, res: Response) => {
     const query = (req as ValidatedRequest).valid.query as SaleInvoiceListQuery;
     const { page, limit } = query;
 
-    const where: Prisma.SaleInvoiceWhereInput = {};
+    const where: Prisma.SaleInvoiceWhereInput = {
+      workspaceId: workspaceIdOf(req),
+    };
 
     if (query.search) {
       const term = persianToEnglish(query.search);
@@ -138,8 +141,10 @@ export const getById = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const invoice = await prisma.saleInvoice.findUnique({
-      where: { id },
+    // findFirst rather than findUnique: the id alone would resolve an
+    // invoice belonging to another workspace.
+    const invoice = await prisma.saleInvoice.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       include: {
         ...deviceSelect,
         items: {
@@ -208,12 +213,15 @@ function isInventoryLine(line: LineInput): line is LineInput & {
 async function assertStockAvailable(
   tx: Prisma.TransactionClient,
   lines: LineInput[],
+  workspaceId: number,
 ): Promise<string | null> {
   for (const line of lines) {
     if (!isInventoryLine(line)) continue;
 
-    const item = await tx.item.findUnique({
-      where: { id: line.item_id },
+    // Scoped, so an item id from another workspace reads as missing rather
+    // than lending its stock to this invoice.
+    const item = await tx.item.findFirst({
+      where: { id: line.item_id, workspaceId },
       select: { name: true, currentStock: true },
     });
 
@@ -238,6 +246,7 @@ async function writeLines(
   invoiceId: number,
   lines: LineInput[],
   actorId: number | null,
+  workspaceId: number,
 ): Promise<void> {
   for (const line of lines) {
     const totalPrice = line.quantity * line.unit_price;
@@ -245,6 +254,7 @@ async function writeLines(
 
     await tx.saleInvoiceItem.create({
       data: {
+        workspaceId,
         invoiceId,
         itemId: inventory ? line.item_id : null,
         quantity: line.quantity,
@@ -257,8 +267,8 @@ async function writeLines(
 
     if (!inventory) continue;
 
-    const item = await tx.item.findUniqueOrThrow({
-      where: { id: line.item_id },
+    const item = await tx.item.findFirstOrThrow({
+      where: { id: line.item_id, workspaceId },
       select: { currentStock: true },
     });
 
@@ -269,6 +279,7 @@ async function writeLines(
 
     await tx.inventoryTransaction.create({
       data: {
+        workspaceId,
         itemId: line.item_id,
         type: "sale",
         quantity: -line.quantity,
@@ -295,12 +306,13 @@ async function returnLinesToStock(
   lines: { itemId: number | null; quantity: number }[],
   note: string,
   actorId: number | null,
+  workspaceId: number,
 ): Promise<void> {
   for (const line of lines) {
     if (line.itemId === null) continue;
 
-    const item = await tx.item.findUniqueOrThrow({
-      where: { id: line.itemId },
+    const item = await tx.item.findFirstOrThrow({
+      where: { id: line.itemId, workspaceId },
       select: { currentStock: true },
     });
 
@@ -311,6 +323,7 @@ async function returnLinesToStock(
 
     await tx.inventoryTransaction.create({
       data: {
+        workspaceId,
         itemId: line.itemId,
         type: "adjustment",
         quantity: line.quantity,
@@ -328,6 +341,9 @@ export const create = async (req: Request, res: Response) => {
   try {
     const body = (req as ValidatedRequest).valid.body as SaleInvoiceCreateBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    // Read once, outside the transaction, and passed to every write inside
+    // it: the request isn't available in there.
+    const workspaceId = workspaceIdOf(req);
 
     const lines = body.items as LineInput[];
     const totalAmount = lines.reduce(
@@ -336,15 +352,16 @@ export const create = async (req: Request, res: Response) => {
     );
 
     const result = await prisma.$transaction(async (tx) => {
-      const stockError = await assertStockAvailable(tx, lines);
+      const stockError = await assertStockAvailable(tx, lines, workspaceId);
       if (stockError) return { error: stockError };
 
       const todayCount = await tx.saleInvoice.count({
-        where: { invoiceDate: todayRange() },
+        where: { invoiceDate: todayRange(), workspaceId },
       });
 
       const invoice = await tx.saleInvoice.create({
         data: {
+          workspaceId,
           invoiceNumber: buildInvoiceNumber("SAL", todayCount),
           customerId: body.customer_id ?? null,
           customerName: body.customer_name,
@@ -359,7 +376,7 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, invoice.id, lines, actorId);
+      await writeLines(tx, invoice.id, lines, actorId, workspaceId);
 
       return { invoice };
     });
@@ -387,9 +404,10 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as SaleInvoiceUpdateBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    const existing = await prisma.saleInvoice.findUnique({
-      where: { id },
+    const existing = await prisma.saleInvoice.findFirst({
+      where: { id, workspaceId },
       include: { items: { select: { itemId: true, quantity: true } } },
     });
 
@@ -414,9 +432,10 @@ export const update = async (req: Request, res: Response) => {
         existing.items,
         "ویرایش فاکتور فروش",
         actorId,
+        workspaceId,
       );
 
-      const stockError = await assertStockAvailable(tx, lines);
+      const stockError = await assertStockAvailable(tx, lines, workspaceId);
       if (stockError) {
         // Unwinds every write above, including the stock that was put back.
         throw new StockError(stockError);
@@ -439,7 +458,7 @@ export const update = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, id, lines, actorId);
+      await writeLines(tx, id, lines, actorId, workspaceId);
     });
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
@@ -465,11 +484,10 @@ export const updatePayment = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const { paid_amount } = valid.body as SaleInvoicePaymentBody;
 
-    const invoice = await prisma.saleInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.saleInvoice.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { totalAmount: true },
     });
-
     if (!invoice) {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
     }
@@ -498,12 +516,13 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
     // Looks up the invoice, not its lines: the old code read the lines and
     // treated an empty result as "not found", so an invoice with no lines
     // could never be deleted.
-    const invoice = await prisma.saleInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.saleInvoice.findFirst({
+      where: { id, workspaceId },
       include: { items: { select: { itemId: true, quantity: true } } },
     });
 
@@ -518,6 +537,7 @@ export const remove = async (req: Request, res: Response) => {
         invoice.items,
         "ابطال فاکتور فروش",
         actorId,
+        workspaceId,
       );
 
       // The lines go with it via onDelete: Cascade.

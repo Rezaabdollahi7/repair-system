@@ -5,6 +5,7 @@ import { ValidatedRequest } from "../middleware/validate";
 import { errorMessage, isUniqueConstraintError } from "../utils/errors";
 import type { IdParam } from "../schemas/common";
 import type { CategoryBody } from "../schemas/category";
+import { workspaceIdOf } from "../utils/workspace";
 
 // Hand-mapped rather than serialized: this endpoint has always answered in
 // camelCase, unlike most of the API. Kept as-is so the frontend doesn't need
@@ -25,6 +26,7 @@ const DUPLICATE_NAME = { error: "این نام قبلاً ثبت شده است" 
 export const getAll = async (req: Request, res: Response) => {
   try {
     const categories = await prisma.category.findMany({
+      where: { workspaceId: workspaceIdOf(req) },
       orderBy: { name: "asc" },
     });
 
@@ -39,7 +41,11 @@ export const getById = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const category = await prisma.category.findUnique({ where: { id } });
+    // findFirst rather than findUnique: the id alone would resolve a
+    // category belonging to another workspace.
+    const category = await prisma.category.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
+    });
     if (!category) {
       return res.status(404).json({ error: "دسته‌بندی یافت نشد" });
     }
@@ -55,7 +61,9 @@ export const create = async (req: Request, res: Response) => {
   try {
     const data = (req as ValidatedRequest).valid.body as CategoryBody;
 
-    const category = await prisma.category.create({ data });
+    const category = await prisma.category.create({
+      data: { ...data, workspaceId: workspaceIdOf(req) },
+    });
 
     res.status(201).json(toCategoryResponse(category));
   } catch (error) {
@@ -75,8 +83,8 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const data = valid.body as CategoryBody;
 
-    const existing = await prisma.category.findUnique({
-      where: { id },
+    const existing = await prisma.category.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true },
     });
     if (!existing) {
@@ -99,8 +107,8 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const category = await prisma.category.findUnique({
-      where: { id },
+    const category = await prisma.category.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { _count: { select: { items: true } } },
     });
 

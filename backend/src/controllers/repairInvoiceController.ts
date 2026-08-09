@@ -15,6 +15,7 @@ import type {
   RepairInvoiceStatusBody,
   RepairInvoiceUpdateBody,
 } from "../schemas/repairInvoice";
+import { workspaceIdOf } from "../utils/workspace";
 
 type LineInput = RepairInvoiceCreateBody["items"][number];
 
@@ -76,14 +77,17 @@ function toInvoiceResponse(invoice: InvoiceRow) {
  */
 async function nextInvoiceNumber(
   tx: Prisma.TransactionClient,
+  workspaceId: number,
 ): Promise<string> {
+  // Settings are one row per workspace now, keyed on workspaceId rather than
+  // the hardcoded id 1 the single-tenant version used.
   const settings = await tx.settings.findUnique({
-    where: { id: 1 },
+    where: { workspaceId },
     select: { invoicePrefix: true },
   });
 
   const todayCount = await tx.repairInvoice.count({
-    where: { invoiceDate: todayRange() },
+    where: { invoiceDate: todayRange(), workspaceId },
   });
 
   const prefix = settings?.invoicePrefix ?? "INV-";
@@ -98,13 +102,16 @@ async function nextInvoiceNumber(
 async function resolveLinePrices(
   tx: Prisma.TransactionClient,
   lines: LineInput[],
+  workspaceId: number,
 ): Promise<void> {
   for (const line of lines) {
     if (line.item_type !== "inventory" || !line.item_id) continue;
     if (line.unit_price) continue;
 
-    const item = await tx.item.findUnique({
-      where: { id: line.item_id },
+    // Scoped, so an item id from another workspace can't lend its price to
+    // this invoice.
+    const item = await tx.item.findFirst({
+      where: { id: line.item_id, workspaceId },
       select: { sellPrice: true, unit: true },
     });
     if (!item) continue;
@@ -118,12 +125,14 @@ async function writeLines(
   tx: Prisma.TransactionClient,
   invoiceId: number,
   lines: LineInput[],
+  workspaceId: number,
 ): Promise<void> {
   for (const [index, line] of lines.entries()) {
     const totals = lineTotals(line);
 
     await tx.repairInvoiceItem.create({
       data: {
+        workspaceId,
         invoiceId,
         itemType: line.item_type,
         itemId: line.item_id ?? null,
@@ -161,13 +170,14 @@ async function moveStock(
   direction: -1 | 1,
   note: string,
   actorId: number | null,
+  workspaceId: number,
 ): Promise<void> {
   for (const line of lines) {
     if (line.itemType !== "inventory" || line.itemId === null) continue;
 
     const quantity = Math.round(line.quantity.toNumber());
-    const item = await tx.item.findUnique({
-      where: { id: line.itemId },
+    const item = await tx.item.findFirst({
+      where: { id: line.itemId, workspaceId },
       select: { currentStock: true },
     });
     if (!item) continue;
@@ -181,6 +191,7 @@ async function moveStock(
 
     await tx.inventoryTransaction.create({
       data: {
+        workspaceId,
         itemId: line.itemId,
         // Issuing is a sale; putting parts back is an adjustment, matching
         // how the ledger recorded these before.
@@ -212,7 +223,9 @@ export const getAll = async (req: Request, res: Response) => {
       .query as RepairInvoiceListQuery;
     const { page, limit } = query;
 
-    const where: Prisma.RepairInvoiceWhereInput = {};
+    const where: Prisma.RepairInvoiceWhereInput = {
+      workspaceId: workspaceIdOf(req),
+    };
 
     if (query.search) {
       const term = persianToEnglish(query.search);
@@ -261,8 +274,10 @@ export const getById = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const invoice = await prisma.repairInvoice.findUnique({
-      where: { id },
+    const workspaceId = workspaceIdOf(req);
+
+    const invoice = await prisma.repairInvoice.findFirst({
+      where: { id, workspaceId },
       include: {
         ...invoiceInclude,
         items: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
@@ -283,7 +298,7 @@ export const getById = async (req: Request, res: Response) => {
 
     const items = inventoryIds.length
       ? await prisma.item.findMany({
-          where: { id: { in: inventoryIds } },
+          where: { id: { in: inventoryIds }, workspaceId },
           select: { id: true, code: true, unit: true },
         })
       : [];
@@ -340,9 +355,12 @@ export const create = async (req: Request, res: Response) => {
     const body = (req as ValidatedRequest).valid
       .body as RepairInvoiceCreateBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    // Read once, outside the transaction, and passed to every write inside
+    // it: the request isn't available in there.
+    const workspaceId = workspaceIdOf(req);
 
-    const device = await prisma.device.findUnique({
-      where: { id: body.device_id },
+    const device = await prisma.device.findFirst({
+      where: { id: body.device_id, workspaceId },
       select: {
         customerId: true,
         customer: { select: { name: true, phone: true } },
@@ -356,7 +374,7 @@ export const create = async (req: Request, res: Response) => {
     const invoiceDate = body.invoice_date ?? new Date();
 
     const invoice = await prisma.$transaction(async (tx) => {
-      await resolveLinePrices(tx, body.items);
+      await resolveLinePrices(tx, body.items, workspaceId);
 
       const totals = invoiceTotals(
         body.items,
@@ -367,7 +385,8 @@ export const create = async (req: Request, res: Response) => {
 
       const created = await tx.repairInvoice.create({
         data: {
-          invoiceNumber: await nextInvoiceNumber(tx),
+          workspaceId,
+          invoiceNumber: await nextInvoiceNumber(tx, workspaceId),
           deviceId: body.device_id,
           customerId: device.customerId,
           customerName:
@@ -391,8 +410,7 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, created.id, body.items);
-
+      await writeLines(tx, created.id, body.items, workspaceId);
       return created;
     });
 
@@ -414,8 +432,10 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as RepairInvoiceUpdateBody;
 
-    const existing = await prisma.repairInvoice.findUnique({
-      where: { id },
+    const workspaceId = workspaceIdOf(req);
+
+    const existing = await prisma.repairInvoice.findFirst({
+      where: { id, workspaceId },
       select: { status: true },
     });
 
@@ -432,8 +452,7 @@ export const update = async (req: Request, res: Response) => {
     const invoiceDate = body.invoice_date ?? new Date();
 
     await prisma.$transaction(async (tx) => {
-      await resolveLinePrices(tx, body.items);
-
+      await resolveLinePrices(tx, body.items, workspaceId);
       const totals = invoiceTotals(
         body.items,
         body.discount_type,
@@ -464,8 +483,10 @@ export const update = async (req: Request, res: Response) => {
 
       // Draft invoices haven't touched stock yet, so replacing the lines
       // needs no reversal.
-      await tx.repairInvoiceItem.deleteMany({ where: { invoiceId: id } });
-      await writeLines(tx, id, body.items);
+      await tx.repairInvoiceItem.deleteMany({
+        where: { invoiceId: id, workspaceId },
+      });
+      await writeLines(tx, id, body.items, workspaceId);
     });
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
@@ -481,9 +502,10 @@ export const changeStatus = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const { status } = valid.body as RepairInvoiceStatusBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    const invoice = await prisma.repairInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.repairInvoice.findFirst({
+      where: { id, workspaceId },
       select: {
         status: true,
         totalAmount: true,
@@ -545,6 +567,7 @@ export const changeStatus = async (req: Request, res: Response) => {
           -1,
           "مصرف در فاکتور تعمیر",
           actorId,
+          workspaceId,
         );
       }
 
@@ -556,6 +579,7 @@ export const changeStatus = async (req: Request, res: Response) => {
           1,
           "ابطال فاکتور تعمیر - برگشت موجودی",
           actorId,
+          workspaceId,
         );
       }
 
@@ -581,9 +605,10 @@ export const addPayment = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as RepairInvoicePaymentBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    const invoice = await prisma.repairInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.repairInvoice.findFirst({
+      where: { id, workspaceId },
       select: { status: true, totalAmount: true, paidAmount: true },
     });
 
@@ -613,6 +638,7 @@ export const addPayment = async (req: Request, res: Response) => {
     await prisma.$transaction(async (tx) => {
       await tx.repairInvoicePayment.create({
         data: {
+          workspaceId,
           invoiceId: id,
           amount: body.amount,
           paymentMethod: body.payment_method,
@@ -648,9 +674,10 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    const invoice = await prisma.repairInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.repairInvoice.findFirst({
+      where: { id, workspaceId },
       select: {
         status: true,
         items: {
@@ -678,6 +705,7 @@ export const remove = async (req: Request, res: Response) => {
           1,
           "ابطال فاکتور تعمیر - برگشت موجودی",
           actorId,
+          workspaceId,
         );
       }
 

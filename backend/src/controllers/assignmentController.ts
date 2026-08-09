@@ -9,6 +9,7 @@ import type {
   AssignmentParams,
   SetAssignmentsBody,
 } from "../schemas/assignment";
+import { workspaceIdOf } from "../utils/workspace";
 
 interface AssigneeRow {
   id: number;
@@ -35,9 +36,9 @@ function toAssigneeResponse(row: AssigneeRow) {
   };
 }
 
-function listAssignees(deviceId: number) {
+function listAssignees(deviceId: number, workspaceId: number) {
   return prisma.deviceAssignment.findMany({
-    where: { deviceId },
+    where: { deviceId, workspaceId },
     orderBy: { assignedAt: "asc" },
     select: {
       id: true,
@@ -47,9 +48,14 @@ function listAssignees(deviceId: number) {
   });
 }
 
-async function deviceExists(deviceId: number): Promise<boolean> {
-  const device = await prisma.device.findUnique({
-    where: { id: deviceId },
+async function deviceExists(
+  deviceId: number,
+  workspaceId: number,
+): Promise<boolean> {
+  // findFirst rather than findUnique: the id alone would resolve a device
+  // belonging to another workspace.
+  const device = await prisma.device.findFirst({
+    where: { id: deviceId, workspaceId },
     select: { id: true },
   });
   return device !== null;
@@ -59,12 +65,13 @@ async function deviceExists(deviceId: number): Promise<boolean> {
 export const getAssignments = async (req: Request, res: Response) => {
   try {
     const { id: deviceId } = (req as ValidatedRequest).valid.params as IdParam;
+    const workspaceId = workspaceIdOf(req);
 
-    if (!(await deviceExists(deviceId))) {
+    if (!(await deviceExists(deviceId, workspaceId))) {
       return res.status(404).json({ error: "دستگاه یافت نشد" });
     }
 
-    const assignees = await listAssignees(deviceId);
+    const assignees = await listAssignees(deviceId, workspaceId);
     res.json(assignees.map(toAssigneeResponse));
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
@@ -78,8 +85,9 @@ export const setAssignments = async (req: Request, res: Response) => {
     const { id: deviceId } = valid.params as IdParam;
     const { personnel_ids: personnelIds } = valid.body as SetAssignmentsBody;
     const assignedBy = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    if (!(await deviceExists(deviceId))) {
+    if (!(await deviceExists(deviceId, workspaceId))) {
       return res.status(404).json({ error: "دستگاه یافت نشد" });
     }
 
@@ -87,7 +95,7 @@ export const setAssignments = async (req: Request, res: Response) => {
       // One query instead of the old per-id loop, then the difference is
       // reported so the message still names the offending id.
       const active = await prisma.user.findMany({
-        where: { id: { in: personnelIds }, isActive: true },
+        where: { id: { in: personnelIds }, isActive: true, workspaceId },
         select: { id: true },
       });
       const activeIds = new Set(active.map((user) => user.id));
@@ -103,9 +111,10 @@ export const setAssignments = async (req: Request, res: Response) => {
     // Replace-all in a transaction: without it a failure between the delete
     // and the insert would leave the device with no assignees at all.
     await prisma.$transaction([
-      prisma.deviceAssignment.deleteMany({ where: { deviceId } }),
+      prisma.deviceAssignment.deleteMany({ where: { deviceId, workspaceId } }),
       prisma.deviceAssignment.createMany({
         data: personnelIds.map((personnelId) => ({
+          workspaceId,
           deviceId,
           personnelId,
           assignedBy,
@@ -114,7 +123,7 @@ export const setAssignments = async (req: Request, res: Response) => {
       }),
     ]);
 
-    const assignees = await listAssignees(deviceId);
+    const assignees = await listAssignees(deviceId, workspaceId);
     res.json(assignees.map(toAssigneeResponse));
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
@@ -128,13 +137,14 @@ export const addAssignment = async (req: Request, res: Response) => {
     const { id: deviceId } = valid.params as IdParam;
     const { personnel_id: personnelId } = valid.body as AddAssignmentBody;
     const assignedBy = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    if (!(await deviceExists(deviceId))) {
+    if (!(await deviceExists(deviceId, workspaceId))) {
       return res.status(404).json({ error: "دستگاه یافت نشد" });
     }
 
     const personnel = await prisma.user.findFirst({
-      where: { id: personnelId, isActive: true },
+      where: { id: personnelId, isActive: true, workspaceId },
       select: { id: true },
     });
     if (!personnel) {
@@ -144,7 +154,7 @@ export const addAssignment = async (req: Request, res: Response) => {
     // createMany with skipDuplicates stands in for INSERT OR IGNORE: assigning
     // someone twice is a no-op rather than a unique-constraint error.
     await prisma.deviceAssignment.createMany({
-      data: [{ deviceId, personnelId, assignedBy }],
+      data: [{ workspaceId, deviceId, personnelId, assignedBy }],
       skipDuplicates: true,
     });
 
@@ -161,7 +171,7 @@ export const removeAssignment = async (req: Request, res: Response) => {
       .params as AssignmentParams;
 
     const deleted = await prisma.deviceAssignment.deleteMany({
-      where: { deviceId, personnelId },
+      where: { deviceId, personnelId, workspaceId: workspaceIdOf(req) },
     });
 
     if (deleted.count === 0) {

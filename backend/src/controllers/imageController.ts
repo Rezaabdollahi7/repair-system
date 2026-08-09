@@ -9,6 +9,7 @@ import { ValidatedRequest } from "../middleware/validate";
 import { serialize } from "../utils/serialize";
 import type { IdParam } from "../schemas/common";
 import type { ImageParams } from "../schemas/image";
+import { workspaceIdOf } from "../utils/workspace";
 
 export const DEVICE_UPLOADS_DIR = path.join(__dirname, "../uploads/devices");
 
@@ -33,8 +34,12 @@ export const uploadImages = async (req: Request, res: Response) => {
     const { id: deviceId } = (req as ValidatedRequest).valid.params as IdParam;
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
 
-    const device = await prisma.device.findUnique({
-      where: { id: deviceId },
+    const workspaceId = workspaceIdOf(req);
+
+    // findFirst rather than findUnique: the id alone would resolve a device
+    // belonging to another workspace.
+    const device = await prisma.device.findFirst({
+      where: { id: deviceId, workspaceId },
       select: { id: true },
     });
     if (!device) {
@@ -50,7 +55,7 @@ export const uploadImages = async (req: Request, res: Response) => {
     // uploads can't collide, and a crash mid-upload leaves an orphaned file
     // rather than a half-written database row.
     const highest = await prisma.deviceImage.aggregate({
-      where: { deviceId },
+      where: { deviceId, workspaceId },
       _max: { sortOrder: true },
     });
     let nextSortOrder = (highest._max.sortOrder ?? 0) + 1;
@@ -75,6 +80,7 @@ export const uploadImages = async (req: Request, res: Response) => {
 
       const image = await prisma.deviceImage.create({
         data: {
+          workspaceId,
           deviceId,
           filename,
           // Stored relative to the uploads root rather than as an absolute
@@ -116,7 +122,7 @@ export const getImages = async (req: Request, res: Response) => {
     const { id: deviceId } = (req as ValidatedRequest).valid.params as IdParam;
 
     const images = await prisma.deviceImage.findMany({
-      where: { deviceId },
+      where: { deviceId, workspaceId: workspaceIdOf(req) },
       orderBy: { sortOrder: "asc" },
       select: {
         id: true,
@@ -143,7 +149,7 @@ export const deleteImage = async (req: Request, res: Response) => {
     // device, so an image belonging to a different one shouldn't be reachable
     // through it.
     const image = await prisma.deviceImage.findFirst({
-      where: { id: imageId, deviceId },
+      where: { id: imageId, deviceId, workspaceId: workspaceIdOf(req) },
       select: { id: true, filename: true },
     });
 
@@ -181,9 +187,12 @@ function removeFile(filename: string): void {
  * itself is deleted; the deviceImage rows are not removed here because the
  * schema's onDelete: Cascade already handles them.
  */
-export const deleteDeviceImages = async (deviceId: number): Promise<void> => {
+export const deleteDeviceImages = async (
+  deviceId: number,
+  workspaceId: number,
+): Promise<void> => {
   const images = await prisma.deviceImage.findMany({
-    where: { deviceId },
+    where: { deviceId, workspaceId },
     select: { filename: true },
   });
 

@@ -12,9 +12,19 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
 
-// Mirrors what initSchema() in the old sql.js layer inserted on first boot:
-// the three roles, one super admin, the single settings row, and the four
-// default services that serviceController used to create lazily at runtime.
+// Everything below hangs off one workspace. Self-serve sign-up arrives in
+// phase 3; until then this is the only tenant, and it exists so the app has
+// something to run against locally.
+const DEFAULT_WORKSPACE = "کارگاه پیش‌فرض";
+
+const TRIAL_MONTHS = 1;
+
+function trialExpiry(): Date {
+  const expires = new Date();
+  expires.setMonth(expires.getMonth() + TRIAL_MONTHS);
+  return expires;
+}
+
 async function main() {
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   if (!adminPassword) {
@@ -24,6 +34,8 @@ async function main() {
     );
   }
 
+  // Roles are reference data shared by every workspace, so they're seeded
+  // once and carry no workspaceId.
   const roles = [
     { name: "super_admin", label: "سوپر ادمین" },
     { name: "admin", label: "ادمین" },
@@ -42,12 +54,31 @@ async function main() {
     where: { name: "super_admin" },
   });
 
+  // No natural key to upsert on — a workspace name isn't unique — so the
+  // first one is reused if it's already there.
+  const existing = await prisma.workspace.findFirst({
+    orderBy: { id: "asc" },
+    select: { id: true },
+  });
+
+  const workspace =
+    existing ??
+    (await prisma.workspace.create({
+      data: {
+        name: DEFAULT_WORKSPACE,
+        status: "trial",
+        expiresAt: trialExpiry(),
+      },
+      select: { id: true },
+    }));
+
   await prisma.user.upsert({
     where: { username: "superadmin" },
     // Password is left alone on re-seed so an already-changed password isn't
     // silently reset back to the env value.
     update: {},
     create: {
+      workspaceId: workspace.id,
       fullName: "سوپر ادمین",
       username: "superadmin",
       password: await bcrypt.hash(adminPassword, 10),
@@ -56,10 +87,10 @@ async function main() {
   });
 
   await prisma.settings.upsert({
-    where: { id: 1 },
+    where: { workspaceId: workspace.id },
     update: {},
     create: {
-      id: 1,
+      workspaceId: workspace.id,
       companyName: "تعمیرگاه",
       defaultTaxRate: 0,
       defaultWarrantyMonths: 3,
@@ -77,15 +108,22 @@ async function main() {
     },
   ];
 
-  // services.name has no unique constraint (it didn't in SQLite either), so
-  // upsert isn't available — seed only when the table is empty, matching the
-  // old controller's `count === 0` guard.
-  const serviceCount = await prisma.service.count();
+  // Service names aren't unique, so upsert isn't available — seeded only
+  // when this workspace has none, matching what the old controller did.
+  const serviceCount = await prisma.service.count({
+    where: { workspaceId: workspace.id },
+  });
+
   if (serviceCount === 0) {
-    await prisma.service.createMany({ data: services });
+    await prisma.service.createMany({
+      data: services.map((service) => ({
+        ...service,
+        workspaceId: workspace.id,
+      })),
+    });
   }
 
-  console.log("Seed complete.");
+  console.log(`Seed complete. Workspace id: ${workspace.id}`);
 }
 
 main()

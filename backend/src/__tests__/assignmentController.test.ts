@@ -5,7 +5,9 @@ import prisma from "../lib/prisma";
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
   default: {
-    device: { findUnique: jest.fn() },
+    // findFirst rather than findUnique: the controller pairs id with
+    // workspaceId now, which findUnique can't express.
+    device: { findFirst: jest.fn() },
     user: { findMany: jest.fn(), findFirst: jest.fn() },
     deviceAssignment: {
       findMany: jest.fn(),
@@ -30,10 +32,15 @@ function mockResponse() {
   return res;
 }
 
+// Every tenant-scoped handler reads workspaceIdOf(req), which throws when
+// the token carried no workspace — so the mock always supplies one, even
+// when a test doesn't care which user acted.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}, userId?: number) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
-    user: userId === undefined ? undefined : { id: userId },
+    user: { id: userId ?? null, workspaceId: WORKSPACE_ID },
   } as unknown as Request;
 }
 
@@ -45,7 +52,7 @@ const assignmentRow = {
 
 describe("assignmentController.getAssignments", () => {
   it("returns 404 for an unknown device", async () => {
-    db.device.findUnique.mockResolvedValue(null);
+    db.device.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.getAssignments(mockRequest({ params: { id: 1 } }), res);
@@ -55,7 +62,7 @@ describe("assignmentController.getAssignments", () => {
   });
 
   it("exposes the user id as `id` and the assignment id separately", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceAssignment.findMany.mockResolvedValue([assignmentRow]);
 
     const res = mockResponse();
@@ -75,7 +82,7 @@ describe("assignmentController.getAssignments", () => {
 
 describe("assignmentController.setAssignments", () => {
   it("rejects an inactive or unknown personnel id by name", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.user.findMany.mockResolvedValue([{ id: 2 }]);
 
     const res = mockResponse();
@@ -92,7 +99,7 @@ describe("assignmentController.setAssignments", () => {
   });
 
   it("replaces assignments in a single transaction", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.user.findMany.mockResolvedValue([{ id: 2 }]);
     db.$transaction.mockResolvedValue([]);
     db.deviceAssignment.findMany.mockResolvedValue([assignmentRow]);
@@ -104,13 +111,20 @@ describe("assignmentController.setAssignments", () => {
 
     expect(db.$transaction).toHaveBeenCalledTimes(1);
     expect(db.deviceAssignment.createMany).toHaveBeenCalledWith({
-      data: [{ deviceId: 1, personnelId: 2, assignedBy: 9 }],
+      data: [
+        {
+          workspaceId: WORKSPACE_ID,
+          deviceId: 1,
+          personnelId: 2,
+          assignedBy: 9,
+        },
+      ],
       skipDuplicates: true,
     });
   });
 
   it("clears every assignee when given an empty list", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.$transaction.mockResolvedValue([]);
     db.deviceAssignment.findMany.mockResolvedValue([]);
 
@@ -122,15 +136,33 @@ describe("assignmentController.setAssignments", () => {
 
     expect(db.user.findMany).not.toHaveBeenCalled();
     expect(db.deviceAssignment.deleteMany).toHaveBeenCalledWith({
-      where: { deviceId: 1 },
+      where: { deviceId: 1, workspaceId: WORKSPACE_ID },
     });
     expect(res.json).toHaveBeenCalledWith([]);
+  });
+
+  it("only accepts personnel from the caller's own workspace", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1 });
+    db.user.findMany.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.setAssignments(
+      mockRequest({ params: { id: 1 }, body: { personnel_ids: [2] } }),
+      res,
+    );
+
+    // A technician from another workspace reads as missing rather than
+    // being assignable.
+    expect(db.user.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+    });
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 });
 
 describe("assignmentController.addAssignment", () => {
   it("returns 404 for an inactive user", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.user.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
@@ -144,7 +176,7 @@ describe("assignmentController.addAssignment", () => {
   });
 
   it("treats a duplicate assignment as a no-op", async () => {
-    db.device.findUnique.mockResolvedValue({ id: 1 });
+    db.device.findFirst.mockResolvedValue({ id: 1 });
     db.user.findFirst.mockResolvedValue({ id: 2 });
     db.deviceAssignment.createMany.mockResolvedValue({ count: 0 });
 
@@ -155,7 +187,14 @@ describe("assignmentController.addAssignment", () => {
     );
 
     expect(db.deviceAssignment.createMany).toHaveBeenCalledWith({
-      data: [{ deviceId: 1, personnelId: 2, assignedBy: 9 }],
+      data: [
+        {
+          workspaceId: WORKSPACE_ID,
+          deviceId: 1,
+          personnelId: 2,
+          assignedBy: 9,
+        },
+      ],
       skipDuplicates: true,
     });
     expect(res.status).toHaveBeenCalledWith(201);

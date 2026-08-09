@@ -13,7 +13,18 @@ function authenticate(req, res, next) {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload; // { id, username, role, isActive }
+
+    // Tokens issued before workspaceId was added to the payload are treated
+    // as expired: they'd otherwise reach a handler that throws for a missing
+    // workspace, surfacing as a 500 rather than a prompt to log in again.
+    if (typeof payload.workspaceId !== "number") {
+      return res.status(401).json({ error: "توکن نامعتبر یا منقضی شده" });
+    }
+
+    // { id, workspaceId, username, role, isActive } — workspaceId is what
+    // every tenant-scoped query is filtered by, so it has to come from the
+    // signed token and never from the request body or query.
+    req.user = payload;
     next();
   } catch (err) {
     return res.status(401).json({ error: "توکن نامعتبر یا منقضی شده" });

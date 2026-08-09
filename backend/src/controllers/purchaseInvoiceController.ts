@@ -14,6 +14,7 @@ import type {
   PurchaseInvoicePaymentBody,
 } from "../schemas/purchaseInvoice";
 import { dateFilter } from "../utils/dateRange";
+import { workspaceIdOf } from "../utils/workspace";
 
 function toInvoiceResponse(invoice: PurchaseInvoice) {
   return {
@@ -38,7 +39,9 @@ export const getAll = async (req: Request, res: Response) => {
       .query as PurchaseInvoiceListQuery;
     const { page, limit } = query;
 
-    const where: Prisma.PurchaseInvoiceWhereInput = {};
+    const where: Prisma.PurchaseInvoiceWhereInput = {
+      workspaceId: workspaceIdOf(req),
+    };
 
     if (query.supplier) {
       where.supplierName = {
@@ -79,8 +82,10 @@ export const getById = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const invoice = await prisma.purchaseInvoice.findUnique({
-      where: { id },
+    // findFirst rather than findUnique: the id alone would resolve an
+    // invoice belonging to another workspace.
+    const invoice = await prisma.purchaseInvoice.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       include: {
         items: {
           orderBy: { id: "asc" },
@@ -121,12 +126,16 @@ export const create = async (req: Request, res: Response) => {
     const body = (req as ValidatedRequest).valid
       .body as PurchaseInvoiceCreateBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    // Read once, outside the transaction, and passed to every write inside
+    // it: the request isn't available in there.
+    const workspaceId = workspaceIdOf(req);
 
     // Checked up front, outside the transaction, so an unknown id is reported
-    // by its own number rather than surfacing as a foreign-key error.
+    // by its own number rather than surfacing as a foreign-key error. Scoped
+    // by workspace too, so an id from another shop reads as missing.
     const itemIds = [...new Set(body.items.map((line) => line.item_id))];
     const existing = await prisma.item.findMany({
-      where: { id: { in: itemIds } },
+      where: { id: { in: itemIds }, workspaceId },
       select: { id: true },
     });
     const existingIds = new Set(existing.map((item) => item.id));
@@ -149,11 +158,12 @@ export const create = async (req: Request, res: Response) => {
     // apart.
     const invoice = await prisma.$transaction(async (tx) => {
       const todayCount = await tx.purchaseInvoice.count({
-        where: { invoiceDate: todayRange() },
+        where: { invoiceDate: todayRange(), workspaceId },
       });
 
       const created = await tx.purchaseInvoice.create({
         data: {
+          workspaceId,
           invoiceNumber: buildInvoiceNumber("PUR", todayCount),
           supplierName: body.supplier_name,
           invoiceDate: body.invoice_date ?? new Date(),
@@ -170,6 +180,7 @@ export const create = async (req: Request, res: Response) => {
 
         await tx.purchaseInvoiceItem.create({
           data: {
+            workspaceId,
             invoiceId: created.id,
             itemId: line.item_id,
             quantity: line.quantity,
@@ -178,11 +189,11 @@ export const create = async (req: Request, res: Response) => {
           },
         });
 
-        // Re-read inside the loop rather than from a bulk fetch: an invoice
-        // may list the same item twice, and each line has to build on the
-        // stock the previous one left behind.
-        const item = await tx.item.findUniqueOrThrow({
-          where: { id: line.item_id },
+        // findFirstOrThrow rather than findUniqueOrThrow: the composite
+        // condition rules out an item from another workspace, and the ids
+        // were already verified above.
+        const item = await tx.item.findFirstOrThrow({
+          where: { id: line.item_id, workspaceId },
           select: { currentStock: true, avgPurchasePrice: true },
         });
 
@@ -201,6 +212,7 @@ export const create = async (req: Request, res: Response) => {
 
         await tx.inventoryTransaction.create({
           data: {
+            workspaceId,
             itemId: line.item_id,
             type: "purchase",
             quantity: line.quantity,
@@ -232,8 +244,8 @@ export const updatePayment = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const { paid_amount } = valid.body as PurchaseInvoicePaymentBody;
 
-    const invoice = await prisma.purchaseInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.purchaseInvoice.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { totalAmount: true },
     });
 
@@ -265,12 +277,13 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
     // Looks up the invoice itself, not its lines. The old code read the lines
     // and treated an empty result as "not found", which made an invoice with
     // no lines impossible to delete.
-    const invoice = await prisma.purchaseInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.purchaseInvoice.findFirst({
+      where: { id, workspaceId },
       include: {
         items: { select: { itemId: true, quantity: true } },
       },
@@ -282,8 +295,8 @@ export const remove = async (req: Request, res: Response) => {
 
     await prisma.$transaction(async (tx) => {
       for (const line of invoice.items) {
-        const item = await tx.item.findUniqueOrThrow({
-          where: { id: line.itemId },
+        const item = await tx.item.findFirstOrThrow({
+          where: { id: line.itemId, workspaceId },
           select: { currentStock: true },
         });
 
@@ -298,6 +311,7 @@ export const remove = async (req: Request, res: Response) => {
 
         await tx.inventoryTransaction.create({
           data: {
+            workspaceId,
             itemId: line.itemId,
             type: "adjustment",
             quantity: -line.quantity,

@@ -36,9 +36,14 @@ function mockResponse() {
   return res;
 }
 
+// Every report reads workspaceIdOf(req), which throws when the token carried
+// no workspace — so the mock has to supply one.
+const WORKSPACE_ID = 1;
+
 function mockRequest(valid: Record<string, unknown> = {}) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
   } as unknown as Request;
 }
 
@@ -114,13 +119,14 @@ describe("reportController.getStockReport", () => {
     });
   });
 
-  it("excludes inactive items", async () => {
+  it("excludes inactive items and other workspaces", async () => {
     db.item.findMany.mockResolvedValue([]);
 
     await controller.getStockReport(mockRequest({ query: {} }), mockResponse());
 
     expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
       isActive: true,
+      workspaceId: WORKSPACE_ID,
     });
   });
 });
@@ -172,7 +178,7 @@ describe("reportController.getPurchaseReport", () => {
     expect(filter.lte.getUTCDate()).toBe(31);
   });
 
-  it("applies no date filter when neither bound is given", async () => {
+  it("still scopes by workspace when no date bound is given", async () => {
     db.purchaseInvoice.findMany.mockResolvedValue([]);
 
     await controller.getPurchaseReport(
@@ -180,7 +186,9 @@ describe("reportController.getPurchaseReport", () => {
       mockResponse(),
     );
 
-    expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({});
+    expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+    });
   });
 });
 
@@ -210,6 +218,16 @@ describe("reportController.getSaleReport", () => {
       total_remaining: 0,
     });
   });
+
+  it("scopes the report to the caller's workspace", async () => {
+    db.saleInvoice.findMany.mockResolvedValue([]);
+
+    await controller.getSaleReport(mockRequest({ query: {} }), mockResponse());
+
+    expect(db.saleInvoice.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
 });
 
 describe("reportController.getProfitReport", () => {
@@ -222,6 +240,7 @@ describe("reportController.getProfitReport", () => {
     );
 
     expect(db.saleInvoiceItem.groupBy.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
       itemId: { not: null },
     });
   });
@@ -246,6 +265,22 @@ describe("reportController.getProfitReport", () => {
       total_cost: 20000,
       profit: 30000,
       profit_margin: 60,
+    });
+  });
+
+  it("costs items from the caller's own catalogue", async () => {
+    db.saleInvoiceItem.groupBy.mockResolvedValue([
+      { itemId: 1, _sum: { quantity: 1, totalPrice: decimal(1000) } },
+    ]);
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.getProfitReport(
+      mockRequest({ query: {} }),
+      mockResponse(),
+    );
+
+    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
     });
   });
 
@@ -286,7 +321,7 @@ describe("reportController.getProfitReport", () => {
 });
 
 describe("reportController.getDashboardStats", () => {
-  function stubDashboard(overrides: Record<string, unknown> = {}) {
+  function stubDashboard() {
     db.repairInvoice.count.mockResolvedValue(0);
     db.repairInvoice.aggregate.mockResolvedValue({
       _sum: { totalAmount: null, paidAmount: null },
@@ -303,7 +338,6 @@ describe("reportController.getDashboardStats", () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([]);
     db.device.count.mockResolvedValue(0);
     db.device.groupBy.mockResolvedValue([]);
-    Object.assign(db, overrides);
   }
 
   it("reports zeros rather than nulls on an empty database", async () => {
@@ -316,6 +350,32 @@ describe("reportController.getDashboardStats", () => {
     expect(payload.today).toEqual({ purchase: 0, sale: 0, net: 0 });
     expect(payload.month).toEqual({ purchase: 0, sale: 0, net: 0 });
     expect(payload.repair_invoices.issued_unpaid_amount).toBe(0);
+  });
+
+  it("scopes every one of its reads to the caller's workspace", async () => {
+    stubDashboard();
+
+    await controller.getDashboardStats(mockRequest(), mockResponse());
+
+    // Seventeen parallel queries; a workspace filter missing from any one of
+    // them would leak another shop's figures into this dashboard.
+    const everyWhere = [
+      ...db.repairInvoice.count.mock.calls,
+      ...db.repairInvoice.aggregate.mock.calls,
+      ...db.item.count.mock.calls,
+      ...db.item.findMany.mock.calls,
+      ...db.purchaseInvoice.aggregate.mock.calls,
+      ...db.saleInvoice.aggregate.mock.calls,
+      ...db.inventoryTransaction.findMany.mock.calls,
+      ...db.saleInvoiceItem.groupBy.mock.calls,
+      ...db.device.count.mock.calls,
+      ...db.device.groupBy.mock.calls,
+    ].map(([args]) => args?.where);
+
+    expect(everyWhere.length).toBeGreaterThan(0);
+    for (const where of everyWhere) {
+      expect(where).toMatchObject({ workspaceId: WORKSPACE_ID });
+    }
   });
 
   it("derives the outstanding amount from the difference of two sums", async () => {

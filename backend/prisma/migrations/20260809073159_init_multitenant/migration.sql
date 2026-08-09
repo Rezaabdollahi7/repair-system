@@ -4,6 +4,21 @@ CREATE TYPE "inventory_transaction_type" AS ENUM ('purchase', 'sale', 'adjustmen
 -- CreateEnum
 CREATE TYPE "repair_invoice_status" AS ENUM ('draft', 'issued', 'paid', 'cancelled');
 
+-- CreateEnum
+CREATE TYPE "workspace_status" AS ENUM ('trial', 'active', 'expired');
+
+-- CreateTable
+CREATE TABLE "workspaces" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "status" "workspace_status" NOT NULL DEFAULT 'trial',
+    "expires_at" TIMESTAMP(3),
+
+    CONSTRAINT "workspaces_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateTable
 CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
@@ -17,6 +32,7 @@ CREATE TABLE "roles" (
 -- CreateTable
 CREATE TABLE "users" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "full_name" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "password" TEXT NOT NULL,
@@ -33,6 +49,7 @@ CREATE TABLE "users" (
 -- CreateTable
 CREATE TABLE "customers" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "phone" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -43,6 +60,7 @@ CREATE TABLE "customers" (
 -- CreateTable
 CREATE TABLE "devices" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "customer_id" INTEGER,
     "personnel_id" INTEGER,
     "device_name" TEXT NOT NULL,
@@ -63,6 +81,7 @@ CREATE TABLE "devices" (
 -- CreateTable
 CREATE TABLE "device_images" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "device_id" INTEGER NOT NULL,
     "filename" TEXT NOT NULL,
     "filepath" TEXT NOT NULL,
@@ -75,6 +94,7 @@ CREATE TABLE "device_images" (
 -- CreateTable
 CREATE TABLE "device_assignments" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "device_id" INTEGER NOT NULL,
     "personnel_id" INTEGER NOT NULL,
     "assigned_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -86,6 +106,7 @@ CREATE TABLE "device_assignments" (
 -- CreateTable
 CREATE TABLE "categories" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -97,6 +118,7 @@ CREATE TABLE "categories" (
 -- CreateTable
 CREATE TABLE "items" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "category_id" INTEGER,
     "name" TEXT NOT NULL,
     "code" TEXT,
@@ -116,6 +138,7 @@ CREATE TABLE "items" (
 -- CreateTable
 CREATE TABLE "inventory_transactions" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "item_id" INTEGER NOT NULL,
     "type" "inventory_transaction_type" NOT NULL,
     "quantity" INTEGER NOT NULL,
@@ -132,6 +155,7 @@ CREATE TABLE "inventory_transactions" (
 -- CreateTable
 CREATE TABLE "purchase_invoices" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_number" TEXT NOT NULL,
     "supplier_name" TEXT,
     "invoice_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -149,6 +173,7 @@ CREATE TABLE "purchase_invoices" (
 -- CreateTable
 CREATE TABLE "purchase_invoice_items" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_id" INTEGER NOT NULL,
     "item_id" INTEGER NOT NULL,
     "quantity" INTEGER NOT NULL,
@@ -162,6 +187,7 @@ CREATE TABLE "purchase_invoice_items" (
 -- CreateTable
 CREATE TABLE "sale_invoices" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_number" TEXT NOT NULL,
     "customer_id" INTEGER,
     "customer_name" TEXT,
@@ -182,6 +208,7 @@ CREATE TABLE "sale_invoices" (
 -- CreateTable
 CREATE TABLE "sale_invoice_items" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_id" INTEGER NOT NULL,
     "item_id" INTEGER,
     "name" TEXT,
@@ -200,6 +227,7 @@ CREATE TABLE "sale_invoice_items" (
 -- CreateTable
 CREATE TABLE "services" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
     "default_price" DECIMAL(18,0) NOT NULL DEFAULT 0,
@@ -215,6 +243,7 @@ CREATE TABLE "services" (
 -- CreateTable
 CREATE TABLE "repair_invoices" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_number" TEXT NOT NULL,
     "device_id" INTEGER NOT NULL,
     "customer_id" INTEGER,
@@ -246,6 +275,7 @@ CREATE TABLE "repair_invoices" (
 -- CreateTable
 CREATE TABLE "repair_invoice_items" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_id" INTEGER NOT NULL,
     "item_type" TEXT NOT NULL,
     "item_id" INTEGER,
@@ -267,6 +297,7 @@ CREATE TABLE "repair_invoice_items" (
 -- CreateTable
 CREATE TABLE "repair_invoice_payments" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "invoice_id" INTEGER NOT NULL,
     "amount" DECIMAL(18,0) NOT NULL,
     "payment_method" TEXT NOT NULL DEFAULT 'cash',
@@ -282,6 +313,7 @@ CREATE TABLE "repair_invoice_payments" (
 -- CreateTable
 CREATE TABLE "settings" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "company_name" TEXT,
     "company_address" TEXT,
     "company_phone" TEXT,
@@ -318,6 +350,7 @@ CREATE TABLE "settings" (
 -- CreateTable
 CREATE TABLE "backups" (
     "id" SERIAL NOT NULL,
+    "workspace_id" INTEGER NOT NULL,
     "filename" TEXT NOT NULL,
     "size_bytes" BIGINT NOT NULL DEFAULT 0,
     "includes_uploads" BOOLEAN NOT NULL DEFAULT false,
@@ -328,16 +361,34 @@ CREATE TABLE "backups" (
 );
 
 -- CreateIndex
+CREATE INDEX "workspaces_status_idx" ON "workspaces"("status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "roles_name_key" ON "roles"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
+CREATE INDEX "users_workspace_id_idx" ON "users"("workspace_id");
+
+-- CreateIndex
 CREATE INDEX "users_role_id_idx" ON "users"("role_id");
 
 -- CreateIndex
-CREATE INDEX "customers_phone_idx" ON "customers"("phone");
+CREATE INDEX "customers_workspace_id_name_idx" ON "customers"("workspace_id", "name");
+
+-- CreateIndex
+CREATE INDEX "customers_workspace_id_phone_idx" ON "customers"("workspace_id", "phone");
+
+-- CreateIndex
+CREATE INDEX "devices_workspace_id_id_idx" ON "devices"("workspace_id", "id" DESC);
+
+-- CreateIndex
+CREATE INDEX "devices_workspace_id_status_idx" ON "devices"("workspace_id", "status");
+
+-- CreateIndex
+CREATE INDEX "devices_workspace_id_entry_date_idx" ON "devices"("workspace_id", "entry_date");
 
 -- CreateIndex
 CREATE INDEX "devices_customer_id_idx" ON "devices"("customer_id");
@@ -346,10 +397,13 @@ CREATE INDEX "devices_customer_id_idx" ON "devices"("customer_id");
 CREATE INDEX "devices_personnel_id_idx" ON "devices"("personnel_id");
 
 -- CreateIndex
-CREATE INDEX "devices_status_idx" ON "devices"("status");
+CREATE INDEX "device_images_workspace_id_idx" ON "device_images"("workspace_id");
 
 -- CreateIndex
 CREATE INDEX "device_images_device_id_idx" ON "device_images"("device_id");
+
+-- CreateIndex
+CREATE INDEX "device_assignments_workspace_id_idx" ON "device_assignments"("workspace_id");
 
 -- CreateIndex
 CREATE INDEX "device_assignments_personnel_id_idx" ON "device_assignments"("personnel_id");
@@ -358,16 +412,22 @@ CREATE INDEX "device_assignments_personnel_id_idx" ON "device_assignments"("pers
 CREATE UNIQUE INDEX "device_assignments_device_id_personnel_id_key" ON "device_assignments"("device_id", "personnel_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "categories_name_key" ON "categories"("name");
+CREATE UNIQUE INDEX "categories_workspace_id_name_key" ON "categories"("workspace_id", "name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "items_code_key" ON "items"("code");
+CREATE INDEX "items_workspace_id_code_idx" ON "items"("workspace_id", "code");
+
+-- CreateIndex
+CREATE INDEX "items_workspace_id_name_idx" ON "items"("workspace_id", "name");
 
 -- CreateIndex
 CREATE INDEX "items_category_id_idx" ON "items"("category_id");
 
 -- CreateIndex
-CREATE INDEX "items_name_idx" ON "items"("name");
+CREATE UNIQUE INDEX "items_workspace_id_code_key" ON "items"("workspace_id", "code");
+
+-- CreateIndex
+CREATE INDEX "inventory_transactions_workspace_id_created_at_idx" ON "inventory_transactions"("workspace_id", "created_at" DESC);
 
 -- CreateIndex
 CREATE INDEX "inventory_transactions_item_id_idx" ON "inventory_transactions"("item_id");
@@ -376,13 +436,16 @@ CREATE INDEX "inventory_transactions_item_id_idx" ON "inventory_transactions"("i
 CREATE INDEX "inventory_transactions_created_by_idx" ON "inventory_transactions"("created_by");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "purchase_invoices_invoice_number_key" ON "purchase_invoices"("invoice_number");
-
--- CreateIndex
-CREATE INDEX "purchase_invoices_invoice_date_idx" ON "purchase_invoices"("invoice_date");
+CREATE INDEX "purchase_invoices_workspace_id_invoice_date_idx" ON "purchase_invoices"("workspace_id", "invoice_date" DESC);
 
 -- CreateIndex
 CREATE INDEX "purchase_invoices_created_by_idx" ON "purchase_invoices"("created_by");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "purchase_invoices_workspace_id_invoice_number_key" ON "purchase_invoices"("workspace_id", "invoice_number");
+
+-- CreateIndex
+CREATE INDEX "purchase_invoice_items_workspace_id_idx" ON "purchase_invoice_items"("workspace_id");
 
 -- CreateIndex
 CREATE INDEX "purchase_invoice_items_invoice_id_idx" ON "purchase_invoice_items"("invoice_id");
@@ -391,10 +454,10 @@ CREATE INDEX "purchase_invoice_items_invoice_id_idx" ON "purchase_invoice_items"
 CREATE INDEX "purchase_invoice_items_item_id_idx" ON "purchase_invoice_items"("item_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "sale_invoices_invoice_number_key" ON "sale_invoices"("invoice_number");
+CREATE INDEX "sale_invoices_workspace_id_invoice_date_idx" ON "sale_invoices"("workspace_id", "invoice_date" DESC);
 
 -- CreateIndex
-CREATE INDEX "sale_invoices_invoice_date_idx" ON "sale_invoices"("invoice_date");
+CREATE INDEX "sale_invoices_workspace_id_payment_status_idx" ON "sale_invoices"("workspace_id", "payment_status");
 
 -- CreateIndex
 CREATE INDEX "sale_invoices_customer_id_idx" ON "sale_invoices"("customer_id");
@@ -406,25 +469,28 @@ CREATE INDEX "sale_invoices_device_id_idx" ON "sale_invoices"("device_id");
 CREATE INDEX "sale_invoices_created_by_idx" ON "sale_invoices"("created_by");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "sale_invoices_workspace_id_invoice_number_key" ON "sale_invoices"("workspace_id", "invoice_number");
+
+-- CreateIndex
+CREATE INDEX "sale_invoice_items_workspace_id_idx" ON "sale_invoice_items"("workspace_id");
+
+-- CreateIndex
 CREATE INDEX "sale_invoice_items_invoice_id_idx" ON "sale_invoice_items"("invoice_id");
 
 -- CreateIndex
 CREATE INDEX "sale_invoice_items_item_id_idx" ON "sale_invoice_items"("item_id");
 
 -- CreateIndex
-CREATE INDEX "services_is_active_sort_order_idx" ON "services"("is_active", "sort_order");
+CREATE INDEX "services_workspace_id_is_active_sort_order_idx" ON "services"("workspace_id", "is_active", "sort_order");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "repair_invoices_invoice_number_key" ON "repair_invoices"("invoice_number");
+CREATE INDEX "repair_invoices_workspace_id_invoice_date_idx" ON "repair_invoices"("workspace_id", "invoice_date" DESC);
+
+-- CreateIndex
+CREATE INDEX "repair_invoices_workspace_id_status_idx" ON "repair_invoices"("workspace_id", "status");
 
 -- CreateIndex
 CREATE INDEX "repair_invoices_device_id_idx" ON "repair_invoices"("device_id");
-
--- CreateIndex
-CREATE INDEX "repair_invoices_status_idx" ON "repair_invoices"("status");
-
--- CreateIndex
-CREATE INDEX "repair_invoices_invoice_date_idx" ON "repair_invoices"("invoice_date");
 
 -- CreateIndex
 CREATE INDEX "repair_invoices_customer_id_idx" ON "repair_invoices"("customer_id");
@@ -436,7 +502,16 @@ CREATE INDEX "repair_invoices_technician_id_idx" ON "repair_invoices"("technicia
 CREATE INDEX "repair_invoices_created_by_idx" ON "repair_invoices"("created_by");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "repair_invoices_workspace_id_invoice_number_key" ON "repair_invoices"("workspace_id", "invoice_number");
+
+-- CreateIndex
+CREATE INDEX "repair_invoice_items_workspace_id_idx" ON "repair_invoice_items"("workspace_id");
+
+-- CreateIndex
 CREATE INDEX "repair_invoice_items_invoice_id_idx" ON "repair_invoice_items"("invoice_id");
+
+-- CreateIndex
+CREATE INDEX "repair_invoice_payments_workspace_id_idx" ON "repair_invoice_payments"("workspace_id");
 
 -- CreateIndex
 CREATE INDEX "repair_invoice_payments_invoice_id_idx" ON "repair_invoice_payments"("invoice_id");
@@ -445,10 +520,25 @@ CREATE INDEX "repair_invoice_payments_invoice_id_idx" ON "repair_invoice_payment
 CREATE INDEX "repair_invoice_payments_created_by_idx" ON "repair_invoice_payments"("created_by");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "settings_workspace_id_key" ON "settings"("workspace_id");
+
+-- CreateIndex
+CREATE INDEX "backups_workspace_id_idx" ON "backups"("workspace_id");
+
+-- CreateIndex
 CREATE INDEX "backups_created_by_idx" ON "backups"("created_by");
 
 -- AddForeignKey
+ALTER TABLE "users" ADD CONSTRAINT "users_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "customers" ADD CONSTRAINT "customers_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "devices" ADD CONSTRAINT "devices_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "devices" ADD CONSTRAINT "devices_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -457,7 +547,13 @@ ALTER TABLE "devices" ADD CONSTRAINT "devices_customer_id_fkey" FOREIGN KEY ("cu
 ALTER TABLE "devices" ADD CONSTRAINT "devices_personnel_id_fkey" FOREIGN KEY ("personnel_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "device_images" ADD CONSTRAINT "device_images_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "device_images" ADD CONSTRAINT "device_images_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "devices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "device_assignments" ADD CONSTRAINT "device_assignments_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "device_assignments" ADD CONSTRAINT "device_assignments_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "devices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -469,7 +565,16 @@ ALTER TABLE "device_assignments" ADD CONSTRAINT "device_assignments_personnel_id
 ALTER TABLE "device_assignments" ADD CONSTRAINT "device_assignments_assigned_by_fkey" FOREIGN KEY ("assigned_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "categories" ADD CONSTRAINT "categories_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "items" ADD CONSTRAINT "items_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "items" ADD CONSTRAINT "items_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "inventory_transactions" ADD CONSTRAINT "inventory_transactions_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "inventory_transactions" ADD CONSTRAINT "inventory_transactions_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "items"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -478,13 +583,22 @@ ALTER TABLE "inventory_transactions" ADD CONSTRAINT "inventory_transactions_item
 ALTER TABLE "inventory_transactions" ADD CONSTRAINT "inventory_transactions_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "purchase_invoices" ADD CONSTRAINT "purchase_invoices_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "purchase_invoices" ADD CONSTRAINT "purchase_invoices_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "purchase_invoice_items" ADD CONSTRAINT "purchase_invoice_items_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "purchase_invoice_items" ADD CONSTRAINT "purchase_invoice_items_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "purchase_invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "purchase_invoice_items" ADD CONSTRAINT "purchase_invoice_items_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sale_invoices" ADD CONSTRAINT "sale_invoices_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sale_invoices" ADD CONSTRAINT "sale_invoices_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -496,10 +610,19 @@ ALTER TABLE "sale_invoices" ADD CONSTRAINT "sale_invoices_device_id_fkey" FOREIG
 ALTER TABLE "sale_invoices" ADD CONSTRAINT "sale_invoices_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "sale_invoice_items" ADD CONSTRAINT "sale_invoice_items_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "sale_invoice_items" ADD CONSTRAINT "sale_invoice_items_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "sale_invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sale_invoice_items" ADD CONSTRAINT "sale_invoice_items_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "services" ADD CONSTRAINT "services_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "repair_invoices" ADD CONSTRAINT "repair_invoices_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "repair_invoices" ADD CONSTRAINT "repair_invoices_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "devices"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -514,13 +637,25 @@ ALTER TABLE "repair_invoices" ADD CONSTRAINT "repair_invoices_technician_id_fkey
 ALTER TABLE "repair_invoices" ADD CONSTRAINT "repair_invoices_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "repair_invoice_items" ADD CONSTRAINT "repair_invoice_items_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "repair_invoice_items" ADD CONSTRAINT "repair_invoice_items_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "repair_invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "repair_invoice_payments" ADD CONSTRAINT "repair_invoice_payments_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "repair_invoice_payments" ADD CONSTRAINT "repair_invoice_payments_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "repair_invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "repair_invoice_payments" ADD CONSTRAINT "repair_invoice_payments_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "settings" ADD CONSTRAINT "settings_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "backups" ADD CONSTRAINT "backups_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "backups" ADD CONSTRAINT "backups_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;

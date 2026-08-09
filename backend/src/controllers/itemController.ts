@@ -17,6 +17,7 @@ import type {
   QuickSaleBody,
 } from "../schemas/item";
 import { buildInvoiceNumber, todayRange } from "../utils/invoiceNumber";
+import { workspaceIdOf } from "../utils/workspace";
 
 const itemInclude = {
   category: { select: { name: true } },
@@ -67,7 +68,7 @@ export const getAll = async (req: Request, res: Response) => {
     const { categoryId, page, limit } = (req as ValidatedRequest).valid
       .query as ItemListQuery;
 
-    const where: Prisma.ItemWhereInput = {};
+    const where: Prisma.ItemWhereInput = { workspaceId: workspaceIdOf(req) };
     if (categoryId !== undefined) {
       where.categoryId = categoryId;
     }
@@ -94,8 +95,10 @@ export const getById = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const item = await prisma.item.findUnique({
-      where: { id },
+    // findFirst rather than findUnique: the id alone would resolve an item
+    // belonging to another workspace.
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       include: itemInclude,
     });
 
@@ -115,7 +118,7 @@ export const search = async (req: Request, res: Response) => {
     const { q, categoryId, page, limit } = (req as ValidatedRequest).valid
       .query as ItemSearchQuery;
 
-    const where: Prisma.ItemWhereInput = {};
+    const where: Prisma.ItemWhereInput = { workspaceId: workspaceIdOf(req) };
 
     if (q) {
       const term = persianToEnglish(q).replace(/\s+/g, " ");
@@ -154,7 +157,10 @@ export const getLowStock = async (req: Request, res: Response) => {
     // orderBy. Raw SQL would bypass the Prisma Client extension that scopes
     // queries by workspaceId in phase 2, and a single workshop's catalogue is
     // small enough that loading it costs little.
-    const items = await prisma.item.findMany({ include: itemInclude });
+    const items = await prisma.item.findMany({
+      where: { workspaceId: workspaceIdOf(req) },
+      include: itemInclude,
+    });
 
     const lowStock = items
       .filter((item) => item.currentStock <= item.minStock)
@@ -175,6 +181,7 @@ export const searchForInvoice = async (req: Request, res: Response) => {
       .query as InvoiceSearchQuery;
 
     const where: Prisma.ItemWhereInput = {
+      workspaceId: workspaceIdOf(req),
       isActive: true,
       currentStock: { gt: 0 },
     };
@@ -219,15 +226,20 @@ export const getTransactions = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const { page, limit } = valid.query as ItemTransactionsQuery;
 
-    const item = await prisma.item.findUnique({
-      where: { id },
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
       select: { id: true },
     });
     if (!item) {
       return res.status(404).json({ error: "کالا یافت نشد" });
     }
 
-    const where: Prisma.InventoryTransactionWhereInput = { itemId: id };
+    const where: Prisma.InventoryTransactionWhereInput = {
+      itemId: id,
+      workspaceId,
+    };
 
     const [total, transactions] = await Promise.all([
       prisma.inventoryTransaction.count({ where }),
@@ -247,7 +259,7 @@ export const getTransactions = async (req: Request, res: Response) => {
 
     const invoices = purchaseIds.length
       ? await prisma.purchaseInvoice.findMany({
-          where: { id: { in: purchaseIds } },
+          where: { id: { in: purchaseIds }, workspaceId },
           select: { id: true, invoiceNumber: true },
         })
       : [];
@@ -286,6 +298,7 @@ export const create = async (req: Request, res: Response) => {
 
     const item = await prisma.item.create({
       data: {
+        workspaceId: workspaceIdOf(req),
         code: body.code,
         name: body.name,
         unit: body.unit,
@@ -313,8 +326,8 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as ItemUpdateBody;
 
-    const existing = await prisma.item.findUnique({
-      where: { id },
+    const existing = await prisma.item.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: { id: true },
     });
     if (!existing) {
@@ -355,8 +368,8 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    const item = await prisma.item.findUnique({
-      where: { id },
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId: workspaceIdOf(req) },
       select: {
         _count: {
           select: {
@@ -402,9 +415,12 @@ export const quickPurchase = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as QuickPurchaseBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    // Read once, outside the transaction, and passed to every write inside
+    // it: the request isn't available in there.
+    const workspaceId = workspaceIdOf(req);
 
-    const item = await prisma.item.findUnique({
-      where: { id },
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
       select: { currentStock: true, avgPurchasePrice: true },
     });
     if (!item) {
@@ -424,11 +440,12 @@ export const quickPurchase = async (req: Request, res: Response) => {
     // drift apart.
     const invoiceNumber = await prisma.$transaction(async (tx) => {
       const todayCount = await tx.purchaseInvoice.count({
-        where: { invoiceDate: todayRange() },
+        where: { invoiceDate: todayRange(), workspaceId },
       });
       const number = buildInvoiceNumber("PUR", todayCount);
       const invoice = await tx.purchaseInvoice.create({
         data: {
+          workspaceId,
           invoiceNumber: number,
           supplierName: "خرید سریع",
           totalAmount,
@@ -441,6 +458,7 @@ export const quickPurchase = async (req: Request, res: Response) => {
 
       await tx.purchaseInvoiceItem.create({
         data: {
+          workspaceId,
           invoiceId: invoice.id,
           itemId: id,
           quantity: body.quantity,
@@ -456,6 +474,7 @@ export const quickPurchase = async (req: Request, res: Response) => {
 
       await tx.inventoryTransaction.create({
         data: {
+          workspaceId,
           itemId: id,
           type: "purchase",
           quantity: body.quantity,
@@ -487,9 +506,10 @@ export const quickSale = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as QuickSaleBody;
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    const item = await prisma.item.findUnique({
-      where: { id },
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
       select: { currentStock: true, sellPrice: true, avgPurchasePrice: true },
     });
     if (!item) {
@@ -515,11 +535,12 @@ export const quickSale = async (req: Request, res: Response) => {
 
     const invoiceNumber = await prisma.$transaction(async (tx) => {
       const todayCount = await tx.saleInvoice.count({
-        where: { invoiceDate: todayRange() },
+        where: { invoiceDate: todayRange(), workspaceId },
       });
       const number = buildInvoiceNumber("SAL", todayCount);
       const invoice = await tx.saleInvoice.create({
         data: {
+          workspaceId,
           invoiceNumber: number,
           customerName: body.customer_name ?? "فروش سریع",
           totalAmount,
@@ -532,6 +553,7 @@ export const quickSale = async (req: Request, res: Response) => {
 
       await tx.saleInvoiceItem.create({
         data: {
+          workspaceId,
           invoiceId: invoice.id,
           itemId: id,
           quantity: body.quantity,
@@ -547,6 +569,7 @@ export const quickSale = async (req: Request, res: Response) => {
 
       await tx.inventoryTransaction.create({
         data: {
+          workspaceId,
           itemId: id,
           type: "sale",
           // Negative, matching how the ledger records outgoing stock.

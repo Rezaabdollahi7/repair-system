@@ -121,13 +121,13 @@ business features**. Payment integration is the last phase and is explicitly out
 
 ### Subscriptions (plan, not yet implemented)
 
-- Free trial: **7 days, no feature restrictions**.
+- Free trial: **1 month, no feature restrictions**.
 - Paid plans: monthly / 3-month / 6-month / annual — **identical features across all plans**,
   price/duration only differs.
 - When a subscription lapses, the workspace becomes **read-only** (no writes, data still visible).
 - **Payment gateway is Zibal** — this integration is explicitly the **last phase** of the
   migration. Do not build payment flows unless asked.
-- Trial-expiry enforcement (locking to read-only after 7 days) is **not being implemented yet**
+- Trial-expiry enforcement (locking to read-only after 1 month) is **not being implemented yet**
   either — it will be tackled together in a later session. Don't add expiry-checking middleware
   proactively.
 

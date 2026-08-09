@@ -9,7 +9,7 @@ CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "label" TEXT NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,x
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
 );
@@ -245,7 +245,7 @@ CREATE TABLE "repair_invoices" (
 
 -- CreateTable
 CREATE TABLE "repair_invoice_items" (
-    "id" SERIAL NOT NULL,x
+    "id" SERIAL NOT NULL,
     "invoice_id" INTEGER NOT NULL,
     "item_type" TEXT NOT NULL,
     "item_id" INTEGER,

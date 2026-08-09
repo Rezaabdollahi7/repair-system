@@ -12,6 +12,14 @@ datasource db {
   provider = "postgresql"
 }
 
+enum WorkspaceStatus {
+  trial
+  active
+  expired
+
+  @@map("workspace_status")
+}
+
 // Enums are used only where the current code proves the value set is closed:
 // the CHECK constraint in the old SQLite schema, and the validStatuses array
 // in repairInvoiceController. Other status-like columns stay String until
@@ -489,4 +497,29 @@ model Backup {
 
   @@index([createdBy])
   @@map("backups")
+}
+
+// ── Tenancy ──────────────────────────────────────────────────
+
+// A repair shop. Nothing references it yet — task 2.2 adds workspaceId to
+// the tenant-scoped tables.
+//
+// No slug: the app is served from one shared domain, so a workspace is only
+// ever identified by the id carried in the caller's token. A URL-safe name
+// would have nothing to do.
+model Workspace {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Subscription state. Plans differ only in price and duration, so the plan
+  // itself lives on the Subscription record added in phase 8 — what matters
+  // here is whether the workspace may currently be written to.
+  status    WorkspaceStatus @default(trial)
+  // Both the trial and a paid period end here; whichever is current.
+  expiresAt DateTime?       @map("expires_at")
+
+  @@index([status])
+  @@map("workspaces")
 }

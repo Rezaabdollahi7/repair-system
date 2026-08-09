@@ -5,8 +5,20 @@ import { toJalaali, toGregorian, jalaaliMonthLength } from "jalaali-js";
 
 function gregorianToJalali(dateStr) {
   if (!dateStr) return { jy: null, jm: null, jd: null };
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return toJalaali(y, m, d);
+
+  // The API returns full ISO timestamps ("2026-01-15T10:30:00.000Z"), not
+  // bare dates. Splitting the whole string on "-" left NaN as the day and
+  // produced a nonsensical Jalali year.
+  //
+  // Read through Date so the calendar shows the day as it fell in the user's
+  // own timezone: a record saved at 02:00 in Tehran is the previous day in
+  // UTC, and taking the raw date part would show it a day early.
+  const local = new Date(dateStr);
+  if (Number.isNaN(local.getTime())) {
+    return { jy: null, jm: null, jd: null };
+  }
+
+  return toJalaali(local.getFullYear(), local.getMonth() + 1, local.getDate());
 }
 
 function jalaliToGregorian(jy, jm, jd) {

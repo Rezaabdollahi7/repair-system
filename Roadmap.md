@@ -116,6 +116,16 @@ Not being built yet — sequenced last on purpose. Revisit together when ready.
 - [ ] 8.5 Plan selection UI (monthly / 3-month / 6-month / annual — same features, different price/duration)
 - [ ] 8.6 Kavenegar SMS integration for phone verification (sign-up OTP, and/or password reset)
 
+## Phase 9 — UI Consolidation (after the migration settles)
+
+Product changes deliberately held until the data model and auth stop moving,
+so a screen that breaks has one obvious cause rather than three.
+
+- [ ] 9.1 Fold the stock report into the items page as a filter and retire the separate page — it is the item list with one condition applied
+- [ ] 9.2 Move the profit summary onto the dashboard and retire the profit report page, where it currently goes unseen
+- [ ] 9.3 Let the purchase invoice form create a complete item inline. It creates a reduced one today, so the same catalogue has two entry points with different results
+- [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price. It currently returns the stock but leaves the average untouched, so it drifts — a weighted average can't be reversed from the invoice alone. Either recompute from that item's full purchase history, or stop allowing deletion and record a return invoice instead, which is what accounting practice would do.
+
 ---
 
 ## How to use this with Claude Code

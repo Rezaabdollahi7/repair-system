@@ -593,7 +593,10 @@ export default function DeviceList() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleToggleNeedsInvoice(device.id, false);
+                                        handleToggleNeedsInvoice(
+                                          device.id,
+                                          false,
+                                        );
                                       }}
                                       className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                                       title="فاکتور لازم نیست"
@@ -675,8 +678,12 @@ export default function DeviceList() {
             toast.success("دستگاه حذف شد");
             setDeleteTarget(null);
             fetchDevices(debouncedSearch, filters, page, limit);
-          } catch {
-            toast.error("خطا در حذف دستگاه");
+          } catch (error) {
+            // The server explains why a delete was refused — a device with
+            // repair invoices, for instance. Showing a generic message
+            // instead left the user with no idea what to do.
+            toast.error(error.response?.data?.error || "خطا در حذف دستگاه");
+            setDeleteTarget(null);
           } finally {
             setDeleting(false);
           }

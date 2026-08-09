@@ -40,9 +40,13 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // session (dashboard load, list pagination, etc.) never gets near it. This
 // is a basic/untuned config per roadmap 0.4; revisit limits once real
 // traffic patterns are known.
+const apiLimitMax = Number(process.env.RATE_LIMIT_API ?? 1000);
+const loginLimitMax = Number(process.env.RATE_LIMIT_LOGIN ?? 10);
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: apiLimitMax,
+  skip: () => apiLimitMax === 0,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "تعداد درخواست‌ها بیش از حد مجاز است" },
@@ -54,7 +58,8 @@ const apiLimiter = rateLimit({
 // endpoint.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: loginLimitMax,
+  skip: () => loginLimitMax === 0,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

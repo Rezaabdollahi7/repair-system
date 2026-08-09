@@ -253,6 +253,34 @@ describe("personnelController.update", () => {
     expect(res.status).toHaveBeenCalledWith(403);
     expect(db.user.update).not.toHaveBeenCalled();
   });
+
+  it("refuses to change the caller's own role", async () => {
+    db.user.findUnique.mockResolvedValue({ id: 1 });
+
+    const res = mockResponse();
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { role_id: 3 } }, superAdmin),
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it("still lets a super admin change someone else's role", async () => {
+    db.user.findUnique.mockResolvedValue({ id: 3 });
+    db.role.findUnique.mockResolvedValue({ name: "technician" });
+    db.user.update.mockResolvedValue(userRow());
+
+    const res = mockResponse();
+    await controller.update(
+      mockRequest({ params: { id: 3 }, body: { role_id: 3 } }, superAdmin),
+      res,
+    );
+
+    expect(db.user.update).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalledWith(400);
+  });
 });
 
 describe("personnelController.toggleActive", () => {

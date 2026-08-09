@@ -183,6 +183,15 @@ export const update = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "پرسنل یافت نشد" });
     }
 
+    // Changing your own role is a one-way door: a super admin who demotes
+    // themselves has no way back, and in a workspace with a single super
+    // admin it locks the account out of its own settings.
+    if (body.role_id !== undefined && id === actor?.id) {
+      return res
+        .status(400)
+        .json({ error: "نمی‌توانید نقش حساب خود را تغییر دهید" });
+    }
+
     if (body.username) {
       const duplicate = await prisma.user.findFirst({
         where: { username: body.username, id: { not: id } },

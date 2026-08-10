@@ -133,3 +133,8 @@ container (e.g. `docker compose ps`, `docker compose exec`, `git status`, `git d
   restart the service with `docker compose restart backend`. tsx watch's module
   resolution gets stuck on the removed path and doesn't recover; the resulting
   error usually points at the new file and is misleading.
+
+- Any migration that adds a table with a `workspace_id` column must enable RLS
+  and create its `workspace_isolation` policy in the same migration. Grants
+  carry forward automatically via ALTER DEFAULT PRIVILEGES; RLS does not.
+  `backend/prisma/rls-check.sql` lists tables that were missed.

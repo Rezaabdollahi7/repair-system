@@ -205,3 +205,6 @@ business features**. Payment integration is the last phase and is explicitly out
   partial diffs described in prose, unless explicitly asked for a smaller patch.
 - `src/app.ts` — Express app assembly (middleware, routes); exported without
   listening, so tests can mount it via supertest
+- Tenant isolation is verified against a real database, not mocks — mocked
+  tests never reach the RLS policies, so a passing suite would say nothing
+  about them. See `src/__tests__/integration/`.

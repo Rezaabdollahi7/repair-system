@@ -226,7 +226,7 @@ describe("customerController.update", () => {
 });
 
 describe("customerController.remove", () => {
-  it("answers success even for an id that no longer exists", async () => {
+  it("reports an id that no longer exists as 404", async () => {
     db.customer.deleteMany.mockResolvedValue({ count: 0 });
 
     const res = mockResponse();
@@ -235,6 +235,11 @@ describe("customerController.remove", () => {
     expect(db.customer.deleteMany).toHaveBeenCalledWith({
       where: { id: 99, workspaceId: WORKSPACE_ID },
     });
-    expect(res.json).toHaveBeenCalledWith({ success: true });
+    // Was "success even for a missing id", matching the old sql.js handler.
+    // The isolation tests showed devices and items answering 404 for the same
+    // case, and one operation reporting three different ways is a frontend
+    // bug waiting to happen.
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: "مشتری یافت نشد" });
   });
 });

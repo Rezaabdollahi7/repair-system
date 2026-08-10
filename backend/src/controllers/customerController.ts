@@ -196,17 +196,26 @@ export const update = async (req: Request, res: Response) => {
 };
 
 // DELETE /api/customers/:id
+// DELETE /api/customers/:id
 export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
 
-    // deleteMany rather than delete: the old handler answered
-    // { success: true } even for an id that no longer existed, and delete()
-    // throws P2025 instead. Detaching the customer's devices is no longer
-    // done by hand — the schema's onDelete: SetNull does it.
-    await prisma.customer.deleteMany({
+    // deleteMany rather than delete: delete() throws P2025 for a missing row,
+    // and the composite id + workspaceId condition findUnique can't express
+    // is needed anyway. Detaching the customer's devices is no longer done by
+    // hand — the schema's onDelete: SetNull does it.
+    const deleted = await prisma.customer.deleteMany({
       where: { id, workspaceId: workspaceIdOf(req) },
     });
+
+    // The old sql.js handler answered success for an id that never existed.
+    // Kept until the isolation tests showed devices and items answering 404
+    // for the same case: one operation reporting three different ways is a
+    // frontend bug waiting to happen.
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: "مشتری یافت نشد" });
+    }
 
     res.json({ success: true });
   } catch (error) {

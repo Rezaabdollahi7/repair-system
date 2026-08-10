@@ -44,7 +44,7 @@ Goal: introduce `Workspace` as a first-class concept and isolate all tenant data
 - [x] 2.4 Add a Prisma middleware / query wrapper that sets `app.workspace_id` per request (e.g. via `SET LOCAL` in a transaction) so RLS is actually enforced, not just app-level filtering
 - [x] 2.5 Update every controller to scope queries by the authenticated user's `workspaceId` (belt-and-suspenders alongside RLS)
 - [x] 2.6 Add composite indexes leading with `workspaceId` on hot tables (Device, Invoices) for query performance at the ~500 tenants / ~1,000 devices each scale
-- [ ] 2.7 Write unit tests confirming cross-tenant data access is impossible (e.g. workspace A's token cannot read workspace B's devices)
+- [x] 2.7 Write unit tests confirming cross-tenant data access is impossible (e.g. workspace A's token cannot read workspace B's devices)
 - [ ] 2.8 Unify invoice numbering across all three invoice types, with the counter held on the Workspace row rather than derived from COUNT — atomic, per-workspace, and free of the race the current daily count has. Prefix comes from settings, as repair invoices already do. (Moved from 1.7: it needs Workspace to exist first.)
 
 ## Phase 3 — Auth Rework (Sign-up, Login, Sessions)
@@ -93,7 +93,7 @@ workspace.
 - [ ] 6.1 Unit tests for all controllers (one test file per controller, covering CRUD + auth/authorization edge cases)
 - [ ] 6.2 Unit tests for services/business logic (invoice totals, stock calculations, profit & loss report)
 - [ ] 6.3 Unit tests specifically for tenant-isolation (see 2.7) and auth (token issuance/refresh/expiry)
-- [ ] 6.4 (Later, optional) Integration tests against a real test Postgres database
+- [x] 6.4 (Later, optional) Integration tests against a real test Postgres database
 
 ## Phase 7 — Dockerization & Deployment
 

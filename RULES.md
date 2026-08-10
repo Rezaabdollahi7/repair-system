@@ -32,6 +32,13 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   skipping tests — don't leave it ambiguous whether tests were considered.
 - Never present a task as complete if tests are failing. Fix or clearly flag failures first.
 
+- A new REST resource needs a line in the `resources` table in
+  `src/__tests__/integration/isolation.test.ts`, not four new tests. Anything
+  that doesn't fit the table (singletons, aggregates) goes in
+  `isolationSpecialCases.test.ts` with a comment saying why.
+- `pnpm test` runs the mocked suites; `pnpm test:integration` needs Postgres
+  and the `dofixo_test` database. `pnpm test:all` runs both.
+
 ## 4. Commit conventions
 
 - Use **Conventional Commits** format: `type(scope): short description`

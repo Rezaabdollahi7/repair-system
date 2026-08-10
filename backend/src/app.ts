@@ -6,6 +6,7 @@ import path from "path";
 import "dotenv/config";
 import prisma from "./lib/prisma";
 import routes from "./routes";
+import { requestContext } from "./middleware/requestContext";
 
 const app = express();
 
@@ -34,6 +35,10 @@ app.use(
   }),
 );
 app.use(express.json());
+
+// Ahead of every router: authenticate() writes the caller's workspace into
+// the context this opens, and the Prisma extension reads it from there.
+app.use(requestContext);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // General ceiling for the whole API — generous enough that a normal SPA

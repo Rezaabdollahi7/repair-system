@@ -105,6 +105,18 @@ business features**. Payment integration is the last phase and is explicitly out
     neither should be skipped.
 - Expected scale: ~500 tenants (workspaces), up to ~1,000 devices each. Design with this scale in
   mind (e.g., composite indexes that lead with `workspaceId`), but don't over-engineer beyond it.
+- **Two database connections, deliberately.** `DATABASE_URL` is the owner
+  (`dofixo`) and is used only by migrations and `prisma/seed.ts`. The running
+  API uses `DATABASE_URL_APP` (`dofixo_app`), a role that owns no tables —
+  because in Postgres a table's owner bypasses RLS, so an app connected as
+  the owner would make every policy inert. `src/lib/prisma.ts` refuses to
+  start without `DATABASE_URL_APP` and deliberately does not fall back.
+- **One deliberate aperture.** Login has to find a user by username before
+  any workspace is known, which no policy can allow. The
+  `app_login_lookup(username)` SQL function is `SECURITY DEFINER` and returns
+  four columns — id, workspace, password hash, active flag. Everything else
+  login needs is read normally once the workspace is established. Sign-up
+  (task 3.1) will need a second, equally narrow aperture; don't widen this one.
 
 ### Workspace & roles
 
@@ -128,6 +140,11 @@ business features**. Payment integration is the last phase and is explicitly out
     (revocable), delivered to the client as an **httpOnly cookie** (not localStorage) to reduce
     XSS risk.
 - Keep using bcryptjs for password hashing.
+
+- The workspace reaches the Prisma layer through an `AsyncLocalStorage`
+  context (`src/lib/workspaceContext.ts`), opened per request by
+  `requestContext` middleware and filled in by `authenticate` once the token
+  verifies. Controllers are unchanged by this; the client extension reads it.
 
 ### Subscriptions (plan, not yet implemented)
 

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
@@ -373,7 +373,7 @@ export const create = async (req: Request, res: Response) => {
 
     const invoiceDate = body.invoice_date ?? new Date();
 
-    const invoice = await prisma.$transaction(async (tx) => {
+    const invoice = await runInWorkspaceTransaction(workspaceId, async (tx) => {
       await resolveLinePrices(tx, body.items, workspaceId);
 
       const totals = invoiceTotals(
@@ -451,7 +451,7 @@ export const update = async (req: Request, res: Response) => {
 
     const invoiceDate = body.invoice_date ?? new Date();
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       await resolveLinePrices(tx, body.items, workspaceId);
       const totals = invoiceTotals(
         body.items,
@@ -558,7 +558,7 @@ export const changeStatus = async (req: Request, res: Response) => {
       paymentStatus = "pending";
     }
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       if (issuing) {
         await moveStock(
           tx,
@@ -635,7 +635,7 @@ export const addPayment = async (req: Request, res: Response) => {
 
     const fullyPaid = newPaid >= totalAmount;
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       await tx.repairInvoicePayment.create({
         data: {
           workspaceId,
@@ -695,7 +695,7 @@ export const remove = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       // Only an issued or paid invoice ever took stock; a draft never did.
       if (invoice.status === "issued" || invoice.status === "paid") {
         await moveStock(

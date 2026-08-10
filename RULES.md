@@ -96,6 +96,12 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
 - Every new environment variable (DB credentials, object storage keys, JWT secrets): added to
   `.env.example` (without real values) and documented, never hardcoded.
 
+- Raw SQL (`$queryRaw`/`$executeRaw`) is NOT covered by the client extension,
+  so it carries no workspace context. Any raw query touching a tenant-scoped
+  table must run inside `runInWorkspaceTransaction()`. The only exceptions are
+  `SELECT 1` in the health check and `app_login_lookup`, which exists
+  precisely because no workspace is known yet.
+
 ## 8. Documentation upkeep
 
 - When a roadmap task is completed and approved, update `ROADMAP.md`: flip `[ ]` to `[x]`.

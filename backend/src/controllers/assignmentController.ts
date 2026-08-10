@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
@@ -110,9 +110,15 @@ export const setAssignments = async (req: Request, res: Response) => {
 
     // Replace-all in a transaction: without it a failure between the delete
     // and the insert would leave the device with no assignees at all.
-    await prisma.$transaction([
-      prisma.deviceAssignment.deleteMany({ where: { deviceId, workspaceId } }),
-      prisma.deviceAssignment.createMany({
+    //
+    // Callback form rather than the array form: the array's promises come
+    // from the extended client, so each would open a transaction of its own
+    // and the batch would nest.
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      await tx.deviceAssignment.deleteMany({
+        where: { deviceId, workspaceId },
+      });
+      await tx.deviceAssignment.createMany({
         data: personnelIds.map((personnelId) => ({
           workspaceId,
           deviceId,
@@ -120,8 +126,8 @@ export const setAssignments = async (req: Request, res: Response) => {
           assignedBy,
         })),
         skipDuplicates: true,
-      }),
-    ]);
+      });
+    });
 
     const assignees = await listAssignees(deviceId, workspaceId);
     res.json(assignees.map(toAssigneeResponse));

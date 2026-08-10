@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/itemController";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
@@ -28,12 +28,13 @@ jest.mock("../lib/prisma", () => {
 
       inventoryTransaction: { count: jest.fn(), findMany: jest.fn() },
       purchaseInvoice: { findMany: jest.fn() },
-      // Runs the callback against the same mocks the assertions inspect.
-      $transaction: jest.fn((callback: (client: unknown) => unknown) =>
-        callback(tx),
-      ),
       __tx: tx,
     },
+    // Named alongside the default export now that controllers import both.
+    // Runs the callback against the same mocks the assertions inspect.
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (client: unknown) => unknown) => fn(tx),
+    ),
   };
 });
 
@@ -41,7 +42,7 @@ const db = prisma as unknown as {
   item: Record<string, jest.Mock>;
   inventoryTransaction: Record<string, jest.Mock>;
   purchaseInvoice: Record<string, jest.Mock>;
-  $transaction: jest.Mock;
+
   __tx: {
     purchaseInvoice: Record<string, jest.Mock>;
     purchaseInvoiceItem: Record<string, jest.Mock>;
@@ -51,6 +52,8 @@ const db = prisma as unknown as {
     inventoryTransaction: Record<string, jest.Mock>;
   };
 };
+
+const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
 // Stands in for Prisma's Decimal, which the controller calls toNumber() on.
 function decimal(value: number) {
@@ -306,7 +309,7 @@ describe("itemController.getTransactions", () => {
       mockResponse(),
     );
 
-    expect(db.purchaseInvoice.findMany).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 });
 
@@ -386,7 +389,7 @@ describe("itemController.update", () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.item.update).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 });
 
@@ -404,7 +407,7 @@ describe("itemController.remove", () => {
     await controller.remove(mockRequest({ params: { id: 1 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(db.item.delete).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("deletes an item nothing references", async () => {
@@ -442,7 +445,7 @@ describe("itemController.quickPurchase", () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("recalculates the weighted average purchase price", async () => {
@@ -497,7 +500,7 @@ describe("itemController.quickPurchase", () => {
       mockResponse(),
     );
 
-    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(runInTx).toHaveBeenCalledWith(WORKSPACE_ID, expect.any(Function));
   });
 });
 
@@ -523,7 +526,7 @@ describe("itemController.quickSale", () => {
     expect(res.json).toHaveBeenCalledWith({
       error: "موجودی کافی نیست. موجودی فعلی: 3",
     });
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("sells at the item's sale price", async () => {

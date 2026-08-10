@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/saleInvoiceController";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
@@ -30,17 +30,19 @@ jest.mock("../lib/prisma", () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
-      $transaction: jest.fn((callback: (client: unknown) => unknown) =>
-        callback(tx),
-      ),
       __tx: tx,
     },
+    // Named alongside the default export now that controllers import both.
+    // Runs the callback against the same mocks the assertions inspect.
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (client: unknown) => unknown) => fn(tx),
+    ),
   };
 });
 
 const db = prisma as unknown as {
   saleInvoice: Record<string, jest.Mock>;
-  $transaction: jest.Mock;
+
   __tx: {
     saleInvoice: Record<string, jest.Mock>;
     saleInvoiceItem: Record<string, jest.Mock>;
@@ -48,6 +50,8 @@ const db = prisma as unknown as {
     inventoryTransaction: Record<string, jest.Mock>;
   };
 };
+
+const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
 function decimal(value: number) {
   return { toNumber: () => value };
@@ -472,7 +476,7 @@ describe("saleInvoiceController.update", () => {
       workspaceId: WORKSPACE_ID,
     });
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("puts the old stock back before validating the new lines", async () => {
@@ -597,7 +601,7 @@ describe("saleInvoiceController.remove", () => {
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("deletes an invoice that has no lines", async () => {

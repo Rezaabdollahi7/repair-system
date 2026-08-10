@@ -3,16 +3,30 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import * as controller from "../controllers/authController";
 import prisma from "../lib/prisma";
+import {
+  currentWorkspaceId,
+  runWithRequestContext,
+} from "../lib/workspaceContext";
 import { JWT_SECRET } from "../middleware/auth";
 
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
   default: {
-    user: { findUnique: jest.fn(), update: jest.fn() },
+    // login reads its candidate through app_login_lookup(), the one query
+    // that runs before a workspace is known.
+    $queryRaw: jest.fn(),
+    user: {
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
+    },
   },
 }));
 
-const db = prisma as unknown as { user: Record<string, jest.Mock> };
+const db = prisma as unknown as {
+  $queryRaw: jest.Mock;
+  user: Record<string, jest.Mock>;
+};
 
 function mockResponse() {
   const res = {} as Response & { status: jest.Mock; json: jest.Mock };
@@ -35,12 +49,33 @@ function mockRequest(
   } as unknown as Request;
 }
 
+/**
+ * login writes the caller's workspace into the async context once the
+ * password checks out, which requires a context to already be open — in
+ * production that's the requestContext middleware. Wrapping here keeps the
+ * real workspaceContext module in play rather than mocking it away.
+ */
+function login(req: Request, res: Response) {
+  return runWithRequestContext(() => controller.login(req, res));
+}
+
 const correctPassword = "secret123";
 let passwordHash: string;
 
 beforeAll(async () => {
   passwordHash = await bcrypt.hash(correctPassword, 10);
 });
+
+/** The four columns app_login_lookup() returns, in snake_case as SQL gives them. */
+function candidateRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    workspace_id: WORKSPACE_ID,
+    password: passwordHash,
+    is_active: true,
+    ...overrides,
+  };
+}
 
 function userRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -68,13 +103,13 @@ beforeEach(() => {
 
 describe("authController.login", () => {
   it("gives the same message for an unknown user as for a wrong password", async () => {
-    db.user.findUnique.mockResolvedValue(null);
+    db.$queryRaw.mockResolvedValue([]);
     const unknownUser = mockResponse();
-    await controller.login(mockRequest({ body: credentials }), unknownUser);
+    await login(mockRequest({ body: credentials }), unknownUser);
 
-    db.user.findUnique.mockResolvedValue(userRow());
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
     const wrongPassword = mockResponse();
-    await controller.login(
+    await login(
       mockRequest({ body: { ...credentials, password: "wrong" } }),
       wrongPassword,
     );
@@ -86,20 +121,40 @@ describe("authController.login", () => {
     );
   });
 
-  it("refuses a disabled account with 403", async () => {
-    db.user.findUnique.mockResolvedValue(userRow({ isActive: false }));
+  it("refuses a disabled account with 403 without reading the full record", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow({ is_active: false })]);
 
     const res = mockResponse();
-    await controller.login(mockRequest({ body: credentials }), res);
+    await login(mockRequest({ body: credentials }), res);
 
     expect(res.status).toHaveBeenCalledWith(403);
+    expect(db.user.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("establishes the workspace context before reading the user", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUniqueOrThrow.mockResolvedValue(userRow());
+
+    // Without this the follow-up read would run with no workspace set, which
+    // RLS answers with no rows — a login that silently fails at the last step.
+    let contextDuringLogin: number | undefined;
+    await runWithRequestContext(async () => {
+      await controller.login(
+        mockRequest({ body: credentials }),
+        mockResponse(),
+      );
+      contextDuringLogin = currentWorkspaceId();
+    });
+
+    expect(contextDuringLogin).toBe(WORKSPACE_ID);
   });
 
   it("issues a token carrying the user's id and role name", async () => {
-    db.user.findUnique.mockResolvedValue(userRow());
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUniqueOrThrow.mockResolvedValue(userRow());
 
     const res = mockResponse();
-    await controller.login(mockRequest({ body: credentials }), res);
+    await login(mockRequest({ body: credentials }), res);
 
     const { token } = res.json.mock.calls[0][0];
     const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
@@ -116,10 +171,11 @@ describe("authController.login", () => {
   });
 
   it("never returns the password hash", async () => {
-    db.user.findUnique.mockResolvedValue(userRow());
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUniqueOrThrow.mockResolvedValue(userRow());
 
     const res = mockResponse();
-    await controller.login(mockRequest({ body: credentials }), res);
+    await login(mockRequest({ body: credentials }), res);
 
     const { user } = res.json.mock.calls[0][0];
     expect(user).not.toHaveProperty("password");

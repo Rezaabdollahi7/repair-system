@@ -54,6 +54,7 @@ services:
       # without needing to edit or delete that file.
       DATABASE_URL: postgresql://${POSTGRES_USER:-dofixo}:${POSTGRES_PASSWORD:-dofixo}@postgres:5432/${POSTGRES_DB:-dofixo_dev}?schema=public
       PORT: ${BACKEND_PORT:-5001}
+      DATABASE_URL_APP: postgresql://dofixo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-dofixo_dev}?schema=public
       # No reverse proxy in local dev — see the comment on this var in
       # backend/.env.example.
       TRUST_PROXY: "0"

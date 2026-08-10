@@ -7,6 +7,7 @@ import { JWT_SECRET } from "../middleware/auth";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
+import { setContextWorkspaceId } from "../lib/workspaceContext";
 import type { ChangePasswordBody, LoginBody } from "../schemas/auth";
 
 // Includes the password hash because login has to compare against it. Every
@@ -16,6 +17,18 @@ const userWithRole = {
 } satisfies Prisma.UserInclude;
 
 type UserWithRole = Prisma.UserGetPayload<{ include: typeof userWithRole }>;
+
+/**
+ * What app_login_lookup() returns: only the columns password verification
+ * needs. The full user is read through the normal client afterwards, once
+ * the workspace is known and the RLS policies apply again.
+ */
+interface LoginCandidate {
+  id: number;
+  workspace_id: number;
+  password: string;
+  is_active: boolean;
+}
 
 /**
  * The response shape the frontend already expects: the role relation is
@@ -45,27 +58,42 @@ export const login = async (req: Request, res: Response) => {
     const { username, password } = (req as ValidatedRequest).valid
       .body as LoginBody;
 
-    const user = await prisma.user.findUnique({
-      where: { username },
-      include: userWithRole,
-    });
+    // Goes through app_login_lookup rather than the client: at this point no
+    // workspace is known, so an ordinary query would be filtered to nothing
+    // by RLS and every login would read as a wrong password.
+    const [candidate] = await prisma.$queryRaw<LoginCandidate[]>`
+      SELECT * FROM app_login_lookup(${username})
+    `;
 
     // Same message whether the username is unknown or the password is wrong,
     // so the response doesn't reveal which usernames exist.
     const invalidCredentials = { error: "نام کاربری یا رمز عبور اشتباه است" };
 
-    if (!user) {
+    if (!candidate) {
       return res.status(401).json(invalidCredentials);
     }
 
-    const matches = await bcrypt.compare(password, user.password);
+    const matches = await bcrypt.compare(password, candidate.password);
     if (!matches) {
       return res.status(401).json(invalidCredentials);
     }
 
-    if (!user.isActive) {
+    if (!candidate.is_active) {
       return res.status(403).json({ error: "حساب کاربری غیرفعال است" });
     }
+
+    // Credentials are proven, so the caller's workspace is established and
+    // the rest of this request runs under it like any other. Set here rather
+    // than in authenticate(), which hasn't run and won't for this endpoint.
+    setContextWorkspaceId(candidate.workspace_id);
+
+    // findUniqueOrThrow rather than findUnique: the row was just read by
+    // app_login_lookup, so its absence now would mean it vanished mid-request
+    // — an unexpected state, not a login failure to report as one.
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: candidate.id },
+      include: userWithRole,
+    });
 
     // Token shape gains workspaceId here rather than in phase 3: every
     // tenant-scoped query needs it, and reading it from the database on each
@@ -97,6 +125,8 @@ export const me = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "احراز هویت نشده" });
     }
 
+    // No workspace in the filter: authenticate() has already put the caller's
+    // workspace into the request context, so RLS scopes this lookup to it.
     const user = await prisma.user.findUnique({
       where: { id: actor.id },
       include: userWithRole,

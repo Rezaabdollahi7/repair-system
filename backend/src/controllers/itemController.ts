@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
@@ -438,56 +438,59 @@ export const quickPurchase = async (req: Request, res: Response) => {
     // One transaction: the invoice, its line, the stock adjustment and the
     // ledger entry have to land together or not at all, or stock and history
     // drift apart.
-    const invoiceNumber = await prisma.$transaction(async (tx) => {
-      const todayCount = await tx.purchaseInvoice.count({
-        where: { invoiceDate: todayRange(), workspaceId },
-      });
-      const number = buildInvoiceNumber("PUR", todayCount);
-      const invoice = await tx.purchaseInvoice.create({
-        data: {
-          workspaceId,
-          invoiceNumber: number,
-          supplierName: "خرید سریع",
-          totalAmount,
-          paidAmount: totalAmount,
-          paymentStatus: "paid",
-          note: body.note ?? "خرید سریع از صفحه جزئیات کالا",
-          createdBy: actorId,
-        },
-      });
+    const invoiceNumber = await runInWorkspaceTransaction(
+      workspaceId,
+      async (tx) => {
+        const todayCount = await tx.purchaseInvoice.count({
+          where: { invoiceDate: todayRange(), workspaceId },
+        });
+        const number = buildInvoiceNumber("PUR", todayCount);
+        const invoice = await tx.purchaseInvoice.create({
+          data: {
+            workspaceId,
+            invoiceNumber: number,
+            supplierName: "خرید سریع",
+            totalAmount,
+            paidAmount: totalAmount,
+            paymentStatus: "paid",
+            note: body.note ?? "خرید سریع از صفحه جزئیات کالا",
+            createdBy: actorId,
+          },
+        });
 
-      await tx.purchaseInvoiceItem.create({
-        data: {
-          workspaceId,
-          invoiceId: invoice.id,
-          itemId: id,
-          quantity: body.quantity,
-          unitPrice: body.unit_price,
-          totalPrice: totalAmount,
-        },
-      });
+        await tx.purchaseInvoiceItem.create({
+          data: {
+            workspaceId,
+            invoiceId: invoice.id,
+            itemId: id,
+            quantity: body.quantity,
+            unitPrice: body.unit_price,
+            totalPrice: totalAmount,
+          },
+        });
 
-      await tx.item.update({
-        where: { id },
-        data: { currentStock: newStock, avgPurchasePrice: newAvgPrice },
-      });
+        await tx.item.update({
+          where: { id },
+          data: { currentStock: newStock, avgPurchasePrice: newAvgPrice },
+        });
 
-      await tx.inventoryTransaction.create({
-        data: {
-          workspaceId,
-          itemId: id,
-          type: "purchase",
-          quantity: body.quantity,
-          unitPrice: body.unit_price,
-          referenceId: invoice.id,
-          referenceType: "purchase_invoice",
-          note: "خرید سریع",
-          createdBy: actorId,
-        },
-      });
+        await tx.inventoryTransaction.create({
+          data: {
+            workspaceId,
+            itemId: id,
+            type: "purchase",
+            quantity: body.quantity,
+            unitPrice: body.unit_price,
+            referenceId: invoice.id,
+            referenceType: "purchase_invoice",
+            note: "خرید سریع",
+            createdBy: actorId,
+          },
+        });
 
-      return number;
-    });
+        return number;
+      },
+    );
 
     res.json({
       message: "خرید سریع با موفقیت ثبت شد",
@@ -533,57 +536,60 @@ export const quickSale = async (req: Request, res: Response) => {
     const totalAmount = body.quantity * unitPrice;
     const newStock = item.currentStock - body.quantity;
 
-    const invoiceNumber = await prisma.$transaction(async (tx) => {
-      const todayCount = await tx.saleInvoice.count({
-        where: { invoiceDate: todayRange(), workspaceId },
-      });
-      const number = buildInvoiceNumber("SAL", todayCount);
-      const invoice = await tx.saleInvoice.create({
-        data: {
-          workspaceId,
-          invoiceNumber: number,
-          customerName: body.customer_name ?? "فروش سریع",
-          totalAmount,
-          paidAmount: totalAmount,
-          paymentStatus: "paid",
-          note: "فروش سریع از صفحه جزئیات کالا",
-          createdBy: actorId,
-        },
-      });
+    const invoiceNumber = await runInWorkspaceTransaction(
+      workspaceId,
+      async (tx) => {
+        const todayCount = await tx.saleInvoice.count({
+          where: { invoiceDate: todayRange(), workspaceId },
+        });
+        const number = buildInvoiceNumber("SAL", todayCount);
+        const invoice = await tx.saleInvoice.create({
+          data: {
+            workspaceId,
+            invoiceNumber: number,
+            customerName: body.customer_name ?? "فروش سریع",
+            totalAmount,
+            paidAmount: totalAmount,
+            paymentStatus: "paid",
+            note: "فروش سریع از صفحه جزئیات کالا",
+            createdBy: actorId,
+          },
+        });
 
-      await tx.saleInvoiceItem.create({
-        data: {
-          workspaceId,
-          invoiceId: invoice.id,
-          itemId: id,
-          quantity: body.quantity,
-          unitPrice,
-          totalPrice: totalAmount,
-        },
-      });
+        await tx.saleInvoiceItem.create({
+          data: {
+            workspaceId,
+            invoiceId: invoice.id,
+            itemId: id,
+            quantity: body.quantity,
+            unitPrice,
+            totalPrice: totalAmount,
+          },
+        });
 
-      await tx.item.update({
-        where: { id },
-        data: { currentStock: newStock },
-      });
+        await tx.item.update({
+          where: { id },
+          data: { currentStock: newStock },
+        });
 
-      await tx.inventoryTransaction.create({
-        data: {
-          workspaceId,
-          itemId: id,
-          type: "sale",
-          // Negative, matching how the ledger records outgoing stock.
-          quantity: -body.quantity,
-          unitPrice,
-          referenceId: invoice.id,
-          referenceType: "sale_invoice",
-          note: "فروش سریع",
-          createdBy: actorId,
-        },
-      });
+        await tx.inventoryTransaction.create({
+          data: {
+            workspaceId,
+            itemId: id,
+            type: "sale",
+            // Negative, matching how the ledger records outgoing stock.
+            quantity: -body.quantity,
+            unitPrice,
+            referenceId: invoice.id,
+            referenceType: "sale_invoice",
+            note: "فروش سریع",
+            createdBy: actorId,
+          },
+        });
 
-      return number;
-    });
+        return number;
+      },
+    );
 
     res.json({
       message: "فروش سریع با موفقیت ثبت شد",

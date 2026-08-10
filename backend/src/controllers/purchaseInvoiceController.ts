@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma, PurchaseInvoice } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
@@ -156,7 +156,7 @@ export const create = async (req: Request, res: Response) => {
     // One transaction: the invoice, its lines, every stock adjustment and
     // every ledger entry have to land together, or stock and history drift
     // apart.
-    const invoice = await prisma.$transaction(async (tx) => {
+    const invoice = await runInWorkspaceTransaction(workspaceId, async (tx) => {
       const todayCount = await tx.purchaseInvoice.count({
         where: { invoiceDate: todayRange(), workspaceId },
       });
@@ -293,7 +293,7 @@ export const remove = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       for (const line of invoice.items) {
         const item = await tx.item.findFirstOrThrow({
           where: { id: line.itemId, workspaceId },

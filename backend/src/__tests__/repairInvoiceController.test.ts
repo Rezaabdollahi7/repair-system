@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/repairInvoiceController";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
@@ -29,11 +29,13 @@ jest.mock("../lib/prisma", () => {
       },
       device: { findFirst: jest.fn() },
       item: { findMany: jest.fn() },
-      $transaction: jest.fn((callback: (client: unknown) => unknown) =>
-        callback(tx),
-      ),
       __tx: tx,
     },
+    // Named alongside the default export now that controllers import both.
+    // Runs the callback against the same mocks the assertions inspect.
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (client: unknown) => unknown) => fn(tx),
+    ),
   };
 });
 
@@ -41,7 +43,6 @@ const db = prisma as unknown as {
   repairInvoice: Record<string, jest.Mock>;
   device: Record<string, jest.Mock>;
   item: Record<string, jest.Mock>;
-  $transaction: jest.Mock;
   __tx: {
     settings: Record<string, jest.Mock>;
     repairInvoice: Record<string, jest.Mock>;
@@ -51,6 +52,8 @@ const db = prisma as unknown as {
     inventoryTransaction: Record<string, jest.Mock>;
   };
 };
+
+const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
 function decimal(value: number) {
   return { toNumber: () => value };
@@ -277,7 +280,7 @@ describe("repairInvoiceController.create", () => {
       workspaceId: WORKSPACE_ID,
     });
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("copies the customer from the device when none was given", async () => {
@@ -455,7 +458,7 @@ describe("repairInvoiceController.update", () => {
     expect(res.json).toHaveBeenCalledWith({
       error: "فقط فاکتورهای پیش‌نویس قابل ویرایش هستند",
     });
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("replaces the lines of a draft", async () => {
@@ -636,7 +639,7 @@ describe("repairInvoiceController.addPayment", () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("marks a part payment partial and leaves the status alone", async () => {
@@ -701,7 +704,7 @@ describe("repairInvoiceController.remove", () => {
     await controller.remove(mockRequest({ params: { id: 9 } }, 3), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("returns the parts of an issued invoice before deleting it", async () => {

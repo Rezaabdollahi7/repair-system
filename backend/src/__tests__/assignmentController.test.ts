@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/assignmentController";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
-jest.mock("../lib/prisma", () => ({
-  __esModule: true,
-  default: {
-    // findFirst rather than findUnique: the controller pairs id with
-    // workspaceId now, which findUnique can't express.
+jest.mock("../lib/prisma", () => {
+  // findFirst rather than findUnique: the controller pairs id with
+  // workspaceId now, which findUnique can't express.
+  const client = {
     device: { findFirst: jest.fn() },
     user: { findMany: jest.fn(), findFirst: jest.fn() },
     deviceAssignment: {
@@ -14,16 +13,27 @@ jest.mock("../lib/prisma", () => ({
       deleteMany: jest.fn(),
       createMany: jest.fn(),
     },
-    $transaction: jest.fn(),
-  },
-}));
+  };
+
+  return {
+    __esModule: true,
+    default: client,
+    // A named export beside the default, because the controller imports both
+    // now. Runs the callback against the same mocks the assertions inspect,
+    // so writes made inside the transaction stay visible to them.
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (tx: unknown) => unknown) => fn(client),
+    ),
+  };
+});
 
 const db = prisma as unknown as {
   device: Record<string, jest.Mock>;
   user: Record<string, jest.Mock>;
   deviceAssignment: Record<string, jest.Mock>;
-  $transaction: jest.Mock;
 };
+
+const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
 function mockResponse() {
   const res = {} as Response & { status: jest.Mock; json: jest.Mock };
@@ -95,13 +105,12 @@ describe("assignmentController.setAssignments", () => {
     expect(res.json).toHaveBeenCalledWith({
       error: "پرسنل با id=7 یافت نشد یا غیرفعال است",
     });
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("replaces assignments in a single transaction", async () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.user.findMany.mockResolvedValue([{ id: 2 }]);
-    db.$transaction.mockResolvedValue([]);
     db.deviceAssignment.findMany.mockResolvedValue([assignmentRow]);
 
     await controller.setAssignments(
@@ -109,7 +118,9 @@ describe("assignmentController.setAssignments", () => {
       mockResponse(),
     );
 
-    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    // The workspace is passed explicitly rather than inferred, because the
+    // transaction runs on the unextended client and sets its own context.
+    expect(runInTx).toHaveBeenCalledWith(WORKSPACE_ID, expect.any(Function));
     expect(db.deviceAssignment.createMany).toHaveBeenCalledWith({
       data: [
         {
@@ -125,7 +136,6 @@ describe("assignmentController.setAssignments", () => {
 
   it("clears every assignee when given an empty list", async () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
-    db.$transaction.mockResolvedValue([]);
     db.deviceAssignment.findMany.mockResolvedValue([]);
 
     const res = mockResponse();

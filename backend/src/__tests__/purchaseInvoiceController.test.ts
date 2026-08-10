@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/purchaseInvoiceController";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
@@ -26,18 +26,19 @@ jest.mock("../lib/prisma", () => {
         update: jest.fn(),
       },
       item: { findMany: jest.fn() },
-      $transaction: jest.fn((callback: (client: unknown) => unknown) =>
-        callback(tx),
-      ),
       __tx: tx,
     },
+    // Named alongside the default export now that controllers import both.
+    // Runs the callback against the same mocks the assertions inspect.
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (client: unknown) => unknown) => fn(tx),
+    ),
   };
 });
 
 const db = prisma as unknown as {
   purchaseInvoice: Record<string, jest.Mock>;
   item: Record<string, jest.Mock>;
-  $transaction: jest.Mock;
   __tx: {
     purchaseInvoice: Record<string, jest.Mock>;
     purchaseInvoiceItem: Record<string, jest.Mock>;
@@ -45,6 +46,8 @@ const db = prisma as unknown as {
     inventoryTransaction: Record<string, jest.Mock>;
   };
 };
+
+const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
 function decimal(value: number) {
   return { toNumber: () => value };
@@ -231,7 +234,7 @@ describe("purchaseInvoiceController.create", () => {
     expect(res.json).toHaveBeenCalledWith({
       error: "کالا با شناسه 2 یافت نشد",
     });
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("treats an item from another workspace as missing", async () => {
@@ -373,7 +376,7 @@ describe("purchaseInvoiceController.create", () => {
 
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
-    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(runInTx).toHaveBeenCalledWith(WORKSPACE_ID, expect.any(Function));
   });
 });
 
@@ -426,7 +429,7 @@ describe("purchaseInvoiceController.remove", () => {
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(runInTx).not.toHaveBeenCalled();
   });
 
   it("deletes an invoice that has no lines", async () => {

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma, SaleInvoice } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
@@ -351,7 +351,7 @@ export const create = async (req: Request, res: Response) => {
       0,
     );
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await runInWorkspaceTransaction(workspaceId, async (tx) => {
       const stockError = await assertStockAvailable(tx, lines, workspaceId);
       if (stockError) return { error: stockError };
 
@@ -421,7 +421,7 @@ export const update = async (req: Request, res: Response) => {
       0,
     );
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       // Old stock goes back first so an edit that raises a quantity can draw
       // on what this same invoice was already holding. Inside the transaction
       // now: the old code wrote this back before validating the new lines, so
@@ -530,7 +530,7 @@ export const remove = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "فاکتور یافت نشد" });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
       await returnLinesToStock(
         tx,
         id,

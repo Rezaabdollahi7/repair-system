@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-
+const { setContextWorkspaceId } = require("../lib/workspaceContext");
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
@@ -25,6 +25,11 @@ function authenticate(req, res, next) {
     // every tenant-scoped query is filtered by, so it has to come from the
     // signed token and never from the request body or query.
     req.user = payload;
+
+    // Also published to the async context, which is where the Prisma
+    // extension reads it — req isn't reachable from inside the client.
+    setContextWorkspaceId(payload.workspaceId);
+
     next();
   } catch (err) {
     return res.status(401).json({ error: "توکن نامعتبر یا منقضی شده" });

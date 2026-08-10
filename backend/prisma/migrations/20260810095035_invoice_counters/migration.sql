@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "workspaces" ADD COLUMN     "purchase_seq" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "repair_seq" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "sale_seq" INTEGER NOT NULL DEFAULT 0;

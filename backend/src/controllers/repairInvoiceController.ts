@@ -4,7 +4,7 @@ import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
-import { todayRange, todayStamp } from "../utils/invoiceNumber";
+import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { invoiceTotals, lineTotals } from "../utils/invoiceTotals";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
@@ -68,30 +68,6 @@ function toInvoiceResponse(invoice: InvoiceRow) {
     serial_number: invoice.device.serialNumber,
     technician_name: invoice.technician?.fullName ?? null,
   };
-}
-
-/**
- * Invoice numbers keep their settings-driven prefix (INV- by default),
- * unlike purchase and sale invoices which hardcode theirs. Roadmap 1.7
- * unifies all three.
- */
-async function nextInvoiceNumber(
-  tx: Prisma.TransactionClient,
-  workspaceId: number,
-): Promise<string> {
-  // Settings are one row per workspace now, keyed on workspaceId rather than
-  // the hardcoded id 1 the single-tenant version used.
-  const settings = await tx.settings.findUnique({
-    where: { workspaceId },
-    select: { invoicePrefix: true },
-  });
-
-  const todayCount = await tx.repairInvoice.count({
-    where: { invoiceDate: todayRange(), workspaceId },
-  });
-
-  const prefix = settings?.invoicePrefix ?? "INV-";
-  return `${prefix}${todayStamp()}-${String(todayCount + 1).padStart(4, "0")}`;
 }
 
 /**
@@ -386,7 +362,7 @@ export const create = async (req: Request, res: Response) => {
       const created = await tx.repairInvoice.create({
         data: {
           workspaceId,
-          invoiceNumber: await nextInvoiceNumber(tx, workspaceId),
+          invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "repair"),
           deviceId: body.device_id,
           customerId: device.customerId,
           customerName:

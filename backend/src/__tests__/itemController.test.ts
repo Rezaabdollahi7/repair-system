@@ -4,9 +4,10 @@ import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
-    purchaseInvoice: { count: jest.fn(), create: jest.fn() },
+    workspace: { update: jest.fn() },
+    purchaseInvoice: { create: jest.fn() },
     purchaseInvoiceItem: { create: jest.fn() },
-    saleInvoice: { count: jest.fn(), create: jest.fn() },
+    saleInvoice: { create: jest.fn() },
     saleInvoiceItem: { create: jest.fn() },
     item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
@@ -41,9 +42,11 @@ jest.mock("../lib/prisma", () => {
 const db = prisma as unknown as {
   item: Record<string, jest.Mock>;
   inventoryTransaction: Record<string, jest.Mock>;
+  workspace: Record<string, jest.Mock>;
   purchaseInvoice: Record<string, jest.Mock>;
 
   __tx: {
+    workspace: Record<string, jest.Mock>;
     purchaseInvoice: Record<string, jest.Mock>;
     purchaseInvoiceItem: Record<string, jest.Mock>;
     saleInvoice: Record<string, jest.Mock>;
@@ -431,7 +434,7 @@ describe("itemController.quickPurchase", () => {
   const body = { quantity: 10, unit_price: 2000, note: null };
 
   beforeEach(() => {
-    db.__tx.purchaseInvoice.count.mockResolvedValue(0);
+    db.__tx.workspace.update.mockResolvedValue({ purchaseSeq: 1 });
     db.__tx.purchaseInvoice.create.mockResolvedValue({ id: 50 });
   });
 
@@ -508,7 +511,7 @@ describe("itemController.quickSale", () => {
   const body = { quantity: 4, customer_name: "رضا" };
 
   beforeEach(() => {
-    db.__tx.saleInvoice.count.mockResolvedValue(0);
+    db.__tx.workspace.update.mockResolvedValue({ saleSeq: 1 });
     db.__tx.saleInvoice.create.mockResolvedValue({ id: 60 });
   });
 

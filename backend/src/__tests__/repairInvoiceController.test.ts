@@ -4,9 +4,10 @@ import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
-    settings: { findUnique: jest.fn() },
+    // settings is gone with the local invoice-number helper: the prefix is
+    // fixed per invoice kind now, and the counter lives on the workspace row.
+    workspace: { update: jest.fn() },
     repairInvoice: {
-      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -44,7 +45,7 @@ const db = prisma as unknown as {
   device: Record<string, jest.Mock>;
   item: Record<string, jest.Mock>;
   __tx: {
-    settings: Record<string, jest.Mock>;
+    workspace: Record<string, jest.Mock>;
     repairInvoice: Record<string, jest.Mock>;
     repairInvoiceItem: Record<string, jest.Mock>;
     repairInvoicePayment: Record<string, jest.Mock>;
@@ -82,7 +83,7 @@ function invoiceRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 5,
     workspaceId: WORKSPACE_ID,
-    invoiceNumber: "INV-20260806-0001",
+    invoiceNumber: "REP-0001",
     deviceId: 7,
     customerId: 2,
     customerName: "رضا",
@@ -158,8 +159,7 @@ const createBody = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  db.__tx.settings.findUnique.mockResolvedValue({ invoicePrefix: "INV-" });
-  db.__tx.repairInvoice.count.mockResolvedValue(0);
+  db.__tx.workspace.update.mockResolvedValue({ repairSeq: 1 });
   db.__tx.repairInvoice.create.mockResolvedValue(invoiceRow());
 });
 
@@ -319,35 +319,27 @@ describe("repairInvoiceController.create", () => {
     ).toBe("مشتری متفرقه");
   });
 
-  it("takes the invoice prefix from the workspace's own settings", async () => {
+  it("takes its number from its own workspace's counter", async () => {
     db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
-    db.__tx.settings.findUnique.mockResolvedValue({ invoicePrefix: "REP-" });
 
     await controller.create(
       mockRequest({ body: createBody }, 3),
       mockResponse(),
     );
 
-    // Settings are keyed on workspaceId now, not a hardcoded row id.
-    expect(db.__tx.settings.findUnique.mock.calls[0][0].where).toEqual({
-      workspaceId: WORKSPACE_ID,
+    // The prefix used to come from settings.invoicePrefix, which only repair
+    // invoices ever read — purchase and sale had theirs hardcoded. All three
+    // are fixed now: a number is accounting data whose job is to be unique
+    // and traceable, while what a workshop wants to customise is how the
+    // printed invoice looks (roadmap 9.5).
+    expect(db.__tx.workspace.update).toHaveBeenCalledWith({
+      where: { id: WORKSPACE_ID },
+      data: { repairSeq: { increment: 1 } },
+      select: { repairSeq: true },
     });
     expect(
       db.__tx.repairInvoice.create.mock.calls[0][0].data.invoiceNumber,
-    ).toMatch(/^REP-\d{8}-0001$/);
-  });
-
-  it("counts only its own workspace's invoices when numbering", async () => {
-    db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
-
-    await controller.create(
-      mockRequest({ body: createBody }, 3),
-      mockResponse(),
-    );
-
-    expect(db.__tx.repairInvoice.count.mock.calls[0][0].where).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-    });
+    ).toBe("REP-0001");
   });
 
   it("fills an inventory line's price from the item when none was sent", async () => {

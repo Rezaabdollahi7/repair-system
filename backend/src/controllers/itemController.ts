@@ -16,7 +16,7 @@ import type {
   QuickPurchaseBody,
   QuickSaleBody,
 } from "../schemas/item";
-import { buildInvoiceNumber, todayRange } from "../utils/invoiceNumber";
+import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
 
 const itemInclude = {
@@ -441,10 +441,7 @@ export const quickPurchase = async (req: Request, res: Response) => {
     const invoiceNumber = await runInWorkspaceTransaction(
       workspaceId,
       async (tx) => {
-        const todayCount = await tx.purchaseInvoice.count({
-          where: { invoiceDate: todayRange(), workspaceId },
-        });
-        const number = buildInvoiceNumber("PUR", todayCount);
+        const number = await nextInvoiceNumber(tx, workspaceId, "purchase");
         const invoice = await tx.purchaseInvoice.create({
           data: {
             workspaceId,
@@ -539,10 +536,7 @@ export const quickSale = async (req: Request, res: Response) => {
     const invoiceNumber = await runInWorkspaceTransaction(
       workspaceId,
       async (tx) => {
-        const todayCount = await tx.saleInvoice.count({
-          where: { invoiceDate: todayRange(), workspaceId },
-        });
-        const number = buildInvoiceNumber("SAL", todayCount);
+        const number = await nextInvoiceNumber(tx, workspaceId, "sale");
         const invoice = await tx.saleInvoice.create({
           data: {
             workspaceId,

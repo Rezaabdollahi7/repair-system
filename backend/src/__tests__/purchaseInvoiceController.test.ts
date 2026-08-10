@@ -4,8 +4,10 @@ import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
+    // The counter lives on the workspace row now, so numbering is an update
+    // rather than a count.
+    workspace: { update: jest.fn() },
     purchaseInvoice: {
-      count: jest.fn(),
       create: jest.fn(),
       delete: jest.fn(),
     },
@@ -40,6 +42,7 @@ const db = prisma as unknown as {
   purchaseInvoice: Record<string, jest.Mock>;
   item: Record<string, jest.Mock>;
   __tx: {
+    workspace: Record<string, jest.Mock>;
     purchaseInvoice: Record<string, jest.Mock>;
     purchaseInvoiceItem: Record<string, jest.Mock>;
     item: Record<string, jest.Mock>;
@@ -220,7 +223,7 @@ describe("purchaseInvoiceController.create", () => {
   };
 
   beforeEach(() => {
-    db.__tx.purchaseInvoice.count.mockResolvedValue(0);
+    db.__tx.workspace.update.mockResolvedValue({ purchaseSeq: 1 });
     db.__tx.purchaseInvoice.create.mockResolvedValue(invoiceRow());
   });
 
@@ -265,7 +268,7 @@ describe("purchaseInvoiceController.create", () => {
     });
   });
 
-  it("counts only its own workspace's invoices when numbering", async () => {
+  it("takes its number from its own workspace's counter", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
       currentStock: 0,
@@ -274,11 +277,17 @@ describe("purchaseInvoiceController.create", () => {
 
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
-    // Numbering is per workspace, so one shop's invoices can't advance
-    // another's counter.
-    expect(db.__tx.purchaseInvoice.count.mock.calls[0][0].where).toMatchObject({
-      workspaceId: WORKSPACE_ID,
+    // increment rather than a count: two concurrent requests could both read
+    // the same count, while `seq = seq + 1` takes a row lock and hands each
+    // caller a number nobody else can get.
+    expect(db.__tx.workspace.update).toHaveBeenCalledWith({
+      where: { id: WORKSPACE_ID },
+      data: { purchaseSeq: { increment: 1 } },
+      select: { purchaseSeq: true },
     });
+    expect(
+      db.__tx.purchaseInvoice.create.mock.calls[0][0].data.invoiceNumber,
+    ).toBe("PUR-0001");
   });
 
   it("marks a part payment as partial", async () => {

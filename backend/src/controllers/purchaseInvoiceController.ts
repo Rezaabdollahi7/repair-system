@@ -4,7 +4,7 @@ import type { Prisma, PurchaseInvoice } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
-import { buildInvoiceNumber, todayRange } from "../utils/invoiceNumber";
+import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { paymentStatusFor } from "../utils/payment";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
@@ -157,14 +157,10 @@ export const create = async (req: Request, res: Response) => {
     // every ledger entry have to land together, or stock and history drift
     // apart.
     const invoice = await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      const todayCount = await tx.purchaseInvoice.count({
-        where: { invoiceDate: todayRange(), workspaceId },
-      });
-
       const created = await tx.purchaseInvoice.create({
         data: {
           workspaceId,
-          invoiceNumber: buildInvoiceNumber("PUR", todayCount),
+          invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "purchase"),
           supplierName: body.supplier_name,
           invoiceDate: body.invoice_date ?? new Date(),
           totalAmount,

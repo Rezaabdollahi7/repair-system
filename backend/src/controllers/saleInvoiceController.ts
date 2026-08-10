@@ -4,7 +4,7 @@ import type { Prisma, SaleInvoice } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
-import { buildInvoiceNumber, todayRange } from "../utils/invoiceNumber";
+import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { paymentStatusFor } from "../utils/payment";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
@@ -355,14 +355,10 @@ export const create = async (req: Request, res: Response) => {
       const stockError = await assertStockAvailable(tx, lines, workspaceId);
       if (stockError) return { error: stockError };
 
-      const todayCount = await tx.saleInvoice.count({
-        where: { invoiceDate: todayRange(), workspaceId },
-      });
-
       const invoice = await tx.saleInvoice.create({
         data: {
           workspaceId,
-          invoiceNumber: buildInvoiceNumber("SAL", todayCount),
+          invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "sale"),
           customerId: body.customer_id ?? null,
           customerName: body.customer_name,
           customerPhone: body.customer_phone,

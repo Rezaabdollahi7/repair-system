@@ -66,6 +66,10 @@ Key entities:
 - **Item** — inventory good with SKU, name, category, unit, minimum stock threshold, opening stock.
 - **Invoices** — three kinds (purchase, sale, repair), each with date, description, line items,
   and payment status.
+  - **Invoice numbers** are `PUR-0001`, `SAL-0001`, `REP-0001` — a fixed prefix
+    per kind plus a counter held on the workspace row and incremented inside
+    the invoice's transaction. Per-workspace, gap-free, and safe under
+    concurrency. `settings.invoice_prefix` is left in place but unused (9.6).
 - **Reports** — low-stock report (items below minimum threshold), profit & loss report
   (sales, purchases, net, margin).
 

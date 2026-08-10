@@ -4,8 +4,8 @@ import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
+    workspace: { update: jest.fn() },
     saleInvoice: {
-      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -25,6 +25,8 @@ jest.mock("../lib/prisma", () => {
     __esModule: true,
     default: {
       saleInvoice: {
+        // Pagination's total, not invoice numbering — that moved to the
+        // workspace counter.
         count: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
@@ -44,6 +46,7 @@ const db = prisma as unknown as {
   saleInvoice: Record<string, jest.Mock>;
 
   __tx: {
+    workspace: Record<string, jest.Mock>;
     saleInvoice: Record<string, jest.Mock>;
     saleInvoiceItem: Record<string, jest.Mock>;
     item: Record<string, jest.Mock>;
@@ -347,7 +350,7 @@ describe("saleInvoiceController.create", () => {
   };
 
   beforeEach(() => {
-    db.__tx.saleInvoice.count.mockResolvedValue(0);
+    db.__tx.workspace.update.mockResolvedValue({ saleSeq: 1 });
     db.__tx.saleInvoice.create.mockResolvedValue(invoiceRow());
   });
 
@@ -381,7 +384,7 @@ describe("saleInvoiceController.create", () => {
     });
   });
 
-  it("counts only its own workspace's invoices when numbering", async () => {
+  it("takes its number from its own workspace's counter", async () => {
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
       currentStock: 10,
@@ -390,11 +393,14 @@ describe("saleInvoiceController.create", () => {
 
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
-    // Numbering is per workspace, so one shop's sales can't advance
-    // another's counter.
-    expect(db.__tx.saleInvoice.count.mock.calls[0][0].where).toMatchObject({
-      workspaceId: WORKSPACE_ID,
+    expect(db.__tx.workspace.update).toHaveBeenCalledWith({
+      where: { id: WORKSPACE_ID },
+      data: { saleSeq: { increment: 1 } },
+      select: { saleSeq: true },
     });
+    expect(db.__tx.saleInvoice.create.mock.calls[0][0].data.invoiceNumber).toBe(
+      "SAL-0001",
+    );
   });
 
   it("links the ledger entry to the invoice", async () => {

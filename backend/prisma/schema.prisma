@@ -50,10 +50,19 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // One expiresAt covers both the trial and a paid period: the question
+// One expiresAt covers both the trial and a paid period: the question
   // asked of it is always "may this workspace still be written to".
   status    WorkspaceStatus @default(trial)
   expiresAt DateTime?       @map("expires_at")
+
+  // Invoice numbering, one counter per kind. Held here rather than derived
+  // from COUNT(*): counting reads a value two concurrent requests can both
+  // see, while `seq = seq + 1` takes a row lock and hands each caller a
+  // different number. Incremented inside the invoice's own transaction, so a
+  // rollback returns the number rather than leaving a gap in the books.
+  purchaseSeq Int @default(0) @map("purchase_seq")
+  saleSeq     Int @default(0) @map("sale_seq")
+  repairSeq   Int @default(0) @map("repair_seq")
 
   users                 User[]
   customers             Customer[]

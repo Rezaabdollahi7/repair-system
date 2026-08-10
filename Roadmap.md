@@ -45,7 +45,7 @@ Goal: introduce `Workspace` as a first-class concept and isolate all tenant data
 - [x] 2.5 Update every controller to scope queries by the authenticated user's `workspaceId` (belt-and-suspenders alongside RLS)
 - [x] 2.6 Add composite indexes leading with `workspaceId` on hot tables (Device, Invoices) for query performance at the ~500 tenants / ~1,000 devices each scale
 - [x] 2.7 Write unit tests confirming cross-tenant data access is impossible (e.g. workspace A's token cannot read workspace B's devices)
-- [ ] 2.8 Unify invoice numbering across all three invoice types, with the counter held on the Workspace row rather than derived from COUNT — atomic, per-workspace, and free of the race the current daily count has. Prefix comes from settings, as repair invoices already do. (Moved from 1.7: it needs Workspace to exist first.)
+- [x] 2.8 Unify invoice numbering across all three invoice types, with the counter held on the Workspace row rather than derived from COUNT — atomic, per-workspace, and free of the race the current daily count has. Prefix comes from settings, as repair invoices already do. (Moved from 1.7: it needs Workspace to exist first.)
 
 ## Phase 3 — Auth Rework (Sign-up, Login, Sessions)
 
@@ -125,6 +125,8 @@ so a screen that breaks has one obvious cause rather than three.
 - [ ] 9.2 Move the profit summary onto the dashboard and retire the profit report page, where it currently goes unseen
 - [ ] 9.3 Let the purchase invoice form create a complete item inline. It creates a reduced one today, so the same catalogue has two entry points with different results
 - [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price. It currently returns the stock but leaves the average untouched, so it drifts — a weighted average can't be reversed from the invoice alone. Either recompute from that item's full purchase history, or stop allowing deletion and record a return invoice instead, which is what accounting practice would do.
+- [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement, column choice and print styling, replacing the pile of `sale_invoice_show_*` booleans in settings. Numbering is deliberately not part of this — a number is accounting data and should stay boring; this is about what the customer actually sees
+- [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8 fixed the prefixes per invoice kind. Touches the schema, the settings form and the response shape, so it belongs with the other frontend work
 
 ---
 

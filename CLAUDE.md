@@ -150,6 +150,23 @@ business features**. Payment integration is the last phase and is explicitly out
   `requestContext` middleware and filled in by `authenticate` once the token
   verifies. Controllers are unchanged by this; the client extension reads it.
 
+- **Sign-up (task 3.1)** takes a phone, a password and a workspace name —
+  nothing else. `fullName` defaults to "مدیر" and is edited later from the
+  personnel page; using the shop's name would leave a row in the personnel
+  list that reads as a person. The workspace comes from
+  `app_create_workspace`, the second and last SECURITY DEFINER aperture;
+  the owner, settings row and default services that follow are written under
+  the policies via `populateWorkspace`, which `prisma/seed.ts` also calls so
+  a seeded workspace and a registered one are furnished identically.
+- **Username is an Iranian mobile number**, eleven digits starting 09.
+  Normalised identically by sign-up and login (Persian and Arabic-Indic
+  digits, separators, `+98`/`0098`), so one number is one account however it
+  was typed. Landlines are excluded because the username doubles as the SMS
+  channel planned in 8.6.
+- Sign-up shares the login rate limiter. Until SMS verification exists, that
+  is the only thing between an open endpoint and unlimited tenants.
+  
+
 ### Subscriptions (plan, not yet implemented)
 
 - Free trial: **1 month, no feature restrictions**.

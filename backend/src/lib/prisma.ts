@@ -102,4 +102,37 @@ export function runInWorkspaceTransaction<T>(
   });
 }
 
+/**
+ * Creates a workspace and runs the rest of sign-up inside its context.
+ *
+ * The workspace itself has to come from app_create_workspace: the
+ * application role has no INSERT on workspaces, deliberately, because
+ * creating a tenant is not an ordinary request. Everything after it is
+ * ordinary tenant data, so the context is set to the new id and the callback
+ * writes through the transaction client like any other handler would — under
+ * the policies, not around them.
+ *
+ * One transaction throughout: a workspace that exists with no user in it
+ * cannot be signed into and cannot be found, so a half-finished sign-up
+ * would leave an unreachable row behind.
+ */
+export async function runInNewWorkspaceTransaction<T>(
+  name: string,
+  fn: (tx: Prisma.TransactionClient, workspaceId: number) => Promise<T>,
+): Promise<T> {
+  return basePrisma.$transaction(async (tx) => {
+    const [created] = await tx.$queryRaw<{ app_create_workspace: number }[]>`
+      SELECT app_create_workspace(${name})
+    `;
+
+    const workspaceId = created.app_create_workspace;
+
+    await tx.$executeRaw`
+      SELECT set_config('app.workspace_id', ${String(workspaceId)}, TRUE)
+    `;
+
+    return fn(tx, workspaceId);
+  });
+}
+
 export default prisma;

@@ -1,29 +1,20 @@
 import "dotenv/config";
-import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { populateWorkspace } from "../src/utils/newWorkspace";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set.");
 }
 
+// The owner connection, not DATABASE_URL_APP: seeding writes the shared role
+// rows, which the application role is deliberately not allowed to touch.
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
 
-// Everything below hangs off one workspace. Self-serve sign-up arrives in
-// phase 3; until then this is the only tenant, and it exists so the app has
-// something to run against locally.
 const DEFAULT_WORKSPACE = "کارگاه پیش‌فرض";
-
-const TRIAL_MONTHS = 1;
-
-function trialExpiry(): Date {
-  const expires = new Date();
-  expires.setMonth(expires.getMonth() + TRIAL_MONTHS);
-  return expires;
-}
 
 async function main() {
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
@@ -34,8 +25,18 @@ async function main() {
     );
   }
 
+  const adminUsername = process.env.SEED_ADMIN_USERNAME;
+  if (!adminUsername || !/^09\d{9}$/.test(adminUsername)) {
+    throw new Error(
+      "SEED_ADMIN_USERNAME must be an Iranian mobile number (09xxxxxxxxx). " +
+        "The username is a phone number since task 3.1, so the old " +
+        '"superadmin" value can no longer be signed in with.',
+    );
+  }
+
   // Roles are reference data shared by every workspace, so they're seeded
-  // once and carry no workspaceId.
+  // once and carry no workspaceId. They also have to exist before any
+  // workspace, since its owner needs one.
   const roles = [
     { name: "super_admin", label: "سوپر ادمین" },
     { name: "admin", label: "ادمین" },
@@ -50,80 +51,42 @@ async function main() {
     });
   }
 
-  const superAdminRole = await prisma.role.findUniqueOrThrow({
-    where: { name: "super_admin" },
-  });
-
-  // No natural key to upsert on — a workspace name isn't unique — so the
-  // first one is reused if it's already there.
+  // No natural key to upsert on — a workspace name isn't unique — so an
+  // existing one is left alone rather than duplicated on a re-seed.
   const existing = await prisma.workspace.findFirst({
     orderBy: { id: "asc" },
     select: { id: true },
   });
 
-  const workspace =
-    existing ??
-    (await prisma.workspace.create({
-      data: {
-        name: DEFAULT_WORKSPACE,
-        status: "trial",
-        expiresAt: trialExpiry(),
-      },
-      select: { id: true },
-    }));
-
-  await prisma.user.upsert({
-    where: { username: "superadmin" },
-    // Password is left alone on re-seed so an already-changed password isn't
-    // silently reset back to the env value.
-    update: {},
-    create: {
-      workspaceId: workspace.id,
-      fullName: "سوپر ادمین",
-      username: "superadmin",
-      password: await bcrypt.hash(adminPassword, 10),
-      roleId: superAdminRole.id,
-    },
-  });
-
-  await prisma.settings.upsert({
-    where: { workspaceId: workspace.id },
-    update: {},
-    create: {
-      workspaceId: workspace.id,
-      companyName: "تعمیرگاه",
-      defaultTaxRate: 0,
-      defaultWarrantyMonths: 3,
-      invoicePrefix: "INV-",
-    },
-  });
-
-  const services = [
-    { name: "دستمزد تعمیر", description: "هزینه تعمیر دستگاه" },
-    { name: "هزینه تست و عیب‌یابی", description: "بررسی اولیه دستگاه" },
-    { name: "هزینه نصب قطعه", description: "نصب قطعات روی برد" },
-    {
-      name: "هزینه برنامه‌ریزی",
-      description: "برنامه‌ریزی آی‌سی و میکروکنترلر",
-    },
-  ];
-
-  // Service names aren't unique, so upsert isn't available — seeded only
-  // when this workspace has none, matching what the old controller did.
-  const serviceCount = await prisma.service.count({
-    where: { workspaceId: workspace.id },
-  });
-
-  if (serviceCount === 0) {
-    await prisma.service.createMany({
-      data: services.map((service) => ({
-        ...service,
-        workspaceId: workspace.id,
-      })),
-    });
+  if (existing) {
+    console.log(`Seed complete. Workspace ${existing.id} already existed.`);
+    return;
   }
 
-  console.log(`Seed complete. Workspace id: ${workspace.id}`);
+  const workspaceId = await prisma.$transaction(async (tx) => {
+    // The same function sign-up calls, rather than a plain insert: the trial
+    // status and expiry are defined there, and a second definition here
+    // would drift from it the first time either changed.
+    const [created] = await tx.$queryRaw<{ app_create_workspace: number }[]>`
+      SELECT app_create_workspace(${DEFAULT_WORKSPACE})
+    `;
+
+    const id = created.app_create_workspace;
+
+    // Also the same helper sign-up uses, so a seeded workspace and a
+    // registered one are furnished identically.
+    await populateWorkspace(tx, id, {
+      workspaceName: DEFAULT_WORKSPACE,
+      username: adminUsername,
+      password: adminPassword,
+    });
+
+    return id;
+  });
+
+  console.log(
+    `Seed complete. Workspace ${workspaceId}, sign in as ${adminUsername}.`,
+  );
 }
 
 main()

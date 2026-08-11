@@ -2,7 +2,8 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import * as controller from "../controllers/authController";
-import prisma from "../lib/prisma";
+import prisma, { runInNewWorkspaceTransaction } from "../lib/prisma";
+import { populateWorkspace } from "../utils/newWorkspace";
 import {
   currentWorkspaceId,
   runWithRequestContext,
@@ -21,12 +22,27 @@ jest.mock("../lib/prisma", () => ({
       update: jest.fn(),
     },
   },
+  runInNewWorkspaceTransaction: jest.fn(),
+}));
+
+// Mocked separately from the controller: what a new workspace is furnished
+// with is its own concern, covered in newWorkspace.test.ts. These tests are
+// about what register does with the result.
+jest.mock("../utils/newWorkspace", () => ({
+  __esModule: true,
+  populateWorkspace: jest.fn(),
 }));
 
 const db = prisma as unknown as {
   $queryRaw: jest.Mock;
   user: Record<string, jest.Mock>;
 };
+
+const runInNewWorkspace = runInNewWorkspaceTransaction as unknown as jest.Mock;
+const populate = populateWorkspace as unknown as jest.Mock;
+
+/** A workspace id that is not WORKSPACE_ID, so a mix-up would be visible. */
+const NEW_WORKSPACE_ID = 7;
 
 function mockResponse() {
   const res = {} as Response & { status: jest.Mock; json: jest.Mock };
@@ -99,6 +115,108 @@ const credentials = { username: "superadmin", password: correctPassword };
 
 beforeEach(() => {
   jest.clearAllMocks();
+
+  // Runs the callback the way the real helper does: the workspace exists by
+  // then, so its id is handed to the callback rather than read from context.
+  runInNewWorkspace.mockImplementation(
+    (_name: string, fn: (tx: unknown, workspaceId: number) => unknown) =>
+      fn({}, NEW_WORKSPACE_ID),
+  );
+});
+
+describe("authController.register", () => {
+  const body = {
+    workspace_name: "تعمیرگاه رضا",
+    username: "09123456789",
+    password: "testpass123",
+  };
+
+  function ownerRow() {
+    return userRow({
+      id: 9,
+      workspaceId: NEW_WORKSPACE_ID,
+      fullName: "مدیر",
+      username: body.username,
+    });
+  }
+
+  it("creates the workspace and its owner in one call", async () => {
+    populate.mockResolvedValue(ownerRow());
+
+    const res = mockResponse();
+    await controller.register(mockRequest({ body }), res);
+
+    // The name goes to the helper, which passes it to app_create_workspace —
+    // the application role has no INSERT on workspaces of its own.
+    expect(runInNewWorkspace).toHaveBeenCalledWith(
+      body.workspace_name,
+      expect.any(Function),
+    );
+    expect(populate).toHaveBeenCalledWith({}, NEW_WORKSPACE_ID, {
+      workspaceName: body.workspace_name,
+      username: body.username,
+      password: body.password,
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it("signs the new owner in rather than sending them to the login form", async () => {
+    populate.mockResolvedValue(ownerRow());
+
+    const res = mockResponse();
+    await controller.register(mockRequest({ body }), res);
+
+    const { token } = res.json.mock.calls[0][0];
+    const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
+
+    expect(payload).toMatchObject({
+      id: 9,
+      workspaceId: NEW_WORKSPACE_ID,
+      username: body.username,
+      role: "super_admin",
+    });
+  });
+
+  it("never returns the password hash", async () => {
+    populate.mockResolvedValue(ownerRow());
+
+    const res = mockResponse();
+    await controller.register(mockRequest({ body }), res);
+
+    const { user } = res.json.mock.calls[0][0];
+    expect(user).not.toHaveProperty("password");
+    expect(user).toMatchObject({
+      workspace_id: NEW_WORKSPACE_ID,
+      username: body.username,
+      full_name: "مدیر",
+    });
+  });
+
+  it("reports an already-registered phone as 409, not 500", async () => {
+    // The number belongs to whoever is being told, so this reveals nothing
+    // they don't already know — unlike login, where the same specificity
+    // would enumerate accounts.
+    populate.mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
+    );
+
+    const res = mockResponse();
+    await controller.register(mockRequest({ body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "این شماره موبایل قبلاً ثبت شده است",
+    });
+  });
+
+  it("lets any other failure surface as 500", async () => {
+    populate.mockRejectedValue(new Error("connection lost"));
+
+    const res = mockResponse();
+    await controller.register(mockRequest({ body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
 });
 
 describe("authController.login", () => {

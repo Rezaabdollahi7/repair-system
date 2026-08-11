@@ -73,6 +73,9 @@ const loginLimiter = rateLimit({
 });
 
 app.use("/api/auth/login", loginLimiter);
+// Sign-up gets the same tight limit: until SMS verification exists (8.6),
+// nothing else stands between an open endpoint and unlimited tenants.
+app.use("/api/auth/register", loginLimiter);
 app.use("/api", apiLimiter);
 app.use("/api", routes);
 

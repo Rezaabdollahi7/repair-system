@@ -1,14 +1,19 @@
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import prisma from "../lib/prisma";
+import prisma, { runInNewWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { JWT_SECRET } from "../middleware/auth";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
-import { errorMessage } from "../utils/errors";
+import { errorMessage, isUniqueConstraintError } from "../utils/errors";
+import { populateWorkspace } from "../utils/newWorkspace";
 import { setContextWorkspaceId } from "../lib/workspaceContext";
-import type { ChangePasswordBody, LoginBody } from "../schemas/auth";
+import type {
+  ChangePasswordBody,
+  LoginBody,
+  RegisterBody,
+} from "../schemas/auth";
 
 // Includes the password hash because login has to compare against it. Every
 // response goes through toUserResponse, which drops it again.
@@ -51,6 +56,64 @@ function toUserResponse(user: UserWithRole) {
     role_label: user.role.label,
   };
 }
+
+/**
+ * Token shape gains workspaceId here rather than in phase 3's later tasks:
+ * every tenant-scoped query needs it, and reading it from the database on
+ * each request is exactly the round-trip the design set out to avoid.
+ */
+function issueToken(user: UserWithRole): string {
+  return jwt.sign(
+    {
+      id: user.id,
+      workspaceId: user.workspaceId,
+      username: user.username,
+      role: user.role.name,
+      isActive: user.isActive,
+    },
+    JWT_SECRET,
+    { expiresIn: "72h" },
+  );
+}
+
+// POST /api/auth/register
+export const register = async (req: Request, res: Response) => {
+  try {
+    const body = (req as ValidatedRequest).valid.body as RegisterBody;
+
+    // The workspace comes from app_create_workspace, which the helper calls:
+    // the application role has no INSERT on workspaces, because creating a
+    // tenant is not an ordinary request. Everything inside the callback is
+    // ordinary tenant data and is written under the policies.
+    const owner = await runInNewWorkspaceTransaction(
+      body.workspace_name,
+      (tx, workspaceId) =>
+        populateWorkspace(tx, workspaceId, {
+          workspaceName: body.workspace_name,
+          username: body.username,
+          password: body.password,
+        }),
+    );
+
+    // Signed in straight away rather than bounced to the login form: the
+    // credentials were just proven by having been chosen.
+    res.status(201).json({
+      token: issueToken(owner),
+      user: toUserResponse(owner),
+    });
+  } catch (error) {
+    // Username is unique platform-wide, so this is a real person being told
+    // something true — not a leak. The number is their own.
+    if (isUniqueConstraintError(error)) {
+      return res
+        .status(409)
+        .json({ error: "این شماره موبایل قبلاً ثبت شده است" });
+    }
+
+    console.error("register error:", error);
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
 
 // POST /api/auth/login
 export const login = async (req: Request, res: Response) => {
@@ -98,17 +161,7 @@ export const login = async (req: Request, res: Response) => {
     // Token shape gains workspaceId here rather than in phase 3: every
     // tenant-scoped query needs it, and reading it from the database on each
     // request is exactly the round-trip the design set out to avoid.
-    const token = jwt.sign(
-      {
-        id: user.id,
-        workspaceId: user.workspaceId,
-        username: user.username,
-        role: user.role.name,
-        isActive: user.isActive,
-      },
-      JWT_SECRET,
-      { expiresIn: "72h" },
-    );
+    const token = issueToken(user);
 
     res.json({ token, user: toUserResponse(user) });
   } catch (error) {

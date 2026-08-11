@@ -52,8 +52,8 @@ Goal: introduce `Workspace` as a first-class concept and isolate all tenant data
 Goal: move from a single hardcoded/admin-seeded login to self-serve workspace creation and proper
 token handling.
 
-- [ ] 3.1 Build the "create workspace" sign-up flow: user submits phone number + password + workspace name → creates `Workspace` + `Personnel` record (role = super admin) in one transaction
-- [ ] 3.2 Enforce phone number uniqueness globally, since phone is the username. Workspace names are deliberately not unique — two shops in different cities may share one
+- [x] 3.1 Build the "create workspace" sign-up flow: user submits phone number + password + workspace name → creates `Workspace` + `Personnel` record (role = super admin) in one transaction
+- [x] 3.2 Enforce phone number uniqueness globally, since phone is the username. Workspace names are deliberately not unique — two shops in different cities may share one
 - [ ] 3.3 Implement access token (JWT, ~15 min expiry, payload: `userId`, `workspaceId`, `role`) issuance on login
 - [ ] 3.4 Implement `RefreshToken` model + issuance (~30 day expiry, stored server-side, revocable) delivered as httpOnly cookie
 - [ ] 3.5 Implement `/auth/refresh` endpoint (rotate refresh token, issue new access token)

@@ -6,6 +6,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
@@ -26,12 +27,17 @@ import { ModalProvider } from "./context/ModalContext";
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
+      {/* Router outside the provider: AuthContext navigates on logout and on
+          an expired session, and useNavigate only works inside one. */}
+      <BrowserRouter>
+        <AuthProvider>
           <ModalProvider>
             <Toaster position="top-center" />
             <Routes>
               <Route path="/login" element={<Login />} />
+              {/* Linked from dofixo.ir, so the marketing site can point
+                  straight at app.dofixo.ir/register. */}
+              <Route path="/register" element={<Register />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Layout />}>
@@ -41,7 +47,6 @@ function App() {
 
                   <Route element={<ProtectedRoute minRole="admin" />}>
                     <Route path="personnel" element={<PersonnelList />} />
-                    //!TODO : check
                     <Route path="items" element={<ItemList />} />
                     <Route
                       path="purchase-invoices"
@@ -70,8 +75,8 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </ModalProvider>
-        </BrowserRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

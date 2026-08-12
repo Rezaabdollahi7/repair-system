@@ -1,4 +1,5 @@
 import { loginSchema, registerSchema } from "../schemas/auth";
+import { personnelCreateSchema } from "../schemas/personnel";
 
 const validRegistration = {
   workspace_name: "تعمیرگاه رضا",
@@ -83,6 +84,45 @@ describe("registerSchema", () => {
     expect(
       registerSchema.safeParse({ ...validRegistration, workspace_name: " " })
         .success,
+    ).toBe(false);
+  });
+});
+
+describe("personnel and sign-up agree on what a username is", () => {
+  const validPersonnel = {
+    full_name: "علی محمدی",
+    username: "09123456789",
+    password: "testpass123",
+    role_id: 3,
+  };
+
+  it("normalises a technician's number the same way", () => {
+    const parsed = personnelCreateSchema.parse({
+      ...validPersonnel,
+      username: "۰۹۱۲۳۴۵۶۷۸۹",
+    });
+
+    expect(parsed.username).toBe("09123456789");
+  });
+
+  it("rejects a username login would not accept", () => {
+    // The bug this guards against is silent: the account is created, appears
+    // in the list, reads as active — and can be signed into by nobody,
+    // because loginSchema rejects the username it was given.
+    const result = personnelCreateSchema.safeParse({
+      ...validPersonnel,
+      username: "ali_tech",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("holds every account to the same password minimum", () => {
+    expect(
+      personnelCreateSchema.safeParse({
+        ...validPersonnel,
+        password: "short12",
+      }).success,
     ).toBe(false);
   });
 });

@@ -136,17 +136,21 @@ export default function PersonnelFormModal({
 
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">
-              نام کاربری <span className="text-danger">*</span>
+              شماره موبایل <span className="text-danger">*</span>
             </label>
             <input
-              type="text"
+              type="tel"
               name="username"
               value={form.username}
               onChange={handleChange}
               required
+              dir="ltr"
               className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary font-mono"
-              placeholder="مثال: ali_tech"
+              placeholder="09123456789"
             />
+            <p className="text-xs text-text-secondary mt-1">
+              این شماره، نام کاربری او برای ورود است
+            </p>
           </div>
 
           <div>
@@ -167,23 +171,25 @@ export default function PersonnelFormModal({
               onChange={handleChange}
               required={!isEdit}
               className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+              minLength={8}
               placeholder={
-                isEdit ? "برای تغییر رمز وارد کنید" : "حداقل ۶ کاراکتر"
+                isEdit ? "برای تغییر رمز وارد کنید" : "حداقل ۸ کاراکتر"
               }
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">
-              شماره تلفن
+              شماره تماس دیگر
             </label>
             <input
               type="text"
               name="phone"
               value={form.phone}
               onChange={handleChange}
+              dir="ltr"
               className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
-              placeholder="مثال: 09123456789"
+              placeholder="اختیاری — مثلاً تلفن ثابت"
             />
           </div>
 

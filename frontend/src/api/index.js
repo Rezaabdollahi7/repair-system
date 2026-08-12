@@ -1,32 +1,128 @@
 // src/api/index.js
 import axios from "axios";
 
+const baseURL =
+  (import.meta.env.VITE_API_URL || "http://localhost:5001") + "/api";
+
+// withCredentials so the refresh cookie travels: the API is a different
+// origin from the dev server, and cross-origin requests drop cookies unless
+// asked to carry them.
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL || "http://localhost:5001") + "/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
 });
 
+/**
+ * A second client for /auth/refresh, deliberately without the response
+ * interceptor below — otherwise a failing refresh would trigger a refresh,
+ * and so on.
+ */
+const authClient = axios.create({ baseURL, withCredentials: true });
+
+/**
+ * The access token lives here rather than in localStorage.
+ *
+ * It is gone on reload, which is the point: script that gets onto the page
+ * cannot read a variable it has no reference to, while localStorage is
+ * readable by anything running on the origin. The session survives reloads
+ * through the refresh cookie instead, which the page cannot read at all.
+ */
+let accessToken = null;
+
+export function setAccessToken(token) {
+  accessToken = token;
+}
+
+/**
+ * Called when the session is beyond saving, so AuthContext can clear its
+ * state and route to the login page. A callback rather than
+ * window.location.href, which throws away the whole React tree and any
+ * unsaved work along with it.
+ */
+let onSessionExpired = null;
+
+export function setSessionExpiredHandler(handler) {
+  onSessionExpired = handler;
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
 
+/** Endpoints where a 401 is the answer, not a signal to renew anything. */
+const AUTH_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/logout",
+];
+
+function isAuthPath(url = "") {
+  return AUTH_PATHS.some((path) => url.startsWith(path));
+}
+
+/**
+ * In flight while a refresh is happening, so ten requests that all expire at
+ * once wait on one renewal rather than starting ten.
+ *
+ * That matters more than it looks: each refresh rotates the token, so the
+ * second would present one the first had just revoked — which the server
+ * reads as a stolen copy and answers by ending every session the user has.
+ */
+let refreshInFlight = null;
+
+function refreshSession() {
+  if (!refreshInFlight) {
+    refreshInFlight = authClient
+      .post("/auth/refresh")
+      .then((res) => {
+        setAccessToken(res.data.token);
+        return res.data;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+
+  return refreshInFlight;
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+  async (error) => {
+    const original = error.config;
+
+    // _retried guards against a loop: if the renewed token is refused too,
+    // the second 401 falls straight through.
+    if (
+      error.response?.status !== 401 ||
+      !original ||
+      original._retried ||
+      isAuthPath(original.url)
+    ) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    original._retried = true;
+
+    try {
+      await refreshSession();
+      return api(original);
+    } catch {
+      // The refresh cookie is gone, expired, or was revoked. Nothing left to
+      // try — the caller has to sign in again.
+      setAccessToken(null);
+      onSessionExpired?.();
+      return Promise.reject(error);
+    }
   },
 );
+
+export { refreshSession };
 
 // Devices
 export const getDevices = (params) => api.get("/devices", { params });
@@ -62,6 +158,8 @@ export const deleteDeviceImage = (deviceId, imageId) =>
 
 // Auth
 export const login = (credentials) => api.post("/auth/login", credentials);
+export const register = (data) => api.post("/auth/register", data);
+export const logout = () => authClient.post("/auth/logout");
 export const getMe = () => api.get("/auth/me");
 export const changeMyPassword = (data) =>
   api.put("/auth/change-password", data);

@@ -43,7 +43,12 @@ function normalizePhone(value: unknown): unknown {
   return phone;
 }
 
-const phone = z.preprocess(
+/**
+ * Exported so personnel creation uses the identical rule. A user created
+ * with a username login would reject can be signed in as by nobody — the
+ * account exists, looks active, and simply never works.
+ */
+export const phoneSchema = z.preprocess(
   normalizePhone,
   z.string().regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: ۰۹۱۲۳۴۵۶۷۸۹)"),
 );
@@ -59,14 +64,14 @@ export const registerSchema = z.object({
     .trim()
     .min(2, "نام کارگاه باید حداقل ۲ کاراکتر باشد")
     .max(100, "نام کارگاه بیش از حد طولانی است"),
-  username: phone,
+  username: phoneSchema,
   password,
 });
 
 export type RegisterBody = z.infer<typeof registerSchema>;
 
 export const loginSchema = z.object({
-  username: phone,
+  username: phoneSchema,
   password: z.string().min(1, "نام کاربری و رمز عبور الزامی است"),
 });
 

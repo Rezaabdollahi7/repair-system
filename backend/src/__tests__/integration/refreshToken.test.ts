@@ -86,6 +86,8 @@ describe("POST /api/auth/refresh", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.token).toBeTruthy();
+    // Saves the client a follow-up /auth/me on every page load.
+    expect(res.body.user.username).toBe(signUp.username);
   });
 
   it("issues a token that works on the next request", async () => {

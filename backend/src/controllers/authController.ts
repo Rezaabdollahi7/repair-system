@@ -250,6 +250,13 @@ export const refresh = async (req: Request, res: Response) => {
       where: { userId: user.id, expiresAt: { lt: new Date() } },
     });
 
+    // The user comes back too: it was already read above to check isActive,
+    // and without it the client would have to call /auth/me right after every
+    // refresh just to learn who it is.
+    res.json({
+      token: await issueSession(res, user),
+      user: toUserResponse(user),
+    });
     res.json({ token: await issueSession(res, user) });
   } catch (error) {
     console.error("refresh error:", error);

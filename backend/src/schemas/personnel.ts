@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { phoneSchema } from "./auth";
 
 export const personnelListQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -10,11 +11,18 @@ export const personnelListQuerySchema = z.object({
 
 export type PersonnelListQuery = z.infer<typeof personnelListQuerySchema>;
 
-const password = z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد");
+// Eight, matching sign-up and change-password: one minimum nobody has to
+// look up.
+const password = z
+  .string()
+  .min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد")
+  .max(72, "رمز عبور بیش از حد طولانی است");
 
 export const personnelCreateSchema = z.object({
   full_name: z.string().trim().min(1, "نام الزامی است"),
-  username: z.string().trim().min(1, "نام کاربری الزامی است"),
+  // The same rule sign-up and login use. A username those two would reject
+  // makes an account that can never be signed into.
+  username: phoneSchema,
   password,
   phone: z
     .string()
@@ -30,7 +38,9 @@ export type PersonnelCreateBody = z.infer<typeof personnelCreateSchema>;
 export const personnelUpdateSchema = z
   .object({
     full_name: z.string().trim().min(1, "نام الزامی است"),
-    username: z.string().trim().min(1, "نام کاربری الزامی است"),
+    // The same rule sign-up and login use. A username those two would reject
+    // makes an account that can never be signed into.
+    username: phoneSchema,
     password,
     phone: z
       .string()

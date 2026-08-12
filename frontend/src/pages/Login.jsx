@@ -1,6 +1,6 @@
 // src/pages/Login.jsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { login } from "../api";
 import toast from "react-hot-toast";
@@ -38,7 +38,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">
-              نام کاربری
+              شماره موبایل
             </label>
             <input
               type="text"
@@ -47,7 +47,7 @@ export default function Login() {
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               className="w-full border border-border rounded-lg px-3 py-2 
                          focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
-              placeholder="superadmin"
+              placeholder="09123456789"
               dir="ltr"
             />
           </div>
@@ -76,6 +76,13 @@ export default function Login() {
             {loading ? "در حال ورود..." : "ورود"}
           </button>
         </form>
+
+        <p className="text-sm text-center text-text-secondary mt-6">
+          کارگاه ندارید؟{" "}
+          <Link to="/register" className="text-primary hover:underline">
+            ساخت کارگاه جدید
+          </Link>
+        </p>
       </div>
     </div>
   );

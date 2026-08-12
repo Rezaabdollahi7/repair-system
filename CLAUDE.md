@@ -162,6 +162,19 @@ business features**. Payment integration is the last phase and is explicitly out
   `requestContext` middleware and filled in by `authenticate` once the token
   verifies. Controllers are unchanged by this; the client extension reads it.
 
+- The frontend keeps the access token in a module variable in `src/api`, not
+  localStorage: script that gets onto the page cannot read a variable it has
+  no reference to. Reloads lose it and recover through `/auth/refresh`, which
+  returns the user alongside the new token so the page needs one round trip
+  rather than two. An Axios interceptor retries a 401 once after refreshing,
+  and concurrent 401s share a single refresh — each rotation revokes the
+  previous token, so parallel refreshes would look like a stolen copy and end
+  every session.
+- **Usernames are phone numbers everywhere a user is created**: sign-up and
+  personnel creation share `phoneSchema`. They didn't at first, and a
+  technician created with `ali_tech` was an account nobody could sign into.
+
+
 - **Sign-up (task 3.1)** takes a phone, a password and a workspace name —
   nothing else. `fullName` defaults to "مدیر" and is edited later from the
   personnel page; using the shop's name would leave a row in the personnel

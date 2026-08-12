@@ -58,8 +58,8 @@ token handling.
 - [x] 3.4 Implement `RefreshToken` model + issuance (~30 day expiry, stored server-side, revocable) delivered as httpOnly cookie
 - [x] 3.5 Implement `/auth/refresh` endpoint (rotate refresh token, issue new access token)
 - [x] 3.6 Implement logout (revoke refresh token)
-- [ ] 3.7 Update `auth.js` middleware to read the new JWT shape (`workspaceId`, `role`) and set request context accordingly
-- [ ] 3.8 Update `authorize.js` middleware / role checks to work per-workspace (super admin / admin / technician, scoped to the request's workspace)
+- [x] 3.7 Update `auth.js` middleware to read the new JWT shape (`workspaceId`, `role`) and set request context accordingly
+- [x] 3.8 Update `authorize.js` middleware / role checks to work per-workspace (super admin / admin / technician, scoped to the request's workspace)
 - [ ] 3.9 Update frontend `AuthContext` for the new login/refresh/logout flow and httpOnly cookie handling
 - [ ] 3.10 Build/update the sign-up page on the frontend (workspace name, phone, password)
 - [ ] 3.11 Update Personnel management UI so a workspace's super admin can create admin/technician users within their own workspace

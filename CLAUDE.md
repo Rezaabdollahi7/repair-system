@@ -34,7 +34,8 @@ frontend/   React SPA (Vite)
 - `src/routes/` — one file per resource; `index.js` is still CommonJS, so route
   files use `export =` rather than a default export
 - `src/schemas/` — Zod schemas, one file per resource plus `common.ts`
-- `src/middleware/` — `auth.js` (JWT), `authorize.js` (roles), `validate.ts` (Zod)
+- `src/middleware/` — `auth.ts` (JWT + request context), `authorize.ts`
+  (roles), `requestContext.ts` (opens the async context), `validate.ts` (Zod)
 - `src/lib/prisma.ts` — the shared Prisma client
 - `src/utils/` — `serialize.ts`, `workspace.ts`, `dateRange.ts`,
   `invoiceNumber.ts`, `invoiceTotals.ts`, `payment.ts`, `errors.ts`,

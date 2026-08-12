@@ -152,9 +152,9 @@ backend/
 └── tsconfig.build.json
 ```
 
-**چهار فایل `.js` باقی‌مانده** (بی‌ضرر، `allowJs` کامپایلشان می‌کند):
-`middleware/auth.js`، `middleware/authorize.js`، `routes/index.js`،
-`utils/persianToEnglish.js`. دو تای اول در فاز ۳ بازنویسی می‌شوند.
+**دو فایل `.js` باقی‌مانده** (بی‌ضرر، `allowJs` کامپایلشان می‌کند):
+`routes/index.js` و `utils/persianToEnglish.js`. اولی به‌خاطر `export =` در
+فایل‌های روت است و دومی مصرف‌کننده‌های ساده‌ای دارد؛ هیچ‌کدام در روادمپ تسکی ندارند.
 
 ### مهاجرت‌ها
 

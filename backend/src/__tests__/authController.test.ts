@@ -21,6 +21,12 @@ jest.mock("../lib/prisma", () => ({
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
     },
+    refreshToken: {
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
   },
   runInNewWorkspaceTransaction: jest.fn(),
 }));
@@ -36,6 +42,7 @@ jest.mock("../utils/newWorkspace", () => ({
 const db = prisma as unknown as {
   $queryRaw: jest.Mock;
   user: Record<string, jest.Mock>;
+  refreshToken: Record<string, jest.Mock>;
 };
 
 const runInNewWorkspace = runInNewWorkspaceTransaction as unknown as jest.Mock;
@@ -45,9 +52,16 @@ const populate = populateWorkspace as unknown as jest.Mock;
 const NEW_WORKSPACE_ID = 7;
 
 function mockResponse() {
-  const res = {} as Response & { status: jest.Mock; json: jest.Mock };
+  const res = {} as Response & {
+    status: jest.Mock;
+    json: jest.Mock;
+    cookie: jest.Mock;
+    clearCookie: jest.Mock;
+  };
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  res.cookie = jest.fn().mockReturnValue(res);
+  res.clearCookie = jest.fn().mockReturnValue(res);
   return res;
 }
 
@@ -56,12 +70,16 @@ const WORKSPACE_ID = 1;
 function mockRequest(
   valid: Record<string, unknown> = {},
   actor?: { id: number },
+  cookies: Record<string, string> = {},
 ) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
     // login runs before authentication, but me and changePassword read the
     // token's user — and every account belongs to a workspace.
     user: actor ? { ...actor, workspaceId: WORKSPACE_ID } : undefined,
+    // refresh and logout take their credential from an httpOnly cookie, not
+    // a header: script that got onto the page cannot read it.
+    cookies,
   } as unknown as Request;
 }
 
@@ -122,6 +140,11 @@ beforeEach(() => {
     (_name: string, fn: (tx: unknown, workspaceId: number) => unknown) =>
       fn({}, NEW_WORKSPACE_ID),
   );
+  // Every successful sign-in writes one of these.
+  db.refreshToken.create.mockResolvedValue({ id: 1 });
+  db.refreshToken.update.mockResolvedValue({ id: 1 });
+  db.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+  db.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
 });
 
 describe("authController.register", () => {
@@ -140,11 +163,24 @@ describe("authController.register", () => {
     });
   }
 
+  /**
+   * register publishes the new workspace into the async context so the
+   * refresh-token row can be written like ordinary tenant data — which needs
+   * a context to already be open, as the requestContext middleware does in
+   * production.
+   */
+  function register(req: Request) {
+    const res = mockResponse();
+    return runWithRequestContext(async () => {
+      await controller.register(req, res);
+      return res;
+    });
+  }
+
   it("creates the workspace and its owner in one call", async () => {
     populate.mockResolvedValue(ownerRow());
 
-    const res = mockResponse();
-    await controller.register(mockRequest({ body }), res);
+    const res = await register(mockRequest({ body }));
 
     // The name goes to the helper, which passes it to app_create_workspace —
     // the application role has no INSERT on workspaces of its own.
@@ -163,8 +199,7 @@ describe("authController.register", () => {
   it("signs the new owner in rather than sending them to the login form", async () => {
     populate.mockResolvedValue(ownerRow());
 
-    const res = mockResponse();
-    await controller.register(mockRequest({ body }), res);
+    const res = await register(mockRequest({ body }));
 
     const { token } = res.json.mock.calls[0][0];
     const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
@@ -180,8 +215,7 @@ describe("authController.register", () => {
   it("never returns the password hash", async () => {
     populate.mockResolvedValue(ownerRow());
 
-    const res = mockResponse();
-    await controller.register(mockRequest({ body }), res);
+    const res = await register(mockRequest({ body }));
 
     const { user } = res.json.mock.calls[0][0];
     expect(user).not.toHaveProperty("password");
@@ -200,8 +234,7 @@ describe("authController.register", () => {
       Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
     );
 
-    const res = mockResponse();
-    await controller.register(mockRequest({ body }), res);
+    const res = await register(mockRequest({ body }));
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({
@@ -212,8 +245,7 @@ describe("authController.register", () => {
   it("lets any other failure surface as 500", async () => {
     populate.mockRejectedValue(new Error("connection lost"));
 
-    const res = mockResponse();
-    await controller.register(mockRequest({ body }), res);
+    const res = await register(mockRequest({ body }));
 
     expect(res.status).toHaveBeenCalledWith(500);
   });
@@ -360,5 +392,184 @@ describe("authController.changePassword", () => {
     expect(res.json).toHaveBeenCalledWith({
       message: "رمز عبور با موفقیت تغییر کرد",
     });
+  });
+});
+
+describe("authController.refresh", () => {
+  const PRESENTED = "a-refresh-token";
+  const TOKEN_ROW_ID = 42;
+
+  /** What app_refresh_lookup returns — snake_case, as SQL gives it. */
+  function candidateRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: TOKEN_ROW_ID,
+      user_id: 1,
+      workspace_id: WORKSPACE_ID,
+      expires_at: new Date(Date.now() + 60_000),
+      revoked_at: null,
+      ...overrides,
+    };
+  }
+
+  function refresh(
+    cookies: Record<string, string> = { dofixo_refresh: PRESENTED },
+  ) {
+    const res = mockResponse();
+    return runWithRequestContext(async () => {
+      await controller.refresh(mockRequest({}, undefined, cookies), res);
+      return res;
+    });
+  }
+
+  it("rotates the token and hands back a fresh access token", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUnique.mockResolvedValue(userRow());
+
+    const res = await refresh();
+
+    // Marked rather than deleted: a stolen copy presented later has to read
+    // as revoked, not as unknown.
+    expect(db.refreshToken.update).toHaveBeenCalledWith({
+      where: { id: TOKEN_ROW_ID },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(db.refreshToken.create).toHaveBeenCalled();
+    expect(res.cookie).toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0]).toHaveProperty("token");
+  });
+
+  it("refuses a request with no cookie at all", async () => {
+    const res = await refresh({});
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown token and clears the cookie", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = await refresh();
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.clearCookie).toHaveBeenCalled();
+    expect(db.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("ends every session when a revoked token is presented again", async () => {
+    db.$queryRaw.mockResolvedValue([
+      candidateRow({ revoked_at: new Date(Date.now() - 1000) }),
+    ]);
+
+    const res = await refresh();
+
+    // The legitimate holder rotated this away, so whoever sent it kept an
+    // old copy. Which of the two is the thief is unknowable, so both are
+    // made to sign in again.
+    expect(db.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: 1, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(db.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses an expired token without ending other sessions", async () => {
+    db.$queryRaw.mockResolvedValue([
+      candidateRow({ expires_at: new Date(Date.now() - 1000) }),
+    ]);
+
+    const res = await refresh();
+
+    // Ageing out is ordinary, unlike a replay — nothing suspicious happened.
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses an account disabled since the token was issued", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUnique.mockResolvedValue(userRow({ isActive: false }));
+
+    const res = await refresh();
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(db.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("says the same thing however it failed", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+    const unknown = await refresh();
+
+    db.$queryRaw.mockResolvedValue([
+      candidateRow({ expires_at: new Date(Date.now() - 1000) }),
+    ]);
+    const expired = await refresh();
+
+    // Which failure it was is information about somebody else's session.
+    expect(unknown.json.mock.calls[0][0]).toEqual(
+      expired.json.mock.calls[0][0],
+    );
+  });
+
+  it("clears expired rows for this user while it is here", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUnique.mockResolvedValue(userRow());
+
+    await refresh();
+
+    // Without this the table only ever grows, and these rows can never be
+    // useful again.
+    expect(db.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 1, expiresAt: { lt: expect.any(Date) } },
+    });
+  });
+});
+
+describe("authController.logout", () => {
+  function logout(cookies: Record<string, string>) {
+    const res = mockResponse();
+    return runWithRequestContext(async () => {
+      await controller.logout(mockRequest({}, undefined, cookies), res);
+      return res;
+    });
+  }
+
+  it("revokes only the session it was given", async () => {
+    db.$queryRaw.mockResolvedValue([
+      {
+        id: 42,
+        user_id: 1,
+        workspace_id: WORKSPACE_ID,
+        expires_at: new Date(),
+        revoked_at: null,
+      },
+    ]);
+
+    const res = await logout({ dofixo_refresh: "a-refresh-token" });
+
+    // Signing out on a phone shouldn't sign the shop's desktop out too.
+    expect(db.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { id: 42 },
+    });
+    // Not marked revoked: that is reserved for rotation, where a replay means
+    // a copy is in circulation and every session has to end.
+    expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(res.clearCookie).toHaveBeenCalled();
+  });
+
+  it("succeeds even with no cookie", async () => {
+    const res = await logout({});
+
+    // The caller wanted to be logged out, and they are.
+    expect(res.clearCookie).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalledWith(500);
+  });
+
+  it("succeeds with a token that no longer exists", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = await logout({ dofixo_refresh: "stale" });
+
+    expect(res.clearCookie).toHaveBeenCalled();
+    expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 });

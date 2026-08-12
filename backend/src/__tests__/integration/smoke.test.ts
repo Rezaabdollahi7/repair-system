@@ -31,17 +31,32 @@ describe("integration plumbing", () => {
     const result = await prisma.$queryRaw<{ current_user: string }[]>`
       SELECT current_user
     `;
+
     const role = result[0]?.current_user;
 
     expect(role).toBe("dofixo_app");
   });
 
   it("has row-level security enabled on the test database", async () => {
-    const result = await owner.$queryRaw<{ count: bigint }[]>`
-      SELECT count(*) FROM pg_policies WHERE schemaname = 'public'
+    // Counted against the tables rather than pinned to a number: a hard 19
+    // has to be edited every time a model is added, and the edit is easy to
+    // make without checking whether the policy was actually written.
+    const result = await owner.$queryRaw<
+      {
+        tables: bigint;
+        policies: bigint;
+      }[]
+    >`
+      SELECT
+        (SELECT count(*) FROM information_schema.columns
+          WHERE table_schema = 'public' AND column_name = 'workspace_id')
+          AS tables,
+        (SELECT count(*) FROM pg_policies WHERE schemaname = 'public')
+          AS policies
     `;
 
-    expect(Number(result[0]?.count)).toBe(19);
+    // Every tenant-scoped table, plus workspaces itself.
+    expect(Number(result[0].policies)).toBe(Number(result[0].tables) + 1);
   });
 
   it("seeds two workspaces that can be told apart", async () => {
@@ -53,8 +68,14 @@ describe("a token reaches only its own workspace", () => {
   it("lists the caller's customers and nobody else's", async () => {
     await owner.customer.createMany({
       data: [
-        { workspaceId: workspaces.a.workspaceId, name: "مشتری الف" },
-        { workspaceId: workspaces.b.workspaceId, name: "مشتری ب" },
+        {
+          workspaceId: workspaces.a.workspaceId,
+          name: "مشتری الف",
+        },
+        {
+          workspaceId: workspaces.b.workspaceId,
+          name: "مشتری ب",
+        },
       ],
     });
 
@@ -66,4 +87,4 @@ describe("a token reaches only its own workspace", () => {
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].name).toBe("مشتری الف");
   });
-}); // ← فقط یک }); اینجا کافی است
+});

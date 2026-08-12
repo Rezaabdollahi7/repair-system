@@ -82,6 +82,7 @@ model Workspace {
   repairInvoicePayments RepairInvoicePayment[]
   settings              Settings?
   backups               Backup[]
+  refreshTokens         RefreshToken[]
 
   @@index([status])
   @@map("workspaces")
@@ -130,10 +131,38 @@ model User {
   repairInvoicesAssigned RepairInvoice[]        @relation("RepairInvoiceTechnician")
   repairInvoicePayments  RepairInvoicePayment[]
   backups                Backup[]
+  refreshTokens          RefreshToken[]
 
   @@index([workspaceId])
   @@index([roleId])
   @@map("users")
+}
+
+// Long-lived, revocable sessions. Separate from the access token because a
+// JWT cannot be taken back once issued: logging out, or noticing a stolen
+// session, has to change something the server checks.
+model RefreshToken {
+  id          Int       @id @default(autoincrement())
+  workspaceId Int       @map("workspace_id")
+  userId      Int       @map("user_id")
+  // SHA-256 of the token, never the token itself. A leaked database dump
+  // then contains nothing that can be replayed. Not bcrypt: this is a
+  // 32-byte random secret, not a human password, so there is no dictionary
+  // to defend against — and bcrypt would slow every single refresh.
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  // Kept rather than deleted on rotation: a revoked row being presented
+  // again is how a stolen token announces itself.
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  // Serves both "revoke every session this user has" and the expiry sweep.
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 // ── Customers & devices ──────────────────────────────────────

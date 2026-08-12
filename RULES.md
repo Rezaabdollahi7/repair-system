@@ -109,6 +109,12 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   `SELECT 1` in the health check and `app_login_lookup`, which exists
   precisely because no workspace is known yet.
 
+- Three SECURITY DEFINER functions exist and each is a named, deliberate hole
+  in RLS: `app_login_lookup`, `app_create_workspace`, `app_refresh_lookup`.
+  All three exist because the caller has no workspace context yet. Do not
+  widen one to avoid writing a fourth, and do not add a fourth without saying
+  in its COMMENT why no ordinary query could do the job.
+
 ## 8. Documentation upkeep
 
 - When a roadmap task is completed and approved, update `ROADMAP.md`: flip `[ ]` to `[x]`.

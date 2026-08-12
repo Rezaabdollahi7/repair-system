@@ -134,16 +134,27 @@ business features**. Payment integration is the last phase and is explicitly out
 
 ### Auth
 
-- Sign-up/login uses **username + password** for now. Username = the user's phone number
-  (unique). SMS-based verification (via Kavenegar) is planned but **not implemented yet** — no
-  Kavenegar account exists yet.
-- **Token strategy (decided):**
-  - **Access token (JWT)**, short-lived (~15 min), payload includes `userId`, `workspaceId`, `role`
-    so middleware can authorize without an extra DB round-trip.
-  - **Refresh token**, long-lived (~30 days), stored server-side in a `RefreshToken` table
-    (revocable), delivered to the client as an **httpOnly cookie** (not localStorage) to reduce
-    XSS risk.
-- Keep using bcryptjs for password hashing.
+- **Token strategy (implemented, tasks 3.3–3.6):**
+  - **Access token (JWT), 15 minutes**, payload `userId`, `workspaceId`,
+    `role`. Lives in the page's memory, never localStorage — gone on reload
+    and unreadable by injected script.
+  - **Refresh token, 30 days**, a 32-byte random secret rather than a JWT: a
+    JWT would invite verifying it without a database round-trip, which is
+    exactly the property a revocable credential must not have. Stored as a
+    SHA-256 hash (not bcrypt — a random secret has no dictionary to defend
+    against, and bcrypt would tax every refresh). Delivered as an httpOnly,
+    SameSite=Strict cookie scoped to `/api/auth`.
+  - **Rotation with replay detection:** each refresh revokes the presented
+    token and issues a new one. A _revoked_ token presented again means a
+    copy is in circulation, so every session that user has is ended.
+  - **Logout deletes** its row instead of revoking it. Ending your own
+    session carries no signal, and a stale tab retrying afterwards would
+    otherwise be read as theft and sign the shop's other devices out.
+  - Several concurrent sessions are allowed; each sign-in is its own row.
+  - Expired rows for that user are swept on each refresh.
+  - Deliberately not stored: IP and user-agent. They would only serve an
+    "active devices" screen that doesn't exist, and until it does they are
+    just personal data accumulating.
 
 - The workspace reaches the Prisma layer through an `AsyncLocalStorage`
   context (`src/lib/workspaceContext.ts`), opened per request by
@@ -165,7 +176,6 @@ business features**. Payment integration is the last phase and is explicitly out
   channel planned in 8.6.
 - Sign-up shares the login rate limiter. Until SMS verification exists, that
   is the only thing between an open endpoint and unlimited tenants.
-  
 
 ### Subscriptions (plan, not yet implemented)
 

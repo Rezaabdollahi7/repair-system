@@ -54,10 +54,10 @@ token handling.
 
 - [x] 3.1 Build the "create workspace" sign-up flow: user submits phone number + password + workspace name → creates `Workspace` + `Personnel` record (role = super admin) in one transaction
 - [x] 3.2 Enforce phone number uniqueness globally, since phone is the username. Workspace names are deliberately not unique — two shops in different cities may share one
-- [ ] 3.3 Implement access token (JWT, ~15 min expiry, payload: `userId`, `workspaceId`, `role`) issuance on login
-- [ ] 3.4 Implement `RefreshToken` model + issuance (~30 day expiry, stored server-side, revocable) delivered as httpOnly cookie
-- [ ] 3.5 Implement `/auth/refresh` endpoint (rotate refresh token, issue new access token)
-- [ ] 3.6 Implement logout (revoke refresh token)
+- [x] 3.3 Implement access token (JWT, ~15 min expiry, payload: `userId`, `workspaceId`, `role`) issuance on login
+- [x] 3.4 Implement `RefreshToken` model + issuance (~30 day expiry, stored server-side, revocable) delivered as httpOnly cookie
+- [x] 3.5 Implement `/auth/refresh` endpoint (rotate refresh token, issue new access token)
+- [x] 3.6 Implement logout (revoke refresh token)
 - [ ] 3.7 Update `auth.js` middleware to read the new JWT shape (`workspaceId`, `role`) and set request context accordingly
 - [ ] 3.8 Update `authorize.js` middleware / role checks to work per-workspace (super admin / admin / technician, scoped to the request's workspace)
 - [ ] 3.9 Update frontend `AuthContext` for the new login/refresh/logout flow and httpOnly cookie handling

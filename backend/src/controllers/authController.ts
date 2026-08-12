@@ -9,6 +9,14 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage, isUniqueConstraintError } from "../utils/errors";
 import { populateWorkspace } from "../utils/newWorkspace";
 import { setContextWorkspaceId } from "../lib/workspaceContext";
+import {
+  ACCESS_TOKEN_TTL,
+  REFRESH_COOKIE_NAME,
+  generateRefreshToken,
+  hashRefreshToken,
+  refreshCookieOptions,
+  refreshTokenExpiry,
+} from "../utils/refreshToken";
 import type {
   ChangePasswordBody,
   LoginBody,
@@ -58,11 +66,10 @@ function toUserResponse(user: UserWithRole) {
 }
 
 /**
- * Token shape gains workspaceId here rather than in phase 3's later tasks:
- * every tenant-scoped query needs it, and reading it from the database on
- * each request is exactly the round-trip the design set out to avoid.
+ * The short-lived half of the pair. Carries workspaceId so middleware can
+ * authorize without a database round-trip — the reason it exists at all.
  */
-function issueToken(user: UserWithRole): string {
+function issueAccessToken(user: UserWithRole): string {
   return jwt.sign(
     {
       id: user.id,
@@ -72,8 +79,43 @@ function issueToken(user: UserWithRole): string {
       isActive: user.isActive,
     },
     JWT_SECRET,
-    { expiresIn: "72h" },
+    { expiresIn: ACCESS_TOKEN_TTL },
   );
+}
+
+/**
+ * Starts a session: records a refresh token, hands it to the browser as an
+ * httpOnly cookie, and returns the access token for the response body.
+ *
+ * The two halves are stored differently on purpose. The access token lives
+ * in the page's memory, so it is gone on reload and never sits in
+ * localStorage where injected script could read it. The refresh token is a
+ * cookie the page cannot read at all, which is what makes a long-lived
+ * credential tolerable.
+ *
+ * Requires a workspace context — the row it writes is tenant data like any
+ * other.
+ */
+async function issueSession(
+  res: Response,
+  user: UserWithRole,
+): Promise<string> {
+  const token = generateRefreshToken();
+  const expiresAt = refreshTokenExpiry();
+
+  await prisma.refreshToken.create({
+    data: {
+      workspaceId: user.workspaceId,
+      userId: user.id,
+      // Only the hash: a leaked dump then holds nothing that can be replayed.
+      tokenHash: hashRefreshToken(token),
+      expiresAt,
+    },
+  });
+
+  res.cookie(REFRESH_COOKIE_NAME, token, refreshCookieOptions(expiresAt));
+
+  return issueAccessToken(user);
 }
 
 // POST /api/auth/register
@@ -95,10 +137,16 @@ export const register = async (req: Request, res: Response) => {
         }),
     );
 
+    // The helper set the workspace inside its transaction, which has now
+    // closed; the async context never learned about it. Publishing it here
+    // is what lets the refresh-token row below be written like ordinary
+    // tenant data.
+    setContextWorkspaceId(owner.workspaceId);
+
     // Signed in straight away rather than bounced to the login form: the
     // credentials were just proven by having been chosen.
     res.status(201).json({
-      token: issueToken(owner),
+      token: await issueSession(res, owner),
       user: toUserResponse(owner),
     });
   } catch (error) {
@@ -111,6 +159,133 @@ export const register = async (req: Request, res: Response) => {
     }
 
     console.error("register error:", error);
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+/** The shape app_refresh_lookup returns — snake_case, as SQL gives it. */
+interface RefreshCandidate {
+  id: number;
+  user_id: number;
+  workspace_id: number;
+  expires_at: Date;
+  revoked_at: Date | null;
+}
+
+/** Clears the cookie so a browser doesn't keep presenting a dead token. */
+function clearRefreshCookie(res: Response) {
+  res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/auth" });
+}
+
+// POST /api/auth/refresh
+export const refresh = async (req: Request, res: Response) => {
+  try {
+    const presented = req.cookies?.[REFRESH_COOKIE_NAME];
+
+    // One message for every failure below: which of them happened is
+    // information about somebody else's session.
+    const invalid = { error: "نشست معتبر نیست. دوباره وارد شوید" };
+
+    if (typeof presented !== "string" || presented.length === 0) {
+      return res.status(401).json(invalid);
+    }
+
+    // Through app_refresh_lookup, not the client: this endpoint is reached
+    // precisely when the access token has expired, so there is no workspace
+    // context for a policy to match against.
+    const [candidate] = await prisma.$queryRaw<RefreshCandidate[]>`
+      SELECT * FROM app_refresh_lookup(${hashRefreshToken(presented)})
+    `;
+
+    if (!candidate) {
+      clearRefreshCookie(res);
+      return res.status(401).json(invalid);
+    }
+
+    // Everything from here is this workspace's own data.
+    setContextWorkspaceId(candidate.workspace_id);
+
+    // A revoked token presented again means a copy is in circulation: the
+    // legitimate holder rotated it away, so whoever sent this one kept an
+    // old copy. Which of the two is the thief is unknowable, so every
+    // session that user has is ended and both are made to sign in again.
+    if (candidate.revoked_at !== null) {
+      await prisma.refreshToken.updateMany({
+        where: { userId: candidate.user_id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      clearRefreshCookie(res);
+      return res.status(401).json(invalid);
+    }
+
+    if (candidate.expires_at.getTime() <= Date.now()) {
+      clearRefreshCookie(res);
+      return res.status(401).json(invalid);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: candidate.user_id },
+      include: userWithRole,
+    });
+
+    // Re-checked rather than trusted: the account may have been disabled or
+    // deleted since this token was issued.
+    if (!user || !user.isActive) {
+      clearRefreshCookie(res);
+      return res.status(401).json(invalid);
+    }
+
+    // Rotation: this token is spent, and a replay of it is what triggers the
+    // revocation above. Marked rather than deleted, or a stolen copy would
+    // simply read as unknown.
+    await prisma.refreshToken.update({
+      where: { id: candidate.id },
+      data: { revokedAt: new Date() },
+    });
+
+    // Housekeeping while we're already here: without it the table only ever
+    // grows, and these rows can never be useful again.
+    await prisma.refreshToken.deleteMany({
+      where: { userId: user.id, expiresAt: { lt: new Date() } },
+    });
+
+    res.json({ token: await issueSession(res, user) });
+  } catch (error) {
+    console.error("refresh error:", error);
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+// POST /api/auth/logout
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const presented = req.cookies?.[REFRESH_COOKIE_NAME];
+
+    if (typeof presented === "string" && presented.length > 0) {
+      const [candidate] = await prisma.$queryRaw<RefreshCandidate[]>`
+        SELECT * FROM app_refresh_lookup(${hashRefreshToken(presented)})
+      `;
+
+      if (candidate) {
+        setContextWorkspaceId(candidate.workspace_id);
+
+        // Deleted rather than marked revoked, unlike rotation. A revoked row
+        // presented again is treated as a stolen copy and ends every session
+        // that user has — which is right after a rotation, but wrong here: a
+        // stale tab retrying after logout would sign the shop's desktop out
+        // too. Ending your own session carries no signal, so it leaves
+        // nothing behind to misread.
+        await prisma.refreshToken.deleteMany({ where: { id: candidate.id } });
+      }
+    }
+
+    // Always cleared and always 200: an unknown or already-dead token still
+    // leaves the caller logged out, which is what they asked for.
+    clearRefreshCookie(res);
+    res.json({ message: "خروج انجام شد" });
+  } catch (error) {
+    console.error("logout error:", error);
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -158,12 +333,10 @@ export const login = async (req: Request, res: Response) => {
       include: userWithRole,
     });
 
-    // Token shape gains workspaceId here rather than in phase 3: every
-    // tenant-scoped query needs it, and reading it from the database on each
-    // request is exactly the round-trip the design set out to avoid.
-    const token = issueToken(user);
-
-    res.json({ token, user: toUserResponse(user) });
+    res.json({
+      token: await issueSession(res, user),
+      user: toUserResponse(user),
+    });
   } catch (error) {
     console.error("login error:", error);
     res.status(500).json({ error: errorMessage(error) });

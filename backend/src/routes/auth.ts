@@ -12,6 +12,10 @@ const router = express.Router();
 
 router.post("/register", validate({ body: registerSchema }), ctrl.register);
 router.post("/login", validate({ body: loginSchema }), ctrl.login);
+// No authenticate on either: both are reached with an expired access token,
+// or none at all. The cookie is the credential.
+router.post("/refresh", ctrl.refresh);
+router.post("/logout", ctrl.logout);
 router.get("/me", authenticate, ctrl.me);
 router.put(
   "/change-password",

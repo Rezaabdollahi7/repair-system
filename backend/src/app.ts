@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -35,6 +36,9 @@ app.use(
   }),
 );
 app.use(express.json());
+// The refresh token arrives as an httpOnly cookie rather than in the body,
+// so it cannot be read by script that has got onto the page.
+app.use(cookieParser());
 
 // Ahead of every router: authenticate() writes the caller's workspace into
 // the context this opens, and the Prisma extension reads it from there.

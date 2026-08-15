@@ -229,8 +229,39 @@ business features**. Payment integration is the last phase and is explicitly out
 
 ### Infrastructure
 
-- **App server**: hosts backend + frontend (both from ParsPack, not yet provisioned).
-- **Database server**: separate host running PostgreSQL (ParsPack, not yet provisioned).
+- **One ParsPack VPS in Iran** runs everything: backend, frontend and Postgres,
+  as three containers with a named volume for the database. The frontend is
+  static files after build and costs nothing; Node spends most of its time
+  waiting on I/O; only Postgres really wants resources, and mostly as cache.
+  At ~500 workshops the whole load is a few requests per second.
+- **Not split across two hosts, deliberately.** The RLS design makes two round
+  trips per query (`set_config` plus the query itself), so a network hop
+  between app and database would multiply latency for no benefit at this
+  scale. Splitting later is a change of `DATABASE_URL`; splitting now is two
+  operating systems to patch and a private network to configure, for a
+  problem that doesn't exist yet.
+
+  ### Backups
+
+- `ops/backup-database.sh` runs from cron on the host, dumps Postgres through
+  `docker compose exec`, and pipes straight through gzip and age to
+  ArvanCloud. The plain dump never lands on disk, so an unencrypted copy of
+  every customer's data is never sitting in `/tmp`.
+- **Asymmetric encryption on purpose.** Only the age public key is on the
+  server; the private key lives in a password manager and one offline copy.
+  A server that has been broken into can write backups but not read them.
+- ⚠️ Losing the private key makes every backup permanently unreadable.
+- Retention lives in three folders — `daily`, `weekly`, `monthly` — pruned
+  independently, so a bug in one cannot delete the others. A single run may
+  remove at most five files, which turns a bad listing into a puzzle rather
+  than a catastrophe.
+- The VPS's own snapshots are not a substitute: crash-consistent rather than
+  application-consistent, all-or-nothing to restore, and no way to pull one
+  workspace out.
+- Recovery is `ops/restore-database.md`. It restores into a temporary
+  database first and checks the policy count and the `app_*` functions before
+  anything is switched over — a dump missing those would restore the data and
+  none of the isolation.
 - **Object storage**: ArvanCloud (not yet provisioned).
 - **Docker**: used for both development and production. Prefer docker-compose for local dev;
   production should also run containerized (a reverse proxy such as Nginx/Caddy is expected but

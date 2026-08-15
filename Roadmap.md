@@ -81,8 +81,9 @@ Split deliberately: platform durability is the operator's concern and lives
 outside the app; data export is a customer-facing feature scoped to one
 workspace.
 
-- [ ] 5.1 Check whether ParsPack's managed Postgres offers automated backups. If it does, configure and document it rather than building our own.
-- [ ] 5.2 (only if 5.1 says no) Scheduled `pg_dump` on the database server, compressed and encrypted, shipped to ArvanCloud. Runs as a cron on the host — deliberately not an app feature, so a broken app can't take the backups with it. Retention: 7 daily, 4 weekly, 3 monthly.
+- [x] 5.1 Check whether ParsPack's managed Postgres offers automated backups. If it does, configure and document it rather than building our own.
+- [x] 5.2 Scheduled `pg_dump` on the host, compressed and encrypted, shipped to ArvanCloud. Runs as a cron outside the containers — deliberately not an app feature, so a broken app can't take the backups with it. Retention: 7 daily, 4 weekly, 3 monthly.
+      The VPS plan's own automated snapshots do not replace this: a machine snapshot is crash-consistent rather than application-consistent, restoring one means restoring the whole server, and a single workspace cannot be pulled out of it — which is what 5.5 needs
 - [ ] 5.3 Per-workspace data export: customers, devices, items and invoices as an Excel workbook plus a zip of that workspace's device images. Generated on demand, scoped by workspaceId, never a SQL dump — a dump is unreadable to a workshop owner and risks leaking schema or other tenants' rows.
 - [ ] 5.4 Rework `BackupList.jsx` into an export page: request an export, see past exports, download. No restore button.
 - [ ] 5.5 Write an operator runbook for restoring a single workspace from a platform dump. A manual, support-mediated procedure rather than a feature — selectively replacing one tenant's rows in a shared schema while others are live is too dangerous to expose.
@@ -100,9 +101,9 @@ workspace.
 
 - [ ] 7.1 Write production `Dockerfile` for backend
 - [ ] 7.2 Write production `Dockerfile` for frontend (build + serve static, e.g. via Nginx)
-- [ ] 7.3 Write `docker-compose.prod.yml` (backend, frontend/reverse proxy, does NOT include Postgres — that's on the separate DB server)
+- [ ] 7.3 Write `docker-compose.prod.yml` — backend, frontend, reverse proxy **and Postgres**, on one host. Postgres gets its own named volume, and `shared_buffers` must be raised from the image default of 128MB, which wastes most of an 8GB machine
 - [ ] 7.4 Set up reverse proxy (Nginx or Caddy) with TLS for `app.dofixo.ir`
-- [ ] 7.5 Provision ParsPack app server and database server (manual step)
+- [ ] 7.5 Provision one ParsPack VPS (irVPS5-class: 4 vCPU, 8GB RAM, 100GB SSD), Iran location. Splitting the database onto its own host is deliberately deferred — it costs latency now and buys nothing until there is more than one app instance
 - [ ] 7.6 First manual deployment to production infrastructure
 - [ ] 7.7 (Later) Introduce a simple GitHub Actions workflow that runs the test suite on push — a first, minimal step into CI/CD, before considering automated deploys
 

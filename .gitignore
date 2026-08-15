@@ -13,7 +13,7 @@ package-lock.json
 
 # Backups
 backups/
-
+ops/backup.env
 #uploads
 backend/src/uploads/devices
 backend/src/uploads/settings

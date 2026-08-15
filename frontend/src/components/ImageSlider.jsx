@@ -5,7 +5,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-import { getImageUrl } from "../utils/helpers";
+
 
 export default function ImageSlider({ images, initialIndex = 0, onClose }) {
   const [current, setCurrent] = useState(initialIndex);
@@ -29,8 +29,6 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
   }, [prev, next, onClose]);
 
   if (!images || images.length === 0) return null;
-
-  const imgUrl = (filename) => getImageUrl("/uploads/devices/" + filename);
 
   return (
     <div
@@ -73,7 +71,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
 
         <img
           key={current}
-          src={imgUrl(images[current].filename)}
+          src={images[current].url}
           alt={`عکس ${current + 1}`}
           className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl animate-fade"
         />
@@ -113,7 +111,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
               }`}
             >
               <img
-                src={imgUrl(img.filename)}
+                src={img.url}
                 alt={`بند انگشتی ${i + 1}`}
                 className="w-16 h-12 object-cover"
               />

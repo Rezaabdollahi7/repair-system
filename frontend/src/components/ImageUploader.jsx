@@ -11,7 +11,6 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-import { getImageUrl } from "../utils/helpers";
 import ImageSlider from "./ImageSlider";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
@@ -190,7 +189,7 @@ export default function ImageUploader({
           {existingImages.map((img, i) => (
             <div key={`existing-${img.id}`} className="relative group">
               <img
-                src={getImageUrl("/uploads/devices/" + img.filename)}
+                src={img.url}
                 onClick={() => setSliderIndex(i)}
                 className="w-full h-28 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition"
               />

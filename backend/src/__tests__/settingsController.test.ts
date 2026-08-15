@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
+import sharp from "sharp";
 import * as controller from "../controllers/settingsController";
 import prisma from "../lib/prisma";
+import { deleteObject, putObject, signedUrlFor } from "../lib/storage";
 
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
@@ -9,10 +11,28 @@ jest.mock("../lib/prisma", () => ({
   },
 }));
 
-jest.mock("fs", () => ({ mkdirSync: jest.fn() }));
+jest.mock("sharp");
+
+jest.mock("../lib/storage", () => ({
+  __esModule: true,
+  putObject: jest.fn(),
+  deleteObject: jest.fn(),
+  signedUrlFor: jest.fn(),
+  // The real implementation, so a change to the key layout shows up here.
+  settingsImageKey: (workspaceId: number, filename: string) =>
+    `workspaces/${workspaceId}/settings/${filename}`,
+}));
 
 const db = prisma as unknown as { settings: Record<string, jest.Mock> };
 
+const storage = {
+  put: putObject as unknown as jest.Mock,
+  deleteOne: deleteObject as unknown as jest.Mock,
+  sign: signedUrlFor as unknown as jest.Mock,
+};
+
+const CONVERTED = Buffer.from("webp-bytes");
+const SIGNED = "https://signed.example/object?sig=x";
 function decimal(value: number) {
   return { toNumber: () => value };
 }
@@ -30,7 +50,7 @@ const WORKSPACE_ID = 1;
 
 function mockRequest(
   valid: Record<string, unknown> = {},
-  file?: { filename: string },
+  file?: { buffer: Buffer },
 ) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
@@ -76,8 +96,20 @@ function settingsRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Stands in for an uploaded file: multer holds it in memory now. */
+const uploadedFile = { buffer: Buffer.from("original") };
+
 beforeEach(() => {
   jest.clearAllMocks();
+  storage.put.mockResolvedValue(undefined);
+  storage.deleteOne.mockResolvedValue(undefined);
+  storage.sign.mockResolvedValue(SIGNED);
+  (sharp as unknown as jest.Mock).mockReturnValue({
+    webp: () => ({ toBuffer: jest.fn().mockResolvedValue(CONVERTED) }),
+  });
+  // uploadImage reads the row before writing, to remove the object it
+  // replaces.
+  db.settings.findUnique.mockResolvedValue({});
 });
 
 describe("settingsController.getSettings", () => {
@@ -124,6 +156,24 @@ describe("settingsController.getSettings", () => {
         sale_invoice_show_logo: true,
       }),
     );
+  });
+
+  it("signs a stored image key but not an old disk path", async () => {
+    db.settings.findUnique.mockResolvedValue(
+      settingsRow({
+        companyLogo: "workspaces/1/settings/logo.webp",
+        stampImage: "/uploads/settings/stamp-1.png",
+      }),
+    );
+
+    const res = mockResponse();
+    await controller.getSettings(mockRequest(), res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.company_logo).toBe(SIGNED);
+    // Signing an old path would produce a link to nothing, so it reads as a
+    // missing image instead.
+    expect(payload.stamp_image).toBeNull();
   });
 });
 
@@ -198,38 +248,86 @@ describe("settingsController.uploadImage", () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(400);
+    expect(storage.put).not.toHaveBeenCalled();
     expect(db.settings.update).not.toHaveBeenCalled();
   });
 
-  it("stores a logo against the company_logo column", async () => {
+  it("stores the object under the workspace's own prefix", async () => {
+    db.settings.update.mockResolvedValue(settingsRow());
+
+    await controller.uploadImage(
+      mockRequest({ params: { type: "logo" } }, uploadedFile),
+      mockResponse(),
+    );
+
+    // Object storage has no row-level security, so the workspace in the key
+    // is the only thing keeping one shop's objects out of another's reach.
+    const [key, body, contentType] = storage.put.mock.calls[0];
+    expect(key).toMatch(
+      new RegExp(`^workspaces/${WORKSPACE_ID}/settings/logo-.+\\.webp$`),
+    );
+    expect(body).toBe(CONVERTED);
+    expect(contentType).toBe("image/webp");
+  });
+
+  it("records the key against the column the type names", async () => {
+    db.settings.update.mockResolvedValue(settingsRow());
+
+    await controller.uploadImage(
+      mockRequest({ params: { type: "signature" } }, uploadedFile),
+      mockResponse(),
+    );
+
+    const { data, where } = db.settings.update.mock.calls[0][0];
+    expect(where).toEqual({ workspaceId: WORKSPACE_ID });
+    expect(data.signatureImage).toBe(storage.put.mock.calls[0][0]);
+  });
+
+  it("answers with a signed url, not the stored key", async () => {
     db.settings.update.mockResolvedValue(settingsRow());
 
     const res = mockResponse();
     await controller.uploadImage(
-      mockRequest({ params: { type: "logo" } }, { filename: "logo-1.png" }),
+      mockRequest({ params: { type: "logo" } }, uploadedFile),
       res,
     );
 
-    expect(db.settings.update).toHaveBeenCalledWith({
-      where: { workspaceId: WORKSPACE_ID },
-      data: { companyLogo: "/uploads/settings/logo-1.png" },
-    });
+    // The bucket is private: a key on its own is useless to the browser.
     expect(res.json).toHaveBeenCalledWith({
       message: "تصویر با موفقیت آپلود شد",
-      path: "/uploads/settings/logo-1.png",
+      path: SIGNED,
     });
   });
 
-  it("stores a signature against its own column", async () => {
+  it("removes the object it replaced", async () => {
+    db.settings.findUnique.mockResolvedValue({
+      companyLogo: "workspaces/1/settings/logo-old.webp",
+    });
     db.settings.update.mockResolvedValue(settingsRow());
 
     await controller.uploadImage(
-      mockRequest({ params: { type: "signature" } }, { filename: "sig-1.png" }),
+      mockRequest({ params: { type: "logo" } }, uploadedFile),
       mockResponse(),
     );
 
-    expect(db.settings.update.mock.calls[0][0].data).toEqual({
-      signatureImage: "/uploads/settings/sig-1.png",
+    // Without this every logo change leaves its predecessor behind forever.
+    expect(storage.deleteOne).toHaveBeenCalledWith(
+      "workspaces/1/settings/logo-old.webp",
+    );
+  });
+
+  it("leaves a pre-phase-4 disk path alone rather than trying to delete it", async () => {
+    db.settings.findUnique.mockResolvedValue({
+      companyLogo: "/uploads/settings/logo-1.png",
     });
+    db.settings.update.mockResolvedValue(settingsRow());
+
+    await controller.uploadImage(
+      mockRequest({ params: { type: "logo" } }, uploadedFile),
+      mockResponse(),
+    );
+
+    // Values written before phase 4 are local URL paths, not object keys.
+    expect(storage.deleteOne).not.toHaveBeenCalled();
   });
 });

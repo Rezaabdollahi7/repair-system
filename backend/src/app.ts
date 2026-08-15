@@ -3,7 +3,6 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import path from "path";
 import "dotenv/config";
 import prisma from "./lib/prisma";
 import routes from "./routes";
@@ -20,11 +19,9 @@ app.set("trust proxy", process.env.TRUST_PROXY === "1");
 
 app.use(
   helmet({
-    // /uploads serves device/settings images that the frontend <img> tags
-    // load directly. Helmet's default Cross-Origin-Resource-Policy
-    // ("same-origin") blocks that if the frontend is ever served from a
-    // different origin/CDN than the API. Revisit once object storage
-    // (roadmap phase 4) replaces local /uploads entirely.
+    // Still relaxed, though no longer for /uploads: the SPA and the API are
+    // separate origins in development (5173 and 5001), and the default
+    // "same-origin" policy stops the browser using the response at all.
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
@@ -43,7 +40,6 @@ app.use(cookieParser());
 // Ahead of every router: authenticate() writes the caller's workspace into
 // the context this opens, and the Prisma extension reads it from there.
 app.use(requestContext);
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // General ceiling for the whole API — generous enough that a normal SPA
 // session (dashboard load, list pagination, etc.) never gets near it. This

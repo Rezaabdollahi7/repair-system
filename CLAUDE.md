@@ -174,7 +174,6 @@ business features**. Payment integration is the last phase and is explicitly out
   personnel creation share `phoneSchema`. They didn't at first, and a
   technician created with `ali_tech` was an account nobody could sign into.
 
-
 - **Sign-up (task 3.1)** takes a phone, a password and a workspace name —
   nothing else. `fullName` defaults to "مدیر" and is edited later from the
   personnel page; using the shop's name would leave a row in the personnel
@@ -214,8 +213,19 @@ business features**. Payment integration is the last phase and is explicitly out
 
 ### Object storage
 
-- Photos (device images, settings/logo images) move from local disk (`backend/uploads/`) to an
-  **S3-compatible object storage** — **ArvanCloud Object Storage** (not yet provisioned).
+- Photos live in **ArvanCloud Object Storage**, a **private** bucket. The app
+  serves them as **presigned URLs valid for 15 minutes**, signed per request
+  after the row has been scoped by workspace — a public bucket would leave
+  the isolation built in phase 2 open from one side, since object storage has
+  no row-level security of its own.
+- Keys carry the tenant: `workspaces/{id}/devices/{deviceId}/{uuid}.webp` and
+  `workspaces/{id}/settings/{type}-{uuid}.webp`. That prefix and the
+  application's own check are the only things keeping one shop's objects out
+  of another's reach.
+- `src/lib/storage.ts` is the only module that knows the SDK. Controllers ask
+  it for keys and URLs.
+- Deletion failures are logged, never thrown: an orphaned object wastes a few
+  kilobytes, whereas a propagated error leaves a row nobody can remove.
 
 ### Infrastructure
 

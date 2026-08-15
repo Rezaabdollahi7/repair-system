@@ -3,6 +3,7 @@ import * as ctrl from "../controllers/settingsController";
 import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
+import { restoreWorkspaceContext } from "../lib/workspaceContext";
 import {
   settingsUpdateSchema,
   uploadTypeParamSchema,
@@ -31,6 +32,10 @@ router.post(
   authorize("super_admin"),
   validate({ params: uploadTypeParamSchema }),
   ctrl.upload.single("image"),
+  // After multer, not before: reading a multipart body through busboy
+  // detaches the request from the async context, so the workspace has to be
+  // put back before any query runs.
+  restoreWorkspaceContext,
   ctrl.uploadImage,
 );
 

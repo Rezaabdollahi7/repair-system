@@ -20,7 +20,6 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
-import { getImageUrl } from "../utils/helpers";
 
 const STATUS_MAP = {
   pending: { label: "در انتظار بررسی", color: "bg-warning-soft text-warning" },
@@ -284,9 +283,9 @@ export default function DeviceDetailModal({
                           className="group cursor-pointer"
                         >
                           <img
-                            src={getImageUrl(
-                              "/uploads/devices/" + img.filename,
-                            )}
+                            // Signed by the server: the bucket is private, so
+                            // the key alone would be useless here.
+                            src={img.url}
                             alt={img.filename}
                             className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-lg border border-border group-hover:border-primary group-hover:shadow-md transition-all"
                           />

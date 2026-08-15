@@ -522,6 +522,19 @@ describe("authController.refresh", () => {
       where: { userId: 1, expiresAt: { lt: expect.any(Date) } },
     });
   });
+
+  it("answers exactly once", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.user.findUnique.mockResolvedValue(userRow());
+
+    const res = await refresh();
+
+    // Two responses on one request throw ERR_HTTP_HEADERS_SENT, and issue
+    // two sessions where one was asked for. The second call is invisible to
+    // the client, so only the log says anything is wrong.
+    expect(res.json).toHaveBeenCalledTimes(1);
+    expect(db.refreshToken.create).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("authController.logout", () => {

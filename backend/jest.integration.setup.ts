@@ -23,3 +23,10 @@ process.env.RATE_LIMIT_LOGIN = "0";
 // Signed tokens are minted by the fixtures, so the secret only has to be
 // stable within a run.
 process.env.JWT_SECRET ??= "integration-test-secret";
+
+// Object storage is mocked in the unit tests, but lib/storage throws at
+// import time without these.
+process.env.S3_ENDPOINT ??= "https://s3.example.invalid";
+process.env.S3_BUCKET ??= "dofixo-test";
+process.env.S3_ACCESS_KEY ??= "test-key";
+process.env.S3_SECRET_KEY ??= "test-secret";

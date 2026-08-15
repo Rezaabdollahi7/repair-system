@@ -7,3 +7,9 @@ process.env.RATE_LIMIT_LOGIN = "10";
 // at import time without this.
 process.env.DATABASE_URL_APP ??=
   "postgresql://dofixo_app:test@127.0.0.1:5432/dofixo_test?schema=public";
+// Object storage is mocked in the unit tests, but lib/storage throws at
+// import time without these.
+process.env.S3_ENDPOINT ??= "https://s3.example.invalid";
+process.env.S3_BUCKET ??= "dofixo-test";
+process.env.S3_ACCESS_KEY ??= "test-key";
+process.env.S3_SECRET_KEY ??= "test-secret";

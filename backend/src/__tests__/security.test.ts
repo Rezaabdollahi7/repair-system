@@ -20,7 +20,7 @@ describe("security middleware", () => {
     expect(res.headers["x-dns-prefetch-control"]).toBe("off");
   });
 
-  it("allows cross-origin loading of uploaded images", async () => {
+  it("lets a browser on another origin use the response", async () => {
     // Overridden away from helmet's "same-origin" default — see app.ts.
     const res = await request(app).get("/api/health");
 

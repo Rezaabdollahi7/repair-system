@@ -1,22 +1,23 @@
 import { randomUUID } from "crypto";
-import fs from "fs";
-import path from "path";
 import { Request, Response } from "express";
 import multer from "multer";
 import sharp from "sharp";
 import prisma from "../lib/prisma";
+import {
+  deleteObject,
+  deleteObjects,
+  deviceImageKey,
+  putObject,
+  signedUrlFor,
+} from "../lib/storage";
 import { ValidatedRequest } from "../middleware/validate";
-import { serialize } from "../utils/serialize";
 import type { IdParam } from "../schemas/common";
 import type { ImageParams } from "../schemas/image";
 import { workspaceIdOf } from "../utils/workspace";
 
-export const DEVICE_UPLOADS_DIR = path.join(__dirname, "../uploads/devices");
-
-fs.mkdirSync(DEVICE_UPLOADS_DIR, { recursive: true });
-
-// memoryStorage because sharp reads the buffer directly — the raw upload never
-// needs to touch disk, only the converted webp does.
+// memoryStorage because sharp reads the buffer directly and the converted
+// result goes straight to object storage — nothing touches disk at any point
+// now, which is what makes a rebuilt container harmless.
 export const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
@@ -37,7 +38,9 @@ export const uploadImages = async (req: Request, res: Response) => {
     const workspaceId = workspaceIdOf(req);
 
     // findFirst rather than findUnique: the id alone would resolve a device
-    // belonging to another workspace.
+    // belonging to another workspace — and the workspace is what the object
+    // key is built from, so getting this wrong would write into someone
+    // else's prefix.
     const device = await prisma.device.findFirst({
       where: { id: deviceId, workspaceId },
       select: { id: true },
@@ -51,9 +54,7 @@ export const uploadImages = async (req: Request, res: Response) => {
     }
 
     // Names come from randomUUID rather than the row id, so no placeholder row
-    // has to be reserved first just to obtain a unique name. Two concurrent
-    // uploads can't collide, and a crash mid-upload leaves an orphaned file
-    // rather than a half-written database row.
+    // has to be reserved first just to obtain a unique name.
     const highest = await prisma.deviceImage.aggregate({
       where: { deviceId, workspaceId },
       _max: { sortOrder: true },
@@ -64,12 +65,15 @@ export const uploadImages = async (req: Request, res: Response) => {
 
     for (const file of files) {
       const filename = `${randomUUID()}.webp`;
-      const absolutePath = path.join(DEVICE_UPLOADS_DIR, filename);
+      const key = deviceImageKey(workspaceId, deviceId, filename);
 
+      let converted: Buffer;
       try {
         // Format conversion only — no resize, no rotate. quality 92 is
-        // visually lossless while cutting the file size noticeably.
-        await sharp(file.buffer).webp({ quality: 92 }).toFile(absolutePath);
+        // visually lossless while cutting the file size noticeably, which
+        // matters more now that every view costs bandwidth twice: once to
+        // upload, once for each viewer to fetch.
+        converted = await sharp(file.buffer).webp({ quality: 92 }).toBuffer();
       } catch (conversionError) {
         console.error(
           `خطا در تبدیل عکس ${file.originalname}:`,
@@ -78,16 +82,25 @@ export const uploadImages = async (req: Request, res: Response) => {
         continue;
       }
 
+      try {
+        await putObject(key, converted, "image/webp");
+      } catch (uploadError) {
+        // Skipped rather than aborting the batch: one failed object shouldn't
+        // discard the images that did upload. No row is written, so nothing
+        // points at an object that isn't there.
+        console.error(`خطا در آپلود ${file.originalname}:`, uploadError);
+        continue;
+      }
+
       const image = await prisma.deviceImage.create({
         data: {
           workspaceId,
           deviceId,
           filename,
-          // Stored relative to the uploads root rather than as an absolute
-          // path: the old value embedded the host's directory layout, which
-          // differs inside the container. Phase 4 replaces this with an
-          // object-storage key.
-          filepath: path.posix.join("devices", filename),
+          // The full object key, not a disk path. Read back and signed as-is
+          // rather than rebuilt from workspaceId and deviceId, so a later
+          // change to the key layout leaves existing images findable.
+          filepath: key,
           sortOrder: nextSortOrder,
         },
       });
@@ -99,6 +112,7 @@ export const uploadImages = async (req: Request, res: Response) => {
         device_id: image.deviceId,
         filename: image.filename,
         sort_order: image.sortOrder,
+        url: await signedUrlFor(key),
       });
     }
 
@@ -127,12 +141,26 @@ export const getImages = async (req: Request, res: Response) => {
       select: {
         id: true,
         filename: true,
+        filepath: true,
         sortOrder: true,
         createdAt: true,
       },
     });
 
-    res.json(serialize(images));
+    // Signed here rather than stored: the URL is a temporary credential, and
+    // the rows were already scoped by workspace, so nothing gets signed that
+    // the caller wasn't entitled to.
+    const withUrls = await Promise.all(
+      images.map(async (image) => ({
+        id: image.id,
+        filename: image.filename,
+        sort_order: image.sortOrder,
+        created_at: image.createdAt.toISOString(),
+        url: await signedUrlFor(image.filepath),
+      })),
+    );
+
+    res.json(withUrls);
   } catch (error) {
     console.error("Get images error:", error);
     res.status(500).json({ error: "خطا در دریافت عکس‌ها" });
@@ -150,15 +178,17 @@ export const deleteImage = async (req: Request, res: Response) => {
     // through it.
     const image = await prisma.deviceImage.findFirst({
       where: { id: imageId, deviceId, workspaceId: workspaceIdOf(req) },
-      select: { id: true, filename: true },
+      select: { id: true, filepath: true },
     });
 
     if (!image) {
       return res.status(404).json({ error: "عکس یافت نشد" });
     }
 
-    removeFile(image.filename);
-
+    // Object first, row second. The other order would risk a row pointing at
+    // an object that no longer exists, which shows up as a broken image; this
+    // order risks an orphaned object, which nobody sees.
+    await deleteObject(image.filepath);
     await prisma.deviceImage.delete({ where: { id: image.id } });
 
     res.json({ message: "عکس حذف شد" });
@@ -169,21 +199,7 @@ export const deleteImage = async (req: Request, res: Response) => {
 };
 
 /**
- * Deletes an image file from disk. A failure here is logged but not thrown:
- * an orphaned file wastes space, whereas propagating the error would leave the
- * user with a database row they can't remove and a broken image in the UI.
- */
-function removeFile(filename: string): void {
-  const absolutePath = path.join(DEVICE_UPLOADS_DIR, filename);
-  try {
-    fs.rmSync(absolutePath, { force: true });
-  } catch (error) {
-    console.error(`خطا در حذف فایل ${filename}:`, error);
-  }
-}
-
-/**
- * Removes every image file belonging to a device. Called before the device
+ * Removes every stored object belonging to a device. Called before the device
  * itself is deleted; the deviceImage rows are not removed here because the
  * schema's onDelete: Cascade already handles them.
  */
@@ -193,10 +209,8 @@ export const deleteDeviceImages = async (
 ): Promise<void> => {
   const images = await prisma.deviceImage.findMany({
     where: { deviceId, workspaceId },
-    select: { filename: true },
+    select: { filepath: true },
   });
 
-  for (const image of images) {
-    removeFile(image.filename);
-  }
+  await deleteObjects(images.map((image) => image.filepath));
 };

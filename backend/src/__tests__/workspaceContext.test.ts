@@ -1,5 +1,7 @@
+import type { NextFunction, Request, Response } from "express";
 import {
   currentWorkspaceId,
+  restoreWorkspaceContext,
   runWithRequestContext,
   setContextWorkspaceId,
 } from "../lib/workspaceContext";
@@ -56,6 +58,68 @@ describe("workspaceContext", () => {
     await runWithRequestContext(async () => {
       setContextWorkspaceId(3);
     });
+
+    expect(currentWorkspaceId()).toBeUndefined();
+  });
+});
+
+describe("restoreWorkspaceContext", () => {
+  function requestWith(workspaceId?: number) {
+    return { user: workspaceId ? { workspaceId } : undefined } as Request;
+  }
+
+  /**
+   * Stands in for multer: busboy hands control back from a stream event,
+   * which AsyncLocalStorage does not follow. Everything after it runs with no
+   * store at all — not an empty one, none.
+   */
+  function afterAStreamEvent(fn: () => void) {
+    return new Promise<void>((resolve) => {
+      setImmediate(() => {
+        fn();
+        resolve();
+      });
+    });
+  }
+
+  it("gives back a workspace where multer took the context away", async () => {
+    let seen: number | undefined = -1;
+
+    await runWithRequestContext(async () => {
+      setContextWorkspaceId(5);
+
+      await afterAStreamEvent(() => {
+        const next = (() => {
+          seen = currentWorkspaceId();
+        }) as NextFunction;
+
+        restoreWorkspaceContext(requestWith(5), {} as Response, next);
+      });
+    });
+
+    expect(seen).toBe(5);
+  });
+
+  it("leaves the workspace unset when the request has no user", async () => {
+    let seen: number | undefined = -1;
+
+    const next = (() => {
+      seen = currentWorkspaceId();
+    }) as NextFunction;
+
+    restoreWorkspaceContext(requestWith(), {} as Response, next);
+
+    // Not a silent pass: the first query then throws, which is the right
+    // outcome for a request that never authenticated.
+    expect(seen).toBeUndefined();
+  });
+
+  it("closes its context when the handler returns", () => {
+    restoreWorkspaceContext(
+      requestWith(5),
+      {} as Response,
+      (() => {}) as NextFunction,
+    );
 
     expect(currentWorkspaceId()).toBeUndefined();
   });

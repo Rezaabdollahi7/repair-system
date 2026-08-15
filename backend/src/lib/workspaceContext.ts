@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { NextFunction, Request, Response } from "express";
 
 /**
  * Per-request state that has to reach code with no access to `req` — the
@@ -45,4 +46,30 @@ export function setContextWorkspaceId(workspaceId: number): void {
 /** undefined outside a request, or inside one that hasn't authenticated yet. */
 export function currentWorkspaceId(): number | undefined {
   return storage.getStore()?.workspaceId;
+}
+
+/**
+ * Re-opens the request context after middleware that severs it.
+ *
+ * AsyncLocalStorage propagates through promises but not through stream
+ * events, and multer reads a multipart body through busboy — so everything
+ * after it runs with no store at all, not merely an empty one. req.user
+ * survives, because that lives on the request object rather than in the
+ * context.
+ *
+ * Opening a fresh store rather than writing into the old one is therefore
+ * the only option: there is nothing left to write into. Safe because the
+ * workspace comes from the same verified token authenticate() already read.
+ *
+ * Placed after the multer middleware on any route that accepts a file.
+ */
+export function restoreWorkspaceContext(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) {
+  const workspaceId = (req as { user?: { workspaceId?: number } }).user
+    ?.workspaceId;
+
+  storage.run({ workspaceId }, () => next());
 }

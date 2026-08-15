@@ -1,31 +1,26 @@
-import fs from "fs";
-import path from "path";
+import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import multer from "multer";
+import sharp from "sharp";
 import prisma from "../lib/prisma";
 import type { Prisma, Settings } from "../generated/prisma/client";
+import {
+  deleteObject,
+  putObject,
+  settingsImageKey,
+  signedUrlFor,
+} from "../lib/storage";
 import { ValidatedRequest } from "../middleware/validate";
 import { errorMessage } from "../utils/errors";
 import type { SettingsUpdateBody, UploadTypeParam } from "../schemas/settings";
 import { workspaceIdOf } from "../utils/workspace";
 
-export const SETTINGS_UPLOADS_DIR = path.join(__dirname, "../uploads/settings");
-
-fs.mkdirSync(SETTINGS_UPLOADS_DIR, { recursive: true });
-
-// diskStorage rather than memoryStorage: unlike device photos these aren't
-// converted, so there's nothing to gain from holding them in memory first.
+// memoryStorage now, like device photos: nothing touches disk on the way to
+// object storage. These are converted too — they weren't before, but a logo
+// and stamp load on every printed invoice, so their size matters more than a
+// device photo's does.
 export const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, SETTINGS_UPLOADS_DIR),
-    filename: (req, file, cb) => {
-      const suffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(
-        null,
-        `${req.params.type}-${suffix}${path.extname(file.originalname)}`,
-      );
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -36,7 +31,22 @@ export const upload = multer({
   },
 });
 
-function toSettingsResponse(settings: Settings) {
+/**
+ * Signs a stored object key, or passes anything else through untouched.
+ *
+ * Values written before phase 4 are local URL paths, not object keys, and
+ * signing one would produce a link to nothing. Recognised by their prefix so
+ * an old row renders as a missing image rather than an error.
+ */
+async function imageUrlOf(key: string | null): Promise<string | null> {
+  if (!key || !key.startsWith("workspaces/")) {
+    return null;
+  }
+
+  return signedUrlFor(key);
+}
+
+async function toSettingsResponse(settings: Settings) {
   return {
     id: settings.id,
     company_name: settings.companyName,
@@ -44,9 +54,11 @@ function toSettingsResponse(settings: Settings) {
     company_phone: settings.companyPhone,
     company_email: settings.companyEmail,
     company_website: settings.companyWebsite,
-    company_logo: settings.companyLogo,
-    stamp_image: settings.stampImage,
-    signature_image: settings.signatureImage,
+    // Short-lived signed URLs rather than the stored keys: the bucket is
+    // private, so a key on its own is useless to the browser.
+    company_logo: await imageUrlOf(settings.companyLogo),
+    stamp_image: await imageUrlOf(settings.stampImage),
+    signature_image: await imageUrlOf(settings.signatureImage),
     default_tax_rate: settings.defaultTaxRate.toNumber(),
     default_warranty_months: settings.defaultWarrantyMonths,
     invoice_prefix: settings.invoicePrefix,
@@ -97,7 +109,7 @@ export const getSettings = async (req: Request, res: Response) => {
       });
     }
 
-    res.json(toSettingsResponse(settings));
+    res.json(await toSettingsResponse(settings));
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }
@@ -188,7 +200,7 @@ export const updateSettings = async (req: Request, res: Response) => {
       data,
     });
 
-    res.json(toSettingsResponse(settings));
+    res.json(await toSettingsResponse(settings));
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }
@@ -210,17 +222,43 @@ export const uploadImage = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "فایلی آپلود نشده است" });
     }
 
-    // Served by the static handler in app.ts, which maps /uploads onto
-    // src/uploads. Phase 4 replaces this with an object-storage URL.
-    const filePath = `/uploads/settings/${file.filename}`;
+    const workspaceId = workspaceIdOf(req);
+    const column = IMAGE_COLUMNS[type];
 
-    await prisma.settings.update({
-      where: { workspaceId: workspaceIdOf(req) },
-      data: { [IMAGE_COLUMNS[type]]: filePath },
+    // Read before writing, so the object being replaced can be removed.
+    // Without this every logo change leaves its predecessor behind forever.
+    const existing = await prisma.settings.findUnique({
+      where: { workspaceId },
+      select: { [column]: true } as Record<string, boolean>,
     });
 
-    res.json({ message: "تصویر با موفقیت آپلود شد", path: filePath });
+    // webp keeps transparency, so a stamp or signature with a clear
+    // background survives the conversion intact.
+    const converted = await sharp(file.buffer).webp({ quality: 92 }).toBuffer();
+
+    const key = settingsImageKey(workspaceId, `${type}-${randomUUID()}.webp`);
+    await putObject(key, converted, "image/webp");
+
+    await prisma.settings.update({
+      where: { workspaceId },
+      data: { [column]: key },
+    });
+
+    const previous = (existing as Record<string, string | null> | null)?.[
+      column
+    ];
+    if (previous && previous.startsWith("workspaces/")) {
+      // After the row points at the new object, so a failure here leaves an
+      // orphan rather than a settings page with a broken image.
+      await deleteObject(previous);
+    }
+
+    res.json({
+      message: "تصویر با موفقیت آپلود شد",
+      path: await signedUrlFor(key),
+    });
   } catch (error) {
+    console.error("Settings image upload error:", error);
     res.status(500).json({ error: errorMessage(error) });
   }
 };

@@ -6,6 +6,7 @@ import {
   uploadImages,
 } from "../controllers/imageController";
 import { validate } from "../middleware/validate";
+import { restoreWorkspaceContext } from "../lib/workspaceContext";
 import { idParamSchema } from "../schemas/common";
 import { imageParamsSchema } from "../schemas/image";
 
@@ -18,6 +19,10 @@ router.post(
   "/",
   validate({ params: idParamSchema }),
   upload.array("images", 20),
+  // After multer, not before: reading the multipart body through busboy
+  // detaches the request from the async context, so the workspace has to be
+  // put back before any query runs.
+  restoreWorkspaceContext,
   uploadImages,
 );
 

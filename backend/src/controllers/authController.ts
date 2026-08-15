@@ -113,8 +113,19 @@ async function issueSession(
     },
   });
 
-  res.cookie(REFRESH_COOKIE_NAME, token, refreshCookieOptions(expiresAt));
+  // The browser can walk away mid-request — React's development double-render
+  // makes this routine on page load — and Express closes the response when it
+  // does. Writing to a closed one throws ERR_HTTP_HEADERS_SENT, which then
+  // surfaces as a 500 in the logs for something that was never a failure.
+  //
+  // The token row above is deliberately left in place: it costs nothing, and
+  // the client that abandoned the request never received the token, so
+  // nobody can present it.
+  if (res.headersSent) {
+    return issueAccessToken(user);
+  }
 
+  res.cookie(REFRESH_COOKIE_NAME, token, refreshCookieOptions(expiresAt));
   return issueAccessToken(user);
 }
 
@@ -253,14 +264,20 @@ export const refresh = async (req: Request, res: Response) => {
     // The user comes back too: it was already read above to check isActive,
     // and without it the client would have to call /auth/me right after every
     // refresh just to learn who it is.
-    res.json({
-      token: await issueSession(res, user),
-      user: toUserResponse(user),
-    });
-    res.json({ token: await issueSession(res, user) });
+    const token = await issueSession(res, user);
+
+    if (!res.headersSent) {
+      res.json({ token, user: toUserResponse(user) });
+    }
   } catch (error) {
     console.error("refresh error:", error);
-    res.status(500).json({ error: errorMessage(error) });
+
+    // Guarded: a failure after the response went out cannot be reported to
+    // the caller, and trying only replaces the real error in the log with a
+    // second, misleading one.
+    if (!res.headersSent) {
+      res.status(500).json({ error: errorMessage(error) });
+    }
   }
 };
 

@@ -13,7 +13,6 @@ import {
   Cog6ToothIcon,
   DocumentIcon,
 } from "@heroicons/react/24/solid";
-import { getBaseUrl } from "../utils/helpers";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 
 function ImageUploadBox({ label, imagePath, type, onUpload }) {
@@ -35,8 +34,6 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
     }
   };
 
-  const baseUrl = getBaseUrl();
-
   return (
     <div>
       <label className="block text-sm font-medium text-text-primary mb-2">
@@ -46,7 +43,9 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
         {imagePath ? (
           <div className="space-y-2">
             <img
-              src={baseUrl + imagePath}
+              // Already a signed URL from the server: the bucket is private,
+              // so the stored key alone would be useless here.
+              src={imagePath}
               alt={label}
               className="max-h-32 mx-auto object-contain"
             />

@@ -68,11 +68,12 @@ token handling.
 
 Goal: move device/settings photos off local disk onto ArvanCloud object storage.
 
-- [ ] 4.1 Provision ArvanCloud Object Storage bucket (manual step, not code)
-- [ ] 4.2 Add an S3-compatible client (e.g. `@aws-sdk/client-s3`, since Arvan is S3-compatible) to the backend
-- [ ] 4.3 Replace `multer` disk storage with direct-to-object-storage upload (or upload-then-forward) for device images and settings/logo images
-- [ ] 4.4 Update `imageController.js` / `ImageUploader.jsx` / `ImageSlider.jsx` to work with object storage URLs instead of local paths
-- [ ] 4.5 Update backup logic: workspace-level backups should include a way to reference/export the tenant's own images from object storage
+- [x] 4.1 Provision ArvanCloud Object Storage bucket — `reza-app-test-1`, private, Simin region (`s3.ir-thr-at1`)
+- [x] 4.2 Add an S3-compatible client (`@aws-sdk/client-s3` + `s3-request-presigner`), wrapped in `src/lib/storage.ts`
+- [x] 4.3 Replace multer disk storage with direct-to-object-storage upload for device images and settings images. Both convert to webp in memory now; nothing touches disk at any point
+- [x] 4.4 imageController / settingsController / ImageUploader / ImageSlider / DeviceDetailModal / Settings all work from short-lived signed URLs instead of local paths
+- [~] 4.5 Moved to 5.6: restoring the image importer means guessing at a Fineti export's shape without a real one to look at, and it belongs beside importFromExcel rather than on its own
+- [~] 4.6 MinIO deferred: with a real bucket in hand, developing straight against Arvan avoids finding S3 compatibility gaps on deployment day. Revisit if working offline becomes necessary
 
 ## Phase 5 — Backups & Data Export
 

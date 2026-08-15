@@ -115,6 +115,12 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   widen one to avoid writing a fourth, and do not add a fourth without saying
   in its COMMENT why no ordinary query could do the job.
 
+- Any route accepting a file upload must place `restoreWorkspaceContext`
+  after the multer middleware. Reading a multipart body through busboy
+  detaches the request from the async context — `req.user` survives, the
+  context does not — so every query behind an upload throws until it is
+  reopened.
+
 ## 8. Documentation upkeep
 
 - When a roadmap task is completed and approved, update `ROADMAP.md`: flip `[ ]` to `[x]`.

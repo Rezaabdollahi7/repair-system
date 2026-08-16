@@ -270,6 +270,18 @@ business features**. Payment integration is the last phase and is explicitly out
   start simple (e.g., a GitHub Actions workflow that just runs tests on push) before considering
   automated deploys.
 
+- Restoring one workspace is `ops/extract-workspace.sh` plus
+  `ops/restore-workspace.md`. It reduces a full dump to a single tenant by
+  deleting every other workspace — the ON DELETE CASCADE does the rest —
+  then shifts every id by a fixed offset, which foreign keys follow because
+  Prisma declares them ON UPDATE CASCADE.
+- **The workspace returns under a new id**, so its users must sign in again.
+  Object keys keep the old prefix, which is harmless because `filepath`
+  stores the full key and is signed as-is rather than rebuilt — but it does
+  mean the prefix alone no longer identifies a workspace's objects.
+- Refresh tokens are deliberately not restored: reviving sessions the
+  rotation logic had revoked would undo the theft detection.
+
 ### Still planned
 
 - **react-hook-form** — frontend forms

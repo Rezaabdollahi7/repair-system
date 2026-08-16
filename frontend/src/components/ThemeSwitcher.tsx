@@ -1,10 +1,15 @@
-// src/components/ThemeSwitcher.jsx
 import { CheckIcon } from "@heroicons/react/24/solid";
-import { useTheme, THEMES } from "../context/ThemeContext";
+import { useTheme, THEMES, type Theme } from "../context/ThemeContext";
 
-// رنگ‌های پیش‌نمایش هر تم - این‌ها مستقل از CSS variable های واقعی‌ان
-// چون باید همیشه (فارغ از تمِ فعلاً فعال روی صفحه) رنگ خودشون رو نشون بدن
-const THEME_PREVIEWS = {
+/**
+ * Preview swatches, deliberately independent of the real CSS variables: each
+ * one must show its own colours regardless of which theme is currently
+ * applied to the page.
+ *
+ * Keyed by Theme, so a theme added to THEMES without a swatch here is a
+ * compile error rather than an undefined lookup at render time.
+ */
+const THEME_PREVIEWS: Record<Theme, { bg: string; primary: string; surface: string }> = {
   light: { bg: "#f8fafc", primary: "#2563eb", surface: "#ffffff" },
   dark: { bg: "#0f172a", primary: "#3b82f6", surface: "#1e293b" },
   blue: { bg: "#eff6ff", primary: "#1d4ed8", surface: "#ffffff" },
@@ -47,7 +52,7 @@ export default function ThemeSwitcher() {
                 </span>
               )}
 
-              {/* پیش‌نمایش رنگی تم */}
+              {/* Colour preview */}
               <div
                 className="w-full h-12 rounded-md border border-black/5 overflow-hidden flex"
                 style={{ backgroundColor: preview.bg }}
@@ -56,9 +61,7 @@ export default function ThemeSwitcher() {
                   className="w-1/3 h-full"
                   style={{ backgroundColor: preview.surface }}
                 />
-                <div
-                  className="flex-1 h-full flex items-center justify-center"
-                >
+                <div className="flex-1 h-full flex items-center justify-center">
                   <span
                     className="w-6 h-2 rounded-full"
                     style={{ backgroundColor: preview.primary }}

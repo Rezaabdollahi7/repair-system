@@ -1,4 +1,12 @@
-// src/components/Pagination.jsx
+interface PaginationProps {
+  page: number;
+  totalPages: number;
+  total: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
 export default function Pagination({
   page,
   totalPages,
@@ -6,7 +14,7 @@ export default function Pagination({
   limit,
   onPageChange,
   onLimitChange,
-}) {
+}: PaginationProps) {
   if (total <= 0 || totalPages <= 0) return null;
 
   const from = (page - 1) * limit + 1;
@@ -14,12 +22,12 @@ export default function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-sm text-text-secondary">
-      {/* نمایش بازه */}
+      {/* Current range */}
       <span>
         نمایش {to}–{from} از {total} دستگاه
       </span>
 
-      {/* دکمه‌های صفحه‌بندی */}
+      {/* Page controls */}
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(1)}
@@ -56,7 +64,7 @@ export default function Pagination({
         </button>
       </div>
 
-      {/* تعداد در هر صفحه */}
+      {/* Rows per page */}
       <select
         value={limit}
         onChange={(e) => onLimitChange(Number(e.target.value))}

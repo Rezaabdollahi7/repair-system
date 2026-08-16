@@ -1,10 +1,35 @@
-// src/components/SearchableSelect.jsx
 import { useState, useRef, useEffect } from "react";
 import {
   MagnifyingGlassIcon,
   ChevronUpIcon,
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
+
+/**
+ * Option values are widened to string | number because callers pass both:
+ * ids arrive from the API as numbers, while status and category codes are
+ * strings.
+ */
+export type SelectValue = string | number;
+
+export interface SelectOption {
+  value: SelectValue;
+  label: string;
+  subLabel?: string;
+}
+
+interface SearchableSelectProps {
+  options?: SelectOption[];
+  value?: SelectValue | null;
+  onChange: (value: SelectValue) => void;
+  onSearch?: (query: string) => void;
+  onOpen?: () => void;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  required?: boolean;
+  error?: string;
+}
 
 export default function SearchableSelect({
   options = [],
@@ -17,14 +42,14 @@ export default function SearchableSelect({
   loading = false,
   required = false,
   error = "",
-}) {
+}: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
         setSearch("");
       }

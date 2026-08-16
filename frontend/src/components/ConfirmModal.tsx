@@ -1,5 +1,18 @@
-// src/components/ConfirmModal.jsx
 import { ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/solid";
+
+type ConfirmVariant = "danger" | "warning" | "info";
+
+interface ConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  message?: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: ConfirmVariant;
+  loading?: boolean;
+}
 
 export default function ConfirmModal({
   isOpen,
@@ -9,23 +22,24 @@ export default function ConfirmModal({
   message = "آیا از انجام این عملیات مطمئن هستید؟",
   confirmText = "تأیید",
   cancelText = "انصراف",
-  variant = "danger", // danger, warning, info
+  variant = "danger",
   loading = false,
-}) {
-  const variantStyles = {
-    danger: {
-      icon: "text-danger bg-danger-soft",
-      button: "bg-danger hover:bg-danger-hover text-text-inverse",
-    },
-    warning: {
-      icon: "text-warning bg-warning-soft",
-      button: "bg-warning hover:opacity-80 text-text-inverse",
-    },
-    info: {
-      icon: "text-primary bg-primary-soft",
-      button: "bg-primary hover:bg-primary-hover text-text-inverse",
-    },
-  };
+}: ConfirmModalProps) {
+  const variantStyles: Record<ConfirmVariant, { icon: string; button: string }> =
+    {
+      danger: {
+        icon: "text-danger bg-danger-soft",
+        button: "bg-danger hover:bg-danger-hover text-text-inverse",
+      },
+      warning: {
+        icon: "text-warning bg-warning-soft",
+        button: "bg-warning hover:opacity-80 text-text-inverse",
+      },
+      info: {
+        icon: "text-primary bg-primary-soft",
+        button: "bg-primary hover:bg-primary-hover text-text-inverse",
+      },
+    };
 
   const style = variantStyles[variant];
 

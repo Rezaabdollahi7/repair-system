@@ -262,6 +262,15 @@ business features**. Payment integration is the last phase and is explicitly out
   database first and checks the policy count and the `app_*` functions before
   anything is switched over — a dump missing those would restore the data and
   none of the isolation.
+  - `ops/reset-password.sh` is the only way back in for a locked-out user until
+    SMS OTP (8.6). It shows the account first so the operator can read it back
+    to the caller, asks for the phone number twice, then sets a random password
+    and deletes that user's refresh tokens — if the call was prompted by
+    someone else being in the account, this cuts them off.
+- The dangerous part is knowing who is on the phone. `ops/reset-password.md`
+  says to ring the registered number rather than answering an incoming call:
+  that is the only step that proves anything, and everything else is
+  supporting evidence.
 - **Object storage**: ArvanCloud (not yet provisioned).
 - **Docker**: used for both development and production. Prefer docker-compose for local dev;
   production should also run containerized (a reverse proxy such as Nginx/Caddy is expected but

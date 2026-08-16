@@ -1,10 +1,8 @@
-// src/utils/formatters.js
 /**
  * فرمت شماره تماس فارسی
  * 09330020020 → ۰۹۳۳ ۰۰۲ ۰۰۲۰
  */
-// src/utils/formatters.js
-export function formatPersianPhone(phone) {
+export function formatPersianPhone(phone: string | null | undefined): string {
   if (!phone) return "—";
 
   const digits = phone.replace(/\D/g, "");
@@ -23,7 +21,7 @@ export function formatPersianPhone(phone) {
 /**
  * تبدیل اعداد انگلیسی به فارسی
  */
-export function toPersianDigits(num) {
+export function toPersianDigits(num: string | number | null | undefined): string {
   if (num === null || num === undefined) return "—";
   const str = String(num);
   const persianDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
@@ -33,8 +31,7 @@ export function toPersianDigits(num) {
 /**
  * فرمت مبلغ با اعداد فارسی
  */
-
-export function formatPersianCurrency(amount) {
+export function formatPersianCurrency(amount: string | number | null | undefined): string {
   if (amount === null || amount === undefined || amount === "") return "—";
   const num = Math.round(Number(amount));
   if (isNaN(num)) return "—";

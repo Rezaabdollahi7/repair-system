@@ -1,8 +1,7 @@
-// src/utils/helpers.js
 import { useState, useEffect } from "react";
 
-export function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
+export function useDebounce<T>(value: T, delay = 400): T {
+  const [debounced, setDebounced] = useState<T>(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(timer);
@@ -10,6 +9,5 @@ export function useDebounce(value, delay = 400) {
   return debounced;
 }
 
-export const getBaseUrl = () =>
+export const getBaseUrl = (): string =>
   import.meta.env.VITE_API_URL || "http://localhost:5001";
-export const getImageUrl = (path) => `${getBaseUrl()}${path}`;

@@ -4,24 +4,23 @@
 > شده است. همه‌چیزی که برای ادامه لازم است اینجاست: وضعیت فعلی، تصمیمات گرفته‌شده و
 > دلیلشان، تسک‌های باقی‌مانده، بدهی‌های فنی، و دام‌هایی که در مسیر به آن‌ها خوردیم.
 >
-> **تاریخ آخرین به‌روزرسانی:** پایان فاز ۴ (object storage)
+> **تاریخ آخرین به‌روزرسانی:** فاز ۵ — تسک‌های ۵.۱، ۵.۲، ۵.۵ و ۵.۷
 
 ---
 
 ## ۱. پروژه در یک نگاه
 
 **Dofixo** یک نرم‌افزار مدیریت تعمیرگاه است برای کارگاه‌های کوچک تعمیر (لوازم خانگی،
-موبایل، لپ‌تاپ) در ایران. دستگاه‌های ورودی، مشتریان، پرسنل، انبار و فاکتورهای
-خرید/فروش/تعمیر را مدیریت می‌کند و سود و زیان را دنبال می‌کند.
+موبایل، لپ‌تاپ) در ایران.
 
-| مورد       | مقدار                                                             |
-| ---------- | ----------------------------------------------------------------- |
-| مخزن       | `/Programming/Code/Dofixo` (مونوریپو: `backend/` و `frontend/`)   |
-| برنچ فعال  | `feature/multi-tenant-migration`                                  |
-| دامنه‌ی اپ | `app.dofixo.ir` — **دامنه‌ی مشترک، بدون زیردامنه برای هر مستأجر** |
-| سایت معرفی | `dofixo.ir` (Astro، مخزن جدا، خارج از این کار)                    |
-| زبان رابط  | فارسی، تاریخ جلالی                                                |
-| واحد پول   | ریال                                                              |
+| مورد       | مقدار                                                                  |
+| ---------- | ---------------------------------------------------------------------- |
+| مخزن       | `/Programming/Code/Dofixo` (مونوریپو: `backend/`، `frontend/`، `ops/`) |
+| برنچ فعال  | `feature/multi-tenant-migration`                                       |
+| دامنه‌ی اپ | `app.dofixo.ir` — **دامنه‌ی مشترک، بدون زیردامنه برای هر مستأجر**      |
+| سایت معرفی | `dofixo.ir` (Astro، مخزن جدا، خارج از این کار)                         |
+| زبان رابط  | فارسی، تاریخ جلالی                                                     |
+| واحد پول   | ریال                                                                   |
 
 **هدف اصلی:** تبدیل زیرساخت به SaaS **بدون تغییر مجموعه‌ی ویژگی‌های موجود**.
 
@@ -29,32 +28,27 @@
 
 ## ۲. وضعیت فعلی
 
-| فاز                                            | وضعیت          |
-| ---------------------------------------------- | -------------- |
-| ۰ — زیرساخت و ابزار                            | ✅ کامل        |
-| ۱ — مهاجرت SQLite → PostgreSQL                 | ✅ کامل        |
-| ۲ — چندمستأجری (RLS، ایزولاسیون، شماره فاکتور) | ✅ کامل        |
-| ۳ — بازنویسی احراز هویت                        | ✅ کامل        |
-| ۴ — Object Storage                             | ✅ کامل        |
-| ۶.۴ — تست یکپارچگی با دیتابیس واقعی            | ✅ (همراه ۲.۷) |
+| فاز                            | وضعیت                                            |
+| ------------------------------ | ------------------------------------------------ |
+| ۰ — زیرساخت و ابزار            | ✅ کامل                                          |
+| ۱ — مهاجرت SQLite → PostgreSQL | ✅ کامل                                          |
+| ۲ — چندمستأجری                 | ✅ کامل                                          |
+| ۳ — بازنویسی احراز هویت        | ✅ کامل                                          |
+| ۴ — Object Storage             | ✅ کامل                                          |
+| ۵ — بکاپ و خروجی داده          | 🔄 ۵.۱، ۵.۲، ۵.۵، ۵.۷ تمام · ۵.۳، ۵.۴، ۵.۶ مانده |
+| ۶.۴ — تست یکپارچگی             | ✅ (همراه ۲.۷)                                   |
 
-**وضعیت اپ:** کاملاً کار می‌کند. ثبت‌نام خودکار، session با کوکی refresh، ایزولاسیون
-اثبات‌شده، و عکس‌ها روی object storage.
+**وضعیت اپ:** کاملاً کار می‌کند. ثبت‌نام خودکار، session با کوکی refresh،
+ایزولاسیون اثبات‌شده، عکس‌ها روی object storage، و بکاپ رمزنگاری‌شده‌ی شبانه.
 
-### فاز ۴ — چه چیزی ساخته شد
+### فاز ۵ — چه چیزی ساخته شد
 
-| تسک                 | خلاصه                                                             |
-| ------------------- | ----------------------------------------------------------------- |
-| 4.1 صندوقچه         | `reza-app-test-1`، خصوصی، منطقه‌ی سیمین (`s3.ir-thr-at1`)         |
-| 4.2 کلاینت S3       | `@aws-sdk/client-s3` + `s3-request-presigner` در `lib/storage.ts` |
-| 4.3 جایگزینی multer | حافظه → webp → object storage. هیچ‌چیز روی دیسک نمی‌ماند          |
-| 4.4 فرانت           | چهار کامپوننت روی URL امضاشده                                     |
-| 4.5 اسکریپت import  | ↪ منتقل شد به **۵.۶**                                             |
-| 4.6 MinIO           | ⬜ کنار گذاشته شد (دلیلش پایین)                                   |
-
-**چرا MinIO کنار گذاشته شد:** با داشتن یک صندوقچه‌ی واقعی، توسعه‌ی مستقیم روی Arvan
-جلوی این را می‌گیرد که تفاوت‌های ریز سازگاری S3 را روز استقرار کشف کنیم. اگر روزی
-کار آفلاین لازم شد، برمی‌گردد.
+| تسک                        | خلاصه                                                        |
+| -------------------------- | ------------------------------------------------------------ |
+| 5.1 بررسی بکاپ ارائه‌دهنده | جواب گرفت — تصمیم: تک‌سرور با بکاپ خودمان (دلیلش پایین)      |
+| 5.2 بکاپ زمان‌بندی‌شده     | `ops/backup-database.sh` — رمزنگاری با `age`، آپلود به Arvan |
+| 5.5 بازیابی یک کارگاه      | `ops/extract-workspace.sh` + `ops/restore-workspace.md`      |
+| 5.7 بازیابی دسترسی کاربر   | `ops/reset-password.sh` + `ops/reset-password.md`            |
 
 ---
 
@@ -79,40 +73,38 @@ React 19 · Vite 8 · React Router 7 · Tailwind 4
 Axios · react-hot-toast · react-to-print · jalaali-js · @heroicons/react
 ```
 
-⚠️ فرانت هنوز JavaScript است و **هیچ زیرساخت تستی ندارد**.
+⚠️ **فرانت هنوز JavaScript است (۵۱ فایل) و هیچ زیرساخت تستی ندارد.** تبدیل به
+TypeScript تسک بعدی است.
 
-### ساختار پوشه‌ی backend
+### ابزارهای عملیاتی روی هاست
+
+```
+age (رمزنگاری بکاپ) · aws-cli (آپلود به Arvan) · docker compose
+```
+
+### ساختار مخزن
 
 ```
 backend/
-├── prisma/
-│   ├── schema.prisma          ۲۱ مدل + ۳ enum
-│   ├── seed.ts                نقش‌ها + یک کارگاه از مسیر ثبت‌نام
-│   ├── rls-check.sql          تأیید دستی سیاست‌های RLS
-│   └── migrations/            ۶ مهاجرت
+├── prisma/               schema.prisma (۲۱ مدل) · seed.ts · rls-check.sql · ۶ مهاجرت
 ├── src/
-│   ├── app.ts · server.ts
-│   ├── lib/
-│   │   ├── prisma.ts          کلاینت + extension + دو helper تراکنش
-│   │   ├── storage.ts         تنها جایی که SDK را می‌شناسد
-│   │   └── workspaceContext.ts  AsyncLocalStorage + restoreWorkspaceContext
-│   ├── controllers/           ۱۴ کنترلر
-│   ├── routes/                همه TypeScript جز index.js
-│   ├── middleware/
-│   │   ├── auth.ts · authorize.ts · requestContext.ts · validate.ts
-│   ├── schemas/
-│   ├── utils/
-│   │   ├── workspace.ts · refreshToken.ts · newWorkspace.ts
-│   │   ├── invoiceNumber.ts · serialize.ts · errors.ts
-│   │   ├── dateRange.ts · invoiceTotals.ts · payment.ts
-│   │   └── persianToEnglish.js ⚠️ هنوز CommonJS
-│   ├── types/request.ts       AuthUser + declare global روی Express.Request
-│   └── __tests__/             ۲۹ فایل (۳۷۱ تست) + integration/ (۶ فایل، ۷۰ تست)
-├── jest.config.js · jest.setup.ts
-└── jest.integration.config.js · .globalSetup.ts · .setup.ts
+│   ├── lib/              prisma.ts · storage.ts · workspaceContext.ts
+│   ├── controllers/      ۱۴ کنترلر
+│   ├── routes/           همه TypeScript جز index.js
+│   ├── middleware/       auth.ts · authorize.ts · requestContext.ts · validate.ts
+│   ├── schemas/ · utils/ · types/
+│   └── __tests__/        ۲۹ فایل (۳۷۱ تست) + integration/ (۶ فایل، ۷۰ تست)
+frontend/
+└── src/                  api/ · context/ · utils/ · components/ (۲۷) · pages/ (۱۴)
+ops/
+├── backup-database.sh    بکاپ شبانه (cron)
+├── extract-workspace.sh  استخراج یک کارگاه از بکاپ
+├── reset-password.sh     بازیابی دسترسی کاربر
+├── restore-database.md · restore-workspace.md · reset-password.md
+└── backup.env.example
 ```
 
-**دو فایل `.js` باقی‌مانده:** `routes/index.js` و `utils/persianToEnglish.js`.
+**دو فایل `.js` در بک‌اند:** `routes/index.js` و `utils/persianToEnglish.js`.
 
 ### مهاجرت‌ها
 
@@ -134,11 +126,33 @@ backend/
 
 مهم‌ترین بخش سند. هر تصمیم دلیلی دارد که اگر ندانید، ممکن است تصادفاً برش گردانید.
 
+### زیرساخت: یک سرور، نه دو تا
+
+**یک VPS در ایران** همه‌چیز را اجرا می‌کند: بک‌اند، فرانت و Postgres، به‌صورت سه
+کانتینر با volume جدا برای دیتابیس.
+
+**چرا نه دیتابیس مدیریت‌شده:** پارس‌پک DBaaS مستقل ندارد، ولی PaaS اش PostgreSQL
+به‌عنوان اپلیکیشن آماده با بکاپ زمان‌بندی‌شده می‌دهد و پشتیبانی تأیید کرد کاربرش
+superuser است. رد شد چون با ۳ هسته و ۴ گیگ رم حدود ۱۶.۷ میلیون تومان در سال است —
+تقریباً همان قیمت یک سرور کامل با ۸ گیگ رم که هم دیتابیس را جا می‌دهد و هم اپ را.
+
+**چرا نه دو سرور:** طراحی RLS ما **هر کوئری را دو رفت‌وبرگشت** می‌کند
+(`set_config` به‌علاوه‌ی خود کوئری). روی یک ماشین هر رفت‌وبرگشت ~۰.۱ میلی‌ثانیه
+است؛ بین دو سرویس ~۰.۵ تا ۱. جدا کردن، تأخیر را پنج تا ده برابر می‌کند بدون هیچ
+سودی در این مقیاس. جدا کردن بعداً فقط عوض کردن `DATABASE_URL` است؛ الان یعنی دو
+سیستم‌عامل برای آپدیت و یک شبکه‌ی خصوصی برای پیکربندی.
+
+**بار واقعی:** با ۵۰۰ کارگاه و ۵۰ کاربر همزمان، حدود ۵ درخواست در ثانیه — کمتر از
+۵ درصد ظرفیت. فرانت بعد از build فقط فایل استاتیک است. حجم دیتابیس سال‌ها زیر ۱۰
+گیگ می‌ماند چون عکس‌ها روی Arvan هستند.
+
+⚠️ **در فاز ۷ حتماً `shared_buffers` را از پیش‌فرض ۱۲۸ مگابایت بالا ببرید.** مشکل
+«کم بودن سرور» نیست، «استفاده نکردن از سرور» است.
+
 ### تنانسی
 
 **دیتابیس مشترک، اسکیمای مشترک.** ایزولاسیون از طریق `workspaceId` روی هر جدول
-tenant-scoped. **دو لایه:** فیلتر اپلیکیشنی + RLS. هیچ‌کدام حذف نشود. مقیاس هدف:
-~۵۰۰ کارگاه، هر کدام تا ~۱۰۰۰ دستگاه.
+tenant-scoped. **دو لایه:** فیلتر اپلیکیشنی + RLS. هیچ‌کدام حذف نشود.
 
 ### دو اتصال دیتابیس، عمداً
 
@@ -147,8 +161,9 @@ tenant-scoped. **دو لایه:** فیلتر اپلیکیشنی + RLS. هیچ‌
 | `DATABASE_URL`     | `dofixo`     | فقط migration و seed |
 | `DATABASE_URL_APP` | `dofixo_app` | اپ در حال اجرا       |
 
-در Postgres مالک جدول RLS را **دور می‌زند**. `dofixo_app` مالک هیچ جدولی نیست و فقط
-DML دارد. ⚠️ `lib/prisma.ts` عمداً **fallback ندارد**.
+در Postgres مالک جدول RLS را **دور می‌زند**. `dofixo_app` مالک هیچ جدولی نیست.
+⚠️ `lib/prisma.ts` عمداً **fallback ندارد** — fallback یعنی یک `.env` ناقص
+بی‌سروصدا اپ را به اتصال superuser برمی‌گرداند.
 
 ### زنجیره‌ی `app.workspace_id`
 
@@ -159,33 +174,18 @@ Prisma extension             →  currentWorkspaceId() را می‌خواند
                              →  set_config('app.workspace_id', id, TRUE)
 ```
 
-**چرا AsyncLocalStorage:** Prisma خبری از `req` ندارد، و متغیر سطح ماژول بین
-درخواست‌های همزمان نشت می‌کند.
-
-**اگر context نباشد، extension خطا پرتاب می‌کند** — نه اینکه بگذارد RLS ساکت صفر ردیف
-برگرداند.
+**اگر context نباشد، extension خطا پرتاب می‌کند** — نه اینکه بگذارد RLS ساکت صفر
+ردیف برگرداند.
 
 ### ⚠️ multer زنجیره را قطع می‌کند
 
-`AsyncLocalStorage` از promise عبور می‌کند ولی **از رویداد stream نه**. multer بدنه‌ی
-`multipart` را با busboy می‌خواند و هندلر را از داخل یک event صدا می‌زند — نتیجه اینکه
-`req.user` سالم می‌ماند ولی **هیچ store ای وجود ندارد**، نه اینکه store خالی باشد.
+`AsyncLocalStorage` از promise عبور می‌کند ولی **از رویداد stream نه**. multer
+بدنه‌ی `multipart` را با busboy می‌خواند — نتیجه اینکه `req.user` سالم می‌ماند ولی
+**هیچ store ای وجود ندارد**، نه اینکه store خالی باشد.
 
-`restoreWorkspaceContext` این را حل می‌کند و باید **بعد از** multer روی هر مسیری که
-فایل می‌پذیرد بنشیند:
-
-```typescript
-router.post(
-  "/",
-  validate({ params: idParamSchema }),
-  upload.array("images", 20),
-  restoreWorkspaceContext, // ← بعد از multer، نه قبلش
-  uploadImages,
-);
-```
-
-چون store دیگر وجود ندارد، این تابع `storage.run(...)` می‌زند نه
-`setContextWorkspaceId(...)` — نمی‌شود در چیزی نوشت که نیست.
+`restoreWorkspaceContext` باید **بعد از** multer روی هر مسیری که فایل می‌پذیرد
+بنشیند. چون store دیگر وجود ندارد، این تابع `storage.run(...)` می‌زند نه
+`setContextWorkspaceId(...)`.
 
 ### دو helper تراکنش
 
@@ -215,94 +215,115 @@ await runInNewWorkspaceTransaction(name, async (tx, workspaceId) => { ... });
 
 ⚠️ هر سه `SET search_path = public` دارند و `EXECUTE` از `PUBLIC` گرفته شده.
 
-### Object storage
-
-**صندوقچه‌ی خصوصی + presigned URL.** عکس‌ها با URL کوتاه‌عمر (۱۵ دقیقه) سرو می‌شوند
-که به‌ازای هر درخواست امضا می‌شود، **بعد از** اینکه ردیف با workspace فیلتر شد.
-
-**چرا خصوصی نه عمومی:** object storage هیچ RLS ای ندارد. صندوقچه‌ی عمومی یعنی
-ایزولاسیونی که کل فاز ۲ برایش صرف شد، از یک طرف باز بماند. عکس دستگاه مشتری هم
-داده‌ی شخصی است — شماره سریال، وضعیت خرابی، گاهی محتویات صفحه.
-
-**کلیدها مستأجر را حمل می‌کنند:**
-
-```
-workspaces/{id}/devices/{deviceId}/{uuid}.webp
-workspaces/{id}/settings/{type}-{uuid}.webp
-```
-
-آن پیشوند و بررسی اپلیکیشن، **تنها** چیزهایی هستند که یک کارگاه را از اشیای دیگری
-دور نگه می‌دارند.
-
-**`filepath` در دیتابیس همان کلید کامل است** و مستقیم امضا می‌شود، نه اینکه از
-`workspaceId` و `deviceId` بازسازی شود — تا اگر روزی ساختار کلید عوض شد، عکس‌های
-قدیمی پیدا بمانند.
-
-**`lib/storage.ts` تنها ماژولی است که SDK را می‌شناسد.** کنترلرها از آن کلید و URL
-می‌خواهند.
-
-**خطای حذف لاگ می‌شود، پرتاب نمی‌شود:** یک شیء یتیم چند کیلوبایت هدر می‌دهد، در حالی
-که خطای منتشرشده ردیفی باقی می‌گذارد که کاربر نمی‌تواند حذفش کند.
-
-**ترتیب حذف:** اول شیء، بعد ردیف. ترتیب برعکس ریسک ردیفی را دارد که به شیء ناموجود
-اشاره می‌کند — یعنی عکس شکسته که کاربر می‌بیند.
-
-**تبدیل به webp برای همه:** عکس دستگاه و لوگو و مهر و امضا. webp شفافیت را نگه
-می‌دارد، پس مهر با پس‌زمینه‌ی شفاف سالم می‌ماند.
-
-**مقدارهای قبل از فاز ۴** (مثل `/uploads/settings/logo-1.png`) کلید نیستند و امضا
-نمی‌شوند؛ `null` برمی‌گردند تا به‌جای خطا، عکس غایب دیده شود.
-
 ### احراز هویت
 
 **access token:** JWT، ۱۵ دقیقه، در **حافظه‌ی صفحه** نه localStorage.
 
 **refresh token:** ۳۰ روز، راز تصادفی ۳۲ بایتی — **نه JWT**، چون JWT وسوسه‌ی
-اعتبارسنجی بدون دیتابیس را می‌آورد و ابطال‌پذیری را از بین می‌برد. در دیتابیس فقط هش
-SHA-256 (نه bcrypt: راز پرآنتروپی دیکشنری ندارد و bcrypt هر refresh را کند می‌کند).
+اعتبارسنجی بدون دیتابیس را می‌آورد و ابطال‌پذیری را از بین می‌برد. در دیتابیس فقط
+هش SHA-256.
 
 **کوکی:** `httpOnly`، `SameSite=Strict`، `Path=/api/auth`، `Secure` فقط در پروداکشن.
 
-**چرخش با تشخیص سرقت:** هر refresh توکن قبلی را باطل می‌کند. ارائه‌ی دوباره‌ی توکن
-**باطل‌شده** یعنی نسخه‌ای در گردش است، پس همه‌ی session های آن کاربر بسته می‌شوند.
+**چرخش با تشخیص سرقت:** ارائه‌ی دوباره‌ی توکن **باطل‌شده** یعنی نسخه‌ای در گردش
+است، پس همه‌ی session های آن کاربر بسته می‌شوند.
 
 **logout حذف می‌کند، نه ابطال.** ابطال سیگنال سرقت است؛ پایان دادن به session خودت
-سیگنالی ندارد. اگر باطل می‌کرد، یک تب بازمانده کامپیوتر مغازه را هم بیرون می‌انداخت.
+سیگنالی ندارد.
 
 **سمت فرانت:** رهگیر Axios یک ۴۰۱ را بعد از refresh دوباره تلاش می‌کند، و **۴۰۱ های
 همزمان یک refresh مشترک دارند** — وگرنه دومی توکن تازه‌چرخیده را می‌فرستد و سرور آن
 را سرقت می‌خواند.
 
-**نگهبان `res.headersSent`:** کلاینتی که وسط درخواست می‌رود (رفرش صفحه با
-double-render در React) باعث می‌شد کد روی پاسخ بسته بنویسد و ۵۰۰ لاگ شود برای چیزی
-که هرگز شکست نخورده بود.
+**نگهبان `res.headersSent`:** کلاینتی که وسط درخواست می‌رود، باعث می‌شد کد روی پاسخ
+بسته بنویسد و ۵۰۰ لاگ شود برای چیزی که هرگز شکست نخورده بود.
 
 ### نام کاربری = شماره موبایل
 
-موبایل ایران، ۱۱ رقم با `09`. تلفن ثابت پذیرفته نمی‌شود چون همین شماره کانال پیامک
-تسک ۸.۶ است.
-
-normalize یکسان در ثبت‌نام، ورود **و ساخت پرسنل** (`phoneSchema` مشترک): ارقام فارسی
-و عربی‌هندی، جداکننده‌ها، `+98` و `0098`.
+موبایل ایران، ۱۱ رقم با `09`. normalize یکسان در ثبت‌نام، ورود **و ساخت پرسنل**
+(`phoneSchema` مشترک): ارقام فارسی و عربی‌هندی، جداکننده‌ها، `+98` و `0098`.
 
 ستون `users.phone` حالا «شماره تماس دیگر» است (اختیاری).
 
-### یک کارگاه تازه
+### Object storage
 
-`populateWorkspace` که ثبت‌نام و `seed.ts` هر دو صدایش می‌زنند: سوپرادمین با
-`fullName = "مدیر"`، یک ردیف `settings` با نام کارگاه، و چهار خدمت پیش‌فرض.
+**صندوقچه‌ی خصوصی + presigned URL** (۱۵ دقیقه)، امضا به‌ازای هر درخواست، **بعد از**
+اینکه ردیف با workspace فیلتر شد. object storage هیچ RLS ای ندارد.
 
-**دوره‌ی آزمایشی:** `status = trial` و `expiresAt = +1 ماه` در تابع SQL. اعمالش تسک
-۸.۳ است.
+**کلیدها مستأجر را حمل می‌کنند:** `workspaces/{id}/devices/{deviceId}/{uuid}.webp`
+
+**`filepath` در دیتابیس همان کلید کامل است** و مستقیم امضا می‌شود، نه اینکه بازسازی
+شود — تا اگر روزی ساختار کلید عوض شد یا کارگاه با شناسه‌ی جدید بازیابی شد، عکس‌ها
+پیدا بمانند.
+
+**`lib/storage.ts` تنها ماژولی است که SDK را می‌شناسد.**
+
+**خطای حذف لاگ می‌شود، پرتاب نمی‌شود.** **ترتیب حذف:** اول شیء، بعد ردیف.
+
+### بکاپ
+
+**`ops/backup-database.sh` از cron روی هاست اجرا می‌شود**، بیرون از کانتینرها —
+اپی که خراب شده نباید مسئول بکاپ گرفتن از خودش هم باشد.
+
+**همه در یک pipeline:** `pg_dump | gzip | age`. dump خام هرگز روی دیسک نمی‌نشیند،
+پس نسخه‌ی رمزنشده‌ی داده‌ی همه‌ی مشتری‌ها هیچ‌وقت در `/tmp` نیست.
+
+**رمزنگاری نامتقارن با `age`.** فقط کلید عمومی روی سرور است؛ کلید خصوصی در password
+manager و یک نسخه‌ی آفلاین. سروری که نفوذ شده می‌تواند بکاپ بنویسد ولی نمی‌تواند
+تاریخچه‌اش را بخواند.
+
+⚠️ **گم شدن کلید خصوصی یعنی همه‌ی بکاپ‌ها برای همیشه غیرقابل بازیابی‌اند.**
+
+**نگهداری در سه پوشه:** `daily` (۷)، `weekly` (۴)، `monthly` (۳) — هرکدام مستقل
+هرس می‌شوند، پس باگ در یکی نمی‌تواند بقیه را پاک کند. هر اجرا حداکثر ۵ فایل حذف
+می‌کند، تا فهرست اشتباه به‌جای فاجعه یک معما شود.
+
+**اسنپ‌شات‌های VPS جایگزین این نیستند:** crash-consistent اند نه
+application-consistent، بازیابی‌شان همه‌یا‌هیچ است، و نمی‌شود یک کارگاه را از
+دلشان بیرون کشید.
+
+### بازیابی یک کارگاه
+
+`ops/extract-workspace.sh` dump کامل را به یک مستأجر تقلیل می‌دهد: **همه‌ی
+کارگاه‌های دیگر را حذف می‌کند** و `ON DELETE CASCADE` بقیه را خالی می‌کند. بسیار
+کم‌خطاتر از پیمودن ۱۹ جدول به ترتیب وابستگی.
+
+بعد **همه‌ی شناسه‌ها را با یک عدد ثابت (۱,۰۰۰,۰۰۰) جابه‌جا می‌کند**. کلیدهای
+خارجی خودشان دنبال می‌آیند، چون Prisma همه را `ON UPDATE CASCADE` اعلام می‌کند.
+
+**کارگاه با شناسه‌ی تازه برمی‌گردد.** شناسه‌ها از sequenceهای مشترک می‌آیند، پس
+برگرداندن شناسه‌های قدیمی با ردیف‌هایی که کارگاه‌های دیگر ساخته‌اند تداخل می‌کند.
+هزینه‌اش این است که کاربران آن کارگاه باید دوباره وارد شوند.
+
+⚠️ **بعد از بارگذاری حتماً sequenceها را جلو ببرید**، وگرنه کارگاه‌های دیگر به‌مرور
+به شناسه‌های بازیابی‌شده می‌رسند.
+
+**refresh tokenها بازیابی نمی‌شوند:** زنده کردن session هایی که منطق چرخش عمداً
+باطلشان کرده بود، تشخیص سرقت را خنثی می‌کند.
+
+**کلیدهای object storage پیشوند قدیمی را نگه می‌دارند.** بی‌ضرر است چون `filepath`
+کلید کامل را دارد، ولی یعنی پیشوند دیگر شناسه‌ی معتبری برای «اشیای این کارگاه» نیست.
+
+### بازیابی دسترسی کاربر
+
+`ops/reset-password.sh` رمز تصادفی می‌سازد و همه‌ی session های آن کاربر را حذف
+می‌کند.
+
+**اسکریپت است نه راهنما، برخلاف آنچه روادمپ می‌گفت.** «رمزم را فراموش کرده‌ام» با
+۵۰۰ کارگاه هفتگی است نه یک فاجعه‌ی نادر، و روال دستی یعنی هر بار یک `UPDATE` روی
+`users` — که یک شب خسته با `WHERE` فراموش‌شده، رمز همه‌ی کاربران پلتفرم را عوض
+می‌کند.
+
+⚠️ **خطرناک‌ترین بخش، احراز هویت تلفنی است نه اجرای اسکریپت.** تنها قدمی که واقعاً
+چیزی ثابت می‌کند، **تماس گرفتن با شماره‌ی ثبت‌شده** است، نه جواب دادن به تماس
+ورودی. `ops/reset-password.md` چک‌لیستش را دارد.
 
 ### شماره‌گذاری فاکتور
 
 سه شمارنده روی ردیف `Workspace`. قالب `PUR-0001`، `SAL-0001`، `REP-0001`.
-`seq = seq + 1` قفل ردیف می‌گیرد (با ده درخواست موازی تست شده). داخل تراکنش خودِ
-فاکتور، پس rollback شماره را برمی‌گرداند.
+`seq = seq + 1` قفل ردیف می‌گیرد (با ده درخواست موازی تست شده).
 
-پیشوند از تنظیمات نمی‌آید: شماره داده‌ی حسابداری است و باید خسته‌کننده بماند. آنچه
-کارگاه می‌خواهد شخصی‌سازی کند **قالب چاپ** است — تسک ۹.۵.
+پیشوند از تنظیمات نمی‌آید: شماره داده‌ی حسابداری است و باید خسته‌کننده بماند.
 
 ### مجوزهای نقش اپ
 
@@ -313,23 +334,19 @@ normalize یکسان در ثبت‌نام، ورود **و ساخت پرسنل** 
 | `_prisma_migrations` | هیچ                           | داده‌ی اپلیکیشن نیست      |
 | بقیه                 | `SELECT/INSERT/UPDATE/DELETE` | —                         |
 
-`ALTER DEFAULT PRIVILEGES` جدول‌های آینده را پوشش می‌دهد. **ولی RLS منتقل نمی‌شود** —
-هر مهاجرتی که جدول با `workspace_id` بسازد باید RLS و policy را در همان مهاجرت اضافه
-کند. `smoke.test.ts` تعداد policy را با تعداد جدول‌های `workspace_id` دار مقایسه
-می‌کند.
+`ALTER DEFAULT PRIVILEGES` جدول‌های آینده را پوشش می‌دهد. **ولی RLS منتقل نمی‌شود**
+— هر مهاجرتی که جدول با `workspace_id` بسازد باید RLS و policy را در همان مهاجرت
+اضافه کند.
 
-### الگوی scope در کنترلرها
+### یکتایی
 
-```typescript
-const where = { workspaceId: workspaceIdOf(req), ...filters };
-
-// تک‌رکورد — findUnique کار نمی‌کند چون شرط مرکب است
-const row = await prisma.x.findFirst({ where: { id, workspaceId } });
-
-// حذف — count را چک کن، وگرنه پاسخ برای شناسه‌ی ناموجود هم موفق است
-const deleted = await prisma.x.deleteMany({ where: { id, workspaceId } });
-if (deleted.count === 0) return res.status(404)...
-```
+| ستون              | دامنه         | دلیل                                      |
+| ----------------- | ------------- | ----------------------------------------- |
+| `User.username`   | **سراسری**    | یک شماره = یک حساب در کل پلتفرم           |
+| `Item.code`       | per-workspace | یک کارگاه نباید کد را برای بقیه رزرو کند  |
+| `Category.name`   | per-workspace | همان                                      |
+| `*.invoiceNumber` | per-workspace | شماره‌گذاری هر کارگاه مستقل               |
+| نام کارگاه        | **یکتا نیست** | دو مغازه در دو شهر می‌توانند هم‌نام باشند |
 
 ### شکل پاسخ API
 
@@ -346,24 +363,23 @@ if (deleted.count === 0) return res.status(404)...
 
 ## ۵. تسک‌های باقی‌مانده
 
-### فاز ۵ — بکاپ و خروجی داده
+### ⬅ بعدی: TypeScript کردن فرانت
 
-|           | بکاپ پلتفرم      | خروجی مشتری          |
-| --------- | ---------------- | -------------------- |
-| مالک      | اپراتور          | صاحب کارگاه          |
-| دامنه     | کل دیتابیس       | فقط یک `workspaceId` |
-| فرمت      | `pg_dump` باینری | Excel + zip عکس‌ها   |
-| در UI اپ؟ | **نه**           | بله                  |
+خارج از روادمپ ولی قبل از ۵.۴ انجام می‌شود، تا صفحه‌ی خروجی داده از اول TypeScript
+باشد. **در یک نشست جداگانه دنبال می‌شود.**
+
+تصمیمات گرفته‌شده: **تدریجی با `allowJs`** (نه یکجا)، و **`strict: true` از همان
+اول** (نه «اول نرم بعد سفت»، که در عمل یعنی هرگز).
+
+⚠️ حساس‌ترین فایل‌ها `api/index.js` و `AuthContext.jsx` اند — منطق ظریف صف refresh
+و رهگیر ۴۰۱ نباید عوض شود.
+
+### فاز ۵ — باقی‌مانده
 
 ```markdown
-- [ ] 5.1 Check whether ParsPack's managed Postgres offers automated backups
-- [ ] 5.2 (only if 5.1 says no) Scheduled pg_dump shipped to ArvanCloud
 - [ ] 5.3 Per-workspace data export: Excel workbook + zip of device images
 - [ ] 5.4 Rework BackupList.jsx into an export page. No restore button
-- [ ] 5.5 Operator runbook for restoring a single workspace from a dump
-- [ ] 5.6 Fineti import: importFromExcel + importDeviceImages with
-      --workspace-id (4.5 موکول شد به اینجا)
-- [ ] 5.7 Operator recovery for a workspace whose owner is locked out
+- [ ] 5.6 Fineti import: importFromExcel + importDeviceImages with --workspace-id
 ```
 
 ### فاز ۶ — تست
@@ -373,7 +389,7 @@ if (deleted.count === 0) return res.status(404)...
 - [ ] 6.1 Audit controller unit tests for gaps rather than starting over
 - [ ] 6.2 Unit tests for business logic (invoiceTotals is done)
 - [ ] 6.3 Auth tests — بیشترش در فاز ۳ نوشته شد؛ ممیزی لازم است
-- [ ] (تازه) Frontend testing: نه Vitest هست نه Testing Library
+- [ ] (تازه) Frontend testing با Vitest — بعد از TypeScript شدن فرانت
 ```
 
 ### فاز ۷ — استقرار
@@ -381,22 +397,22 @@ if (deleted.count === 0) return res.status(404)...
 ```markdown
 - [ ] 7.1 Production Dockerfile for backend (must include prisma generate)
 - [ ] 7.2 Production Dockerfile for frontend (build + serve via Nginx)
-- [ ] 7.3 docker-compose.prod.yml (no Postgres — separate server)
+- [ ] 7.3 docker-compose.prod.yml — backend, frontend, reverse proxy **و Postgres**
+      روی یک هاست. volume نام‌دار برای دیتابیس، و shared_buffers باید از ۱۲۸ مگ بالا برود
 - [ ] 7.4 Reverse proxy (Nginx or Caddy) with TLS for app.dofixo.ir
-- [ ] 7.5 Provision ParsPack app server and database server (manual)
+- [ ] 7.5 Provision one ParsPack VPS (irVPS5-class: 4 vCPU, 8GB RAM, 100GB SSD), Iran
 - [ ] 7.6 First manual deployment
-      ⚠️ Must not happen before 5.1/5.2
 - [ ] 7.7 A GitHub Actions workflow that runs `pnpm test:all` on push
 ```
-
-⚠️ **۷.۵:** روی Postgres مدیریت‌شده ممکن است کاربر superuser نباشد و `CREATE ROLE` در
-مهاجرت `rls_policies` شکست بخورد. قبل از استقرار از ParsPack بپرسید.
 
 ⚠️ **۷.۴:** `NODE_ENV=production` باید ست شود، وگرنه کوکی refresh بدون `Secure`
 فرستاده می‌شود.
 
-⚠️ **تازه:** پروداکشن باید **صندوقچه و کلید Arvan جداگانه** داشته باشد. آنچه الان
-استفاده می‌شود صندوقچه‌ی تست است.
+⚠️ **۷.۶:** cron بکاپ باید نصب شود (دستورش در `ops/backup.env.example`)، و مسیر
+`S3_PREFIX` از `backups/dev` به `backups/prod` عوض شود.
+
+⚠️ **پروداکشن باید صندوقچه و کلید Arvan جداگانه داشته باشد.** آنچه الان استفاده
+می‌شود صندوقچه‌ی تست است.
 
 ### فاز ۸ — اشتراک و پرداخت
 
@@ -406,6 +422,9 @@ if (deleted.count === 0) return res.status(404)...
 - [ ] 8.4 Zibal · 8.5 Plan selection UI · 8.6 Kavenegar SMS OTP
 ```
 
+⚠️ **۸.۶ فقط یک ویژگی نیست.** تا وقتی نیامده، هر «رمزم را فراموش کرده‌ام» یک تماس
+تلفنی با اپراتور است، و ثبت‌نام هیچ سد هویتی ندارد جز rate limiter.
+
 ### فاز ۹ — یکدست‌سازی رابط کاربری
 
 ```markdown
@@ -413,8 +432,7 @@ if (deleted.count === 0) return res.status(404)...
 - [ ] 9.2 Move the profit summary onto the dashboard
 - [ ] 9.3 Let the purchase invoice form create a complete item inline
 - [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price
-- [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature
-      placement, column choice and print styling
+- [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement
 - [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8
 ```
 
@@ -422,71 +440,77 @@ if (deleted.count === 0) return res.status(404)...
 
 ## ۶. بدهی‌های فنی و ریسک‌های شناخته‌شده
 
-هیچ‌کدام باگ تصادفی نیستند — همه آگاهانه پذیرفته شده‌اند.
-
 ### ۱. فرانت هیچ تست خودکاری ندارد
 
-تأیید فاز ۳ و ۴ در سمت فرانت تماماً دستی بود. مهم‌ترین شکاف پروژه.
+تأیید فازهای ۳ و ۴ در سمت فرانت تماماً دستی بود. مهم‌ترین شکاف پروژه.
 
-### ۲. صندوقچه و کلید Arvan همان تست است
+### ۲. تک نقطه‌ی خرابی
+
+یک سرور یعنی اگر آن ماشین بمیرد همه‌چیز می‌میرد. تنها چیزی که بین تو و فاجعه
+می‌ایستد، `pg_dump` شبانه است. آگاهانه پذیرفته شده.
+
+### ۳. کلید خصوصی `age` تنها نقطه‌ی شکست بکاپ است
+
+دو نسخه در دو جای فیزیکی لازم است.
+
+### ۴. صندوقچه و کلید Arvan همان تست است
 
 قبل از پروداکشن باید جدا شود، مثل دیتابیس.
 
-### ۳. URL امضاشده ۱۵ دقیقه اعتبار دارد
+### ۵. URL امضاشده ۱۵ دقیقه اعتبار دارد
 
 اگر کاربر مودالی را بیست دقیقه باز بگذارد، عکس‌ها ۴۰۳ می‌گیرند. تصمیم: فعلاً کاری
-نکنیم. اگر آزارنده شد، یک `onError` با **یک بار** تلاش (نه حلقه) اضافه می‌شود.
+نکنیم؛ اگر آزارنده شد یک `onError` با **یک بار** تلاش اضافه می‌شود.
 
-### ۴. ثبت‌نام بدون تأیید هویت باز است
+### ۶. ثبت‌نام بدون تأیید هویت باز است
 
 تا ۸.۶، تنها ترمز rate limiter مشترک با login است.
 
-### ۵. سقف مطلق عمر session نداریم
+### ۷. سقف مطلق عمر session نداریم
 
-هر چرخش ۳۰ روز تازه می‌دهد. تصمیم عمدی، ولی یعنی توکن دزدیده‌شده‌ای که مرتب چرخانده
-شود تا ابد زنده می‌ماند — مگر دارنده‌ی قانونی هم refresh بزند.
+هر چرخش ۳۰ روز تازه می‌دهد. تصمیم عمدی.
 
-### ۶. `settings.invoice_prefix` کد مرده است
+### ۸. بازیابی جزئی و ادغام پوشش داده نشده‌اند
 
-از ۲.۸ خوانده نمی‌شود → **۹.۶**.
+کل کارگاه برمی‌گردد یا هیچ. اگر کارگاه بعد از حادثه داده‌ی تازه ساخته باشد، بازیابی
+کارگاه دومی می‌سازد.
 
-### ۷. هر کوئری یک تراکنش با دو رفت‌وبرگشت است
+### ۹. اسکریپت‌های `ops/` تست خودکار ندارند
+
+bash هستند و در Jest نمی‌گنجند. تنها تضمینشان تمرین دوره‌ای است.
+
+### ۱۰. `settings.invoice_prefix` کد مرده است → **۹.۶**
+
+### ۱۱. هر کوئری یک تراکنش با دو رفت‌وبرگشت است
 
 `getDashboardStats` هفده کوئری موازی روی pool ده‌اتصالی. تنظیم pool تا وقتی عدد
 واقعی نداریم عمداً انجام نشده.
 
-### ۸. `DeprecationWarning` از `pg`
+### ۱۲. `DeprecationWarning` از `pg` — احتمالاً هم‌ریشه با ۱۱
 
-«کوئری روی کلاینتی که مشغول است». مسدودکننده نیست، احتمالاً هم‌ریشه با ۷.
+### ۱۳. raw SQL زیر extension نمی‌رود
 
-### ۹. raw SQL زیر extension نمی‌رود
+هر raw query روی جدول tenant باید داخل `runInWorkspaceTransaction` باشد.
 
-هر raw query روی جدول tenant باید داخل `runInWorkspaceTransaction` باشد. استثناها:
-health check و سه تابع دریچه.
+### ۱۴. تست‌های یکپارچگی در CI نیستند → **۷.۷** باید `pnpm test:all` بزند
 
-### ۱۰. سه فاکتور فقط از مسیر payment/status تست ایزولاسیون دارند
-
-### ۱۱. تست‌های یکپارچگی در CI نیستند
-
-**۷.۷** باید `pnpm test:all` را اجرا کند.
-
-### ۱۲. `seed.ts` idempotent نیست
+### ۱۵. `seed.ts` idempotent نیست
 
 اگر کارگاهی وجود داشته باشد رد می‌شود. برای seed دوباره `docker compose down -v`.
 
-### ۱۳. حذف فاکتور خرید `avgPurchasePrice` را اصلاح نمی‌کند → **۹.۴**
+### ۱۶. حذف فاکتور خرید `avgPurchasePrice` را اصلاح نمی‌کند → **۹.۴**
 
-### ۱۴. بهای تمام‌شده در گزارش سود، قیمت **فعلی** است، نه قیمت زمان فروش
+### ۱۷. بهای تمام‌شده در گزارش سود، قیمت **فعلی** است، نه قیمت زمان فروش
 
-### ۱۵. گزارش سود اقلام دلخواه را نادیده می‌گیرد
+### ۱۸. گزارش سود اقلام دلخواه را نادیده می‌گیرد
 
-### ۱۶. `repair_invoice_items.itemId` عمداً رابطه نیست (پلی‌مورفیک)
+### ۱۹. `repair_invoice_items.itemId` عمداً رابطه نیست (پلی‌مورفیک)
 
-### ۱۷. `personnel_id` روی `devices` بلااستفاده است. کاندید حذف
+### ۲۰. `personnel_id` روی `devices` بلااستفاده است. کاندید حذف
 
-### ۱۸. سه ستون تخفیف در `SaleInvoiceItem` بلااستفاده‌اند
+### ۲۱. سه ستون تخفیف در `SaleInvoiceItem` بلااستفاده‌اند
 
-### ۱۹. `dist` خودش را پاک نمی‌کند · `pnpm-workspace.yaml` داخل `backend/` است
+### ۲۲. `dist` خودش را پاک نمی‌کند · `pnpm-workspace.yaml` داخل `backend/` است
 
 ---
 
@@ -514,13 +538,13 @@ health check و سه تابع دریچه.
 ```bash
 cp .env.example .env
 cp backend/.env.example backend/.env
+cp ops/backup.env.example ops/backup.env
 
 docker compose up -d --build
 
 node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 docker compose exec postgres psql -U dofixo -d dofixo_dev \
   -c "ALTER ROLE dofixo_app WITH LOGIN PASSWORD '<رمز>';"
-# همان رمز در DATABASE_URL_APP و POSTGRES_APP_PASSWORD
 
 cd backend && pnpm exec prisma migrate dev && pnpm exec prisma generate
 cd backend && pnpm seed        # با SEED_ADMIN_USERNAME وارد می‌شوید
@@ -546,21 +570,12 @@ docker compose logs backend --tail 30
 docker compose restart backend
 ```
 
-### دیتابیس
+### عملیات
 
 ```bash
-cd backend && pnpm migrate
-
-docker compose exec postgres psql -U dofixo -d dofixo_dev \
-  -c "SELECT tablename, policyname FROM pg_policies WHERE schemaname='public';"
-docker compose exec postgres psql -U dofixo -d dofixo_dev \
-  -c "SELECT proname, prosecdef FROM pg_proc WHERE proname LIKE 'app_%';"
-
-docker compose exec -T postgres psql -U dofixo -d dofixo_dev \
-  -v ON_ERROR_STOP=0 < backend/prisma/rls-check.sql
-
-docker compose down -v && docker compose up -d postgres
-cd backend && pnpm exec prisma migrate dev && pnpm seed
+./ops/backup-database.sh                                    # بکاپ دستی
+./ops/extract-workspace.sh <backup.age> <id> <key-file>     # استخراج یک کارگاه
+./ops/reset-password.sh <شماره>                             # بازیابی دسترسی
 ```
 
 ### متغیرهای محیطی — `backend/.env`
@@ -579,7 +594,6 @@ SEED_ADMIN_PASSWORD=<رمز اولیه>
 RATE_LIMIT_API=1000
 RATE_LIMIT_LOGIN=10
 
-# ArvanCloud — صندوقچه باید خصوصی باشد
 S3_ENDPOINT=https://s3.ir-thr-at1.arvanstorage.ir
 S3_REGION=default
 S3_BUCKET=reza-app-test-1
@@ -588,23 +602,21 @@ S3_SECRET_KEY=<کلید>
 ```
 
 `.env` ریشه: `POSTGRES_APP_PASSWORD=<همان رمز>`
+`ops/backup.env`: پیکربندی بکاپ، **مستقل از `backend/.env` عمداً**
 
 ---
 
 ## ۹. دام‌هایی که در مسیر به آن‌ها خوردیم
 
-حتماً بخوانید — هر کدام دست‌کم یک ساعت وقت گرفت.
-
 ### multer از async context عبور نمی‌کند
 
-پرهزینه‌ترین دام فاز ۴. busboy هندلر را از یک رویداد stream صدا می‌زند و
-`AsyncLocalStorage` آن را دنبال نمی‌کند. علامتش: `req.user` هست ولی
-`currentWorkspaceId()` برابر `undefined` و هر کوئری خطای «No workspace context»
-می‌دهد. راه‌حل: `restoreWorkspaceContext` بعد از multer، که store **تازه** باز کند.
+پرهزینه‌ترین دام فاز ۴. علامتش: `req.user` هست ولی `currentWorkspaceId()` برابر
+`undefined`. راه‌حل: `restoreWorkspaceContext` بعد از multer، که store **تازه** باز
+کند.
 
 ### کاراکتر `<` در کپی از چت گم می‌شود
 
-`<` در جنریک‌ها (`z.infer<...>`، `$queryRaw<...>`) گاهی بلعیده می‌شود. بعد از هر کپی:
+بعد از هر کپی:
 
 ```bash
 cd backend && grep -n "z.infer\|GetPayload\|queryRaw\|satisfies" src/**/*.ts
@@ -615,13 +627,18 @@ cd backend && grep -n "z.infer\|GetPayload\|queryRaw\|satisfies" src/**/*.ts
 ### موقع اعمال «از → به»، خط قدیمی را حذف کنید
 
 باگ دو-پاسخی `refresh` از همین آمد: خط تازه اضافه شد ولی قدیمی ماند، و هر رفرش
-صفحه دو session ساخت. علامتش `ERR_HTTP_HEADERS_SENT` در لاگ بود، بدون هیچ اثری در
-مرورگر.
+صفحه دو session ساخت.
+
+### `pg_get_serial_sequence` روی جدول‌های سیستمی می‌شکند
+
+منطق `setval` سه نسخه خواست. `information_schema.tables` جدول‌های سیستمی را
+برمی‌گرداند و `pg_get_serial_sequence` روی جدولی که نیست **خطا پرتاب می‌کند** نه
+`NULL` — و Postgres ترتیب ارزیابی `WHERE` را تضمین نمی‌کند. جواب `pg_sequences` بود.
 
 ### `sudo` نزنید
 
-`prisma generate` فایل می‌نویسد و با `sudo` مالکشان root می‌شود. کانتینر هم موقع بوت
-همین کار را می‌کند:
+`prisma generate` فایل می‌نویسد و با `sudo` مالکشان root می‌شود. کانتینر هم موقع
+بوت همین کار را می‌کند:
 
 ```bash
 sudo chown -R "$USER":"$USER" backend
@@ -629,7 +646,6 @@ sudo chown -R "$USER":"$USER" backend
 
 ### بعد از `pnpm add` کانتینر را بازبسازید
 
-volume ناشناس `node_modules` را می‌پوشاند و کانتینر مجموعه‌ی قدیمی را نگه می‌دارد.
 علامتش `MODULE_NOT_FOUND` روی پکیج تازه‌نصب است:
 
 ```bash
@@ -651,12 +667,14 @@ docker compose exec postgres env PGPASSWORD='wrong' \
 
 ### `ERR_HTTP_HEADERS_SENT` همیشه باگ نیست
 
-کلاینتی که وسط درخواست می‌رود (double-render در React) پاسخ را می‌بندد. نگهبان
-`if (!res.headersSent)` قبل از هر نوشتن، و در `catch` هم.
+کلاینتی که وسط درخواست می‌رود پاسخ را می‌بندد. نگهبان `if (!res.headersSent)` قبل
+از هر نوشتن، و در `catch` هم.
+
+### در zsh دستور `.` مسیر نسبی را در `$PATH` می‌گردد
+
+`. backup.env` شکست می‌خورد؛ `. ./backup.env` کار می‌کند.
 
 ### مهاجرت دستی: timestamp باید بزرگ‌تر باشد
-
-ترتیب اجرا الفبایی است، نه زمانی.
 
 ### `globalSetup` فقط وقتی تستی باشد اجرا می‌شود
 
@@ -671,21 +689,13 @@ runInWorkspaceTransaction: jest.fn(
 ),
 ```
 
-`jest.fn()` خالی یعنی بدنه اصلاً اجرا نمی‌شود.
-
 ### تستی که context لازم دارد باید در `runWithRequestContext` بپیچد
-
-`login`، `register`، `refresh`، `logout` همه `setContextWorkspaceId` صدا می‌زنند.
 
 ### `127.0.0.1` نه `localhost`
 
 روی Arch، `localhost` اول به `::1` حل می‌شود و Prisma با `P1001` شکست می‌خورد.
 
-### `prisma generate` بعد از هر `migrate dev`
-
-در Prisma 7 خودکار نیست. `pnpm migrate` هر دو را می‌زند.
-
-### Prisma 7 به driver adapter نیاز دارد
+### `prisma generate` بعد از هر `migrate dev` · Prisma 7 به driver adapter نیاز دارد
 
 ### `tsx watch` بعد از حذف فایل گیر می‌کند
 
@@ -738,19 +748,6 @@ z.preprocess((value) => (value === "" ? undefined : value), z.coerce.date().opti
 ۲۹ فایل · ۳۷۱ تست · همه پاس · Prisma و storage با mock
 ```
 
-| فایل                       | پوشش                                              |
-| -------------------------- | ------------------------------------------------- |
-| `auth.test.ts`             | authenticate: امضا، انقضا، شکل payload            |
-| `authorize.test.ts`        | `authorize()` و `atLeast()`                       |
-| `authController.test.ts`   | ثبت‌نام، ورود، refresh، logout                    |
-| `authSchemas.test.ts`      | normalize شماره، قواعد رمز، هم‌ترازی پرسنل        |
-| `refreshToken.test.ts`     | ساخت/هش توکن، تنظیمات کوکی                        |
-| `newWorkspace.test.ts`     | فرش کردن کارگاه تازه                              |
-| `workspaceContext.test.ts` | ایزوله بودن context + `restoreWorkspaceContext`   |
-| `prismaExtension.test.ts`  | کوئری بدون context باید خطا بدهد                  |
-| `imageController.test.ts`  | کلید با پیشوند workspace، URL امضاشده، شکست آپلود |
-| ۱۳ فایل کنترلر + ابزار     | CRUD، scope، منطق کسب‌وکار                        |
-
 ### تست‌های یکپارچگی (`pnpm test:integration`)
 
 ```
@@ -766,11 +763,19 @@ z.preprocess((value) => (value === "" ? undefined : value), z.coerce.date().opti
 | `register.test.ts`              | ثبت‌نام، کارگاه یتیم، ایزوله بودن کارگاه تازه    |
 | `refreshToken.test.ts`          | کوکی، چرخش، تشخیص سرقت، logout تک‌session        |
 
-⚠️ تست‌های یکپارچگی **به Arvan واقعی نمی‌خورند** — `lib/storage` در آن‌ها هم mock
-است، وگرنه هر اجرا صندوقچه را پر می‌کرد.
+⚠️ تست‌های یکپارچگی **به Arvan واقعی نمی‌خورند** — `lib/storage` mock است.
 
-**آنچه هنوز تست نمی‌شود:** فرانت، اتمی بودن تراکنش‌ها در حالت شکست، `PUT /:id` کامل
-سه نوع فاکتور، و اتصال واقعی به object storage.
+**اضافه کردن منبع REST جدید:** یک خط در آرایه‌ی `resources` در `isolation.test.ts`.
+
+**آنچه تست نمی‌شود:** فرانت، اسکریپت‌های `ops/`، اتمی بودن تراکنش‌ها در حالت شکست،
+`PUT /:id` کامل سه نوع فاکتور، و اتصال واقعی به object storage.
+
+### تأییدهای دستی که انجام شده‌اند
+
+- **بازیابی کامل دیتابیس:** داده + ۲۰ policy + ۴ تابع `SECURITY DEFINER` برگشتند
+- **بازیابی یک کارگاه:** کاربر با رمز قبلی وارد شد، عکس‌ها با کلید قدیمی لود شدند،
+  و کارگاه دیگری داده‌اش را ندید
+- **بازیابی دسترسی:** رمز عوض شد، session قبلی بسته شد، حساب غیرفعال رد شد
 
 ---
 
@@ -778,19 +783,20 @@ z.preprocess((value) => (value === "" ? undefined : value), z.coerce.date().opti
 
 ۱. سه فایل `CLAUDE.md`، `Roadmap.md` و `RULES.md` را بفرست
 ۲. این سند را بفرست
-۳. تسک را انتخاب کن (پیشنهادها پایین)
+۳. تسک را انتخاب کن
 
-### سه مسیر پیش رو
+### مسیر پیشنهادی
 
-**الف) فاز ۵ — بکاپ و خروجی داده.** منطقی‌ترین ادامه، چون **۷.۶ نباید قبل از ۵.۱ و
-۵.۲ اتفاق بیفتد** — سیستمی که داده‌ی واقعی مشتری دارد و بکاپ ندارد، حادثه‌ای است که
-منتظر وقوع است. شروعش با ۵.۱ است که یک سؤال از ParsPack است، نه کد.
+**۱. TypeScript کردن فرانت** (تصمیمش گرفته شده، نشست جدا)
+**۲. تسک ۵.۳ و ۵.۴** — خروجی Excel هر کارگاه و صفحه‌اش
+**۳. فاز ۷** — استقرار
 
-**ب) Vitest برای فرانت.** بزرگ‌ترین شکاف فعلی. دو فاز اخیر تماماً دستی تأیید شدند، و
-هرچه فرانت بزرگ‌تر شود این گران‌تر می‌شود. اگر تصمیم داری فرانت را TypeScript کنی،
-بهتر است اول آن، بعد تست.
+بعد از ۵.۳ و ۵.۴، هیچ چیز اساسی بین پروژه و اولین مشتری واقعی نمی‌ماند جز خود
+استقرار.
 
-**ج) فاز ۷ — استقرار.** فقط اگر سرورها تهیه شده باشند، و **نه قبل از ۵.۱/۵.۲**.
+⚠️ **قبل از اولین استقرار واقعی این چهار چیز باید انجام شود:**
 
-پیشنهاد من **الف** است، چون تنها چیزی است که مسیر رسیدن به پروداکشن را باز می‌کند و
-شروعش ارزان است.
+- صندوقچه و کلید Arvan جداگانه برای پروداکشن
+- `S3_PREFIX` از `backups/dev` به `backups/prod`
+- نصب cron بکاپ
+- نسخه‌ی دوم کلید خصوصی `age` در جای فیزیکی متفاوت

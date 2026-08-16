@@ -1,8 +1,7 @@
-// src/components/ImageUploader.jsx
 import { useRef, useState, useEffect, useCallback } from "react";
+import axios from "axios";
 import toast from "react-hot-toast";
-import api from "../api";
-import { deleteDeviceImage } from "../api";
+import api, { deleteDeviceImage } from "../api";
 import {
   TrashIcon,
   PhotoIcon,
@@ -12,8 +11,32 @@ import {
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import ImageSlider from "./ImageSlider";
+import type { DeviceImage, Id, UploadImagesResponse } from "../types/api";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+
+/**
+ * queued   — chosen before the device exists, waiting for its id
+ * uploading — bytes on the wire, progress is real
+ * processing — sent in full, the server is converting to webp
+ */
+type QueueStatus = "queued" | "uploading" | "processing" | "done" | "error";
+
+interface QueueItem {
+  id: string;
+  file: File;
+  previewUrl: string;
+  status: QueueStatus;
+  progress: number;
+  error: string | null;
+}
+
+interface ImageUploaderProps {
+  deviceId?: Id | null;
+  existingImages?: DeviceImage[];
+  onDeleteExisting: (imageId: number) => void;
+  onUploadDone?: (images: DeviceImage[]) => void;
+}
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -24,16 +47,16 @@ export default function ImageUploader({
   existingImages = [],
   onDeleteExisting,
   onUploadDone,
-}) {
-  const inputRef = useRef();
-  const [sliderIndex, setSliderIndex] = useState(null);
-  // صف عکس‌های در حال پردازش (انتخاب‌شده ولی هنوز کامل آپلود/ذخیره نشده‌اند)
-  const [queue, setQueue] = useState([]);
-  const abortControllers = useRef({}); // id -> AbortController
+}: ImageUploaderProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [sliderIndex, setSliderIndex] = useState<number | null>(null);
+  // Images chosen but not yet uploaded and stored.
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const abortControllers = useRef<Record<string, AbortController>>({});
 
-  // ─── آپلود یک عکس (جدا از بقیه، برای گرفتن پیشرفت واقعی هر عکس) ─────────────
+  // Uploaded one at a time so each image reports its own progress.
   const uploadOne = useCallback(
-    async (item) => {
+    async (item: QueueItem) => {
       const controller = new AbortController();
       abortControllers.current[item.id] = controller;
 
@@ -49,26 +72,31 @@ export default function ImageUploader({
         const formData = new FormData();
         formData.append("images", item.file);
 
-        const res = await api.post(`/devices/${deviceId}/images`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-          signal: controller.signal,
-          onUploadProgress: (evt) => {
-            if (!evt.total) return;
-            const pct = Math.round((evt.loaded * 100) / evt.total);
-            setQueue((q) =>
-              q.map((i) =>
-                i.id === item.id
-                  ? {
-                      ...i,
-                      progress: pct,
-                      // وقتی ارسال به ۱۰۰٪ رسید ولی جواب سرور نرسیده، یعنی سرور داره تبدیل فرمت انجام می‌ده
-                      status: pct >= 100 ? "processing" : "uploading",
-                    }
-                  : i,
-              ),
-            );
+        const res = await api.post<UploadImagesResponse>(
+          `/devices/${deviceId}/images`,
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+            signal: controller.signal,
+            onUploadProgress: (evt) => {
+              if (!evt.total) return;
+              const pct = Math.round((evt.loaded * 100) / evt.total);
+              setQueue((q) =>
+                q.map((i) =>
+                  i.id === item.id
+                    ? {
+                        ...i,
+                        progress: pct,
+                        // Sent in full but no answer yet: the server is
+                        // converting the file.
+                        status: pct >= 100 ? "processing" : "uploading",
+                      }
+                    : i,
+                ),
+              );
+            },
           },
-        });
+        );
 
         const uploadedImage = res.data?.images?.[0];
 
@@ -80,18 +108,21 @@ export default function ImageUploader({
           onUploadDone([uploadedImage]);
         }
 
-        // بعد از نمایش کوتاه تیک موفقیت، از صف حذفش کن (چون از این به بعد
-        // با existingImages که پدر آپدیت کرده نمایش داده میشه)
+        // Dropped from the queue after the tick has been visible for a
+        // moment: from here the parent shows it through existingImages.
         setTimeout(() => {
           setQueue((q) => q.filter((i) => i.id !== item.id));
           URL.revokeObjectURL(item.previewUrl);
         }, 700);
       } catch (err) {
-        if (api.isCancel?.(err) || err.name === "CanceledError") {
-          // کاربر خودش لغو کرده، نیازی به نمایش خطا نیست
+        if (axios.isCancel(err)) {
+          // Cancelled by the user; there is nothing to report.
           return;
         }
-        const message = err.response?.data?.error || "خطا در آپلود عکس";
+        const message =
+          (axios.isAxiosError(err) &&
+            (err.response?.data as { error?: string } | undefined)?.error) ||
+          "خطا در آپلود عکس";
         setQueue((q) =>
           q.map((i) =>
             i.id === item.id ? { ...i, status: "error", error: message } : i,
@@ -105,10 +136,9 @@ export default function ImageUploader({
     [deviceId, onUploadDone],
   );
 
-  // ─── انتخاب فایل ──────────────────────────────────────────────────────────
-  function handleSelect(e) {
-    const files = Array.from(e.target.files);
-    e.target.value = ""; // اجازه بده همون فایل دوباره هم قابل انتخاب باشه
+  function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // so the same file can be chosen again
 
     const oversized = files.filter((f) => f.size > MAX_FILE_SIZE);
     if (oversized.length > 0) {
@@ -118,11 +148,12 @@ export default function ImageUploader({
     const validFiles = files.filter((f) => f.size <= MAX_FILE_SIZE);
     if (validFiles.length === 0) return;
 
-    const newItems = validFiles.map((file) => ({
+    const newItems: QueueItem[] = validFiles.map((file) => ({
       id: makeId(),
       file,
       previewUrl: URL.createObjectURL(file),
-      // اگه دستگاه هنوز id نداره (در حال ثبت دستگاه جدید)، فقط تو صف می‌مونه
+      // Without a device id there is nowhere to put the file yet, so it
+      // waits in the queue until the form has been saved.
       status: deviceId ? "uploading" : "queued",
       progress: 0,
       error: null,
@@ -135,8 +166,7 @@ export default function ImageUploader({
     }
   }
 
-  // وقتی deviceId بعد از ثبت فرم دستگاه جدید ست میشه، عکس‌های در صف رو
-  // خودکار و در پس‌زمینه آپلود کن
+  // Once the new device has an id, anything waiting goes up on its own.
   useEffect(() => {
     if (!deviceId) return;
     setQueue((currentQueue) => {
@@ -147,7 +177,7 @@ export default function ImageUploader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
-  // پاک‌سازی هنگام unmount: لغو ریکوئست‌های در حال انجام و آزادسازی object URL ها
+  // On unmount: abort what is in flight and release the object URLs.
   useEffect(() => {
     return () => {
       Object.values(abortControllers.current).forEach((c) => c.abort());
@@ -156,18 +186,22 @@ export default function ImageUploader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function retryUpload(item) {
+  function retryUpload(item: QueueItem) {
     uploadOne(item);
   }
 
-  function removeQueueItem(item) {
+  function removeQueueItem(item: QueueItem) {
     const controller = abortControllers.current[item.id];
     if (controller) controller.abort();
     setQueue((q) => q.filter((i) => i.id !== item.id));
     URL.revokeObjectURL(item.previewUrl);
   }
 
-  async function handleDelete(imageId) {
+  async function handleDelete(imageId: number) {
+    // Unreachable in practice — the delete button only exists on images the
+    // device already has — but narrowing it here is honest, where `?? ""`
+    // would only quiet the type.
+    if (!deviceId) return;
     if (!confirm("حذف این عکس؟")) return;
     try {
       await deleteDeviceImage(deviceId, imageId);
@@ -185,7 +219,7 @@ export default function ImageUploader({
     <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
       {(existingImages.length > 0 || queue.length > 0) && (
         <div className="grid grid-cols-3 gap-3">
-          {/* عکس‌های از قبل ذخیره‌شده */}
+          {/* Already stored */}
           {existingImages.map((img, i) => (
             <div key={`existing-${img.id}`} className="relative group">
               <img
@@ -206,7 +240,7 @@ export default function ImageUploader({
             </div>
           ))}
 
-          {/* عکس‌های در صف / در حال آپلود / خطا */}
+          {/* Queued, uploading, or failed */}
           {queue.map((item) => (
             <div key={item.id} className="relative">
               <img
@@ -216,7 +250,7 @@ export default function ImageUploader({
                 }`}
               />
 
-              {/* اورلی وضعیت */}
+              {/* Status overlay */}
               <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1 bg-black/45 text-text-inverse text-center px-2">
                 {item.status === "queued" && (
                   <>
@@ -272,7 +306,7 @@ export default function ImageUploader({
                 )}
               </div>
 
-              {/* دکمه حذف - همیشه در دسترس به‌جز وقتی کار تمام شده */}
+              {/* Removable until the upload has finished */}
               {item.status !== "done" && (
                 <button
                   type="button"
@@ -291,7 +325,7 @@ export default function ImageUploader({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => inputRef.current.click()}
+          onClick={() => inputRef.current?.click()}
           className="px-4 py-2 flex gap-2 justify-center items-center bg-surface-alt rounded-lg hover:bg-surface-alt"
         >
           <PhotoIcon className="w-5 h-5" />

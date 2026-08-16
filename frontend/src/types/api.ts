@@ -54,3 +54,31 @@ export interface AuthResponse {
 export interface MessageResponse {
   message: string;
 }
+
+/**
+ * What both image endpoints have in common. The two shapes differ: uploading
+ * returns `device_id` and no `created_at`, listing returns `created_at` and
+ * no `device_id` — and both end up in the same array, since a freshly
+ * uploaded image is appended to the list the page already holds.
+ *
+ * `url` is a presigned URL valid for fifteen minutes, signed per request.
+ */
+export interface DeviceImage {
+  id: number;
+  filename: string;
+  sort_order: number;
+  url: string;
+}
+
+export interface UploadedDeviceImage extends DeviceImage {
+  device_id: number;
+}
+
+export interface ListedDeviceImage extends DeviceImage {
+  created_at: string;
+}
+
+export interface UploadImagesResponse {
+  message: string;
+  images: UploadedDeviceImage[];
+}

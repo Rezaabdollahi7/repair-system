@@ -1,13 +1,22 @@
-// src/components/ImageSlider.jsx
 import { useState, useEffect, useCallback } from "react";
 import {
   XMarkIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import type { DeviceImage } from "../types/api";
 
+interface ImageSliderProps {
+  images: DeviceImage[];
+  initialIndex?: number;
+  onClose: () => void;
+}
 
-export default function ImageSlider({ images, initialIndex = 0, onClose }) {
+export default function ImageSlider({
+  images,
+  initialIndex = 0,
+  onClose,
+}: ImageSliderProps) {
   const [current, setCurrent] = useState(initialIndex);
 
   const prev = useCallback(() => {
@@ -19,7 +28,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
   }, [images.length]);
 
   useEffect(() => {
-    function handleKey(e) {
+    function handleKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") prev();
       if (e.key === "ArrowLeft") next();
       if (e.key === "Escape") onClose();
@@ -35,7 +44,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
       className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center"
       onClick={onClose}
     >
-      {/* دکمه بستن */}
+      {/* Close */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -46,12 +55,12 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
         <XMarkIcon className="w-6 h-6" />
       </button>
 
-      {/* شمارنده */}
+      {/* Counter */}
       <div className="absolute top-4 right-4 text-text-inverse/70 text-sm bg-black/40 px-3 py-1 rounded-full z-10">
         {current + 1} / {images.length}
       </div>
 
-      {/* تصویر اصلی */}
+      {/* Main image */}
       <div
         className="relative flex items-center justify-center w-full max-w-4xl px-16"
         onClick={(e) => e.stopPropagation()}
@@ -90,7 +99,7 @@ export default function ImageSlider({ images, initialIndex = 0, onClose }) {
         )}
       </div>
 
-      {/* بند انگشتی‌ها */}
+      {/* Thumbnails */}
       {images.length > 1 && (
         <div
           className="flex gap-2 mt-5 overflow-x-auto max-w-2xl px-4 pb-1"

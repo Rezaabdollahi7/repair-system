@@ -1,5 +1,5 @@
-// src/components/CustomerDetailModal.jsx
 import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   getCustomer,
   getCustomerStats,
@@ -19,15 +19,22 @@ import {
   PencilIcon,
   TrashIcon,
   XMarkIcon,
-  EnvelopeIcon,
-  MapPinIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
 import { formatPersianPhone } from "../utils/formatters";
+import type {
+  Customer,
+  CustomerDevice,
+  CustomerStats,
+  Id,
+} from "../types/api";
 
-// ── helper ──────────────────────────────────────────────
-const statusColor = {
+/**
+ * Neither map covers "received", the schema's default, so a device nobody
+ * has touched yet falls through to its raw status. Left as it was.
+ */
+const statusColor: Record<string, string> = {
   pending: "bg-warning-soft text-warning",
   diagnosing: "bg-primary-soft text-primary",
   repairing: "bg-warning-soft text-warning",
@@ -39,7 +46,7 @@ const statusColor = {
   waiting_for_parts: "bg-warning-soft text-warning",
 };
 
-const statusLabel = {
+const statusLabel: Record<string, string> = {
   pending: "در انتظار",
   diagnosing: "در حال بررسی",
   repairing: "در حال تعمیر",
@@ -51,12 +58,19 @@ const statusLabel = {
   waiting_for_parts: "در انتظار قطعه",
 };
 
-function toJalali(dateStr) {
+function toJalali(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("fa-IR");
 }
 
-function StatCard({ icon: Icon, label, value, color }) {
+interface StatCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: React.ReactNode;
+  color: string;
+}
+
+function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
   return (
     <div className="bg-surface rounded-xl shadow-sm border border-border p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
       <div className={`p-2 sm:p-3 rounded-full ${color} shrink-0`}>
@@ -74,7 +88,12 @@ function StatCard({ icon: Icon, label, value, color }) {
   );
 }
 
-function DeviceTimeline({ devices, openDeviceDetail }) {
+interface DeviceTimelineProps {
+  devices: CustomerDevice[];
+  openDeviceDetail: (deviceId: number) => void;
+}
+
+function DeviceTimeline({ devices, openDeviceDetail }: DeviceTimelineProps) {
   if (!devices.length) {
     return (
       <div className="text-center py-10 text-text-secondary">
@@ -86,18 +105,18 @@ function DeviceTimeline({ devices, openDeviceDetail }) {
 
   return (
     <div className="relative">
-      {/* خط زمان عمودی - در موبایل مخفی می‌شه */}
+      {/* Vertical timeline, hidden on mobile */}
       <div className="hidden sm:block absolute right-5 top-0 bottom-0 w-0.5 bg-border" />
       <div className="space-y-3 sm:space-y-4">
-        {devices.map((device, index) => (
+        {devices.map((device) => (
           <div
             key={device.id}
             className="relative flex items-start gap-3 sm:gap-4 pr-6 sm:pr-12"
           >
-            {/* نقطه زمان - در موبایل کوچک‌تر */}
+            {/* Timeline dot */}
             <div className="absolute right-2 sm:right-3 mt-2 sm:mt-1.5 w-3 h-3 sm:w-5 sm:h-5 rounded-full bg-surface border-2 border-primary z-10 shadow-sm" />
 
-            {/* کارت دستگاه */}
+            {/* Device card */}
             <button
               onClick={() => openDeviceDetail(device.id)}
               className="flex-1 bg-surface rounded-xl shadow-sm border border-border p-3 sm:p-4 hover:border-primary-soft hover:shadow-md transition-all text-right group"
@@ -150,17 +169,25 @@ function DeviceTimeline({ devices, openDeviceDetail }) {
   );
 }
 
+interface CustomerDetailModalProps {
+  customerId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onEdit?: (customerId: Id) => void;
+  zIndex?: number;
+}
+
 export default function CustomerDetailModal({
   customerId,
   isOpen,
   onClose,
   onEdit,
-}) {
+}: CustomerDetailModalProps) {
   const { isAtLeast } = useAuth();
   const { openDeviceDetail, openCustomerEdit } = useModal();
-  const [customer, setCustomer] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [devices, setDevices] = useState([]);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [stats, setStats] = useState<CustomerStats | null>(null);
+  const [devices, setDevices] = useState<CustomerDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -184,9 +211,11 @@ export default function CustomerDetailModal({
         })
         .finally(() => setLoading(false));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, customerId]);
 
   const handleDelete = async () => {
+    if (!customerId) return;
     setDeleting(true);
     try {
       await deleteCustomer(customerId);
@@ -194,13 +223,18 @@ export default function CustomerDetailModal({
       setShowDeleteConfirm(false);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || "خطا در حذف");
+      const message =
+        (axios.isAxiosError(err) &&
+          (err.response?.data as { error?: string } | undefined)?.error) ||
+        "خطا در حذف";
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
   };
 
   const handleEdit = () => {
+    if (!customerId) return;
     onClose();
     if (onEdit) {
       onEdit(customerId);
@@ -217,7 +251,7 @@ export default function CustomerDetailModal({
         className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
-        {/* هدر */}
+        {/* Header */}
         <div className="sticky top-0 z-20 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="bg-primary-soft p-2 rounded-xl">
@@ -249,7 +283,7 @@ export default function CustomerDetailModal({
             </div>
           ) : customer ? (
             <div className="space-y-4 sm:space-y-6">
-              {/* کارت اطلاعات مشتری */}
+              {/* Customer card */}
               <div className="bg-gradient-to-r from-primary-soft to-surface rounded-2xl shadow-sm border border-primary-soft p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex items-center gap-3 sm:gap-4">
@@ -276,7 +310,7 @@ export default function CustomerDetailModal({
                     </div>
                   </div>
 
-                  {/* دکمه‌های اقدام */}
+                  {/* Actions */}
                   <div className="flex gap-2 sm:gap-2 justify-end">
                     <button
                       onClick={handleEdit}
@@ -300,7 +334,7 @@ export default function CustomerDetailModal({
                 </div>
               </div>
 
-              {/* آمار */}
+              {/* Stats */}
               {stats && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <StatCard
@@ -320,7 +354,7 @@ export default function CustomerDetailModal({
                     label="میانگین زمان تعمیر"
                     value={
                       stats.avg_repair_days
-                        ? `${Math.round(stats.avg_repair_days)} روز`
+                        ? `${Math.round(Number(stats.avg_repair_days))} روز`
                         : "—"
                     }
                     color="bg-warning-soft text-warning"
@@ -328,7 +362,7 @@ export default function CustomerDetailModal({
                 </div>
               )}
 
-              {/* تاریخچه دستگاه‌ها */}
+              {/* Device history */}
               <div className="bg-surface-alt rounded-xl p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-border">
                   <DevicePhoneMobileIcon className="w-5 h-5 text-primary" />

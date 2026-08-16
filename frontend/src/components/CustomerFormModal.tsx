@@ -1,22 +1,31 @@
-// src/components/CustomerFormModal.jsx
 import { useState, useEffect } from "react";
+import axios from "axios";
 import { createCustomer, updateCustomer, getCustomer } from "../api";
 import { toast } from "react-hot-toast";
 import { XMarkIcon, UserIcon, PhoneIcon } from "@heroicons/react/24/solid";
+import type { CustomerBody, Id } from "../types/api";
+
+interface CustomerFormModalProps {
+  customerId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
 
 export default function CustomerFormModal({
   customerId,
   isOpen,
   onClose,
   onSuccess,
-}) {
+}: CustomerFormModalProps) {
   const isEdit = Boolean(customerId);
-  const [form, setForm] = useState({ name: "", phone: "" });
+  const [form, setForm] = useState<CustomerBody>({ name: "", phone: "" });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      if (isEdit) {
+      if (isEdit && customerId) {
         getCustomer(customerId)
           .then((res) =>
             setForm({ name: res.data.name || "", phone: res.data.phone || "" }),
@@ -28,24 +37,28 @@ export default function CustomerFormModal({
     }
   }, [isOpen, customerId, isEdit]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error("نام الزامی است");
     if (!form.phone.trim()) return toast.error("شماره تماس الزامی است");
 
     setLoading(true);
     try {
-      if (isEdit) {
+      if (isEdit && customerId) {
         await updateCustomer(customerId, form);
         toast.success("مشتری ویرایش شد");
       } else {
         await createCustomer(form);
         toast.success("مشتری اضافه شد");
       }
-      onSuccess && onSuccess();
+      onSuccess?.();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || "خطا در ذخیره‌سازی");
+      const message =
+        (axios.isAxiosError(err) &&
+          (err.response?.data as { error?: string } | undefined)?.error) ||
+        "خطا در ذخیره‌سازی";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

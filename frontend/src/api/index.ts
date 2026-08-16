@@ -5,6 +5,12 @@ import type {
   Id,
   MessageResponse,
   QueryParams,
+  Customer,
+  CustomerBody,
+  CustomerDevice,
+  CustomerListRow,
+  CustomerStats,
+  Paginated,
 } from "../types/api";
 
 /**
@@ -158,17 +164,22 @@ export const deleteDevice = (id: Id) => api.delete(`/devices/${id}`);
 
 // Customers
 export const getCustomers = (params?: QueryParams) =>
-  api.get("/customers", { params });
-export const getCustomer = (id: Id) => api.get(`/customers/${id}`);
-export const createCustomer = (data: unknown) => api.post("/customers", data);
-export const updateCustomer = (id: Id, data: unknown) =>
-  api.put(`/customers/${id}`, data);
+  api.get<Paginated<CustomerListRow>>("/customers", { params });
+export const getCustomer = (id: Id) => api.get<Customer>(`/customers/${id}`);
+export const createCustomer = (data: CustomerBody) =>
+  api.post<Customer>("/customers", data);
+export const updateCustomer = (id: Id, data: CustomerBody) =>
+  api.put<Customer>(`/customers/${id}`, data);
 export const getCustomerDevices = (id: Id) =>
-  api.get(`/customers/${id}/devices`);
-export const getCustomerStats = (id: Id) => api.get(`/customers/${id}/stats`);
-export const deleteCustomer = (id: Id) => api.delete(`/customers/${id}`);
+  api.get<CustomerDevice[]>(`/customers/${id}/devices`);
+export const getCustomerStats = (id: Id) =>
+  api.get<CustomerStats>(`/customers/${id}/stats`);
+export const deleteCustomer = (id: Id) =>
+  api.delete<{ success: boolean }>(`/customers/${id}`);
 export const searchCustomers = (q: string) =>
-  api.get("/customers", { params: { search: q, limit: 20 } });
+  api.get<Paginated<CustomerListRow>>("/customers", {
+    params: { search: q, limit: 20 },
+  });
 
 export const getDeviceImages = (deviceId: Id) =>
   api.get(`/devices/${deviceId}/images`);

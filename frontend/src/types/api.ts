@@ -82,3 +82,71 @@ export interface UploadImagesResponse {
   message: string;
   images: UploadedDeviceImage[];
 }
+
+/**
+ * The paginated envelope the list endpoints return. Note `totalPages` is
+ * camelCase while the rows inside are snake_case — that is what the
+ * controller sends.
+ */
+export interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+/** A row of GET /customers — trimmed, with the device count folded in. */
+export interface CustomerListRow {
+  id: number;
+  name: string;
+  phone: string | null;
+  device_count: number;
+}
+
+export interface CustomerStats {
+  total_devices: number;
+  successful_repairs: number;
+  /**
+   * A string, not a number: the controller keeps toFixed(1)'s output as-is.
+   * Null when no device has both an entry and an exit date.
+   */
+  avg_repair_days: string | null;
+}
+
+/** GET /customers/:id — the whole row, serialized to snake_case. */
+export interface Customer {
+  id: number;
+  workspace_id: number;
+  name: string;
+  phone: string | null;
+  created_at: string;
+}
+
+/** POST and PUT /customers take these; the id and workspace are the server's. */
+export interface CustomerBody {
+  name: string;
+  phone: string;
+}
+
+/**
+ * A row of GET /customers/:id/devices.
+ *
+ * `status` is a plain string column, not an enum: the values in use are
+ * received, pending, diagnosing, waiting_for_parts, repairing, repaired,
+ * ready_for_pickup, delivered, unrepairable and not_repaired. Left as string
+ * rather than narrowed, since nothing on the server constrains it.
+ */
+export interface CustomerDevice {
+  id: number;
+  customer_id: number | null;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  entry_date: string | null;
+  exit_date: string | null;
+  status: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -1,10 +1,10 @@
-// src/context/AuthContext.jsx
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useState,
+  type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,13 +13,27 @@ import {
   setAccessToken,
   setSessionExpiredHandler,
 } from "../api";
+import type { AuthUser, RoleName } from "../types/api";
 
-const AuthContext = createContext(null);
+interface AuthContextValue {
+  user: AuthUser | null;
+  loading: boolean;
+  loginUser: (token: string, userData: AuthUser) => void;
+  logoutUser: () => Promise<void>;
+  hasRole: (...roles: RoleName[]) => boolean;
+  isAtLeast: (minRole: RoleName) => boolean;
+}
 
-const ROLE_HIERARCHY = { super_admin: 3, admin: 2, technician: 1 };
+const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+const ROLE_HIERARCHY: Record<RoleName, number> = {
+  super_admin: 3,
+  admin: 2,
+  technician: 1,
+};
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -59,7 +73,7 @@ export function AuthProvider({ children }) {
     return () => setSessionExpiredHandler(null);
   }, [navigate]);
 
-  const loginUser = useCallback((token, userData) => {
+  const loginUser = useCallback((token: string, userData: AuthUser) => {
     // Held in the api module rather than state: the request interceptor
     // needs it synchronously, before React would have re-rendered.
     setAccessToken(token);
@@ -82,13 +96,17 @@ export function AuthProvider({ children }) {
   }, [navigate]);
 
   const hasRole = useCallback(
-    (...roles) => Boolean(user) && roles.includes(user.role),
+    (...roles: RoleName[]) => user !== null && roles.includes(user.role),
     [user],
   );
 
   const isAtLeast = useCallback(
-    (minRole) =>
-      Boolean(user) &&
+    (minRole: RoleName) =>
+      user !== null &&
+      // The fallbacks are unreachable through these types but stay as a
+      // runtime floor: `role` arrives from the server, and a role added to
+      // the seeded table without being added here would otherwise rank
+      // above super admin as NaN comparisons go false either way.
       (ROLE_HIERARCHY[user.role] ?? 0) >= (ROLE_HIERARCHY[minRole] ?? 0),
     [user],
   );

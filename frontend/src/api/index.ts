@@ -11,6 +11,15 @@ import type {
   CustomerListRow,
   CustomerStats,
   Paginated,
+  PaginatedDevices,
+  Device,
+  DeviceAssignee,
+  DeviceCreateBody,
+  DeviceImage,
+  ListedDeviceImage,
+  UploadedDeviceImage,
+  DeviceUpdateBody,
+  DeviceAssignment,
 } from "../types/api";
 
 /**
@@ -155,12 +164,14 @@ export { refreshSession };
 
 // Devices
 export const getDevices = (params?: QueryParams) =>
-  api.get("/devices", { params });
-export const getDevice = (id: Id) => api.get(`/devices/${id}`);
-export const createDevice = (data: unknown) => api.post("/devices", data);
-export const updateDevice = (id: Id, data: unknown) =>
-  api.put(`/devices/${id}`, data);
-export const deleteDevice = (id: Id) => api.delete(`/devices/${id}`);
+  api.get<PaginatedDevices>("/devices", { params });
+export const getDevice = (id: Id) => api.get<Device>(`/devices/${id}`);
+export const createDevice = (data: DeviceCreateBody) =>
+  api.post<Device>("/devices", data);
+export const updateDevice = (id: Id, data: DeviceUpdateBody) =>
+  api.put<Device>(`/devices/${id}`, data);
+export const deleteDevice = (id: Id) =>
+  api.delete<MessageResponse>(`/devices/${id}`);
 
 // Customers
 export const getCustomers = (params?: QueryParams) =>
@@ -182,7 +193,7 @@ export const searchCustomers = (q: string) =>
   });
 
 export const getDeviceImages = (deviceId: Id) =>
-  api.get(`/devices/${deviceId}/images`);
+  api.get<ListedDeviceImage[]>(`/devices/${deviceId}/images`);
 
 export const uploadDeviceImages = (deviceId: Id, files: File[]) => {
   const formData = new FormData();
@@ -225,16 +236,22 @@ export const changePersonnelPassword = (id: Id, data: unknown) =>
 
 // Device Assignments
 export const getDeviceAssignments = (deviceId: Id) =>
-  api.get(`/devices/${deviceId}/assignments`);
+  api.get<DeviceAssignment[]>(`/devices/${deviceId}/assignments`);
 
-export const addDeviceAssignment = (deviceId: Id, personnelId: Id) =>
-  api.post(`/devices/${deviceId}/assignments`, { personnel_id: personnelId });
+export const addDeviceAssignment = (deviceId: Id, personnelId: number) =>
+  api.post<MessageResponse>(`/devices/${deviceId}/assignments`, {
+    personnel_id: personnelId,
+  });
 
-export const removeDeviceAssignment = (deviceId: Id, personnelId: Id) =>
-  api.delete(`/devices/${deviceId}/assignments/${personnelId}`);
+export const removeDeviceAssignment = (deviceId: Id, personnelId: number) =>
+  api.delete<MessageResponse>(
+    `/devices/${deviceId}/assignments/${personnelId}`,
+  );
 
 export const setDeviceAssignments = (deviceId: Id, personnelIds: number[]) =>
-  api.put(`/devices/${deviceId}/assignments`, { personnel_ids: personnelIds });
+  api.put<DeviceAssignment[]>(`/devices/${deviceId}/assignments`, {
+    personnel_ids: personnelIds,
+  });
 
 // Categories
 export const getCategories = () => api.get("/categories");
@@ -322,7 +339,7 @@ export const addRepairInvoicePayment = (id: Id, data: unknown) =>
 
 // Devices - search for invoice
 export const searchDevicesForInvoice = (q: string) =>
-  api.get("/devices", { params: { search: q, limit: 20 } });
+  api.get<PaginatedDevices>("/devices", { params: { search: q, limit: 20 } });
 
 // Items - search for invoice (از قبل داریم)
 export const searchItemsForInvoice = (q: string) =>

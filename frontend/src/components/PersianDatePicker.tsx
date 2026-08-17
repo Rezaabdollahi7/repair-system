@@ -73,6 +73,8 @@ interface PersianDatePickerProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  required?: boolean;
+  clearable?: boolean;
 }
 
 export default function PersianDatePicker({

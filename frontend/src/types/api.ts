@@ -150,3 +150,97 @@ export interface CustomerDevice {
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * What every device endpoint returns — list, read, create and update all go
+ * through the same mapper, so the shape never depends on which one produced
+ * it.
+ *
+ * `status` is a plain string column with no server-side constraint. The
+ * values the UI knows are received (the default), pending, diagnosing,
+ * waiting_for_parts, repairing, repaired, ready_for_pickup, delivered,
+ * unrepairable and not_repaired.
+ *
+ * personnel_id is deliberately absent: technicians come from
+ * device_assignments, not that column.
+ */
+export interface Device {
+  id: number;
+  customer_id: number | null;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  entry_date: string | null;
+  exit_date: string | null;
+  status: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  needs_invoice: boolean;
+  customer_name: string | null;
+  customer_phone: string | null;
+  /** From the newest sale invoice, or null when there is none. */
+  invoice_status: string | null;
+  sale_invoice_id: number | null;
+  invoice_count: number;
+  assignees: DeviceAssignee[];
+}
+
+/** A technician assigned to a device, flattened from the join row. */
+export interface DeviceAssignee {
+  id: number;
+  name: string;
+  username: string;
+}
+
+/**
+ * The device list carries `limit` as well, which the customer list does not.
+ */
+export interface PaginatedDevices extends Paginated<Device> {
+  limit: number;
+}
+
+/**
+ * POST /devices, written from schemas/device.ts.
+ *
+ * `customer_id` is typed as it leaves the form, which sends "" for no
+ * customer — the schema coerces that to 0 and rejects it as non-positive.
+ * Left as-is rather than corrected here: this is a server-side validation
+ * question, not a typing one.
+ */
+export interface DeviceCreateBody {
+  customer_id?: number | string | null;
+  device_name: string;
+  brand?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  /** "" is treated as absent before coercion. */
+  entry_date?: string | null;
+  exit_date?: string | null;
+  status?: string;
+  description?: string | null;
+}
+
+/**
+ * PUT /devices/:id — every field optional, absent meaning untouched. The
+ * server refuses a body with no keys at all.
+ */
+export type DeviceUpdateBody = Partial<DeviceCreateBody> & {
+  /** Still accepts 1/0 as well as true/false. */
+  needs_invoice?: boolean | 0 | 1;
+};
+
+/**
+ * A row of GET and PUT /devices/:id/assignments.
+ *
+ * The shape predates the Prisma migration: `id` is the user's id, not the
+ * assignment's, which is exposed separately as `assignment_id`.
+ */
+export interface DeviceAssignment {
+  assignment_id: number;
+  assigned_at: string;
+  id: number;
+  name: string;
+  username: string;
+}

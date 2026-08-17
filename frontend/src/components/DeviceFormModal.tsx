@@ -1,10 +1,10 @@
-// src/components/DeviceFormModal.jsx
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 import {
   createDevice,
   updateDevice,
   getDevice,
-  getCustomers,
+  getDevices,
   createCustomer,
   getDeviceImages,
   uploadDeviceImages,
@@ -22,15 +22,57 @@ import {
   UserGroupIcon,
   UserIcon,
   CubeIcon,
-  TagIcon,
   CalendarIcon,
-  ClipboardDocumentListIcon,
   PhotoIcon,
   CheckBadgeIcon,
 } from "@heroicons/react/24/solid";
 import { useDebounce } from "../utils/helpers";
+import type {
+  CustomerBody,
+  CustomerListRow,
+  Device,
+  DeviceCreateBody,
+  Id,
+  ListedDeviceImage,
+} from "../types/api";
 
-const INITIAL_FORM = {
+/**
+ * The form holds every field as a string, which is what the inputs produce.
+ * `customer_id` carries "" for "no customer" — see DeviceCreateBody in
+ * types/api for what the server makes of that.
+ */
+interface DeviceForm {
+  customer_id: number | string;
+  device_name: string;
+  brand: string;
+  model: string;
+  serial_number: string;
+  entry_date: string;
+  exit_date: string;
+  status: string;
+  description: string;
+}
+
+/**
+ * A technician as this form holds one. Assignments arrive from the server
+ * with `name` already flattened; a person picked from the personnel list may
+ * only have `full_name`, so handleSelectPersonnel normalises it.
+ */
+interface SelectedPerson {
+  id: number;
+  name: string;
+  username?: string;
+}
+
+/** A row of the personnel list, which this form only reads three fields of. */
+interface PersonnelOption {
+  id: number;
+  name?: string;
+  full_name?: string;
+  username?: string;
+}
+
+const INITIAL_FORM: DeviceForm = {
   customer_id: "",
   device_name: "",
   brand: "",
@@ -42,7 +84,7 @@ const INITIAL_FORM = {
   description: "",
 };
 
-const INITIAL_CUSTOMER = { name: "", phone: "" };
+const INITIAL_CUSTOMER: CustomerBody = { name: "", phone: "" };
 const INITIAL_DEVICE_NAME = { name: "" };
 const INITIAL_BRAND = { name: "" };
 
@@ -94,45 +136,70 @@ const STATUS_OPTIONS = [
   },
 ];
 
+interface SectionTitleProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+}
+
+function SectionTitle({ icon: Icon, title }: SectionTitleProps) {
+  return (
+    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-primary-soft">
+      <Icon className="size-5 text-primary" />
+      <span className="text-sm font-semibold text-text-primary">{title}</span>
+    </div>
+  );
+}
+
+interface DeviceFormModalProps {
+  deviceId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
+
 export default function DeviceFormModal({
   deviceId,
   isOpen,
   onClose,
   onSuccess,
-}) {
+}: DeviceFormModalProps) {
   const isEdit = Boolean(deviceId);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [form, setForm] = useState<DeviceForm>(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewDeviceName, setShowNewDeviceName] = useState(false);
   const [showNewBrand, setShowNewBrand] = useState(false);
-  const [newCustomer, setNewCustomer] = useState(INITIAL_CUSTOMER);
+  const [newCustomer, setNewCustomer] =
+    useState<CustomerBody>(INITIAL_CUSTOMER);
   const [newDeviceName, setNewDeviceName] = useState(INITIAL_DEVICE_NAME);
   const [newBrand, setNewBrand] = useState(INITIAL_BRAND);
-  const [images, setImages] = useState([]);
-  const [pendingImages, setPendingImages] = useState([]);
+  const [images, setImages] = useState<ListedDeviceImage[]>([]);
+  const [pendingImages] = useState<File[]>([]);
 
-  // جستجوی مشتری
+  // Customer search
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [customerResults, setCustomerResults] = useState([]);
+  const [customerResults, setCustomerResults] = useState<CustomerListRow[]>([]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [, setSelectedCustomer] = useState<CustomerListRow | null>(null);
 
-  // جستجوی نام دستگاه (برای انتخاب از دستگاه‌های موجود)
+  // Device name, suggested from devices already recorded
   const [deviceNameSearch, setDeviceNameSearch] = useState("");
   const [showDeviceNameDropdown, setShowDeviceNameDropdown] = useState(false);
-  const [deviceNameResults, setDeviceNameResults] = useState([]);
+  const [deviceNameResults, setDeviceNameResults] = useState<Device[]>([]);
   const [searchingDeviceNames, setSearchingDeviceNames] = useState(false);
 
-  // جستجوی برند
+  // Brand, likewise
   const [brandSearch, setBrandSearch] = useState("");
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
-  const [brandResults, setBrandResults] = useState([]);
+  const [brandResults, setBrandResults] = useState<Device[]>([]);
   const [searchingBrands, setSearchingBrands] = useState(false);
 
-  const [personnelList, setPersonnelList] = useState([]);
-  const [selectedPersonnel, setSelectedPersonnel] = useState([]);
+  const [personnelList, setPersonnelList] = useState<PersonnelOption[]>([]);
+  const [selectedPersonnel, setSelectedPersonnel] = useState<SelectedPerson[]>(
+    [],
+  );
   const [personnelSearch, setPersonnelSearch] = useState("");
   const [showPersonnelDropdown, setShowPersonnelDropdown] = useState(false);
 
@@ -146,8 +213,7 @@ export default function DeviceFormModal({
     return !alreadySelected && displayName.includes(personnelSearch);
   });
 
-  // جستجوی مشتری از سرور
-  const searchCustomersAPI = useCallback(async (query) => {
+  const searchCustomersAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
       setCustomerResults([]);
       return;
@@ -155,49 +221,47 @@ export default function DeviceFormModal({
     setSearchingCustomers(true);
     try {
       const res = await searchCustomers(query);
-      setCustomerResults(res.data?.data || res.data || []);
+      setCustomerResults(res.data?.data ?? []);
     } catch (error) {
-      console.error("خطا در جستجوی مشتری:", error);
+      console.error("Customer search failed:", error);
       setCustomerResults([]);
     } finally {
       setSearchingCustomers(false);
     }
   }, []);
 
-  // جستجوی نام دستگاه از دستگاه‌های موجود
-  const searchDeviceNamesAPI = useCallback(async (query) => {
+  // Device names are suggested from devices already recorded rather than a
+  // catalogue of their own, so the same name gets spelt the same way twice.
+  const searchDeviceNamesAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
       setDeviceNameResults([]);
       return;
     }
     setSearchingDeviceNames(true);
     try {
-      const { getDevices } = await import("../api");
       const res = await getDevices({ search: query, limit: 20 });
-      const devices = res.data?.data || res.data || [];
+      const devices = res.data?.data ?? [];
       const uniqueNames = [
         ...new Map(devices.map((d) => [d.device_name, d])).values(),
       ];
       setDeviceNameResults(uniqueNames);
     } catch (error) {
-      console.error("خطا در جستجوی نام دستگاه:", error);
+      console.error("Device name search failed:", error);
       setDeviceNameResults([]);
     } finally {
       setSearchingDeviceNames(false);
     }
   }, []);
 
-  // جستجوی برند از دستگاه‌های موجود
-  const searchBrandsAPI = useCallback(async (query) => {
+  const searchBrandsAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
       setBrandResults([]);
       return;
     }
     setSearchingBrands(true);
     try {
-      const { getDevices } = await import("../api");
       const res = await getDevices({ search: query, limit: 20 });
-      const devices = res.data?.data || res.data || [];
+      const devices = res.data?.data ?? [];
       const uniqueBrands = [
         ...new Map(
           devices.filter((d) => d.brand).map((d) => [d.brand, d]),
@@ -205,7 +269,7 @@ export default function DeviceFormModal({
       ];
       setBrandResults(uniqueBrands);
     } catch (error) {
-      console.error("خطا در جستجوی برند:", error);
+      console.error("Brand search failed:", error);
       setBrandResults([]);
     } finally {
       setSearchingBrands(false);
@@ -218,6 +282,7 @@ export default function DeviceFormModal({
       if (isEdit) loadDevice();
       else resetForm();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, deviceId]);
 
   useEffect(() => {
@@ -226,6 +291,7 @@ export default function DeviceFormModal({
     } else {
       setCustomerResults([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedCustomerSearch, searchCustomersAPI]);
 
   useEffect(() => {
@@ -234,6 +300,7 @@ export default function DeviceFormModal({
     } else {
       setDeviceNameResults([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedDeviceNameSearch, searchDeviceNamesAPI]);
 
   useEffect(() => {
@@ -242,12 +309,12 @@ export default function DeviceFormModal({
     } else {
       setBrandResults([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedBrandSearch, searchBrandsAPI]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM);
     setImages([]);
-    setPendingImages([]);
     setSelectedPersonnel([]);
     setCustomerSearch("");
     setSelectedCustomer(null);
@@ -268,6 +335,7 @@ export default function DeviceFormModal({
   };
 
   const loadDevice = async () => {
+    if (!deviceId) return;
     try {
       const [deviceRes, imgRes, assignRes] = await Promise.all([
         getDevice(deviceId),
@@ -277,7 +345,7 @@ export default function DeviceFormModal({
       setImages(imgRes.data);
       setSelectedPersonnel(assignRes.data ?? []);
       setForm({
-        customer_id: deviceRes.data.customer_id || "",
+        customer_id: deviceRes.data.customer_id ?? "",
         device_name: deviceRes.data.device_name || "",
         brand: deviceRes.data.brand || "",
         model: deviceRes.data.model || "",
@@ -293,9 +361,10 @@ export default function DeviceFormModal({
           `${deviceRes.data.customer_name} - ${deviceRes.data.customer_phone ?? ""}`,
         );
         setSelectedCustomer({
-          id: deviceRes.data.customer_id,
+          id: deviceRes.data.customer_id ?? 0,
           name: deviceRes.data.customer_name,
           phone: deviceRes.data.customer_phone,
+          device_count: 0,
         });
       }
       if (deviceRes.data.device_name) {
@@ -309,10 +378,15 @@ export default function DeviceFormModal({
     }
   };
 
-  const handleChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  const handleDateChange = (fieldName) => (gregorianValue) =>
-    setForm((prev) => ({ ...prev, [fieldName]: gregorianValue ?? "" }));
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleDateChange =
+    (fieldName: keyof DeviceForm) => (gregorianValue: string) =>
+      setForm((prev) => ({ ...prev, [fieldName]: gregorianValue ?? "" }));
 
   const handleAddCustomer = async () => {
     if (!newCustomer.name || !newCustomer.phone)
@@ -321,11 +395,16 @@ export default function DeviceFormModal({
       const res = await createCustomer(newCustomer);
       const created = res.data;
       setForm((prev) => ({ ...prev, customer_id: created.id }));
-      setSelectedCustomer(created);
+      setSelectedCustomer({
+        id: created.id,
+        name: created.name,
+        phone: created.phone,
+        device_count: 0,
+      });
       setShowNewCustomer(false);
       setNewCustomer(INITIAL_CUSTOMER);
       toast.success("مشتری اضافه شد");
-      setCustomerSearch(`${created.name} - ${created.phone}`);
+      setCustomerSearch(`${created.name} - ${created.phone ?? ""}`);
     } catch {
       toast.error("خطا در ثبت مشتری");
     }
@@ -349,7 +428,7 @@ export default function DeviceFormModal({
     toast.success("برند اضافه شد");
   };
 
-  const handleSelectPersonnel = (person) => {
+  const handleSelectPersonnel = (person: PersonnelOption) => {
     setSelectedPersonnel((prev) => [
       ...prev,
       {
@@ -361,50 +440,47 @@ export default function DeviceFormModal({
     setShowPersonnelDropdown(false);
   };
 
-  const handleRemovePersonnel = (personId) =>
+  const handleRemovePersonnel = (personId: number) =>
     setSelectedPersonnel((prev) => prev.filter((p) => p.id !== personId));
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.device_name.trim()) return toast.error("نام دستگاه الزامی است");
     setLoading(true);
     try {
-      let devId = deviceId;
-      if (isEdit) {
-        await updateDevice(deviceId, form);
+      let devId: Id | null | undefined = deviceId;
+      if (isEdit && deviceId) {
+        await updateDevice(deviceId, form as DeviceCreateBody);
         if (pendingImages.length > 0) {
           await uploadDeviceImages(deviceId, pendingImages);
-          setPendingImages([]);
         }
         toast.success("دستگاه ویرایش شد");
       } else {
-        const res = await createDevice(form);
+        const res = await createDevice(form as DeviceCreateBody);
         devId = res.data.id;
         if (pendingImages.length > 0) {
           await uploadDeviceImages(devId, pendingImages);
-          setPendingImages([]);
         }
         toast.success("دستگاه ثبت شد");
       }
-      await setDeviceAssignments(
-        devId,
-        selectedPersonnel.map((p) => p.id),
-      );
-      onSuccess && onSuccess();
+      if (devId) {
+        await setDeviceAssignments(
+          devId,
+          selectedPersonnel.map((p) => p.id),
+        );
+      }
+      onSuccess?.();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ثبت دستگاه");
+      const message =
+        (axios.isAxiosError(error) &&
+          (error.response?.data as { error?: string } | undefined)?.error) ||
+        "خطا در ثبت دستگاه";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
-
-  const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-primary-soft">
-      <Icon className="size-5 text-primary" />
-      <span className="text-sm font-semibold text-text-primary">{title}</span>
-    </div>
-  );
 
   if (!isOpen) return null;
 
@@ -414,7 +490,7 @@ export default function DeviceFormModal({
         className="bg-surface rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-8"
         dir="rtl"
       >
-        {/* هدر */}
+        {/* Header */}
         <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="bg-primary-soft p-2 rounded-xl">
@@ -435,9 +511,9 @@ export default function DeviceFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
-          {/* بخش اول: مشتری و مسئول */}
+          {/* Customer and technicians */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* مشتری */}
+            {/* Customer */}
             <div>
               <SectionTitle icon={UserGroupIcon} title="اطلاعات مشتری" />
               <div className="space-y-3">
@@ -557,7 +633,7 @@ export default function DeviceFormModal({
               </div>
             </div>
 
-            {/* مسئول */}
+            {/* Technicians */}
             <div>
               <SectionTitle icon={UserIcon} title="مسئول(ین) دستگاه" />
               <div className="space-y-3">
@@ -590,7 +666,7 @@ export default function DeviceFormModal({
                             onMouseDown={() => handleSelectPersonnel(person)}
                             className="px-3 py-2.5 text-sm hover:bg-primary-soft cursor-pointer flex items-center justify-between text-text-primary"
                           >
-                            <span>{person.name}</span>
+                            <span>{person.name ?? person.full_name}</span>
                             {person.username && (
                               <span className="text-xs text-text-secondary">
                                 @{person.username}
@@ -625,11 +701,11 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* بخش دوم: اطلاعات دستگاه */}
+          {/* Device details */}
           <div>
             <SectionTitle icon={CubeIcon} title="اطلاعات دستگاه" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* نام دستگاه */}
+              {/* Device name */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
                   نام دستگاه <span className="text-danger">*</span>
@@ -715,7 +791,7 @@ export default function DeviceFormModal({
                 )}
               </div>
 
-              {/* برند */}
+              {/* Brand */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
                   برند
@@ -747,8 +823,11 @@ export default function DeviceFormModal({
                             <div
                               key={b.id}
                               onMouseDown={() => {
-                                setForm((p) => ({ ...p, brand: b.brand }));
-                                setBrandSearch(b.brand);
+                                setForm((p) => ({
+                                  ...p,
+                                  brand: b.brand ?? "",
+                                }));
+                                setBrandSearch(b.brand ?? "");
                                 setShowBrandDropdown(false);
                               }}
                               className="px-3 py-2 text-sm hover:bg-primary-soft cursor-pointer text-text-primary"
@@ -796,7 +875,7 @@ export default function DeviceFormModal({
                 )}
               </div>
 
-              {/* مدل */}
+              {/* Model */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
                   مدل
@@ -810,7 +889,7 @@ export default function DeviceFormModal({
                 />
               </div>
 
-              {/* سریال */}
+              {/* Serial number */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
                   سریال
@@ -825,7 +904,7 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* بخش سوم: تاریخ‌ها */}
+          {/* Dates */}
           <div>
             <SectionTitle icon={CalendarIcon} title="تاریخ‌ها" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -854,7 +933,7 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* بخش چهارم: وضعیت و توضیحات */}
+          {/* Status and description */}
           <div>
             <SectionTitle icon={CheckBadgeIcon} title="وضعیت و توضیحات" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -883,7 +962,7 @@ export default function DeviceFormModal({
                   name="description"
                   value={form.description}
                   onChange={handleChange}
-                  rows="7"
+                  rows={7}
                   className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   placeholder="توضیحات تعمیرکار ..."
                 />
@@ -891,7 +970,7 @@ export default function DeviceFormModal({
             </div>
           </div>
 
-          {/* بخش پنجم: عکس‌ها */}
+          {/* Images */}
           <div>
             <SectionTitle icon={PhotoIcon} title="عکس‌های دستگاه" />
             <ImageUploader
@@ -901,12 +980,15 @@ export default function DeviceFormModal({
                 setImages((imgs) => imgs.filter((i) => i.id !== imageId))
               }
               onUploadDone={(newImgs) =>
-                setImages((prev) => [...prev, ...newImgs])
+                setImages((prev) => [
+                  ...prev,
+                  ...(newImgs as ListedDeviceImage[]),
+                ])
               }
             />
           </div>
 
-          {/* دکمه‌های اقدام */}
+          {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-border">
             <button
               type="button"

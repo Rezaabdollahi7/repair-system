@@ -1,9 +1,6 @@
-// src/components/DeviceDetailModal.jsx
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import api from "../api";
-import { getDeviceImages } from "../api";
+import { getDevice, deleteDevice, getDeviceImages } from "../api";
 import ImageSlider from "./ImageSlider";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -16,12 +13,13 @@ import {
   CalendarIcon,
   ClipboardDocumentListIcon,
   PhotoIcon,
-  UserGroupIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
+import type { Device, Id, ListedDeviceImage } from "../types/api";
 
-const STATUS_MAP = {
+/** "received", the schema default, is deliberately absent — as it was. */
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: "در انتظار بررسی", color: "bg-warning-soft text-warning" },
   diagnosing: { label: "در حال بررسی", color: "bg-primary-soft text-primary" },
   waiting_for_parts: {
@@ -39,7 +37,12 @@ const STATUS_MAP = {
   not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
 };
 
-function InfoRow({ label, value }) {
+interface InfoRowProps {
+  label: string;
+  value: React.ReactNode;
+}
+
+function InfoRow({ label, value }: InfoRowProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-border pb-2 sm:pb-3 mb-2 sm:mb-3 last:border-0">
       <span className="text-xs sm:text-sm text-text-secondary mb-1 sm:mb-0">
@@ -52,7 +55,13 @@ function InfoRow({ label, value }) {
   );
 }
 
-function SectionTitle({ icon: Icon, title, count }) {
+interface SectionTitleProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  count?: number;
+}
+
+function SectionTitle({ icon: Icon, title, count }: SectionTitleProps) {
   return (
     <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-2 border-b border-primary-soft">
       <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
@@ -68,18 +77,26 @@ function SectionTitle({ icon: Icon, title, count }) {
   );
 }
 
+interface DeviceDetailModalProps {
+  deviceId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onEdit?: (deviceId: Id) => void;
+  zIndex?: number;
+}
+
 export default function DeviceDetailModal({
   deviceId,
   isOpen,
   onClose,
   onEdit,
-}) {
-  const [device, setDevice] = useState(null);
-  const [images, setImages] = useState([]);
+}: DeviceDetailModalProps) {
+  const [device, setDevice] = useState<Device | null>(null);
+  const [images, setImages] = useState<ListedDeviceImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [sliderIndex, setSliderIndex] = useState(null);
+  const [sliderIndex, setSliderIndex] = useState<number | null>(null);
   const { isAtLeast } = useAuth();
 
   useEffect(() => {
@@ -87,12 +104,16 @@ export default function DeviceDetailModal({
       fetchDevice();
       fetchImages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, deviceId]);
 
   async function fetchDevice() {
+    if (!deviceId) return;
     try {
       setLoading(true);
-      const res = await api.get(`/devices/${deviceId}`);
+      // Through the named helper rather than a bare api.get: the URL then
+      // lives in one place and the response arrives typed.
+      const res = await getDevice(deviceId);
       setDevice(res.data);
     } catch {
       toast.error("خطا در دریافت اطلاعات دستگاه");
@@ -103,6 +124,7 @@ export default function DeviceDetailModal({
   }
 
   async function fetchImages() {
+    if (!deviceId) return;
     try {
       const res = await getDeviceImages(deviceId);
       setImages(res.data);
@@ -112,9 +134,10 @@ export default function DeviceDetailModal({
   }
 
   async function handleDelete() {
+    if (!deviceId) return;
     try {
       setDeleting(true);
-      await api.delete(`/devices/${deviceId}`);
+      await deleteDevice(deviceId);
       toast.success("دستگاه با موفقیت حذف شد");
       setShowDeleteModal(false);
       onClose();
@@ -125,7 +148,7 @@ export default function DeviceDetailModal({
     }
   }
 
-  function formatDate(dateStr) {
+  function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return "—";
     return new Date(dateStr).toLocaleDateString("fa-IR");
   }
@@ -138,7 +161,7 @@ export default function DeviceDetailModal({
         className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
-        {/* هدر */}
+        {/* Header */}
         <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="bg-primary-soft p-2 rounded-xl">
@@ -163,7 +186,7 @@ export default function DeviceDetailModal({
           </button>
         </div>
 
-        {/* محتوا */}
+        {/* Content */}
         <div className="p-4 sm:p-6">
           {loading ? (
             <div className="flex justify-center items-center h-64">
@@ -171,7 +194,7 @@ export default function DeviceDetailModal({
             </div>
           ) : device ? (
             <div className="space-y-4 sm:space-y-6">
-              {/* کارت اطلاعات اصلی */}
+              {/* Summary card */}
               <div className="bg-gradient-to-r from-primary-soft to-surface rounded-2xl p-4 sm:p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
@@ -210,7 +233,7 @@ export default function DeviceDetailModal({
                   </div>
                 </div>
 
-                {/* مسئولین */}
+                {/* Assignees */}
                 <div className="mt-4 pt-4 border-t border-primary-soft">
                   <p className="text-xs text-text-secondary mb-2">
                     مسئولین تعمیر
@@ -234,9 +257,9 @@ export default function DeviceDetailModal({
                 </div>
               </div>
 
-              {/* اطلاعات دستگاه و مشتری */}
+              {/* Device and customer */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                {/* اطلاعات دستگاه */}
+                {/* Device */}
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5">
                   <SectionTitle icon={TagIcon} title="اطلاعات دستگاه" />
                   <div className="space-y-1">
@@ -247,7 +270,7 @@ export default function DeviceDetailModal({
                   </div>
                 </div>
 
-                {/* اطلاعات مشتری */}
+                {/* Customer */}
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5">
                   <SectionTitle icon={UserIcon} title="اطلاعات مشتری" />
                   <div className="space-y-1">
@@ -256,7 +279,7 @@ export default function DeviceDetailModal({
                   </div>
                 </div>
 
-                {/* توضیحات */}
+                {/* Description */}
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
                   <SectionTitle
                     icon={ClipboardDocumentListIcon}
@@ -267,7 +290,7 @@ export default function DeviceDetailModal({
                   </p>
                 </div>
 
-                {/* عکس‌ها */}
+                {/* Images */}
                 {images.length > 0 && (
                   <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
                     <SectionTitle
@@ -299,7 +322,7 @@ export default function DeviceDetailModal({
           ) : null}
         </div>
 
-        {/* فوتر با دکمه‌های اقدام */}
+        {/* Footer actions */}
         <div className="sticky bottom-0 bg-surface-alt rounded-b-2xl border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
           {device && (
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs text-text-secondary order-2 sm:order-1">
@@ -323,7 +346,7 @@ export default function DeviceDetailModal({
             <button
               onClick={() => {
                 onClose();
-                onEdit && onEdit(deviceId);
+                if (deviceId) onEdit?.(deviceId);
               }}
               className="flex-1 sm:flex-none px-4 py-2 bg-primary text-text-inverse rounded-xl hover:bg-primary-hover transition-colors text-sm flex items-center justify-center gap-1 shadow-sm"
             >

@@ -1,5 +1,5 @@
-// src/components/SaleInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   createSaleInvoice,
   updateSaleInvoice,
@@ -7,7 +7,6 @@ import {
   getItems,
   getCustomers,
   createCustomer,
-  createItem,
   getDevice,
   searchCustomers,
 } from "../api";
@@ -25,8 +24,25 @@ import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency } from "../utils/formatters";
 import ItemFormModal from "./ItemFormModal";
+import type { SelectOption, SelectValue } from "./SearchableSelect";
+import type {
+  Customer,
+  CustomerBody,
+  CustomerListRow,
+  Id,
+  Item,
+  SaleInvoiceCreateBody,
+} from "../types/api";
 
-// واحدهای قابل انتخاب
+/** The server answers with { error } on every failing path. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
 const UNIT_OPTIONS = [
   { value: "عدد", label: "عدد" },
   { value: "متر", label: "متر" },
@@ -37,25 +53,87 @@ const UNIT_OPTIONS = [
   { value: "دستگاه", label: "دستگاه" },
 ];
 
-function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({ name: "", phone: "" });
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+/**
+ * A line as the form holds it. An inventory line points at the catalogue; a
+ * custom one carries its own name and touches no stock.
+ */
+interface FormLine {
+  item_type: "inventory" | "custom";
+  item_id?: SelectValue;
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+}
 
-  const handleChange = (e) => {
+interface SaleForm {
+  customer_id: SelectValue | "";
+  customer_name: string;
+  customer_phone: string;
+  invoice_date: string;
+  paid_amount: number;
+  note: string;
+  device_id?: Id | null;
+}
+
+interface CustomerOption extends SelectOption {
+  phone: string | null;
+  name: string;
+}
+
+interface ItemOption extends SelectOption {
+  stock: number;
+  unit: string;
+  avgPrice: number;
+}
+
+const EMPTY_FORM = (): SaleForm => ({
+  customer_id: "",
+  customer_name: "",
+  customer_phone: "",
+  invoice_date: new Date().toISOString().split("T")[0],
+  paid_amount: 0,
+  note: "",
+});
+
+interface QuickCustomerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (customer: Customer) => void;
+}
+
+function QuickCustomerModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: QuickCustomerModalProps) {
+  const [formData, setFormData] = useState<CustomerBody>({
+    name: "",
+    phone: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
     if (!formData.name?.trim()) newErrors.name = "نام مشتری الزامی است";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
@@ -106,7 +184,7 @@ function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
               </label>
               <input
                 name="phone"
-                value={formData.phone}
+                value={formData.phone ?? ""}
                 onChange={handleChange}
                 className="w-full border border-border rounded px-3 py-2 text-sm bg-surface text-text-primary"
                 placeholder="مثلاً: ۰۹۱۲۳۴۵۶۷۸۹"
@@ -135,37 +213,39 @@ function QuickCustomerModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
+interface SaleInvoiceFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  deviceId?: Id | null;
+  invoiceId?: Id | null;
+  zIndex?: number;
+}
+
 export default function SaleInvoiceFormModal({
   isOpen,
   onClose,
   onSuccess,
   deviceId,
   invoiceId,
-}) {
+}: SaleInvoiceFormModalProps) {
   const isEditMode = Boolean(invoiceId);
   const [loading, setLoading] = useState(false);
   const [loadingDevice, setLoadingDevice] = useState(false);
   const [loadingInvoice, setLoadingInvoice] = useState(isEditMode);
-  const [items, setItems] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [customers, setCustomers] = useState<CustomerListRow[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
 
-  const [formData, setFormData] = useState({
-    customer_id: "",
-    customer_name: "",
-    customer_phone: "",
-    invoice_date: new Date().toISOString().split("T")[0],
-    paid_amount: 0,
-    note: "",
-  });
+  const [formData, setFormData] = useState<SaleForm>(EMPTY_FORM);
 
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState<FormLine[]>([]);
 
-  const loadDeviceInfo = async (id) => {
+  const loadDeviceInfo = async (id: Id | null | undefined) => {
     if (!id) return;
     setLoadingDevice(true);
     try {
@@ -173,26 +253,22 @@ export default function SaleInvoiceFormModal({
       const device = res.data;
 
       if (device) {
-        const customerInfo = {
-          customer_id: device.customer_id || "",
-          customer_name: device.customer_name || "",
-          customer_phone: device.customer_phone || "",
-        };
-
         setFormData((prev) => ({
           ...prev,
-          ...customerInfo,
+          customer_id: device.customer_id ?? "",
+          customer_name: device.customer_name || "",
+          customer_phone: device.customer_phone || "",
         }));
       }
     } catch (error) {
-      console.error("خطا در دریافت اطلاعات دستگاه:", error);
+      console.error("Failed to load device:", error);
       toast.error("خطا در دریافت اطلاعات دستگاه");
     } finally {
       setLoadingDevice(false);
     }
   };
 
-  const loadInvoiceData = async (id) => {
+  const loadInvoiceData = async (id: Id) => {
     if (!id) return;
     setLoadingInvoice(true);
     try {
@@ -200,7 +276,7 @@ export default function SaleInvoiceFormModal({
       const invoice = res.data;
 
       setFormData({
-        customer_id: invoice.customer_id || "",
+        customer_id: invoice.customer_id ?? "",
         customer_name: invoice.customer_name || "",
         customer_phone: invoice.customer_phone || "",
         invoice_date:
@@ -212,20 +288,22 @@ export default function SaleInvoiceFormModal({
       });
 
       if (invoice.device_id) {
-        loadDeviceInfo(invoice.device_id);
+        void loadDeviceInfo(invoice.device_id);
       }
 
-      const items = invoice.items.map((item) => ({
-        item_type: item.item_id ? "inventory" : "custom",
-        item_id: item.item_id || "",
-        name: item.item_name || "",
-        quantity: item.quantity || 1,
-        unit: item.item_unit || "عدد",
-        unit_price: item.unit_price || 0,
+      // Named `lines` rather than `items`, which would shadow the catalogue
+      // held in state above.
+      const lines: FormLine[] = invoice.items.map((line) => ({
+        item_type: line.item_id ? "inventory" : "custom",
+        item_id: line.item_id ?? "",
+        name: line.item_name || "",
+        quantity: line.quantity || 1,
+        unit: line.item_unit || "عدد",
+        unit_price: line.unit_price || 0,
       }));
-      setSelectedItems(items);
+      setSelectedItems(lines);
     } catch (error) {
-      console.error("خطا در دریافت اطلاعات فاکتور:", error);
+      console.error("Failed to load invoice:", error);
       toast.error("خطا در دریافت اطلاعات فاکتور");
       onClose();
     } finally {
@@ -233,11 +311,11 @@ export default function SaleInvoiceFormModal({
     }
   };
 
-  const handleCustomerSearch = async (query) => {
+  const handleCustomerSearch = async (query: string) => {
     if (!query || query.trim() === "") {
       try {
         const res = await getCustomers({ limit: 50 });
-        setCustomers(res.data?.data || res.data || []);
+        setCustomers(res.data.data);
       } catch {
         toast.error("خطا در دریافت لیست مشتریان");
       }
@@ -247,9 +325,9 @@ export default function SaleInvoiceFormModal({
     setSearchingCustomers(true);
     try {
       const res = await searchCustomers(query);
-      setCustomers(res.data?.data || res.data || []);
+      setCustomers(res.data.data);
     } catch (error) {
-      console.error("خطا در جستجوی مشتری:", error);
+      console.error("Customer search failed:", error);
       toast.error("خطا در جستجوی مشتری");
     } finally {
       setSearchingCustomers(false);
@@ -263,8 +341,8 @@ export default function SaleInvoiceFormModal({
         getItems({ limit: 1000 }),
         getCustomers({ limit: 50 }),
       ]);
-      setItems(itemsRes.data?.data || itemsRes.data || []);
-      setCustomers(customersRes.data?.data || customersRes.data || []);
+      setItems(itemsRes.data.data);
+      setCustomers(customersRes.data.data);
     } catch {
       toast.error("خطا در دریافت اطلاعات");
     } finally {
@@ -275,7 +353,7 @@ export default function SaleInvoiceFormModal({
   const refreshItems = async () => {
     try {
       const res = await getItems({ limit: 1000 });
-      setItems(res.data?.data || res.data || []);
+      setItems(res.data.data);
     } catch {
       toast.error("خطا در به‌روزرسانی لیست کالاها");
     }
@@ -283,17 +361,19 @@ export default function SaleInvoiceFormModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetchData();
+      void fetchData();
       if (isEditMode && invoiceId) {
-        loadInvoiceData(invoiceId);
+        void loadInvoiceData(invoiceId);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, invoiceId, isEditMode]);
 
   useEffect(() => {
     if (isOpen && deviceId && !isEditMode) {
-      loadDeviceInfo(deviceId);
+      void loadDeviceInfo(deviceId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, deviceId, isEditMode]);
 
   useEffect(() => {
@@ -302,14 +382,14 @@ export default function SaleInvoiceFormModal({
     }
   }, [isOpen, deviceId, isEditMode]);
 
-  const customerOptions = customers.map((c) => ({
+  const customerOptions: CustomerOption[] = customers.map((c) => ({
     value: c.id,
     label: `${c.name} ${c.phone ? `- ${c.phone}` : ""}`,
     phone: c.phone,
     name: c.name,
   }));
 
-  const itemOptions = items.map((item) => ({
+  const itemOptions: ItemOption[] = items.map((item) => ({
     value: item.id,
     label: `[${item.code}] ${item.name}`,
     subLabel: `موجودی: ${item.currentStock} ${item.unit} | میانگین قیمت خرید: ${Number(item.avgPurchasePrice || 0).toLocaleString()} ریال`,
@@ -318,7 +398,8 @@ export default function SaleInvoiceFormModal({
     avgPrice: item.avgPurchasePrice || 0,
   }));
 
-  const calculateItemTotal = (qty, price) => (qty || 0) * (price || 0);
+  const calculateItemTotal = (qty: number, price: number) =>
+    (qty || 0) * (price || 0);
   const calculateTotal = () =>
     selectedItems.reduce(
       (sum, item) => sum + calculateItemTotal(item.quantity, item.unit_price),
@@ -327,7 +408,9 @@ export default function SaleInvoiceFormModal({
   const calculateRemaining = () =>
     calculateTotal() - (formData.paid_amount || 0);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -335,7 +418,7 @@ export default function SaleInvoiceFormModal({
     }));
   };
 
-  const handleCustomerSelect = (customerId) => {
+  const handleCustomerSelect = (customerId: SelectValue) => {
     const customer = customers.find((c) => c.id === customerId);
     if (customer)
       setFormData((prev) => ({
@@ -346,7 +429,7 @@ export default function SaleInvoiceFormModal({
       }));
   };
 
-  const handleAddItem = (type) => {
+  const handleAddItem = (type: "inventory" | "custom") => {
     if (type === "inventory") {
       setSelectedItems((prev) => [
         ...prev,
@@ -372,16 +455,23 @@ export default function SaleInvoiceFormModal({
       ]);
     }
   };
-  const handleRemoveItem = (index) =>
+
+  const handleRemoveItem = (index: number) =>
     setSelectedItems((prev) => prev.filter((_, i) => i !== index));
 
-  const handleItemChange = (index, field, value) => {
+  const handleItemChange = (
+    index: number,
+    field: keyof FormLine,
+    value: SelectValue,
+  ) => {
     setSelectedItems((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
         const updated = { ...item, [field]: value };
         if (field === "item_id" && value) {
           const selectedItem = items.find((it) => it.id === value);
+          // Prefilled at a twenty percent markup on the average purchase
+          // price, which the seller is free to overwrite.
           if (selectedItem)
             updated.unit_price = Math.round(
               (selectedItem.avgPurchasePrice || 0) * 1.2,
@@ -393,7 +483,7 @@ export default function SaleInvoiceFormModal({
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
     if (selectedItems.length === 0)
       newErrors.items = "حداقل یک کالا باید انتخاب شود";
 
@@ -426,14 +516,7 @@ export default function SaleInvoiceFormModal({
   };
 
   const resetForm = () => {
-    setFormData({
-      customer_id: "",
-      customer_name: "",
-      customer_phone: "",
-      invoice_date: new Date().toISOString().split("T")[0],
-      paid_amount: 0,
-      note: "",
-    });
+    setFormData(EMPTY_FORM());
     setSelectedItems([]);
     setErrors({});
   };
@@ -443,7 +526,7 @@ export default function SaleInvoiceFormModal({
     onClose();
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
       toast.error("لطفاً خطاهای فرم را برطرف کنید");
@@ -451,7 +534,7 @@ export default function SaleInvoiceFormModal({
     }
     setLoading(true);
     try {
-      const payload = {
+      const payload: SaleInvoiceCreateBody = {
         customer_id: formData.customer_id || null,
         device_id: formData.device_id || deviceId || null,
         customer_name: formData.customer_name?.trim() || "مشتری متفرقه",
@@ -461,16 +544,15 @@ export default function SaleInvoiceFormModal({
         note: formData.note?.trim() || null,
         items: selectedItems.map((item) => ({
           item_type: item.item_type || "inventory",
-          item_id:
-            item.item_type === "inventory" ? parseInt(item.item_id) : null,
-          name: item.item_type === "inventory" ? item.name || "" : item.name,
+          item_id: item.item_type === "inventory" ? Number(item.item_id) : null,
+          name: item.name,
           quantity: item.quantity,
           unit: item.unit || "عدد",
           unit_price: item.unit_price,
         })),
       };
 
-      if (isEditMode) {
+      if (isEditMode && invoiceId) {
         await updateSaleInvoice(invoiceId, payload);
         toast.success("فاکتور فروش با موفقیت ویرایش شد");
       } else {
@@ -479,10 +561,10 @@ export default function SaleInvoiceFormModal({
       }
 
       resetForm();
-      onSuccess && onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ثبت فاکتور");
+      toast.error(errorText(error, "خطا در ثبت فاکتور"));
     } finally {
       setLoading(false);
     }
@@ -622,7 +704,7 @@ export default function SaleInvoiceFormModal({
                   name="note"
                   value={formData.note}
                   onChange={handleInputChange}
-                  rows="2"
+                  rows={2}
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface text-text-primary"
                   placeholder="توضیحات اضافی..."
                 />
@@ -951,7 +1033,12 @@ export default function SaleInvoiceFormModal({
         isOpen={showCustomerModal}
         onClose={() => setShowCustomerModal(false)}
         onSuccess={(newCustomer) => {
-          setCustomers((prev) => [newCustomer, ...prev]);
+          // The create endpoint returns the full row; the list holds the
+          // trimmed shape, so the device count is filled in as zero.
+          setCustomers((prev) => [
+            { ...newCustomer, device_count: 0 },
+            ...prev,
+          ]);
           handleCustomerSelect(newCustomer.id);
         }}
       />

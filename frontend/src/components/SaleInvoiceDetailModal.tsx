@@ -24,9 +24,16 @@ import {
   CalendarIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency } from "../utils/formatters";
+import type { Id, PaymentStatus, SaleInvoiceDetail } from "../types/api";
 
-function PaymentStatusBadge({ status }) {
-  const map = {
+interface BadgeStyle {
+  label: string;
+  color: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
       color: "bg-success-soft text-success",
@@ -58,7 +65,13 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
-function InfoRow({ label, value, highlight }) {
+interface InfoRowProps {
+  label: string;
+  value: React.ReactNode;
+  highlight?: boolean;
+}
+
+function InfoRow({ label, value, highlight }: InfoRowProps) {
   return (
     <div className="flex justify-between py-2 border-b border-border last:border-0">
       <span className="text-sm text-text-secondary">{label}</span>
@@ -71,12 +84,23 @@ function InfoRow({ label, value, highlight }) {
   );
 }
 
-export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
+interface SaleInvoiceDetailModalProps {
+  invoiceId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  zIndex?: number;
+}
+
+export default function SaleInvoiceDetailModal({
+  invoiceId,
+  isOpen,
+  onClose,
+}: SaleInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
   const { openItemDetail } = useModal();
-  const [invoice, setInvoice] = useState(null);
+  const [invoice, setInvoice] = useState<SaleInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState<string | number>("");
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -84,9 +108,11 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen && invoiceId) fetchInvoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, invoiceId]);
 
   const fetchInvoice = async () => {
+    if (!invoiceId) return;
     setLoading(true);
     try {
       const res = await getSaleInvoice(invoiceId);
@@ -101,6 +127,7 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
   };
 
   const handleDelete = async () => {
+    if (!invoiceId) return;
     setDeleting(true);
     try {
       await deleteSaleInvoice(invoiceId);
@@ -115,7 +142,8 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
   };
 
   const handlePaymentUpdate = async () => {
-    const newAmount = parseInt(paymentAmount);
+    if (!invoiceId || !invoice) return;
+    const newAmount = parseInt(String(paymentAmount));
     if (isNaN(newAmount) || newAmount < 0 || newAmount > invoice.total_amount)
       return toast.error("مبلغ نامعتبر");
     setUpdatingPayment(true);
@@ -130,7 +158,7 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
     }
   };
 
-  const formatDate = (date) =>
+  const formatDate = (date: string | null | undefined) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
   if (!isOpen) return null;
@@ -351,7 +379,8 @@ export default function SaleInvoiceDetailModal({ invoiceId, isOpen, onClose }) {
                                     <button
                                       onClick={() => {
                                         onClose();
-                                        openItemDetail(item.item_id);
+                                        if (item.item_id)
+                                          openItemDetail(item.item_id);
                                       }}
                                       className="text-primary hover:underline"
                                     >

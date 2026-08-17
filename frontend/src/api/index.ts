@@ -41,6 +41,12 @@ import type {
   PurchaseInvoiceLine,
   PaymentUpdateBody,
   PaymentUpdateResponse,
+  SaleInvoice,
+  SaleInvoiceCreateBody,
+  SaleInvoiceCreated,
+  SaleInvoiceDetail,
+  SaleInvoiceLine,
+  SaleInvoiceLineBody,
 } from "../types/api";
 
 /**
@@ -323,15 +329,17 @@ export const deletePurchaseInvoice = (id: Id) =>
 
 // Sale Invoices
 export const getSaleInvoices = (params?: QueryParams) =>
-  api.get("/sale-invoices", { params });
-export const getSaleInvoice = (id: Id) => api.get(`/sale-invoices/${id}`);
-export const createSaleInvoice = (data: unknown) =>
-  api.post("/sale-invoices", data);
-export const updateSaleInvoice = (id: Id, data: unknown) =>
-  api.put(`/sale-invoices/${id}`, data);
-export const updateSaleInvoicePayment = (id: Id, data: unknown) =>
-  api.put(`/sale-invoices/${id}/payment`, data);
-export const deleteSaleInvoice = (id: Id) => api.delete(`/sale-invoices/${id}`);
+  api.get<PaginatedWithLimit<SaleInvoice>>("/sale-invoices", { params });
+export const getSaleInvoice = (id: Id) =>
+  api.get<SaleInvoiceDetail>(`/sale-invoices/${id}`);
+export const createSaleInvoice = (data: SaleInvoiceCreateBody) =>
+  api.post<SaleInvoiceCreated>("/sale-invoices", data);
+export const updateSaleInvoice = (id: Id, data: SaleInvoiceCreateBody) =>
+  api.put<MessageResponse>(`/sale-invoices/${id}`, data);
+export const updateSaleInvoicePayment = (id: Id, data: PaymentUpdateBody) =>
+  api.put<PaymentUpdateResponse>(`/sale-invoices/${id}/payment`, data);
+export const deleteSaleInvoice = (id: Id) =>
+  api.delete<MessageResponse>(`/sale-invoices/${id}`);
 
 export const quickSale = (id: Id, data: QuickSaleBody) =>
   api.post<QuickStockResponse>(`/items/${id}/quick-sale`, data);

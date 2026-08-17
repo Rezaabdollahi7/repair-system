@@ -446,3 +446,80 @@ export interface PaymentUpdateResponse {
   message: string;
   payment_status: PaymentStatus;
 }
+
+/**
+ * Sale invoices. The device fields are spread onto the invoice rather than
+ * nested, and are absent entirely when no device is attached; `serial_number`
+ * additionally only appears on the single-invoice endpoint.
+ */
+export interface SaleInvoice {
+  id: number;
+  invoice_number: string;
+  customer_id: number | null;
+  customer_name: string;
+  customer_phone: string | null;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  note: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  device_id: number | null;
+  device_name?: string;
+  brand?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+}
+
+/**
+ * A sale line may be a catalogue item or a free-text one: `item_id` is null
+ * for the latter, and then `item_code` and `current_stock` are null too.
+ */
+export interface SaleInvoiceLine {
+  id: number;
+  invoice_id: number;
+  item_id: number | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at: string;
+  item_code: string | null;
+  item_name: string | null;
+  item_unit: string | null;
+  current_stock: number | null;
+}
+
+export interface SaleInvoiceDetail extends SaleInvoice {
+  items: SaleInvoiceLine[];
+}
+
+/** A line as sent to the server. */
+export interface SaleInvoiceLineBody {
+  item_type: "inventory" | "custom";
+  item_id: number | null;
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+}
+
+export interface SaleInvoiceCreateBody {
+  customer_id: number | string | null;
+  device_id: number | string | null;
+  customer_name: string;
+  customer_phone: string | null;
+  invoice_date: string;
+  paid_amount: number;
+  note: string | null;
+  items: SaleInvoiceLineBody[];
+}
+
+/** POST answers with four fields, not the whole invoice. */
+export interface SaleInvoiceCreated {
+  id: number;
+  invoice_number: string;
+  total_amount: number;
+  payment_status: PaymentStatus;
+}

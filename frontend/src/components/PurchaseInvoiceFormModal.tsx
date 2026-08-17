@@ -1,5 +1,6 @@
 // src/components/PurchaseInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
+import axios from "axios";
 import { createPurchaseInvoice, getItems, createItem } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -10,32 +11,81 @@ import {
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
+import type {
+  Item,
+  ItemCreateBody,
+  PurchaseInvoiceCreateBody,
+} from "../types/api";
+import type { SelectOption, SelectValue } from "./SearchableSelect";
 
-function QuickItemModal({ isOpen, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
+/** The server answers with { error } on every failing path. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
+/** An option carrying the item's own price, so picking one prefills it. */
+interface ItemOption extends SelectOption {
+  avgPrice: number;
+  unit: string;
+}
+
+/** A line as the form holds it: item_id is "" until one is chosen. */
+interface InvoiceLine {
+  item_id: SelectValue;
+  quantity: number;
+  unit_price: number;
+}
+
+interface PurchaseForm {
+  supplier_name: string;
+  invoice_date: string;
+  paid_amount: number;
+  note: string;
+}
+
+interface QuickItemModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (item: Item) => void;
+}
+
+function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
+  const [formData, setFormData] = useState<ItemCreateBody>({
     code: "",
     name: "",
     unit: "عدد",
     minStock: 0,
   });
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleChange = (e) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
     if (!formData.code?.trim()) newErrors.code = "کد کالا الزامی است";
     if (!formData.name?.trim()) newErrors.name = "نام کالا الزامی است";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
@@ -46,7 +96,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }) {
       onClose();
       setFormData({ code: "", name: "", unit: "عدد", minStock: 0 });
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در تعریف کالا");
+      toast.error(errorText(error, "خطا در تعریف کالا"));
     } finally {
       setLoading(false);
     }
@@ -132,27 +182,34 @@ function QuickItemModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
+interface PurchaseInvoiceFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
+
 export default function PurchaseInvoiceFormModal({
   isOpen,
   onClose,
   onSuccess,
-}) {
+}: PurchaseInvoiceFormModalProps) {
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showQuickModal, setShowQuickModal] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PurchaseForm>({
     supplier_name: "",
     invoice_date: new Date().toISOString().split("T")[0],
     paid_amount: 0,
     note: "",
   });
 
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState<InvoiceLine[]>([]);
 
-  const itemOptions = items.map((item) => ({
+  const itemOptions: ItemOption[] = items.map((item) => ({
     value: item.id,
     label: `[${item.code}] ${item.name}`,
     subLabel: `موجودی: ${item.currentStock} ${item.unit} | میانگین قیمت: ${Number(item.avgPurchasePrice).toLocaleString()} ریال`,
@@ -164,8 +221,7 @@ export default function PurchaseInvoiceFormModal({
     setLoadingItems(true);
     try {
       const res = await getItems({ limit: 1000 });
-      const itemsData = res.data?.data || res.data || [];
-      setItems(Array.isArray(itemsData) ? itemsData : []);
+      setItems(res.data.data);
     } catch {
       toast.error("خطا در دریافت لیست کالاها");
     } finally {
@@ -175,9 +231,10 @@ export default function PurchaseInvoiceFormModal({
 
   useEffect(() => {
     if (isOpen) fetchItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const calculateItemTotal = (quantity, unitPrice) =>
+  const calculateItemTotal = (quantity: number, unitPrice: number) =>
     (quantity || 0) * (unitPrice || 0);
   const calculateSubtotal = () =>
     selectedItems.reduce(
@@ -188,7 +245,9 @@ export default function PurchaseInvoiceFormModal({
   const calculateRemaining = () =>
     calculateTotal() - (formData.paid_amount || 0);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -203,11 +262,15 @@ export default function PurchaseInvoiceFormModal({
     ]);
   };
 
-  const handleRemoveItem = (index) => {
+  const handleRemoveItem = (index: number) => {
     setSelectedItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index, field, value) => {
+  const handleItemChange = (
+    index: number,
+    field: keyof InvoiceLine,
+    value: SelectValue,
+  ) => {
     setSelectedItems((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
@@ -224,7 +287,7 @@ export default function PurchaseInvoiceFormModal({
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
     if (selectedItems.length === 0)
       newErrors.items = "حداقل یک کالا باید انتخاب شود";
     selectedItems.forEach((item, index) => {
@@ -242,7 +305,7 @@ export default function PurchaseInvoiceFormModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
       toast.error("لطفاً خطاهای فرم را برطرف کنید");
@@ -250,29 +313,29 @@ export default function PurchaseInvoiceFormModal({
     }
     setLoading(true);
     try {
-      const payload = {
+      const payload: PurchaseInvoiceCreateBody = {
         supplier_name: formData.supplier_name?.trim() || null,
         invoice_date: formData.invoice_date,
         paid_amount: formData.paid_amount,
         note: formData.note?.trim() || null,
         items: selectedItems.map((item) => ({
-          item_id: parseInt(item.item_id),
+          item_id: Number(item.item_id),
           quantity: item.quantity,
           unit_price: item.unit_price,
         })),
       };
       await createPurchaseInvoice(payload);
       toast.success("فاکتور خرید با موفقیت ثبت شد");
-      onSuccess && onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ثبت فاکتور");
+      toast.error(errorText(error, "خطا در ثبت فاکتور"));
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount) => Number(amount).toLocaleString();
+  const formatCurrency = (amount: number) => Number(amount).toLocaleString();
 
   if (!isOpen) return null;
 
@@ -336,7 +399,7 @@ export default function PurchaseInvoiceFormModal({
                       name="note"
                       value={formData.note}
                       onChange={handleInputChange}
-                      rows="3"
+                      rows={3}
                       className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                       placeholder="توضیحات اضافی..."
                     />
@@ -550,7 +613,7 @@ export default function PurchaseInvoiceFormModal({
         isOpen={showQuickModal}
         onClose={() => setShowQuickModal(false)}
         onSuccess={() => {
-          fetchItems();
+          void fetchItems();
           toast.success("کالا اضافه شد");
         }}
       />

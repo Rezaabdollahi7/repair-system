@@ -388,3 +388,61 @@ export interface ToggleActiveResponse {
   message: string;
   is_active: boolean;
 }
+
+/** Every invoice kind uses these three; the column is a plain string. */
+export type PaymentStatus = "paid" | "partial" | "pending";
+
+/** GET /purchase-invoices — the list rows carry no items. */
+export interface PurchaseInvoice {
+  id: number;
+  invoice_number: string;
+  supplier_name: string | null;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  note: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A line of GET /purchase-invoices/:id, with the item relation flattened. */
+export interface PurchaseInvoiceLine {
+  id: number;
+  invoice_id: number;
+  item_id: number;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at: string;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+}
+
+/** GET /purchase-invoices/:id — the invoice plus its lines. */
+export interface PurchaseInvoiceDetail extends PurchaseInvoice {
+  items: PurchaseInvoiceLine[];
+}
+
+export interface PurchaseInvoiceCreateBody {
+  supplier_name: string | null;
+  invoice_date: string;
+  paid_amount: number;
+  note: string | null;
+  items: {
+    item_id: number;
+    quantity: number;
+    unit_price: number;
+  }[];
+}
+
+export interface PaymentUpdateBody {
+  paid_amount: number;
+}
+
+export interface PaymentUpdateResponse {
+  message: string;
+  payment_status: PaymentStatus;
+}

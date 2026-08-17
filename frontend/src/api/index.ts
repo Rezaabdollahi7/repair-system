@@ -35,6 +35,12 @@ import type {
   PersonnelCreateBody,
   PersonnelUpdateBody,
   ToggleActiveResponse,
+  PurchaseInvoice,
+  PurchaseInvoiceCreateBody,
+  PurchaseInvoiceDetail,
+  PurchaseInvoiceLine,
+  PaymentUpdateBody,
+  PaymentUpdateResponse,
 } from "../types/api";
 
 /**
@@ -303,15 +309,17 @@ export const quickPurchase = (id: Id, data: QuickPurchaseBody) =>
 
 // Purchase Invoices
 export const getPurchaseInvoices = (params?: QueryParams) =>
-  api.get("/purchase-invoices", { params });
+  api.get<PaginatedWithLimit<PurchaseInvoice>>("/purchase-invoices", {
+    params,
+  });
 export const getPurchaseInvoice = (id: Id) =>
-  api.get(`/purchase-invoices/${id}`);
-export const createPurchaseInvoice = (data: unknown) =>
-  api.post("/purchase-invoices", data);
-export const updatePurchaseInvoicePayment = (id: Id, data: unknown) =>
-  api.put(`/purchase-invoices/${id}/payment`, data);
+  api.get<PurchaseInvoiceDetail>(`/purchase-invoices/${id}`);
+export const createPurchaseInvoice = (data: PurchaseInvoiceCreateBody) =>
+  api.post<PurchaseInvoice>("/purchase-invoices", data);
+export const updatePurchaseInvoicePayment = (id: Id, data: PaymentUpdateBody) =>
+  api.put<PaymentUpdateResponse>(`/purchase-invoices/${id}/payment`, data);
 export const deletePurchaseInvoice = (id: Id) =>
-  api.delete(`/purchase-invoices/${id}`);
+  api.delete<MessageResponse>(`/purchase-invoices/${id}`);
 
 // Sale Invoices
 export const getSaleInvoices = (params?: QueryParams) =>

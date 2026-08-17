@@ -18,9 +18,16 @@ import {
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency } from "../utils/formatters";
+import type { Id, PaymentStatus, PurchaseInvoiceDetail } from "../types/api";
 
-function PaymentStatusBadge({ status }) {
-  const map = {
+interface BadgeStyle {
+  label: string;
+  color: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
       color: "bg-success-soft text-success",
@@ -52,7 +59,13 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
-function InfoRow({ label, value, highlight }) {
+interface InfoRowProps {
+  label: string;
+  value: React.ReactNode;
+  highlight?: boolean;
+}
+
+function InfoRow({ label, value, highlight }: InfoRowProps) {
   return (
     <div className="flex justify-between py-2 border-b border-border last:border-0">
       <span className="text-sm text-text-secondary">{label}</span>
@@ -65,25 +78,37 @@ function InfoRow({ label, value, highlight }) {
   );
 }
 
+interface PurchaseInvoiceDetailModalProps {
+  invoiceId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
+
 export default function PurchaseInvoiceDetailModal({
   invoiceId,
   isOpen,
   onClose,
-}) {
+}: PurchaseInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
   const { openItemDetail } = useModal();
-  const [invoice, setInvoice] = useState(null);
+  const [invoice, setInvoice] = useState<PurchaseInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paymentAmount, setPaymentAmount] = useState("");
+  // Starts as a string because the input owns it, then holds whatever the
+  // server last recorded.
+  const [paymentAmount, setPaymentAmount] = useState<string | number>("");
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (isOpen && invoiceId) fetchInvoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, invoiceId]);
 
   const fetchInvoice = async () => {
+    if (!invoiceId) return;
     setLoading(true);
     try {
       const res = await getPurchaseInvoice(invoiceId);
@@ -98,6 +123,7 @@ export default function PurchaseInvoiceDetailModal({
   };
 
   const handleDelete = async () => {
+    if (!invoiceId) return;
     setDeleting(true);
     try {
       await deletePurchaseInvoice(invoiceId);
@@ -112,7 +138,8 @@ export default function PurchaseInvoiceDetailModal({
   };
 
   const handlePaymentUpdate = async () => {
-    const newAmount = parseInt(paymentAmount);
+    if (!invoiceId || !invoice) return;
+    const newAmount = parseInt(String(paymentAmount));
     if (isNaN(newAmount) || newAmount < 0 || newAmount > invoice.total_amount)
       return toast.error("مبلغ پرداختی نامعتبر است");
     setUpdatingPayment(true);
@@ -127,7 +154,7 @@ export default function PurchaseInvoiceDetailModal({
     }
   };
 
-  const formatDate = (date) =>
+  const formatDate = (date: string | null | undefined) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
   if (!isOpen) return null;

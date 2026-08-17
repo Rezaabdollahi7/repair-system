@@ -1,14 +1,16 @@
-// src/components/ItemDetailModal.jsx
 import { useState, useEffect } from "react";
-import { getItem, deleteItem, getItemTransactions } from "../api";
-import api from "../api";
+import axios from "axios";
+import {
+  getItem,
+  deleteItem,
+  getItemTransactions,
+  quickPurchase,
+  quickSale,
+} from "../api";
 import toast from "react-hot-toast";
-import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
 import ConfirmModal from "./ConfirmModal";
 import {
-  PencilSquareIcon,
-  TrashIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   ClipboardDocumentListIcon,
@@ -17,26 +19,49 @@ import {
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
+import type { Id, InventoryTransaction, Item } from "../types/api";
+
+/** The server answers with { error } on every failing path. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
+interface QuickModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  item: Item | null;
+}
 
 // ─── Quick Purchase Modal ──────────────────────────────────
-function QuickPurchaseModal({ isOpen, onClose, onSuccess, item }) {
+function QuickPurchaseModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  item,
+}: QuickModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(item?.avgPurchasePrice || 0);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!item) return;
     setLoading(true);
     try {
-      await api.post(`/items/${item.id}/quick-purchase`, {
-        quantity: parseInt(quantity),
-        unit_price: parseInt(price),
+      await quickPurchase(item.id, {
+        quantity,
+        unit_price: price,
       });
       toast.success("خرید سریع با موفقیت ثبت شد");
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ثبت خرید سریع");
+      toast.error(errorText(error, "خطا در ثبت خرید سریع"));
     } finally {
       setLoading(false);
     }
@@ -126,14 +151,14 @@ function QuickPurchaseModal({ isOpen, onClose, onSuccess, item }) {
 }
 
 // ─── Quick Sale Modal ──────────────────────────────────────
-function QuickSaleModal({ isOpen, onClose, onSuccess, item }) {
+function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [customerName, setCustomerName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<{ quantity?: string }>({});
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors: { quantity?: string } = {};
     if (!quantity || quantity <= 0)
       newErrors.quantity = "تعداد باید بیشتر از صفر باشد";
     if (quantity > (item?.currentStock || 0))
@@ -142,13 +167,14 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!item) return;
     if (!validate()) return;
     setLoading(true);
     try {
-      await api.post(`/items/${item.id}/quick-sale`, {
-        quantity: parseInt(quantity),
+      await quickSale(item.id, {
+        quantity,
         customer_name: customerName?.trim() || "مشتری متفرقه",
       });
       toast.success("فروش سریع با موفقیت ثبت شد");
@@ -157,7 +183,7 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }) {
       setQuantity(1);
       setCustomerName("");
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ثبت فروش سریع");
+      toast.error(errorText(error, "خطا در ثبت فروش سریع"));
     } finally {
       setLoading(false);
     }
@@ -251,7 +277,13 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }) {
 }
 
 // ─── Stock Status Card ─────────────────────────────────────────
-function StockStatusCard({ current, min, unit }) {
+interface StockStatusCardProps {
+  current: number;
+  min: number;
+  unit: string;
+}
+
+function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
   const isCritical = current === 0;
   const isLow = current > 0 && current <= min;
   let bgColor = "bg-success-soft border-success-soft";
@@ -301,7 +333,13 @@ function StockStatusCard({ current, min, unit }) {
   );
 }
 
-function InfoRow({ label, value, highlight = false }) {
+interface InfoRowProps {
+  label: string;
+  value: React.ReactNode;
+  highlight?: boolean;
+}
+
+function InfoRow({ label, value, highlight = false }: InfoRowProps) {
   return (
     <div className="flex justify-between py-2 border-b border-border last:border-0">
       <span className="text-sm text-text-secondary">{label}</span>
@@ -315,15 +353,26 @@ function InfoRow({ label, value, highlight = false }) {
 }
 
 // ─── Main Component ────────────────────────────────────────────
-export default function ItemDetailModal({ itemId, isOpen, onClose }) {
-  const { isAtLeast } = useAuth();
-  const { openItemEdit } = useModal();
-  const [item, setItem] = useState(null);
+interface ItemDetailModalProps {
+  itemId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  zIndex?: number;
+}
+
+export default function ItemDetailModal({
+  itemId,
+  isOpen,
+  onClose,
+}: ItemDetailModalProps) {
+  const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [showQuickPurchase, setShowQuickPurchase] = useState(false);
   const [showQuickSale, setShowQuickSale] = useState(false);
+  // The button that would set this has no counterpart in the header yet —
+  // unlike the device and customer modals, which both have one.
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { openPurchaseInvoiceDetail } = useModal();
@@ -347,9 +396,11 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, itemId]);
 
   const handleDelete = async () => {
+    if (!itemId) return;
     setDeleting(true);
     try {
       await deleteItem(itemId);
@@ -357,7 +408,7 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
       setShowDeleteConfirm(false);
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در حذف کالا");
+      toast.error(errorText(error, "خطا در حذف کالا"));
     } finally {
       setDeleting(false);
     }
@@ -531,7 +582,8 @@ export default function ItemDetailModal({ itemId, isOpen, onClose }) {
                               : "—"}
                           </td>
                           <td className="px-4 py-2 text-sm text-text-secondary">
-                            {tx.purchase_invoice_number ? (
+                            {tx.purchase_invoice_number &&
+                            tx.reference_id !== null ? (
                               <button
                                 onClick={() =>
                                   openPurchaseInvoiceDetail(tx.reference_id)

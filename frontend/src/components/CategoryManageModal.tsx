@@ -16,15 +16,37 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 
-export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
-  const [categories, setCategories] = useState([]);
+import axios from "axios";
+import type { Category } from "../types/api";
+
+interface CategoryManageModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+/** Shared by the three handlers; the server answers with { error } throughout. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
+export default function CategoryManageModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: CategoryManageModalProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState<Category | null>(null);
   const [editName, setEditName] = useState("");
   const [editing, setEditing] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -39,7 +61,8 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
     try {
       const res = await getCategories();
-      setCategories(res.data?.data || res.data || []);
+      // A plain array, not a paginated envelope.
+      setCategories(res.data);
     } catch {
       toast.error("خطا در دریافت دسته‌بندی‌ها");
     } finally {
@@ -55,15 +78,16 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
       toast.success("دسته‌بندی جدید اضافه شد");
       setNewName("");
       fetchCategories();
-      onSuccess && onSuccess();
+      onSuccess?.();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ایجاد دسته‌بندی");
+      toast.error(errorText(error, "خطا در ایجاد دسته‌بندی"));
     } finally {
       setAdding(false);
     }
   };
 
   const handleEdit = async () => {
+    if (!editTarget) return;
     if (!editName.trim()) return toast.error("نام دسته‌بندی الزامی است");
     setEditing(true);
     try {
@@ -72,9 +96,9 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
       setEditTarget(null);
       setEditName("");
       fetchCategories();
-      onSuccess && onSuccess();
+      onSuccess?.();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ویرایش");
+      toast.error(errorText(error, "خطا در ویرایش"));
     } finally {
       setEditing(false);
     }
@@ -88,15 +112,15 @@ export default function CategoryManageModal({ isOpen, onClose, onSuccess }) {
       toast.success("دسته‌بندی حذف شد");
       setDeleteTarget(null);
       fetchCategories();
-      onSuccess && onSuccess();
+      onSuccess?.();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در حذف");
+      toast.error(errorText(error, "خطا در حذف"));
     } finally {
       setDeleting(false);
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (editTarget) handleEdit();

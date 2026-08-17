@@ -197,9 +197,7 @@ export interface DeviceAssignee {
 /**
  * The device list carries `limit` as well, which the customer list does not.
  */
-export interface PaginatedDevices extends Paginated<Device> {
-  limit: number;
-}
+export type PaginatedDevices = PaginatedWithLimit<Device>;
 
 /**
  * POST /devices, written from schemas/device.ts.
@@ -243,4 +241,111 @@ export interface DeviceAssignment {
   id: number;
   name: string;
   username: string;
+}
+
+/** Item and device lists carry `limit`; the customer list does not. */
+export interface PaginatedWithLimit<T> extends Paginated<T> {
+  limit: number;
+}
+
+/**
+ * Categories answer in camelCase, unlike most of the API. Deliberate —
+ * serialize() is not used here because it would break the frontend.
+ */
+export interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The frontend only ever sends `name`; the schema accepts both. */
+export interface CategoryBody {
+  name: string;
+  description?: string | null;
+}
+
+/**
+ * Items answer in camelCase too — except `sell_price`, which the create and
+ * update bodies take in snake_case while the response gives `sellPrice`.
+ * Left as it is.
+ */
+export interface Item {
+  id: number;
+  categoryId: number | null;
+  name: string;
+  code: string;
+  unit: string;
+  minStock: number;
+  currentStock: number;
+  avgPurchasePrice: number;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  sellPrice: number;
+  categoryName: string | null;
+}
+
+export interface ItemCreateBody {
+  code: string;
+  name: string;
+  unit: string;
+  categoryId?: number | string | null;
+  minStock?: number;
+  description?: string | null;
+  /** snake_case where the rest of the body is camelCase. */
+  sell_price?: number;
+}
+
+export type ItemUpdateBody = Partial<ItemCreateBody>;
+
+/**
+ * GET /items/:id/transactions — snake_case, unlike the other item endpoints.
+ *
+ * `reference_id` is polymorphic and carries no foreign key, so the invoice
+ * number is looked up separately and is null for anything else.
+ */
+export interface InventoryTransaction {
+  id: number;
+  item_id: number;
+  type: string;
+  quantity: number;
+  unit_price: number;
+  reference_id: number | null;
+  reference_type: string | null;
+  note: string | null;
+  created_by: number | null;
+  created_at: string;
+  purchase_invoice_number: string | null;
+}
+
+/** GET /items/search/for-invoice — snake_case, also unlike its neighbours. */
+export interface ItemForInvoice {
+  id: number;
+  code: string;
+  name: string;
+  unit: string;
+  current_stock: number;
+  avg_purchase_price: number;
+  sell_price: number;
+  category_name: string | null;
+}
+
+export interface QuickStockResponse {
+  message: string;
+  invoice_number: string;
+  new_stock: number;
+}
+
+export interface QuickPurchaseBody {
+  quantity: number;
+  unit_price: number;
+  note?: string;
+}
+
+export interface QuickSaleBody {
+  quantity: number;
+  customer_name?: string;
 }

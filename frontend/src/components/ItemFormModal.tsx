@@ -1,9 +1,15 @@
-// src/components/ItemFormModal.jsx
 import { useState, useEffect } from "react";
-import { getItem, createItem, updateItem, getCategories } from "../api";
-import api from "../api";
+import axios from "axios";
+import {
+  getItem,
+  createItem,
+  updateItem,
+  getCategories,
+  quickPurchase,
+} from "../api";
 import toast from "react-hot-toast";
 import { XMarkIcon, CubeIcon } from "@heroicons/react/24/solid";
+import type { Category, Id, ItemCreateBody } from "../types/api";
 
 const unitOptions = [
   { value: "عدد", label: "عدد" },
@@ -15,39 +21,67 @@ const unitOptions = [
   { value: "دستگاه", label: "دستگاه" },
 ];
 
-export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
+/**
+ * `currentStock` is display-only and read in edit mode; stock changes go
+ * through purchase and sale invoices, never this form.
+ */
+interface ItemForm {
+  code: string;
+  name: string;
+  categoryId: number | string;
+  unit: string;
+  minStock: number | string;
+  description: string;
+  currentStock?: number;
+}
+
+const EMPTY_FORM: ItemForm = {
+  code: "",
+  name: "",
+  categoryId: "",
+  unit: "عدد",
+  minStock: 0,
+  description: "",
+};
+
+type FormErrors = Partial<Record<keyof ItemForm | "initialStock", string>>;
+
+interface ItemFormModalProps {
+  itemId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
+
+export default function ItemFormModal({
+  itemId,
+  isOpen,
+  onClose,
+  onSuccess,
+}: ItemFormModalProps) {
   const isEditMode = Boolean(itemId);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [initialStock, setInitialStock] = useState(0);
-  const [categories, setCategories] = useState([]);
-  const [errors, setErrors] = useState({});
-  const [formData, setFormData] = useState({
-    code: "",
-    name: "",
-    categoryId: "",
-    unit: "عدد",
-    minStock: 0,
-    description: "",
-  });
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [formData, setFormData] = useState<ItemForm>(EMPTY_FORM);
 
   useEffect(() => {
     if (isOpen) {
       getCategories()
-        .then((res) => {
-          const cats = res.data?.data || res.data || [];
-          setCategories(Array.isArray(cats) ? cats : []);
-        })
+        .then((res) => setCategories(res.data))
         .catch(() => {});
 
-      if (isEditMode) {
+      if (isEditMode && itemId) {
         getItem(itemId)
           .then((res) => {
             const item = res.data;
             setFormData({
               code: item.code || "",
               name: item.name || "",
-              categoryId: item.categoryId || "",
+              categoryId: item.categoryId ?? "",
               unit: item.unit || "عدد",
               minStock: item.minStock || 0,
               description: item.description || "",
@@ -60,35 +94,35 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
           })
           .finally(() => setInitialLoading(false));
       } else {
-        setFormData({
-          code: "",
-          name: "",
-          categoryId: "",
-          unit: "عدد",
-          minStock: 0,
-          description: "",
-        });
+        setFormData(EMPTY_FORM);
         setInitialStock(0);
         setInitialLoading(false);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, itemId, isEditMode]);
 
-  const handleChange = (e) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "number" ? (value === "" ? "" : Number(value)) : value,
     }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+    if (errors[name as keyof FormErrors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: FormErrors = {};
     if (!formData.code?.trim()) newErrors.code = "کد کالا الزامی است";
     if (!formData.name?.trim()) newErrors.name = "نام کالا الزامی است";
     if (!formData.unit?.trim()) newErrors.unit = "واحد کالا الزامی است";
-    if (formData.minStock < 0)
+    if (Number(formData.minStock) < 0)
       newErrors.minStock = "حداقل موجودی نمی‌تواند منفی باشد";
     if (initialStock < 0)
       newErrors.initialStock = "موجودی اولیه نمی‌تواند منفی باشد";
@@ -96,7 +130,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
       toast.error("لطفاً خطاهای فرم را برطرف کنید");
@@ -104,28 +138,28 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
     }
     setLoading(true);
     try {
-      const payload = {
+      const payload: ItemCreateBody = {
         code: formData.code.trim(),
         name: formData.name.trim(),
         categoryId: formData.categoryId || null,
         unit: formData.unit.trim(),
-        minStock: formData.minStock,
+        minStock: Number(formData.minStock),
         description: formData.description?.trim() || null,
       };
 
-      let newItemId = itemId;
-
-      if (isEditMode) {
+      if (isEditMode && itemId) {
         await updateItem(itemId, payload);
         toast.success("کالا با موفقیت ویرایش شد");
       } else {
         const res = await createItem(payload);
-        newItemId = res.data.id;
         toast.success("کالا با موفقیت ثبت شد");
 
         if (initialStock > 0) {
           try {
-            await api.post(`/items/${newItemId}/quick-purchase`, {
+            // Recorded as a purchase at zero price so the opening stock lands
+            // in the ledger like any other movement, rather than as a number
+            // with no history behind it.
+            await quickPurchase(res.data.id, {
               quantity: initialStock,
               unit_price: 0,
               note: "موجودی اولیه",
@@ -136,10 +170,13 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
         }
       }
 
-      onSuccess && onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error) {
-      const errorMessage = error.response?.data?.error;
+      const errorMessage =
+        (axios.isAxiosError(error) &&
+          (error.response?.data as { error?: string } | undefined)?.error) ||
+        undefined;
       if (errorMessage?.includes("کد کالا قبلاً ثبت شده")) {
         setErrors((prev) => ({ ...prev, code: "این کد قبلاً ثبت شده است" }));
         toast.error("کد کالا تکراری است");
@@ -175,7 +212,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* کد کالا */}
+            {/* Code */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 کد کالا <span className="text-danger">*</span>
@@ -194,7 +231,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               )}
             </div>
 
-            {/* نام کالا */}
+            {/* Name */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 نام کالا <span className="text-danger">*</span>
@@ -213,7 +250,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               )}
             </div>
 
-            {/* دسته‌بندی */}
+            {/* Category */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 دسته‌بندی
@@ -234,7 +271,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               </select>
             </div>
 
-            {/* واحد */}
+            {/* Unit */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 واحد شمارش <span className="text-danger">*</span>
@@ -257,7 +294,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               )}
             </div>
 
-            {/* حداقل موجودی */}
+            {/* Minimum stock */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 حداقل موجودی (هشدار)
@@ -280,7 +317,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               </p>
             </div>
 
-            {/* موجودی اولیه - فقط در حالت ایجاد */}
+            {/* Opening stock, only when creating */}
             {!isEditMode && (
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-2">
@@ -307,7 +344,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               </div>
             )}
 
-            {/* موجودی فعلی - فقط در حالت ویرایش */}
+            {/* Current stock, only when editing */}
             {isEditMode && (
               <div className="bg-surface-alt p-4 rounded-lg border border-border">
                 <label className="block text-sm font-medium text-text-primary mb-2">
@@ -323,7 +360,7 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
             )}
           </div>
 
-          {/* توضیحات */}
+          {/* Description */}
           <div className="mt-6">
             <label className="block text-sm font-medium text-text-primary mb-2">
               توضیحات
@@ -333,13 +370,13 @@ export default function ItemFormModal({ itemId, isOpen, onClose, onSuccess }) {
               value={formData.description}
               onChange={handleChange}
               disabled={loading}
-              rows="3"
+              rows={3}
               className="w-full border border-border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary"
               placeholder="توضیحات اضافی درباره کالا..."
             />
           </div>
 
-          {/* دکمه‌ها */}
+          {/* Actions */}
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"

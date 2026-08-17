@@ -20,6 +20,17 @@ import type {
   UploadedDeviceImage,
   DeviceUpdateBody,
   DeviceAssignment,
+  Category,
+  CategoryBody,
+  ItemCreateBody,
+  Item,
+  ItemForInvoice,
+  ItemUpdateBody,
+  InventoryTransaction,
+  PaginatedWithLimit,
+  QuickPurchaseBody,
+  QuickSaleBody,
+  QuickStockResponse
 } from "../types/api";
 
 /**
@@ -254,24 +265,36 @@ export const setDeviceAssignments = (deviceId: Id, personnelIds: number[]) =>
   });
 
 // Categories
-export const getCategories = () => api.get("/categories");
-export const createCategory = (data: unknown) => api.post("/categories", data);
-export const updateCategory = (id: Id, data: unknown) =>
-  api.put(`/categories/${id}`, data);
-export const deleteCategory = (id: Id) => api.delete(`/categories/${id}`);
-
+export const getCategories = () => api.get<Category[]>("/categories");
+export const createCategory = (data: CategoryBody) =>
+  api.post<Category>("/categories", data);
+export const updateCategory = (id: Id, data: CategoryBody) =>
+  api.put<Category>(`/categories/${id}`, data);
+export const deleteCategory = (id: Id) =>
+  api.delete<MessageResponse>(`/categories/${id}`);
 // Items
-export const getItems = (params?: QueryParams) => api.get("/items", { params });
-export const getItem = (id: Id) => api.get(`/items/${id}`);
-export const createItem = (data: unknown) => api.post("/items", data);
-export const updateItem = (id: Id, data: unknown) =>
-  api.put(`/items/${id}`, data);
-export const deleteItem = (id: Id) => api.delete(`/items/${id}`);
+export const getItems = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<Item>>("/items", { params });
+export const getItem = (id: Id) => api.get<Item>(`/items/${id}`);
+export const createItem = (data: ItemCreateBody) =>
+  api.post<Item>("/items", data);
+export const updateItem = (id: Id, data: ItemUpdateBody) =>
+  api.put<Item>(`/items/${id}`, data);
+export const deleteItem = (id: Id) =>
+  api.delete<MessageResponse>(`/items/${id}`);
 export const searchItems = (params?: QueryParams) =>
-  api.get("/items/search", { params });
-export const getLowStockItems = () => api.get("/items/low-stock");
+  api.get<PaginatedWithLimit<Item>>("/items/search", { params });
+export const getLowStockItems = () => api.get<Item[]>("/items/low-stock");
 export const getItemTransactions = (id: Id, params?: QueryParams) =>
-  api.get(`/items/${id}/transactions`, { params });
+  api.get<PaginatedWithLimit<InventoryTransaction>>(
+    `/items/${id}/transactions`,
+    { params },
+  );
+
+// Was reached through a bare api.post from two components; named here so the
+// URL lives in one place like every other endpoint.
+export const quickPurchase = (id: Id, data: QuickPurchaseBody) =>
+  api.post<QuickStockResponse>(`/items/${id}/quick-purchase`, data);
 
 // Purchase Invoices
 export const getPurchaseInvoices = (params?: QueryParams) =>
@@ -297,8 +320,8 @@ export const updateSaleInvoicePayment = (id: Id, data: unknown) =>
   api.put(`/sale-invoices/${id}/payment`, data);
 export const deleteSaleInvoice = (id: Id) => api.delete(`/sale-invoices/${id}`);
 
-export const quickSale = (id: Id, data: unknown) =>
-  api.post(`/items/${id}/quick-sale`, data);
+export const quickSale = (id: Id, data: QuickSaleBody) =>
+  api.post<QuickStockResponse>(`/items/${id}/quick-sale`, data);
 
 // Reports
 export const getDashboardStats = () => api.get("/reports/dashboard");
@@ -343,7 +366,7 @@ export const searchDevicesForInvoice = (q: string) =>
 
 // Items - search for invoice (از قبل داریم)
 export const searchItemsForInvoice = (q: string) =>
-  api.get("/items/search/for-invoice", { params: { q } });
+  api.get<ItemForInvoice[]>("/items/search/for-invoice", { params: { q } });
 
 // Services (از قبل داریم)
 export const getServices = () => api.get("/services");

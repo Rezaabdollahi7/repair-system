@@ -1,4 +1,3 @@
-// src/components/SaleInvoicePreview.jsx
 import { useState, useEffect, useRef } from "react";
 import { getSettings } from "../api";
 import {
@@ -8,12 +7,24 @@ import {
 } from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
 import { formatPersianCurrency } from "../utils/formatters";
-import { getBaseUrl } from "../utils/helpers";
+import type { AppSettings, SaleInvoiceDetail } from "../types/api";
 
-export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const printRef = useRef(null);
+interface SaleInvoicePreviewProps {
+  invoice: SaleInvoiceDetail | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+type PaperSize = "A4" | "A5" | "Thermal";
+
+export default function SaleInvoicePreview({
+  invoice,
+  isOpen,
+  onClose,
+}: SaleInvoicePreviewProps) {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [, setLoading] = useState(true);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -23,19 +34,18 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  const formatDate = (date) =>
+  const formatDate = (date: string | null | undefined) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
-  const paperSize0 = settings?.sale_invoice_paper_size || "A5";
-  const isA50 = paperSize0 === "A5";
-  const isA40 = paperSize0 === "A4";
+  // Read before the early return below, because hooks cannot be conditional.
+  const paperSize = (settings?.sale_invoice_paper_size || "A5") as PaperSize;
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: invoice?.invoice_number || "فاکتور فروش",
     pageStyle: `
       @page {
-        size: ${isA50 ? "A5 landscape" : isA40 ? "A4 portrait" : "80mm auto"};
+        size: ${paperSize === "A5" ? "A5 landscape" : paperSize === "A4" ? "A4 portrait" : "80mm auto"};
         margin: 5mm;
       }
       body {
@@ -43,7 +53,6 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
         print-color-adjust: exact;
       }
     `,
-    onAfterPrint: () => console.log("Print completed"),
   });
 
   const handleDownloadPDF = () => {
@@ -52,17 +61,14 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
 
   if (!isOpen || !invoice) return null;
 
-  const baseUrl = getBaseUrl();
-  const showLogo = settings?.sale_invoice_show_logo !== 0;
+  const showLogo = Boolean(settings?.sale_invoice_show_logo);
   const showEmail = Boolean(settings?.sale_invoice_show_email);
   const showWebsite = Boolean(settings?.sale_invoice_show_website);
   const showCustomerPhone = Boolean(settings?.sale_invoice_show_customer_phone);
   const showSignature = Boolean(settings?.sale_invoice_show_signature);
   const showStamp = Boolean(settings?.sale_invoice_show_stamp);
 
-  const paperSize = settings?.sale_invoice_paper_size || "A5";
-
-  const paperSizeClasses = {
+  const paperSizeClasses: Record<PaperSize, string> = {
     A4: "max-w-[210mm] p-6",
     A5: "max-w-[210mm] p-4",
     Thermal: "max-w-[80mm] p-2",
@@ -142,7 +148,7 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                 <div className="flex items-start gap-2">
                   {showLogo && settings?.company_logo && (
                     <img
-                      src={baseUrl + settings.company_logo}
+                      src={settings.company_logo}
                       alt="Logo"
                       className={`object-contain rounded-sm ${isThermal ? "h-8" : isA5 ? "h-12" : "h-14"}`}
                     />
@@ -294,7 +300,7 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                       <td
                         className={`border border-border px-1 py-1 ${fontSize.small} text-text-primary`}
                       >
-                        {item.item_name || item.name}
+                        {item.item_name || "—"}
                       </td>
                       <td
                         className={`border border-border px-1 py-1 text-center ${fontSize.small} text-text-primary`}
@@ -304,7 +310,7 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                       <td
                         className={`border border-border px-1 py-1 text-center ${fontSize.small} text-text-secondary`}
                       >
-                        {item.unit || item.item_unit || "—"}
+                        {item.item_unit || "—"}
                       </td>
                       <td
                         className={`border border-border px-1 py-1 text-left ${fontSize.small} text-text-primary`}
@@ -380,7 +386,7 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                   {showSignature && settings?.signature_image && (
                     <div className="text-center">
                       <img
-                        src={baseUrl + settings.signature_image}
+                        src={settings.signature_image}
                         alt="Signature"
                         className={`object-contain ${isThermal ? "h-8" : isA5 ? "h-12" : "h-12"}`}
                       />
@@ -394,7 +400,7 @@ export default function SaleInvoicePreview({ invoice, isOpen, onClose }) {
                   {showStamp && settings?.stamp_image && (
                     <div className="text-center">
                       <img
-                        src={baseUrl + settings.stamp_image}
+                        src={settings.stamp_image}
                         alt="Stamp"
                         className={`object-contain ${isThermal ? "h-8" : isA5 ? "h-12" : "h-12"}`}
                       />

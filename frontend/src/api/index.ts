@@ -47,6 +47,7 @@ import type {
   SaleInvoiceDetail,
   SaleInvoiceLine,
   SaleInvoiceLineBody,
+  AppSettings,
 } from "../types/api";
 
 /**
@@ -356,14 +357,17 @@ export const getProfitReport = (params?: QueryParams) =>
   api.get("/reports/profit", { params });
 
 // Settings
-export const getSettings = () => api.get("/settings");
-export const updateSettings = (data: unknown) => api.put("/settings", data);
+export const getSettings = () => api.get<AppSettings>("/settings");
+export const updateSettings = (data: Partial<AppSettings>) =>
+  api.put<AppSettings>("/settings", data);
 export const uploadSettingImage = (type: string, file: File) => {
   const formData = new FormData();
   formData.append("image", file);
-  return api.post(`/settings/upload/${type}`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  return api.post<{ message: string; path: string }>(
+    `/settings/upload/${type}`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
 };
 
 // Repair Invoices

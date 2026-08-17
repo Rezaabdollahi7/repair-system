@@ -523,3 +523,44 @@ export interface SaleInvoiceCreated {
   total_amount: number;
   payment_status: PaymentStatus;
 }
+
+/**
+ * GET /settings. Every field is optional because the endpoint falls back to
+ * a partial object when the row is missing — the seed creates it, so that is
+ * a safety net rather than a normal path.
+ *
+ * The three image fields are presigned URLs, not keys: they are signed
+ * server-side and used as-is. A value written before phase 4 comes back null.
+ */
+export interface AppSettings {
+  id?: number;
+  company_name?: string;
+  company_address?: string | null;
+  company_phone?: string | null;
+  company_email?: string | null;
+  company_website?: string | null;
+  company_logo?: string | null;
+  stamp_image?: string | null;
+  signature_image?: string | null;
+  default_tax_rate?: number;
+  default_warranty_months?: number;
+  invoice_prefix?: string | null;
+  invoice_footer_text?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  sale_invoice_paper_size?: string;
+  sale_invoice_show_logo?: boolean;
+  sale_invoice_show_company_info?: boolean;
+  sale_invoice_show_email?: boolean;
+  sale_invoice_show_website?: boolean;
+  sale_invoice_show_device_info?: boolean;
+  sale_invoice_show_customer_phone?: boolean;
+  sale_invoice_show_discount?: boolean;
+  sale_invoice_show_tax?: boolean;
+  sale_invoice_show_stamp?: boolean;
+  sale_invoice_show_signature?: boolean;
+  sale_invoice_show_warranty?: boolean;
+  sale_invoice_show_technician?: boolean;
+  sale_invoice_header_text?: string | null;
+  sale_invoice_footer_text?: string | null;
+}

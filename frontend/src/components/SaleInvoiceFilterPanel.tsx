@@ -1,4 +1,3 @@
-// src/components/SaleInvoiceFilterPanel.jsx
 import { useState, useRef, useEffect } from "react";
 import {
   FunnelIcon,
@@ -11,8 +10,36 @@ import {
   CreditCardIcon,
 } from "@heroicons/react/24/outline";
 import PersianDatePicker from "./PersianDatePicker";
+import type { PaymentStatus } from "../types/api";
 
-const PAYMENT_STATUS_OPTIONS = [
+/**
+ * The filter state this panel edits. Exported because SaleInvoiceList owns
+ * the value and passes it down — one shape, defined where it is read.
+ *
+ * The amount fields carry "" rather than undefined when cleared, which is
+ * what the number inputs produce.
+ */
+export interface SaleInvoiceFilters {
+  payment_status: PaymentStatus[];
+  date_from: string;
+  date_to: string;
+  amount_from: number | "";
+  amount_to: number | "";
+}
+
+interface SaleInvoiceFilterPanelProps {
+  filters: SaleInvoiceFilters;
+  onChange: (filters: SaleInvoiceFilters) => void;
+  onClear: () => void;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const PAYMENT_STATUS_OPTIONS: {
+  value: PaymentStatus;
+  label: string;
+  color: string;
+}[] = [
   { value: "paid", label: "پرداخت شده", color: "bg-success-soft text-success" },
   {
     value: "partial",
@@ -26,28 +53,59 @@ const PAYMENT_STATUS_OPTIONS = [
   },
 ];
 
+interface SectionTitleProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+}
+
+function SectionTitle({ icon: Icon, title }: SectionTitleProps) {
+  return (
+    <div className="flex items-center gap-2 mb-3 pb-2">
+      <Icon className="size-6 text-success" />
+      <span className="text-sm font-semibold text-text-primary">{title}</span>
+    </div>
+  );
+}
+
+interface ClearButtonProps {
+  onClick: () => void;
+  multi?: boolean;
+}
+
+function ClearButton({ onClick, multi }: ClearButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
+    >
+      <XCircleIcon className="w-3.5 h-3.5" />
+      {multi ? "پاک کردن انتخاب‌ها" : "پاک کردن انتخاب"}
+    </button>
+  );
+}
+
 export default function SaleInvoiceFilterPanel({
   filters,
   onChange,
   onClear,
   isOpen,
   onClose,
-}) {
+}: SaleInvoiceFilterPanelProps) {
   const [paymentStatusDropdownOpen, setPaymentStatusDropdownOpen] =
     useState(false);
   const [paymentStatusSearch, setPaymentStatusSearch] = useState("");
 
-  const paymentStatusRef = useRef(null);
+  const paymentStatusRef = useRef<HTMLDivElement>(null);
 
   const activeCount = Object.values(filters).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v !== "" && v !== undefined,
   ).length;
 
   useEffect(() => {
-    function handleClickOutside(e) {
+    function handleClickOutside(e: MouseEvent) {
       if (
         paymentStatusRef.current &&
-        !paymentStatusRef.current.contains(e.target)
+        !paymentStatusRef.current.contains(e.target as Node)
       ) {
         setPaymentStatusDropdownOpen(false);
         setPaymentStatusSearch("");
@@ -57,7 +115,7 @@ export default function SaleInvoiceFilterPanel({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function togglePaymentStatus(value) {
+  function togglePaymentStatus(value: PaymentStatus) {
     const current = filters.payment_status || [];
     const updated = current.includes(value)
       ? current.filter((s) => s !== value)
@@ -83,23 +141,6 @@ export default function SaleInvoiceFilterPanel({
 
   const dropdownBtnClass =
     "w-full border border-border rounded-xl px-3 py-2.5 text-sm bg-surface text-right flex justify-between items-center hover:border-success hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-success transition-all";
-
-  const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-3 pb-2">
-      <Icon className="size-6 text-success" />
-      <span className="text-sm font-semibold text-text-primary">{title}</span>
-    </div>
-  );
-
-  const ClearButton = ({ onClick, multi }) => (
-    <button
-      onClick={onClick}
-      className="w-full text-right px-3 py-2 text-xs text-danger hover:bg-danger-soft border-b border-border flex items-center gap-1 transition-colors"
-    >
-      <XCircleIcon className="w-3.5 h-3.5" />
-      {multi ? "پاک کردن انتخاب‌ها" : "پاک کردن انتخاب"}
-    </button>
-  );
 
   if (!isOpen) return null;
 
@@ -159,7 +200,7 @@ export default function SaleInvoiceFilterPanel({
                 >
                   <span
                     className={
-                      filters.payment_status?.length > 0
+                      filters.payment_status?.length
                         ? "text-text-primary font-medium"
                         : "text-text-secondary"
                     }

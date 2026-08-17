@@ -48,6 +48,17 @@ import type {
   SaleInvoiceLine,
   SaleInvoiceLineBody,
   AppSettings,
+  RepairInvoice,
+  RepairInvoiceCreateBody,
+  RepairInvoiceCreated,
+  RepairInvoiceDetail,
+  RepairInvoiceLine,
+  RepairInvoiceLineBody,
+  RepairInvoicePayment,
+  RepairInvoiceStatus,
+  RepairPaymentBody,
+  RepairPaymentResponse,
+  AppService,
 } from "../types/api";
 
 /**
@@ -372,18 +383,23 @@ export const uploadSettingImage = (type: string, file: File) => {
 
 // Repair Invoices
 export const getRepairInvoices = (params?: QueryParams) =>
-  api.get("/repair-invoices", { params });
-export const getRepairInvoice = (id: Id) => api.get(`/repair-invoices/${id}`);
-export const createRepairInvoice = (data: unknown) =>
-  api.post("/repair-invoices", data);
-export const updateRepairInvoice = (id: Id, data: unknown) =>
-  api.put(`/repair-invoices/${id}`, data);
+  api.get<PaginatedWithLimit<RepairInvoice>>("/repair-invoices", { params });
+export const getRepairInvoice = (id: Id) =>
+  api.get<RepairInvoiceDetail>(`/repair-invoices/${id}`);
+export const createRepairInvoice = (data: RepairInvoiceCreateBody) =>
+  api.post<RepairInvoiceCreated>("/repair-invoices", data);
+export const updateRepairInvoice = (id: Id, data: RepairInvoiceCreateBody) =>
+  api.put<MessageResponse>(`/repair-invoices/${id}`, data);
 export const deleteRepairInvoice = (id: Id) =>
-  api.delete(`/repair-invoices/${id}`);
-export const changeRepairInvoiceStatus = (id: Id, status: string) =>
-  api.put(`/repair-invoices/${id}/status`, { status });
-export const addRepairInvoicePayment = (id: Id, data: unknown) =>
-  api.post(`/repair-invoices/${id}/payments`, data);
+  api.delete<MessageResponse>(`/repair-invoices/${id}`);
+export const changeRepairInvoiceStatus = (
+  id: Id,
+  status: RepairInvoiceStatus,
+) => api.put<MessageResponse>(`/repair-invoices/${id}/status`, { status });
+export const addRepairInvoicePayment = (id: Id, data: RepairPaymentBody) =>
+  api.post<RepairPaymentResponse>(`/repair-invoices/${id}/payments`, data);
+
+export const getServices = () => api.get<AppService[]>("/services");
 
 // Devices - search for invoice
 export const searchDevicesForInvoice = (q: string) =>
@@ -392,9 +408,6 @@ export const searchDevicesForInvoice = (q: string) =>
 // Items - search for invoice (از قبل داریم)
 export const searchItemsForInvoice = (q: string) =>
   api.get<ItemForInvoice[]>("/items/search/for-invoice", { params: { q } });
-
-// Services (از قبل داریم)
-export const getServices = () => api.get("/services");
 
 // Users - technicians only
 export const getTechnicians = () =>

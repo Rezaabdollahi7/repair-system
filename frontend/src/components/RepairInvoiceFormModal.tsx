@@ -1,5 +1,5 @@
-// src/components/RepairInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   createRepairInvoice,
   updateRepairInvoice,
@@ -9,7 +9,6 @@ import {
   getServices,
   getTechnicians,
   getSettings,
-  getItems,
 } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -24,6 +23,74 @@ import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency } from "../utils/formatters";
 import ItemFormModal from "./ItemFormModal";
+import type { SelectOption, SelectValue } from "./SearchableSelect";
+import type {
+  AppService,
+  AppSettings,
+  Device,
+  DiscountType,
+  Id,
+  ItemForInvoice,
+  Personnel,
+  RepairInvoiceCreateBody,
+  RepairLineType,
+} from "../types/api";
+
+/** The server answers with { error } on every failing path. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
+/** A line as the form holds it, before the server fills in the totals. */
+interface FormLine {
+  item_type: RepairLineType;
+  item_id?: SelectValue;
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  discount_type: DiscountType | "";
+  discount_value: number;
+}
+
+interface RepairForm {
+  device_id: SelectValue | "";
+  customer_name: string;
+  customer_id: number | string | null;
+  customer_phone: string;
+  invoice_date: string;
+  technician_id: number | string;
+  warranty_months: number;
+  tax_rate: number;
+  discount_type: DiscountType | "";
+  discount_value: number;
+  notes: string;
+}
+
+interface DeviceOption extends SelectOption {
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_id: number | null;
+}
+
+interface ItemOption extends SelectOption {
+  sell_price: number;
+  unit: string;
+}
+
+interface RepairInvoiceFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialInvoiceId?: Id | null;
+  initialDeviceId?: Id | null;
+  invoiceId?: Id | null;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
 
 export default function RepairInvoiceFormModal({
   isOpen,
@@ -31,15 +98,15 @@ export default function RepairInvoiceFormModal({
   initialInvoiceId = null,
   initialDeviceId = null,
   onSuccess,
-}) {
+}: RepairInvoiceFormModalProps) {
   const isEditMode = Boolean(initialInvoiceId);
 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
-  const [settings, setSettings] = useState(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const emptyForm = (): RepairForm => ({
     device_id: "",
     customer_name: "",
     customer_id: "",
@@ -53,13 +120,15 @@ export default function RepairInvoiceFormModal({
     notes: "",
   });
 
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [errors, setErrors] = useState({});
+  const [formData, setFormData] = useState<RepairForm>(emptyForm);
 
-  const [devices, setDevices] = useState([]);
-  const [items, setItems] = useState([]);
-  const [services, setServices] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
+  const [selectedItems, setSelectedItems] = useState<FormLine[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [items, setItems] = useState<ItemForInvoice[]>([]);
+  const [services, setServices] = useState<AppService[]>([]);
+  const [technicians, setTechnicians] = useState<Personnel[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,8 +146,8 @@ export default function RepairInvoiceFormModal({
 
     Promise.all([getServices(), getTechnicians()])
       .then(([servicesRes, techRes]) => {
-        setServices(servicesRes.data || []);
-        setTechnicians(techRes.data?.data || techRes.data || []);
+        setServices(servicesRes.data);
+        setTechnicians(techRes.data);
       })
       .catch(() => {});
   }, [isOpen]);
@@ -86,17 +155,17 @@ export default function RepairInvoiceFormModal({
   useEffect(() => {
     if (!isOpen) return;
     if (!isEditMode && initialDeviceId) {
-      searchDevicesForInvoice("").then((res) => {
-        const devicesList = res.data?.data || res.data || [];
+      void searchDevicesForInvoice("").then((res) => {
+        const devicesList = res.data.data;
         setDevices(devicesList);
         const device = devicesList.find(
-          (d) => d.id === parseInt(initialDeviceId),
+          (d) => d.id === Number(initialDeviceId),
         );
         if (device) {
           setFormData((prev) => ({
             ...prev,
             device_id: device.id,
-            customer_id: device.customer_id || null,
+            customer_id: device.customer_id,
             customer_name: device.customer_name || "",
             customer_phone: device.customer_phone || "",
           }));
@@ -114,11 +183,12 @@ export default function RepairInvoiceFormModal({
           setFormData({
             device_id: invoice.device_id,
             customer_name: invoice.customer_name || "",
+            customer_id: invoice.customer_id,
             customer_phone: invoice.customer_phone || "",
             invoice_date:
               invoice.invoice_date?.split("T")[0] ||
               new Date().toISOString().split("T")[0],
-            technician_id: invoice.technician_id || "",
+            technician_id: invoice.technician_id ?? "",
             warranty_months: invoice.warranty_months || 3,
             tax_rate: invoice.tax_rate || 9,
             discount_type: invoice.discount_type || "",
@@ -126,21 +196,23 @@ export default function RepairInvoiceFormModal({
             notes: invoice.notes || "",
           });
 
-          const items = invoice.items.map((item) => ({
-            item_type: item.item_type,
-            item_id: item.item_id || "",
-            name: item.name,
-            quantity: item.quantity,
-            unit: item.unit || "عدد",
-            unit_price: item.unit_price,
-            discount_type: item.discount_type || "",
-            discount_value: item.discount_value || 0,
+          // Named `lines` rather than `items`, which would shadow the
+          // catalogue held in state above.
+          const lines: FormLine[] = invoice.items.map((line) => ({
+            item_type: line.item_type,
+            item_id: line.item_id ?? "",
+            name: line.name,
+            quantity: line.quantity,
+            unit: line.unit || "عدد",
+            unit_price: line.unit_price,
+            discount_type: line.discount_type || "",
+            discount_value: line.discount_value || 0,
           }));
-          setSelectedItems(items);
+          setSelectedItems(lines);
 
           if (invoice.device_id) {
-            searchDevicesForInvoice("").then((res) => {
-              const device = res.data?.data?.find(
+            void searchDevicesForInvoice("").then((deviceRes) => {
+              const device = deviceRes.data.data.find(
                 (d) => d.id === invoice.device_id,
               );
               if (device) setDevices([device]);
@@ -157,8 +229,10 @@ export default function RepairInvoiceFormModal({
 
   const refreshItems = async () => {
     try {
-      const res = await getItems({ limit: 1000 });
-      setItems(res.data?.data || res.data || []);
+      // Through the invoice search, not getItems: the two answer in different
+      // cases, and everything below reads the snake_case one.
+      const res = await searchItemsForInvoice("");
+      setItems(res.data);
     } catch {
       toast.error("خطا در به‌روزرسانی لیست کالاها");
     }
@@ -166,17 +240,9 @@ export default function RepairInvoiceFormModal({
 
   const resetForm = () => {
     setFormData({
-      device_id: "",
-      customer_name: "",
-      customer_id: "",
-      customer_phone: "",
-      invoice_date: new Date().toISOString().split("T")[0],
-      technician_id: "",
+      ...emptyForm(),
       warranty_months: settings?.default_warranty_months || 3,
       tax_rate: settings?.default_tax_rate || 9,
-      discount_type: "",
-      discount_value: 0,
-      notes: "",
     });
     setSelectedItems([]);
     setErrors({});
@@ -187,7 +253,7 @@ export default function RepairInvoiceFormModal({
     onClose();
   };
 
-  const deviceOptions = devices.map((d) => ({
+  const deviceOptions: DeviceOption[] = devices.map((d) => ({
     value: d.id,
     label: `${d.id} - ${d.device_name} ${d.brand ? `(${d.brand})` : ""}`,
     subLabel: `مشتری: ${d.customer_name || "—"} | مدل: ${d.model || "—"} | تلفن: ${d.customer_phone || "—"}`,
@@ -196,7 +262,7 @@ export default function RepairInvoiceFormModal({
     customer_id: d.customer_id,
   }));
 
-  const itemOptions = items.map((i) => ({
+  const itemOptions: ItemOption[] = items.map((i) => ({
     value: i.id,
     label: `[${i.code}] ${i.name}`,
     subLabel: `موجودی: ${i.current_stock} ${i.unit} | قیمت فروش: ${Number(i.sell_price || 0).toLocaleString()} ریال`,
@@ -206,10 +272,10 @@ export default function RepairInvoiceFormModal({
 
   const technicianOptions = technicians.map((t) => ({
     value: t.id,
-    label: t.full_name || t.name || t.username,
+    label: t.full_name || t.username,
   }));
 
-  const calculateItemTotal = (item) => {
+  const calculateItemTotal = (item: FormLine) => {
     const subtotal = item.quantity * item.unit_price;
     let discount = 0;
     if (item.discount_type === "percentage") {
@@ -220,12 +286,8 @@ export default function RepairInvoiceFormModal({
     return subtotal - discount;
   };
 
-  const calculateSubtotal = () => {
-    return selectedItems.reduce(
-      (sum, item) => sum + calculateItemTotal(item),
-      0,
-    );
-  };
+  const calculateSubtotal = () =>
+    selectedItems.reduce((sum, item) => sum + calculateItemTotal(item), 0);
 
   const calculateDiscount = () => {
     const subtotal = calculateSubtotal();
@@ -242,42 +304,45 @@ export default function RepairInvoiceFormModal({
     return afterDiscount * (formData.tax_rate / 100);
   };
 
-  const calculateTotal = () => {
-    return calculateSubtotal() - calculateDiscount() + calculateTax();
-  };
+  const calculateTotal = () =>
+    calculateSubtotal() - calculateDiscount() + calculateTax();
 
-  const handleDeviceSearch = async (query) => {
+  const handleDeviceSearch = async (query: string) => {
     try {
       const res = await searchDevicesForInvoice(query || "");
-      setDevices(res.data?.data || res.data || []);
+      setDevices(res.data.data);
     } catch {
       toast.error("خطا در جستجوی دستگاه");
     }
   };
 
-  const handleItemSearch = async (query) => {
+  const handleItemSearch = async (query: string) => {
     try {
       const res = await searchItemsForInvoice(query || "");
-      setItems(res.data || []);
+      setItems(res.data);
     } catch {
       toast.error("خطا در جستجوی کالا");
     }
   };
 
-  const handleDeviceSelect = (deviceId) => {
+  const handleDeviceSelect = (deviceId: SelectValue) => {
     const device = devices.find((d) => d.id === deviceId);
     if (device) {
       setFormData((prev) => ({
         ...prev,
         device_id: deviceId,
-        customer_id: device.customer_id || null,
+        customer_id: device.customer_id,
         customer_name: device.customer_name || "",
         customer_phone: device.customer_phone || "",
       }));
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -285,55 +350,31 @@ export default function RepairInvoiceFormModal({
     }));
   };
 
-  const handleAddItem = (type) => {
-    if (type === "inventory") {
-      setSelectedItems((prev) => [
-        ...prev,
-        {
-          item_type: "inventory",
-          item_id: "",
-          name: "",
-          quantity: 1,
-          unit: "عدد",
-          unit_price: 0,
-          discount_type: "",
-          discount_value: 0,
-        },
-      ]);
-    } else if (type === "service") {
-      setSelectedItems((prev) => [
-        ...prev,
-        {
-          item_type: "service",
-          name: "",
-          quantity: 1,
-          unit: "خدمت",
-          unit_price: 0,
-          discount_type: "",
-          discount_value: 0,
-        },
-      ]);
-    } else {
-      setSelectedItems((prev) => [
-        ...prev,
-        {
-          item_type: "custom",
-          name: "",
-          quantity: 1,
-          unit: "عدد",
-          unit_price: 0,
-          discount_type: "",
-          discount_value: 0,
-        },
-      ]);
-    }
+  const handleAddItem = (type: RepairLineType) => {
+    const base: FormLine = {
+      item_type: type,
+      name: "",
+      quantity: 1,
+      unit: type === "service" ? "خدمت" : "عدد",
+      unit_price: 0,
+      discount_type: "",
+      discount_value: 0,
+    };
+    setSelectedItems((prev) => [
+      ...prev,
+      type === "inventory" ? { ...base, item_id: "" } : base,
+    ]);
   };
 
-  const handleRemoveItem = (index) => {
+  const handleRemoveItem = (index: number) => {
     setSelectedItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index, field, value) => {
+  const handleItemChange = (
+    index: number,
+    field: keyof FormLine,
+    value: SelectValue,
+  ) => {
     setSelectedItems((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
@@ -364,7 +405,7 @@ export default function RepairInvoiceFormModal({
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.device_id) {
       newErrors.device_id = "دستگاه باید انتخاب شود";
@@ -394,7 +435,7 @@ export default function RepairInvoiceFormModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -405,7 +446,7 @@ export default function RepairInvoiceFormModal({
     setLoading(true);
 
     try {
-      const payload = {
+      const payload: RepairInvoiceCreateBody = {
         device_id: formData.device_id,
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone,
@@ -418,7 +459,7 @@ export default function RepairInvoiceFormModal({
         notes: formData.notes,
         items: selectedItems.map((item) => ({
           item_type: item.item_type,
-          item_id: item.item_id || null,
+          item_id: item.item_id ? Number(item.item_id) : null,
           name: item.name,
           quantity: item.quantity,
           unit: item.unit,
@@ -428,7 +469,7 @@ export default function RepairInvoiceFormModal({
         })),
       };
 
-      if (isEditMode) {
+      if (isEditMode && initialInvoiceId) {
         await updateRepairInvoice(initialInvoiceId, payload);
         toast.success("فاکتور با موفقیت ویرایش شد");
       } else {
@@ -437,10 +478,10 @@ export default function RepairInvoiceFormModal({
       }
 
       resetForm();
-      if (onSuccess) onSuccess();
+      onSuccess?.();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ذخیره فاکتور");
+      toast.error(errorText(error, "خطا در ذخیره فاکتور"));
     } finally {
       setLoading(false);
     }
@@ -603,7 +644,7 @@ export default function RepairInvoiceFormModal({
                         name="notes"
                         value={formData.notes}
                         onChange={handleInputChange}
-                        rows="3"
+                        rows={3}
                         className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                         placeholder="توضیحات اضافی..."
                       />

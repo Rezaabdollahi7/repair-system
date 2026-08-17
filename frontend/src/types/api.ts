@@ -564,3 +564,143 @@ export interface AppSettings {
   sale_invoice_header_text?: string | null;
   sale_invoice_footer_text?: string | null;
 }
+
+/** Repair invoices move through these; the column is a plain string. */
+export type RepairInvoiceStatus = "draft" | "issued" | "paid" | "cancelled";
+
+/** Line-level and invoice-level discounts share this shape. */
+export type DiscountType = "percentage" | "fixed";
+
+export interface RepairInvoice {
+  id: number;
+  invoice_number: string;
+  device_id: number;
+  customer_id: number | null;
+  customer_name: string;
+  customer_phone: string | null;
+  invoice_date: string;
+  due_date: string | null;
+  status: RepairInvoiceStatus;
+  subtotal: number;
+  discount_type: DiscountType | null;
+  discount_value: number;
+  discount_amount: number;
+  tax_rate: number;
+  tax_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  warranty_months: number;
+  warranty_until: string | null;
+  technician_id: number | null;
+  notes: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  technician_name: string | null;
+}
+
+/**
+ * A repair line is one of three kinds. Only an inventory line points at the
+ * catalogue, so `item_code` and `item_unit` are null for the other two —
+ * the controller looks them up per kind rather than joining blindly.
+ */
+export type RepairLineType = "inventory" | "service" | "custom";
+
+export interface RepairInvoiceLine {
+  id: number;
+  invoice_id: number;
+  item_type: RepairLineType;
+  item_id: number | null;
+  name: string;
+  description: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  discount_type: DiscountType | null;
+  discount_value: number;
+  discount_amount: number;
+  total_price: number;
+  sort_order: number;
+  item_code: string | null;
+  item_unit: string | null;
+}
+
+export interface RepairInvoicePayment {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  payment_method: string;
+  reference_number: string | null;
+  note: string | null;
+  payment_date: string;
+  created_by: number | null;
+  created_at: string;
+}
+
+export interface RepairInvoiceDetail extends RepairInvoice {
+  items: RepairInvoiceLine[];
+  payments: RepairInvoicePayment[];
+}
+
+export interface RepairInvoiceLineBody {
+  item_type: RepairLineType;
+  item_id: number | null;
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  discount_type: DiscountType | null;
+  discount_value: number;
+}
+
+export interface RepairInvoiceCreateBody {
+  device_id: number | string;
+  customer_name: string;
+  customer_phone: string;
+  invoice_date: string;
+  technician_id: number | string | null;
+  warranty_months: number;
+  tax_rate: number;
+  discount_type: DiscountType | null;
+  discount_value: number;
+  notes: string;
+  items: RepairInvoiceLineBody[];
+}
+
+/** POST answers with four fields, not the invoice. */
+export interface RepairInvoiceCreated {
+  id: number;
+  invoice_number: string;
+  total_amount: number;
+  status: RepairInvoiceStatus;
+}
+
+export interface RepairPaymentBody {
+  amount: number;
+  payment_method: string;
+  reference_number?: string | null;
+  note?: string | null;
+}
+
+export interface RepairPaymentResponse {
+  message: string;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  remaining: number;
+}
+
+/** GET /services — snake_case, and no timestamps. */
+export interface AppService {
+  id: number;
+  name: string;
+  description: string | null;
+  default_price: number;
+  unit: string;
+  is_active: boolean;
+  sort_order: number;
+}

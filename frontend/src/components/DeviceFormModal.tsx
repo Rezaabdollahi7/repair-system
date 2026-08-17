@@ -7,7 +7,6 @@ import {
   getDevices,
   createCustomer,
   getDeviceImages,
-  uploadDeviceImages,
   getPersonnel,
   getDeviceAssignments,
   setDeviceAssignments,
@@ -37,9 +36,9 @@ import type {
 } from "../types/api";
 
 /**
- * The form holds every field as a string, which is what the inputs produce.
- * `customer_id` carries "" for "no customer" — see DeviceCreateBody in
- * types/api for what the server makes of that.
+ * The form holds every field as the inputs produce it. `customer_id` carries
+ * "" for "no customer" — see DeviceCreateBody in types/api for what the
+ * server makes of that.
  */
 interface DeviceForm {
   customer_id: number | string;
@@ -64,7 +63,7 @@ interface SelectedPerson {
   username?: string;
 }
 
-/** A row of the personnel list, which this form only reads three fields of. */
+/** A row of the personnel list, of which this form reads three fields. */
 interface PersonnelOption {
   id: number;
   name?: string;
@@ -175,14 +174,14 @@ export default function DeviceFormModal({
   const [newDeviceName, setNewDeviceName] = useState(INITIAL_DEVICE_NAME);
   const [newBrand, setNewBrand] = useState(INITIAL_BRAND);
   const [images, setImages] = useState<ListedDeviceImage[]>([]);
-  const [pendingImages] = useState<File[]>([]);
 
-  // Customer search
+  // Customer search. The chosen customer is not held separately: `form
+  // .customer_id` is what gets submitted and `customerSearch` is what the
+  // field shows, so a third copy of the same fact had nothing to answer.
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [customerResults, setCustomerResults] = useState<CustomerListRow[]>([]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
-  const [, setSelectedCustomer] = useState<CustomerListRow | null>(null);
 
   // Device name, suggested from devices already recorded
   const [deviceNameSearch, setDeviceNameSearch] = useState("");
@@ -317,7 +316,6 @@ export default function DeviceFormModal({
     setImages([]);
     setSelectedPersonnel([]);
     setCustomerSearch("");
-    setSelectedCustomer(null);
     setDeviceNameSearch("");
     setBrandSearch("");
     setShowNewCustomer(false);
@@ -360,12 +358,6 @@ export default function DeviceFormModal({
         setCustomerSearch(
           `${deviceRes.data.customer_name} - ${deviceRes.data.customer_phone ?? ""}`,
         );
-        setSelectedCustomer({
-          id: deviceRes.data.customer_id ?? 0,
-          name: deviceRes.data.customer_name,
-          phone: deviceRes.data.customer_phone,
-          device_count: 0,
-        });
       }
       if (deviceRes.data.device_name) {
         setDeviceNameSearch(deviceRes.data.device_name);
@@ -395,12 +387,6 @@ export default function DeviceFormModal({
       const res = await createCustomer(newCustomer);
       const created = res.data;
       setForm((prev) => ({ ...prev, customer_id: created.id }));
-      setSelectedCustomer({
-        id: created.id,
-        name: created.name,
-        phone: created.phone,
-        device_count: 0,
-      });
       setShowNewCustomer(false);
       setNewCustomer(INITIAL_CUSTOMER);
       toast.success("مشتری اضافه شد");
@@ -451,16 +437,10 @@ export default function DeviceFormModal({
       let devId: Id | null | undefined = deviceId;
       if (isEdit && deviceId) {
         await updateDevice(deviceId, form as DeviceCreateBody);
-        if (pendingImages.length > 0) {
-          await uploadDeviceImages(deviceId, pendingImages);
-        }
         toast.success("دستگاه ویرایش شد");
       } else {
         const res = await createDevice(form as DeviceCreateBody);
         devId = res.data.id;
-        if (pendingImages.length > 0) {
-          await uploadDeviceImages(devId, pendingImages);
-        }
         toast.success("دستگاه ثبت شد");
       }
       if (devId) {
@@ -539,7 +519,6 @@ export default function DeviceFormModal({
                           onMouseDown={() => {
                             setForm((p) => ({ ...p, customer_id: "" }));
                             setCustomerSearch("");
-                            setSelectedCustomer(null);
                             setShowCustomerDropdown(false);
                           }}
                         >
@@ -555,7 +534,6 @@ export default function DeviceFormModal({
                               key={c.id}
                               onMouseDown={() => {
                                 setForm((p) => ({ ...p, customer_id: c.id }));
-                                setSelectedCustomer(c);
                                 setCustomerSearch(
                                   `${c.name} - ${c.phone || ""}`,
                                 );

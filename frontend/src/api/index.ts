@@ -30,7 +30,11 @@ import type {
   PaginatedWithLimit,
   QuickPurchaseBody,
   QuickSaleBody,
-  QuickStockResponse
+  QuickStockResponse,
+  Personnel,
+  PersonnelCreateBody,
+  PersonnelUpdateBody,
+  ToggleActiveResponse,
 } from "../types/api";
 
 /**
@@ -234,16 +238,17 @@ export const changeMyPassword = (data: {
 
 // Personnel
 export const getPersonnel = (params?: QueryParams) =>
-  api.get("/personnel", { params });
-export const getPersonnelOne = (id: Id) => api.get(`/personnel/${id}`);
-export const createPersonnel = (data: unknown) => api.post("/personnel", data);
-export const updatePersonnel = (id: Id, data: unknown) =>
-  api.put(`/personnel/${id}`, data);
+  api.get<Personnel[]>("/personnel", { params });
+export const getPersonnelOne = (id: Id) =>
+  api.get<Personnel>(`/personnel/${id}`);
+export const createPersonnel = (data: PersonnelCreateBody) =>
+  api.post<Personnel>("/personnel", data);
+export const updatePersonnel = (id: Id, data: PersonnelUpdateBody) =>
+  api.put<Personnel>(`/personnel/${id}`, data);
 export const togglePersonnelActive = (id: Id) =>
-  api.put(`/personnel/${id}/toggle-active`);
-export const deletePersonnel = (id: Id) => api.delete(`/personnel/${id}`);
-export const changePersonnelPassword = (id: Id, data: unknown) =>
-  api.put(`/personnel/${id}/change-password`, data);
+  api.put<ToggleActiveResponse>(`/personnel/${id}/toggle-active`);
+export const deletePersonnel = (id: Id) =>
+  api.delete<MessageResponse>(`/personnel/${id}`);
 
 // Device Assignments
 export const getDeviceAssignments = (deviceId: Id) =>
@@ -373,6 +378,6 @@ export const getServices = () => api.get("/services");
 
 // Users - technicians only
 export const getTechnicians = () =>
-  api.get("/personnel", { params: { role: "technician" } });
+  api.get<Personnel[]>("/personnel", { params: { role: "technician" } });
 
 export default api;

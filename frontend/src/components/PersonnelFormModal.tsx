@@ -1,46 +1,68 @@
-// src/components/PersonnelFormModal.jsx
 import { useEffect, useState } from "react";
+import axios from "axios";
 import toast from "react-hot-toast";
-import {
-  getPersonnelOne,
-  createPersonnel,
-  updatePersonnel,
-} from "../api/index";
+import { getPersonnelOne, createPersonnel, updatePersonnel } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { XMarkIcon, UserGroupIcon } from "@heroicons/react/24/solid";
+import type { Id, PersonnelCreateBody, RoleName } from "../types/api";
 
-const ALL_ROLES = [
+/**
+ * Role ids as the seed writes them. Hardcoded rather than read from the
+ * server, which exposes no endpoint for the roles table.
+ */
+const ALL_ROLES: { id: number; name: RoleName; label: string }[] = [
   { id: 1, name: "super_admin", label: "سوپر ادمین" },
   { id: 2, name: "admin", label: "ادمین" },
   { id: 3, name: "technician", label: "تکنسین" },
 ];
+
+const TECHNICIAN_ROLE_ID = 3;
+
+interface PersonnelForm {
+  full_name: string;
+  username: string;
+  password: string;
+  phone: string;
+  role_id: number;
+}
+
+const EMPTY_FORM: PersonnelForm = {
+  full_name: "",
+  username: "",
+  password: "",
+  phone: "",
+  role_id: TECHNICIAN_ROLE_ID,
+};
+
+interface PersonnelFormModalProps {
+  personnelId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
 
 export default function PersonnelFormModal({
   personnelId,
   isOpen,
   onClose,
   onSuccess,
-}) {
+}: PersonnelFormModalProps) {
   const { user } = useAuth();
   const isEdit = Boolean(personnelId);
 
+  // The server enforces this too: an admin may only ever act on technicians.
   const allowedRoles =
     user?.role === "super_admin"
       ? ALL_ROLES
       : ALL_ROLES.filter((r) => r.name === "technician");
 
-  const [form, setForm] = useState({
-    full_name: "",
-    username: "",
-    password: "",
-    phone: "",
-    role_id: 3,
-  });
+  const [form, setForm] = useState<PersonnelForm>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      if (isEdit) {
+      if (isEdit && personnelId) {
         getPersonnelOne(personnelId)
           .then((res) => {
             const p = res.data;
@@ -49,45 +71,53 @@ export default function PersonnelFormModal({
               username: p.username || "",
               password: "",
               phone: p.phone || "",
-              role_id: p.role_id || 3,
+              role_id: p.role_id || TECHNICIAN_ROLE_ID,
             });
           })
           .catch(() => toast.error("خطا در دریافت اطلاعات"));
       } else {
-        setForm({
-          full_name: "",
-          username: "",
-          password: "",
-          phone: "",
-          role_id: 3,
-        });
+        setForm(EMPTY_FORM);
       }
     }
   }, [isOpen, personnelId, isEdit]);
 
-  const handleChange = (e) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({
+      ...prev,
+      // The role select carries its value as a string, as every DOM input
+      // does; everything downstream expects a number.
+      [name]: name === "role_id" ? Number(value) : value,
+    }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = { ...form };
-      if (isEdit && !payload.password) delete payload.password;
-
-      if (isEdit) {
-        await updatePersonnel(personnelId, payload);
+      if (isEdit && personnelId) {
+        // An empty password field means "leave it alone", so the key is
+        // dropped rather than sent blank.
+        const { password, ...rest } = form;
+        await updatePersonnel(
+          personnelId,
+          password ? { ...rest, password } : rest,
+        );
         toast.success("اطلاعات بروزرسانی شد");
       } else {
-        await createPersonnel(payload);
+        await createPersonnel(form satisfies PersonnelCreateBody);
         toast.success("پرسنل جدید اضافه شد");
       }
-      onSuccess && onSuccess();
+      onSuccess?.();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || "خطا در ذخیره اطلاعات");
+      const message =
+        (axios.isAxiosError(err) &&
+          (err.response?.data as { error?: string } | undefined)?.error) ||
+        "خطا در ذخیره اطلاعات";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

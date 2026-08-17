@@ -349,3 +349,42 @@ export interface QuickSaleBody {
   quantity: number;
   customer_name?: string;
 }
+
+/**
+ * GET /personnel — a plain array, not a paginated envelope, so the `limit`
+ * parameter callers send has nothing to do.
+ *
+ * Note the role relation flattens to `role_name` here, while /auth/me gives
+ * the same thing as `role`. There is no `name` field on a personnel row.
+ */
+export interface Personnel {
+  id: number;
+  workspace_id: number;
+  full_name: string;
+  username: string;
+  phone: string | null;
+  avatar: string | null;
+  role_id: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  role_name: RoleName;
+  role_label: string;
+}
+
+/** `username` is a mobile number, shared with sign-up via phoneSchema. */
+export interface PersonnelCreateBody {
+  full_name: string;
+  username: string;
+  password: string;
+  phone?: string | null;
+  role_id: number;
+}
+
+/** Every field optional; an absent one keeps its current value. */
+export type PersonnelUpdateBody = Partial<PersonnelCreateBody>;
+
+export interface ToggleActiveResponse {
+  message: string;
+  is_active: boolean;
+}

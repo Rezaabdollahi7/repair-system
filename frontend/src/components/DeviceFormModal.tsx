@@ -33,6 +33,7 @@ import type {
   DeviceCreateBody,
   Id,
   ListedDeviceImage,
+  Personnel,
 } from "../types/api";
 
 /**
@@ -60,14 +61,6 @@ interface DeviceForm {
 interface SelectedPerson {
   id: number;
   name: string;
-  username?: string;
-}
-
-/** A row of the personnel list, of which this form reads three fields. */
-interface PersonnelOption {
-  id: number;
-  name?: string;
-  full_name?: string;
   username?: string;
 }
 
@@ -195,7 +188,7 @@ export default function DeviceFormModal({
   const [brandResults, setBrandResults] = useState<Device[]>([]);
   const [searchingBrands, setSearchingBrands] = useState(false);
 
-  const [personnelList, setPersonnelList] = useState<PersonnelOption[]>([]);
+  const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [selectedPersonnel, setSelectedPersonnel] = useState<SelectedPerson[]>(
     [],
   );
@@ -208,8 +201,9 @@ export default function DeviceFormModal({
 
   const filteredPersonnel = personnelList.filter((p) => {
     const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
-    const displayName = p.name ?? p.full_name ?? "";
-    return !alreadySelected && displayName.includes(personnelSearch);
+    // A personnel row has no `name`: the old `p.name ?? p.full_name` always
+    // fell through to the second.
+    return !alreadySelected && p.full_name.includes(personnelSearch);
   });
 
   const searchCustomersAPI = useCallback(async (query: string) => {
@@ -325,8 +319,10 @@ export default function DeviceFormModal({
 
   const loadPersonnel = async () => {
     try {
-      const res = await getPersonnel({ limit: 200 });
-      setPersonnelList(res.data.data ?? res.data);
+      // Not paginated: the endpoint answers with a plain array, so the limit
+      // it used to be given had nothing to act on.
+      const res = await getPersonnel();
+      setPersonnelList(res.data);
     } catch {
       toast.error("خطا در بارگذاری پرسنل");
     }
@@ -414,13 +410,10 @@ export default function DeviceFormModal({
     toast.success("برند اضافه شد");
   };
 
-  const handleSelectPersonnel = (person: PersonnelOption) => {
+  const handleSelectPersonnel = (person: Personnel) => {
     setSelectedPersonnel((prev) => [
       ...prev,
-      {
-        ...person,
-        name: person.name ?? person.full_name ?? person.username ?? "—",
-      },
+      { id: person.id, name: person.full_name, username: person.username },
     ]);
     setPersonnelSearch("");
     setShowPersonnelDropdown(false);
@@ -644,7 +637,7 @@ export default function DeviceFormModal({
                             onMouseDown={() => handleSelectPersonnel(person)}
                             className="px-3 py-2.5 text-sm hover:bg-primary-soft cursor-pointer flex items-center justify-between text-text-primary"
                           >
-                            <span>{person.name ?? person.full_name}</span>
+                            <span>{person.full_name}</span>
                             {person.username && (
                               <span className="text-xs text-text-secondary">
                                 @{person.username}

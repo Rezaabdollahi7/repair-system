@@ -1,130 +1,97 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getSaleInvoices, deleteSaleInvoice } from "../api";
+import { getPurchaseInvoices, deletePurchaseInvoice } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
-import { formatPersianPhone } from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import {
   PlusIcon,
   EyeIcon,
   TrashIcon,
-  PencilSquareIcon,
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
-  CurrencyDollarIcon,
-  FunnelIcon,
+  ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
-import SaleInvoiceFilterPanel from "../components/SaleInvoiceFilterPanel";
+import { useDebounce } from "../utils/helpers";
+import type { PaymentStatus, PurchaseInvoice, QueryParams } from "../types/api";
 
-function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
+interface BadgeStyle {
+  label: string;
+  color: string;
+  icon?: React.ReactNode;
 }
 
-function PaymentStatusBadge({ status }) {
-  // رنگ‌های وضعیت به success/warning/danger وصل شدن، نه primary،
-  // چون این‌ها معنای ثابت دارن (پرداخت‌شده = همیشه سبز) و نباید
-  // با تغییر تم رنگ برند عوض بشن
-  const map = {
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
       color: "bg-success-soft text-success",
-      icon: CheckCircleIcon,
+      icon: <CheckCircleIcon className="w-4 h-4" />,
     },
     partial: {
       label: "پرداخت ناقص",
       color: "bg-warning-soft text-warning",
-      icon: ExclamationCircleIcon,
+      icon: <ExclamationCircleIcon className="w-4 h-4" />,
     },
     pending: {
       label: "در انتظار پرداخت",
-      color: "bg-danger-soft text-danger",
-      icon: ClockIcon,
+      color: "bg-warning-soft text-warning",
+      icon: <ClockIcon className="w-4 h-4" />,
     },
   };
+
   const s = map[status] || {
     label: status,
     color: "bg-surface-alt text-text-secondary",
   };
-  const Icon = s.icon;
   return (
     <span
-      className={`px-2 py-1 mt-2.5 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${s.color}`}
+      className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit mx-auto ${s.color}`}
     >
-      {Icon && <Icon className="w-3 h-3" />}
+      {s.icon}
       {s.label}
     </span>
   );
 }
 
-const EMPTY_FILTERS = {
-  payment_status: [],
-  date_from: "",
-  date_to: "",
-  amount_from: "",
-  amount_to: "",
-};
-
-export default function SaleInvoiceList() {
-  const [invoices, setInvoices] = useState([]);
+export default function PurchaseInvoiceList() {
+  const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [filterOpen, setFilterOpen] = useState(false);
   const { isAtLeast } = useAuth();
-  const {
-    openSaleInvoiceDetail,
-    openSaleInvoiceCreate,
-    openSaleInvoiceEdit,
-    openCustomerDetail,
-    refreshList,
-  } = useModal();
+  const { openPurchaseInvoiceDetail, openPurchaseInvoiceCreate, refreshList } =
+    useModal();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<PurchaseInvoice | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
+
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  const activeFilterCount = Object.values(filters).filter((v) =>
-    Array.isArray(v) ? v.length > 0 : v !== "",
-  ).length;
-
   const fetchInvoices = useCallback(
-    async (searchTerm, activeFilters, currentPage, currentLimit) => {
+    async (searchTerm: string, currentPage: number, currentLimit: number) => {
       setLoading(true);
       try {
-        const params = { page: currentPage, limit: currentLimit };
-        if (searchTerm) params.search = searchTerm;
+        const params: QueryParams = { page: currentPage, limit: currentLimit };
+        // The list filters on the supplier's name, not a general search.
+        if (searchTerm) params.supplier = searchTerm;
 
-        if (activeFilters.payment_status?.length > 0) {
-          params.payment_status = activeFilters.payment_status.join(",");
-        }
-        if (activeFilters.date_from) params.date_from = activeFilters.date_from;
-        if (activeFilters.date_to) params.date_to = activeFilters.date_to;
-        if (activeFilters.amount_from)
-          params.amount_from = activeFilters.amount_from;
-        if (activeFilters.amount_to) params.amount_to = activeFilters.amount_to;
-
-        const res = await getSaleInvoices(params);
-        const apiData = res.data;
-        setInvoices(apiData.data || []);
-        setTotal(apiData.total || 0);
-        setTotalPages(apiData.totalPages || 1);
+        const res = await getPurchaseInvoices(params);
+        setInvoices(res.data.data);
+        setTotal(res.data.total);
+        setTotalPages(res.data.totalPages);
       } catch {
-        toast.error("خطا در دریافت لیست فاکتورهای فروش");
+        toast.error("خطا در دریافت لیست فاکتورها");
         setInvoices([]);
       } finally {
         setLoading(false);
@@ -134,8 +101,8 @@ export default function SaleInvoiceList() {
   );
 
   useEffect(() => {
-    fetchInvoices(debouncedSearch, filters, page, limit);
-  }, [debouncedSearch, filters, page, limit, fetchInvoices]);
+    void fetchInvoices(debouncedSearch, page, limit);
+  }, [debouncedSearch, page, limit, fetchInvoices]);
 
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -144,49 +111,35 @@ export default function SaleInvoiceList() {
       return;
     }
     setPage(1);
-  }, [debouncedSearch, filters]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     refreshList(() => {
-      fetchInvoices(debouncedSearch, filters, page, limit);
+      void fetchInvoices(debouncedSearch, page, limit);
     });
-  }, [refreshList, fetchInvoices, debouncedSearch, filters, page, limit]);
+  }, [refreshList, fetchInvoices, debouncedSearch, page, limit]);
 
-  const formatDate = (dateStr) =>
-    dateStr ? new Date(dateStr).toLocaleDateString("fa-IR") : "—";
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("fa-IR");
+  };
 
   return (
     <div dir="rtl">
-      {/* هدر */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <CurrencyDollarIcon className="w-6 h-6 text-text-secondary" />
-          فاکتورهای فروش
+          <ShoppingCartIcon className="w-6 h-6 text-text-secondary" />
+          فاکتورهای خرید
         </h1>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none bg-success hover:opacity-90 text-text-inverse px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
-          >
-            <FunnelIcon className="w-5 h-5" />
-            <span>فیلترها</span>
-            {activeFilterCount > 0 && (
-              <span className="bg-surface text-success text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px]">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => openSaleInvoiceCreate()}
-            className="flex-1 sm:flex-none bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 transition-colors shadow-sm"
-          >
-            <PlusIcon className="w-5 h-5" />
-            فاکتور جدید
-          </button>
-        </div>
+        <button
+          onClick={() => openPurchaseInvoiceCreate()}
+          className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
+        >
+          <PlusIcon className="w-5 h-5" />
+          فاکتور جدید
+        </button>
       </div>
 
-      {/* جستجو */}
       <div className="mb-4">
         <div className="relative">
           <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
@@ -194,26 +147,11 @@ export default function SaleInvoiceList() {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="جستجو در شماره فاکتور، نام مشتری یا تلفن..."
-            className="w-full pr-10 pl-4 py-2 border border-border rounded-lg text-sm bg-surface text-text-primary"
+            placeholder="جستجو در نام فروشنده..."
+            className="w-full pr-10 pl-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
           />
         </div>
       </div>
-
-      {/* مودال فیلتر */}
-      <SaleInvoiceFilterPanel
-        isOpen={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        filters={filters}
-        onChange={(newFilters) => {
-          setFilters(newFilters);
-          setPage(1);
-        }}
-        onClear={() => {
-          setFilters(EMPTY_FILTERS);
-          setPage(1);
-        }}
-      />
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
@@ -221,9 +159,7 @@ export default function SaleInvoiceList() {
         </div>
       ) : invoices.length === 0 ? (
         <div className="text-center py-20 text-text-secondary">
-          {searchInput || activeFilterCount > 0
-            ? "نتیجه‌ای یافت نشد"
-            : "هیچ فاکتور فروشی ثبت نشده"}
+          {searchInput ? "نتیجه‌ای یافت نشد" : "هیچ فاکتوری ثبت نشده"}
         </div>
       ) : (
         <div className="bg-surface shadow rounded-lg overflow-hidden">
@@ -235,10 +171,7 @@ export default function SaleInvoiceList() {
                     شماره فاکتور
                   </th>
                   <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    مشتری
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تلفن
+                    فروشنده
                   </th>
                   <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
                     تاریخ
@@ -266,47 +199,30 @@ export default function SaleInvoiceList() {
                   return (
                     <tr
                       key={invoice.id}
-                      onClick={() => openSaleInvoiceDetail(invoice.id)}
+                      onClick={() => openPurchaseInvoiceDetail(invoice.id)}
                       className={`hover:bg-primary transition-colors cursor-pointer group ${
                         index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-border text-text-primary group-hover:text-text-inverse">
+                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
                         {invoice.invoice_number}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center border-l border-border">
-                        {invoice.customer_id ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openCustomerDetail(invoice.customer_id);
-                            }}
-                            className="text-primary hover:underline font-medium group-hover:text-text-inverse"
-                          >
-                            {invoice.customer_name || "—"}
-                          </button>
-                        ) : (
-                          <span className="text-text-primary group-hover:text-text-inverse">
-                            {invoice.customer_name || "—"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
-                        {formatPersianPhone(invoice.customer_phone)}
+                      <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse text-text-primary">
+                        {invoice.supplier_name || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
                         {formatDate(invoice.invoice_date)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-border text-text-primary group-hover:text-text-inverse">
-                        {formatPersianCurrency(invoice.total_amount)}
+                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
+                        {formatPersianCurrency(invoice.total_amount)} {` `} ریال
                       </td>
                       <td className="px-4 py-3 text-sm text-success text-center border-l border-border group-hover:text-text-inverse">
-                        {formatPersianCurrency(invoice.paid_amount)}
+                        {formatPersianCurrency(invoice.paid_amount)} {` `} ریال
                       </td>
                       <td className="px-4 py-3 text-sm text-danger text-center border-l border-border group-hover:text-text-inverse">
                         {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-center border-l border-border flex justify-center">
+                      <td className="px-4 py-3 text-center border-l border-border">
                         <PaymentStatusBadge status={invoice.payment_status} />
                       </td>
                       <td className="px-4 py-3 text-sm">
@@ -314,26 +230,14 @@ export default function SaleInvoiceList() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              openSaleInvoiceDetail(invoice.id);
+                              openPurchaseInvoiceDetail(invoice.id);
                             }}
                             className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
                             title="مشاهده جزئیات"
                           >
                             <EyeIcon className="w-5 h-5" />
                           </button>
-                          {/* دکمه ویرایش - فقط برای ادمین */}
-                          {isAtLeast("admin") && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openSaleInvoiceEdit(invoice.id);
-                              }}
-                              className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
-                              title="ویرایش فاکتور"
-                            >
-                              <PencilSquareIcon className="w-5 h-5" />
-                            </button>
-                          )}
+
                           {isAtLeast("admin") && (
                             <button
                               onClick={(e) => {
@@ -341,7 +245,6 @@ export default function SaleInvoiceList() {
                                 setDeleteTarget(invoice);
                               }}
                               className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
-                              title="حذف"
                             >
                               <TrashIcon className="w-5 h-5" />
                             </button>
@@ -379,17 +282,18 @@ export default function SaleInvoiceList() {
         onConfirm={async () => {
           setDeleting(true);
           try {
-            await deleteSaleInvoice(deleteTarget.id);
+            if (!deleteTarget) return;
+            await deletePurchaseInvoice(deleteTarget.id);
             toast.success("فاکتور حذف شد");
             setDeleteTarget(null);
-            fetchInvoices(debouncedSearch, filters, page, limit);
+            fetchInvoices(debouncedSearch, page, limit);
           } catch {
             toast.error("خطا در حذف فاکتور");
           } finally {
             setDeleting(false);
           }
         }}
-        title="حذف فاکتور فروش"
+        title="حذف فاکتور خرید"
         message={`آیا از حذف فاکتور "${deleteTarget?.invoice_number}" مطمئن هستید؟\nموجودی کالاها به حالت قبل برمی‌گردد.`}
         confirmText="حذف"
         variant="danger"

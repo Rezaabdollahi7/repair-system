@@ -1,4 +1,3 @@
-// src/pages/RepairInvoiceList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getRepairInvoices, deleteRepairInvoice } from "../api";
 import Pagination from "../components/Pagination";
@@ -21,18 +20,22 @@ import {
   WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { useDebounce } from "../utils/helpers";
+import type {
+  PaymentStatus,
+  QueryParams,
+  RepairInvoice,
+  RepairInvoiceStatus,
+} from "../types/api";
 
-function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
+interface BadgeStyle {
+  label: string;
+  color: string;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
-function StatusBadge({ status }) {
-  const map = {
+function StatusBadge({ status }: { status: RepairInvoiceStatus }) {
+  const map: Record<string, BadgeStyle> = {
     draft: {
       label: "پیش‌نویس",
       color: "bg-surface-alt text-text-primary",
@@ -57,7 +60,6 @@ function StatusBadge({ status }) {
   const s = map[status] || {
     label: status,
     color: "bg-surface-alt",
-    icon: null,
   };
   const Icon = s.icon;
   return (
@@ -70,8 +72,8 @@ function StatusBadge({ status }) {
   );
 }
 
-function PaymentStatusBadge({ status }) {
-  const map = {
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
       color: "bg-success-soft text-success",
@@ -100,8 +102,16 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
+const statusOptions: { value: string; label: string }[] = [
+  { value: "", label: "همه وضعیت‌ها" },
+  { value: "draft", label: "پیش‌نویس" },
+  { value: "issued", label: "صادر شده" },
+  { value: "paid", label: "پرداخت شده" },
+  { value: "cancelled", label: "ابطال شده" },
+];
+
 export default function RepairInvoiceList() {
-  const [invoices, setInvoices] = useState([]);
+  const [invoices, setInvoices] = useState<RepairInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -117,21 +127,26 @@ export default function RepairInvoiceList() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<RepairInvoice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const debouncedSearch = useDebounce(searchInput, 400);
 
   const fetchInvoices = useCallback(
-    async (searchTerm, status, currentPage, currentLimit) => {
+    async (
+      searchTerm: string,
+      status: string,
+      currentPage: number,
+      currentLimit: number,
+    ) => {
       setLoading(true);
       try {
-        const params = { page: currentPage, limit: currentLimit };
+        const params: QueryParams = { page: currentPage, limit: currentLimit };
         if (searchTerm) params.search = searchTerm;
         if (status) params.status = status;
         const res = await getRepairInvoices(params);
-        setInvoices(res.data.data || []);
-        setTotal(res.data.total || 0);
-        setTotalPages(res.data.totalPages || 1);
+        setInvoices(res.data.data);
+        setTotal(res.data.total);
+        setTotalPages(res.data.totalPages);
       } catch {
         toast.error("خطا در دریافت لیست فاکتورهای تعمیر");
         setInvoices([]);
@@ -143,8 +158,9 @@ export default function RepairInvoiceList() {
   );
 
   useEffect(() => {
-    fetchInvoices(debouncedSearch, statusFilter, page, limit);
+    void fetchInvoices(debouncedSearch, statusFilter, page, limit);
   }, [debouncedSearch, statusFilter, page, limit, fetchInvoices]);
+
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -154,15 +170,8 @@ export default function RepairInvoiceList() {
     setPage(1);
   }, [debouncedSearch, statusFilter]);
 
-  const formatDate = (d) => (d ? new Date(d).toLocaleDateString("fa-IR") : "—");
-
-  const statusOptions = [
-    { value: "", label: "همه وضعیت‌ها" },
-    { value: "draft", label: "پیش‌نویس" },
-    { value: "issued", label: "صادر شده" },
-    { value: "paid", label: "پرداخت شده" },
-    { value: "cancelled", label: "ابطال شده" },
-  ];
+  const formatDate = (d: string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString("fa-IR") : "—";
 
   return (
     <div dir="rtl">
@@ -295,7 +304,8 @@ export default function RepairInvoiceList() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              openCustomerDetail(invoice.customer_id);
+                              if (invoice.customer_id)
+                                openCustomerDetail(invoice.customer_id);
                             }}
                             className="text-primary hover:underline font-medium group-hover:text-text-inverse"
                           >
@@ -392,6 +402,7 @@ export default function RepairInvoiceList() {
         onConfirm={async () => {
           setDeleting(true);
           try {
+            if (!deleteTarget) return;
             await deleteRepairInvoice(deleteTarget.id);
             toast.success("فاکتور حذف شد");
             setDeleteTarget(null);

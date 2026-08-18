@@ -1,4 +1,3 @@
-// src/components/FilterPanel.jsx
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   FunnelIcon,
@@ -17,6 +16,31 @@ import {
 import PersianDatePicker from "./PersianDatePicker";
 import { searchCustomers, getPersonnel } from "../api";
 import { useDebounce } from "../utils/helpers";
+import type { CustomerListRow, Personnel } from "../types/api";
+
+/**
+ * The device filter state. Owned by DeviceList and edited here, so the shape
+ * is declared once beside the panel that understands it.
+ *
+ * `customer_id` carries "" rather than null when cleared, which is what the
+ * clear button writes.
+ */
+export interface DeviceFilters {
+  status: string[];
+  customer_id: number | "";
+  personnel_ids: number[];
+  entry_from: string;
+  entry_to: string;
+  invoice_status: string[];
+}
+
+interface FilterPanelProps {
+  filters: DeviceFilters;
+  onChange: (filters: DeviceFilters) => void;
+  onClear: () => void;
+  isOpen: boolean;
+  onClose: () => void;
+}
 
 const STATUS_OPTIONS = [
   {
@@ -85,13 +109,62 @@ const INVOICE_STATUS_OPTIONS = [
   },
 ];
 
+const dropdownBtnClass =
+  "w-full border border-border rounded-xl px-3 py-2.5 text-sm bg-surface text-right flex justify-between items-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-success transition-all";
+
+interface SearchInputProps {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+}
+
+/**
+ * Declared at module scope, not inside the component: a component defined in
+ * a render body is a new type on every render, so React unmounts and remounts
+ * it — this input was being rebuilt on every keystroke, and only autoFocus
+ * hid it.
+ */
+function SearchInput({
+  value,
+  onChange,
+  placeholder = "جستجو...",
+}: SearchInputProps) {
+  return (
+    <div className="p-2 border-b border-border relative">
+      <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className="w-full text-sm pr-8 pl-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
+        autoFocus
+      />
+    </div>
+  );
+}
+
+interface SectionTitleProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+}
+
+function SectionTitle({ icon: Icon, title }: SectionTitleProps) {
+  return (
+    <div className="flex items-center gap-2 mb-2 border-border">
+      <Icon className="size-6 text-success" />
+      <span className="text-sm font-semibold text-text-primary">{title}</span>
+    </div>
+  );
+}
+
 export default function FilterPanel({
   filters,
   onChange,
   onClear,
   isOpen,
   onClose,
-}) {
+}: FilterPanelProps) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [invoiceStatusDropdownOpen, setInvoiceStatusDropdownOpen] =
     useState(false);
@@ -105,18 +178,21 @@ export default function FilterPanel({
 
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [searchingPersonnel, setSearchingPersonnel] = useState(false);
-  const [customerResults, setCustomerResults] = useState([]);
-  const [personnelResults, setPersonnelResults] = useState([]);
+  const [customerResults, setCustomerResults] = useState<CustomerListRow[]>([]);
+  const [personnelResults, setPersonnelResults] = useState<Personnel[]>([]);
 
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedPersonnelMap, setSelectedPersonnelMap] = useState({});
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<CustomerListRow | null>(null);
+  const [selectedPersonnelMap, setSelectedPersonnelMap] = useState<
+    Record<number, string>
+  >({});
 
-  const statusRef = useRef(null);
-  const invoiceStatusRef = useRef(null);
-  const customerRef = useRef(null);
-  const personnelRef = useRef(null);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const invoiceStatusRef = useRef<HTMLDivElement>(null);
+  const customerRef = useRef<HTMLDivElement>(null);
+  const personnelRef = useRef<HTMLDivElement>(null);
 
-  // ─── FIX: همیشه آخرین نسخه filters رو داریم، بدون stale closure ───
+  // Always the latest filters, without a stale closure.
   const filtersRef = useRef(filters);
   useEffect(() => {
     filtersRef.current = filters;
@@ -129,7 +205,7 @@ export default function FilterPanel({
     Array.isArray(v) ? v.length > 0 : v !== "",
   ).length;
 
-  const searchCustomersAPI = useCallback(async (query) => {
+  const searchCustomersAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
       setCustomerResults([]);
       return;
@@ -137,24 +213,24 @@ export default function FilterPanel({
     setSearchingCustomers(true);
     try {
       const res = await searchCustomers(query);
-      setCustomerResults(res.data?.data || res.data || []);
+      setCustomerResults(res.data.data);
     } catch (error) {
-      console.error("خطا در جستجوی مشتری:", error);
+      console.error("Customer search failed:", error);
       setCustomerResults([]);
     } finally {
       setSearchingCustomers(false);
     }
   }, []);
 
-  const searchPersonnelAPI = useCallback(async (query) => {
+  const searchPersonnelAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
       setPersonnelResults([]);
       return;
     }
     setSearchingPersonnel(true);
     try {
-      const res = await getPersonnel({ search: query, limit: 20 });
-      setPersonnelResults(res.data?.data || res.data || []);
+      const res = await getPersonnel({ search: query });
+      setPersonnelResults(res.data);
     } finally {
       setSearchingPersonnel(false);
     }
@@ -162,10 +238,11 @@ export default function FilterPanel({
 
   useEffect(() => {
     if (filters.customer_id && !selectedCustomer) {
-      searchCustomersAPI(String(filters.customer_id));
+      void searchCustomersAPI(String(filters.customer_id));
     } else if (!filters.customer_id) {
       setSelectedCustomer(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.customer_id]);
 
   useEffect(() => {
@@ -185,62 +262,61 @@ export default function FilterPanel({
       if (missingIds.length > 0) {
         missingIds.forEach(async (id) => {
           try {
-            const res = await getPersonnel({ search: "", limit: 200 });
-            const allPersonnel = res.data?.data || res.data || [];
-            const found = allPersonnel.find((p) => p.id === id);
+            const res = await getPersonnel();
+            const found = res.data.find((p) => p.id === id);
             if (found) {
               setSelectedPersonnelMap((prev) => ({
                 ...prev,
-                [id]:
-                  found.name ??
-                  found.full_name ??
-                  found.username ??
-                  `مسئول #${id}`,
+                [id]: found.full_name || found.username,
               }));
             }
           } catch (error) {
-            console.error("خطا در دریافت اطلاعات پرسنل:", error);
+            console.error("Failed to load personnel:", error);
           }
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.personnel_ids]);
 
   useEffect(() => {
     if (customerSearch && customerSearch.trim()) {
-      searchCustomersAPI(debouncedCustomerSearch);
+      void searchCustomersAPI(debouncedCustomerSearch);
     } else {
       setCustomerResults([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedCustomerSearch, searchCustomersAPI]);
 
   useEffect(() => {
     if (personnelSearch && personnelSearch.trim()) {
-      searchPersonnelAPI(debouncedPersonnelSearch);
+      void searchPersonnelAPI(debouncedPersonnelSearch);
     } else {
       setPersonnelResults([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPersonnelSearch, searchPersonnelAPI]);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (statusRef.current && !statusRef.current.contains(e.target)) {
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (statusRef.current && !statusRef.current.contains(target)) {
         setStatusDropdownOpen(false);
         setStatusSearch("");
       }
       if (
         invoiceStatusRef.current &&
-        !invoiceStatusRef.current.contains(e.target)
+        !invoiceStatusRef.current.contains(target)
       ) {
         setInvoiceStatusDropdownOpen(false);
         setInvoiceStatusSearch("");
       }
-      if (customerRef.current && !customerRef.current.contains(e.target)) {
+      if (customerRef.current && !customerRef.current.contains(target)) {
         setCustomerDropdownOpen(false);
         setCustomerSearch("");
         setCustomerResults([]);
       }
-      if (personnelRef.current && !personnelRef.current.contains(e.target)) {
+      if (personnelRef.current && !personnelRef.current.contains(target)) {
         setPersonnelDropdownOpen(false);
         setPersonnelSearch("");
         setPersonnelResults([]);
@@ -250,8 +326,8 @@ export default function FilterPanel({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ─── FIX: همه toggle ها از filtersRef.current استفاده می‌کنند ───
-  function toggleStatus(value) {
+  // Every toggle reads filtersRef.current, not the captured prop.
+  function toggleStatus(value: string) {
     const current = filtersRef.current.status || [];
     const updated = current.includes(value)
       ? current.filter((s) => s !== value)
@@ -259,7 +335,7 @@ export default function FilterPanel({
     onChange({ ...filtersRef.current, status: updated });
   }
 
-  function toggleInvoiceStatus(value) {
+  function toggleInvoiceStatus(value: string) {
     const current = filtersRef.current.invoice_status || [];
     const updated = current.includes(value)
       ? current.filter((s) => s !== value)
@@ -267,7 +343,7 @@ export default function FilterPanel({
     onChange({ ...filtersRef.current, invoice_status: updated });
   }
 
-  function togglePersonnel(id) {
+  function togglePersonnel(id: number) {
     const current = filtersRef.current.personnel_ids || [];
     const updated = current.includes(id)
       ? current.filter((p) => p !== id)
@@ -330,34 +406,6 @@ export default function FilterPanel({
     o.label.includes(invoiceStatusSearch),
   );
 
-  const dropdownBtnClass =
-    "w-full border border-border rounded-xl px-3 py-2.5 text-sm bg-surface text-right flex justify-between items-center hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-success transition-all";
-
-  const SearchInput = ({
-    value,
-    onChange: onChangeFn,
-    placeholder = "جستجو...",
-  }) => (
-    <div className="p-2 border-b border-border relative">
-      <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        onChange={onChangeFn}
-        className="w-full text-sm pr-8 pl-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-success focus:border-transparent bg-surface text-text-primary"
-        autoFocus
-      />
-    </div>
-  );
-
-  const SectionTitle = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-2 mb-2 border-border">
-      <Icon className="size-6 text-success" />
-      <span className="text-sm font-semibold text-text-primary">{title}</span>
-    </div>
-  );
-
   if (!isOpen) return null;
 
   return (
@@ -366,7 +414,7 @@ export default function FilterPanel({
         className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
         dir="rtl"
       >
-        {/* هدر */}
+        {/* Header */}
         <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-border px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="bg-success-soft p-2 rounded-xl">
@@ -402,12 +450,12 @@ export default function FilterPanel({
           </div>
         </div>
 
-        {/* محتوا */}
+        {/* Content */}
         <div className="p-4 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* ستون راست */}
+            {/* Right column  */}
             <div className="space-y-8">
-              {/* وضعیت دستگاه */}
+              {/* Device status  */}
               <div>
                 <SectionTitle icon={CheckBadgeIcon} title="وضعیت دستگاه" />
                 <div ref={statusRef} className="relative">
@@ -418,7 +466,7 @@ export default function FilterPanel({
                   >
                     <span
                       className={
-                        filters.status?.length > 0
+                        filters.status.length > 0
                           ? "text-text-primary font-medium"
                           : "text-text-secondary"
                       }
@@ -439,7 +487,7 @@ export default function FilterPanel({
                         onChange={(e) => setStatusSearch(e.target.value)}
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {filters.status?.length > 0 && (
+                        {filters.status.length > 0 && (
                           <button
                             onClick={() => {
                               onChange({ ...filtersRef.current, status: [] });
@@ -453,9 +501,7 @@ export default function FilterPanel({
                           </button>
                         )}
                         {filteredStatuses.map((opt) => {
-                          const isSelected = filters.status?.includes(
-                            opt.value,
-                          );
+                          const isSelected = filters.status.includes(opt.value);
                           return (
                             <button
                               key={opt.value}
@@ -496,7 +542,7 @@ export default function FilterPanel({
                 </div>
               </div>
 
-              {/* وضعیت فاکتور */}
+              {/* Invoice status */}
               <div>
                 <SectionTitle
                   icon={DocumentCurrencyDollarIcon}
@@ -510,7 +556,7 @@ export default function FilterPanel({
                   >
                     <span
                       className={
-                        filters.invoice_status?.length > 0
+                        filters.invoice_status.length > 0
                           ? "text-text-primary font-medium"
                           : "text-text-secondary"
                       }
@@ -531,7 +577,7 @@ export default function FilterPanel({
                         onChange={(e) => setInvoiceStatusSearch(e.target.value)}
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {filters.invoice_status?.length > 0 && (
+                        {filters.invoice_status.length > 0 && (
                           <button
                             onClick={() => {
                               onChange({
@@ -548,7 +594,7 @@ export default function FilterPanel({
                           </button>
                         )}
                         {filteredInvoiceStatuses.map((opt) => {
-                          const isSelected = filters.invoice_status?.includes(
+                          const isSelected = filters.invoice_status.includes(
                             opt.value,
                           );
                           return (
@@ -591,7 +637,7 @@ export default function FilterPanel({
                 </div>
               </div>
 
-              {/* مشتری */}
+              {/* Customer */}
               <div>
                 <SectionTitle icon={UserGroupIcon} title="مشتری" />
                 <div ref={customerRef} className="relative">
@@ -686,9 +732,9 @@ export default function FilterPanel({
               </div>
             </div>
 
-            {/* ستون چپ */}
+            {/* Left column */}
             <div className="space-y-8">
-              {/* مسئول */}
+              {/* Technician */}
               <div>
                 <SectionTitle icon={UserIcon} title="مسئول" />
                 <div ref={personnelRef} className="relative">
@@ -699,7 +745,7 @@ export default function FilterPanel({
                   >
                     <span
                       className={
-                        filters.personnel_ids?.length > 0
+                        filters.personnel_ids.length > 0
                           ? "text-text-primary font-medium"
                           : "text-text-secondary"
                       }
@@ -721,7 +767,7 @@ export default function FilterPanel({
                         placeholder="نام یا نام کاربری..."
                       />
                       <div className="max-h-56 overflow-y-auto">
-                        {filters.personnel_ids?.length > 0 && (
+                        {filters.personnel_ids.length > 0 && (
                           <button
                             onClick={() => {
                               onChange({
@@ -745,9 +791,10 @@ export default function FilterPanel({
                           </div>
                         ) : personnelResults.length > 0 ? (
                           personnelResults.map((p) => {
-                            const displayName =
-                              p.name ?? p.full_name ?? p.username ?? "—";
-                            const isSelected = filters.personnel_ids?.includes(
+                            // A personnel row has no `name`: the old chain
+                            // always fell through to the second.
+                            const displayName = p.full_name || p.username;
+                            const isSelected = filters.personnel_ids.includes(
                               p.id,
                             );
                             return (
@@ -813,7 +860,7 @@ export default function FilterPanel({
                 </div>
               </div>
 
-              {/* تاریخ ورود */}
+              {/* Entry date */}
               <div>
                 <SectionTitle icon={CalendarIcon} title="تاریخ ورود" />
                 <div className="space-y-3">
@@ -839,7 +886,7 @@ export default function FilterPanel({
           </div>
         </div>
 
-        {/* فوتر */}
+        {/* Footer */}
         <div className="sticky bottom-0 bg-surface-alt rounded-b-2xl border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-end gap-3">
           <button
             onClick={onClose}

@@ -1,16 +1,12 @@
-// src/pages/DeviceList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getDevices, deleteDevice, getCustomers, getPersonnel } from "../api";
+import { getDevices, deleteDevice, updateDevice } from "../api";
 import FilterPanel from "../components/FilterPanel";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { updateDevice } from "../api";
 
 import {
   PlusIcon,
-  EyeIcon,
-  PencilSquareIcon,
   TrashIcon,
   DocumentCurrencyDollarIcon,
   WrenchScrewdriverIcon,
@@ -21,21 +17,14 @@ import {
   FunnelIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
-import { formatPersianPhone } from "../utils/formatters";
 import LoadingSpinner from "../components/LoadingSpinner";
-
+import { useDebounce } from "../utils/helpers";
+import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
+import type { DeviceFilters } from "../components/FilterPanel";
+import type { Device, DeviceAssignee, QueryParams } from "../types/api";
 
-function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
-
-function InvoiceStatusBadge({ device }) {
+function InvoiceStatusBadge({ device }: { device: Device }) {
   const getInvoiceStatus = () => {
     if (!device.needs_invoice) {
       return {
@@ -62,10 +51,15 @@ function InvoiceStatusBadge({ device }) {
   );
 }
 
-function StatusBadge({ status, onStatusChange }) {
+interface StatusBadgeProps {
+  status: string;
+  onStatusChange: (status: string) => void;
+}
+
+function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
   const [showModal, setShowModal] = useState(false);
 
-  const map = {
+  const map: Record<string, { label: string; color: string }> = {
     pending: {
       label: "در انتظار بررسی",
       color: "bg-warning-soft text-warning",
@@ -126,7 +120,7 @@ function StatusBadge({ status, onStatusChange }) {
         </button>
       </div>
 
-      {/* Modal انتخاب وضعیت */}
+      {/* Status picker */}
       {showModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
@@ -192,12 +186,12 @@ function StatusBadge({ status, onStatusChange }) {
   );
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("fa-IR");
 }
 
-function AssigneeBadge({ assignees }) {
+function AssigneeBadge({ assignees }: { assignees: DeviceAssignee[] }) {
   if (!assignees || assignees.length === 0) {
     return <span className="text-text-secondary text-xs">—</span>;
   }
@@ -218,9 +212,8 @@ function AssigneeBadge({ assignees }) {
   );
 }
 
-const EMPTY_FILTERS = {
+const EMPTY_FILTERS: DeviceFilters = {
   status: [],
-  brand: "",
   customer_id: "",
   personnel_ids: [],
   entry_from: "",
@@ -229,12 +222,10 @@ const EMPTY_FILTERS = {
 };
 
 export default function DeviceList() {
-  const [devices, setDevices] = useState([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [customers, setCustomers] = useState([]);
-  const [personnelList, setPersonnelList] = useState([]);
+  const [filters, setFilters] = useState<DeviceFilters>(EMPTY_FILTERS);
 
   const { isAtLeast } = useAuth();
 
@@ -243,7 +234,7 @@ export default function DeviceList() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<Device | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const activeFilterCount = Object.values(filters).filter((v) =>
@@ -252,7 +243,6 @@ export default function DeviceList() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const {
-    openDeviceDetail,
     openDeviceEdit,
     openCustomerDetail,
     refreshList,
@@ -262,43 +252,39 @@ export default function DeviceList() {
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  // ─── Fetch ────────────────────────────────────────────────────
   const fetchDevices = useCallback(
-    async (searchTerm, activeFilters, currentPage, currentLimit) => {
+    async (
+      searchTerm: string,
+      activeFilters: DeviceFilters,
+      currentPage: number,
+      currentLimit: number,
+    ) => {
       setLoading(true);
       try {
-        const params = { page: currentPage, limit: currentLimit };
+        const params: QueryParams = {
+          page: currentPage,
+          limit: currentLimit,
+        };
 
+        // The list filters arrive as comma-separated strings; the schema
+        // splits them back into arrays server-side.
         if (searchTerm) params.search = searchTerm;
-        if (activeFilters.status?.length > 0)
+        if (activeFilters.status.length > 0)
           params.status = activeFilters.status.join(",");
-        if (activeFilters.brand) params.brand = activeFilters.brand;
         if (activeFilters.customer_id)
           params.customer_id = activeFilters.customer_id;
         if (activeFilters.entry_from)
           params.entry_from = activeFilters.entry_from;
         if (activeFilters.entry_to) params.entry_to = activeFilters.entry_to;
-        if (activeFilters.personnel_ids?.length > 0)
+        if (activeFilters.personnel_ids.length > 0)
           params.personnel_ids = activeFilters.personnel_ids.join(",");
-        if (activeFilters.invoice_status?.length > 0)
+        if (activeFilters.invoice_status.length > 0)
           params.invoice_status = activeFilters.invoice_status.join(",");
 
         const res = await getDevices(params);
-        const api = res.data;
-
-        if (api && typeof api === "object" && !Array.isArray(api)) {
-          setDevices(api.data || []);
-          setTotal(api.total || 0);
-          setTotalPages(api.totalPages || 1);
-        } else if (Array.isArray(api)) {
-          setDevices(api);
-          setTotal(api.length);
-          setTotalPages(1);
-        } else {
-          setDevices([]);
-          setTotal(0);
-          setTotalPages(1);
-        }
+        setDevices(res.data.data);
+        setTotal(res.data.total);
+        setTotalPages(res.data.totalPages);
       } catch {
         toast.error("خطا در دریافت لیست دستگاه‌ها");
         setDevices([]);
@@ -309,29 +295,8 @@ export default function DeviceList() {
     [],
   );
 
-  // ─── Effects ──────────────────────────────────────────────────
-  // ─── Effects ──────────────────────────────────────────────────
   useEffect(() => {
-    getCustomers()
-      .then((res) => setCustomers(res.data.data ?? res.data))
-      .catch(() => {});
-
-    getPersonnel({ limit: 200 })
-      .then((res) => {
-        const raw = res.data.data ?? res.data;
-        const normalized = Array.isArray(raw)
-          ? raw.map((p) => ({
-              ...p,
-              name: p.name ?? p.full_name ?? p.username ?? "—",
-            }))
-          : [];
-        setPersonnelList(normalized);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetchDevices(debouncedSearch, filters, page, limit);
+    void fetchDevices(debouncedSearch, filters, page, limit);
   }, [debouncedSearch, filters, page, limit, fetchDevices]);
 
   const isFirstRender = useRef(true);
@@ -343,29 +308,28 @@ export default function DeviceList() {
     setPage(1);
   }, [debouncedSearch, filters]);
 
-  // Register refresh callback
+  // Lets a modal refresh this list when the last of them closes.
   useEffect(() => {
     refreshList(() => {
-      fetchDevices(debouncedSearch, filters, page, limit);
+      void fetchDevices(debouncedSearch, filters, page, limit);
     });
   }, [refreshList, fetchDevices, debouncedSearch, filters, page, limit]);
-  // ─── Handlers ─────────────────────────────────────────────────
 
-  const handleStatusChange = async (deviceId, newStatus) => {
+  const handleStatusChange = async (deviceId: number, newStatus: string) => {
     try {
       await updateDevice(deviceId, { status: newStatus });
       toast.success("وضعیت دستگاه بروز شد");
-      fetchDevices(debouncedSearch, filters, page, limit);
+      void fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
     }
   };
 
-  const handleToggleNeedsInvoice = async (deviceId, value) => {
+  const handleToggleNeedsInvoice = async (deviceId: number, value: boolean) => {
     try {
       await updateDevice(deviceId, { needs_invoice: value });
       toast.success(value ? "آماده برای فاکتور" : "فاکتور لازم نیست");
-      fetchDevices(debouncedSearch, filters, page, limit);
+      void fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
     }
@@ -498,7 +462,8 @@ export default function DeviceList() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openCustomerDetail(device.customer_id);
+                          if (device.customer_id)
+                            openCustomerDetail(device.customer_id);
                         }}
                         className="text-primary group-hover:text-text-inverse hover:underline font-medium"
                       >
@@ -535,11 +500,7 @@ export default function DeviceList() {
                     {isAtLeast("admin") && (
                       <>
                         <td className="px-4 py-3 flex  justify-center border-l border-border">
-                          <InvoiceStatusBadge
-                            device={device}
-                            onToggleNeedsInvoice={handleToggleNeedsInvoice}
-                            isAdmin={isAtLeast("admin")}
-                          />
+                          <InvoiceStatusBadge device={device} />
                         </td>
 
                         <td className="px-4 py-3 text-sm text-center">
@@ -550,9 +511,10 @@ export default function DeviceList() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      openSaleInvoiceDetail(
-                                        device.sale_invoice_id,
-                                      );
+                                      if (device.sale_invoice_id)
+                                        openSaleInvoiceDetail(
+                                          device.sale_invoice_id,
+                                        );
                                     }}
                                     className={`p-2 rounded-lg transition-colors ${
                                       device.invoice_status === "paid"
@@ -610,26 +572,6 @@ export default function DeviceList() {
                               </>
                             )}
 
-                            {/* <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeviceDetail(device.id);
-                          }}
-                          className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
-                          title="مشاهده جزئیات"
-                        >
-                          <EyeIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeviceEdit(device.id);
-                          }}
-                          className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
-                          title="ویرایش"
-                        >
-                          <PencilSquareIcon className="w-5 h-5" />
-                        </button> */}
                             {isAtLeast("admin") && (
                               <button
                                 onClick={(e) => {
@@ -674,6 +616,7 @@ export default function DeviceList() {
         onConfirm={async () => {
           setDeleting(true);
           try {
+            if (!deleteTarget) return;
             await deleteDevice(deleteTarget.id);
             toast.success("دستگاه حذف شد");
             setDeleteTarget(null);
@@ -682,7 +625,7 @@ export default function DeviceList() {
             // The server explains why a delete was refused — a device with
             // repair invoices, for instance. Showing a generic message
             // instead left the user with no idea what to do.
-            toast.error(error.response?.data?.error || "خطا در حذف دستگاه");
+            toast.error(errorText(error, "خطا در حذف دستگاه"));
             setDeleteTarget(null);
           } finally {
             setDeleting(false);

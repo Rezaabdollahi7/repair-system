@@ -122,6 +122,7 @@ export default function RepairInvoiceList() {
     openRepairInvoiceEdit,
     openDeviceDetail,
     openCustomerDetail,
+    refreshList,
   } = useModal();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -162,13 +163,14 @@ export default function RepairInvoiceList() {
   }, [debouncedSearch, statusFilter, page, limit, fetchInvoices]);
 
   const isFirstRender = useRef(true);
+  // Lets a modal refresh this list when the last of them closes. The other
+  // five lists have always done this; without it an invoice edited or
+  // cancelled from its modal left a stale row behind.
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    setPage(1);
-  }, [debouncedSearch, statusFilter]);
+    refreshList(() => {
+      void fetchInvoices(debouncedSearch, statusFilter, page, limit);
+    });
+  }, [refreshList, fetchInvoices, debouncedSearch, statusFilter, page, limit]);
 
   const formatDate = (d: string | null | undefined) =>
     d ? new Date(d).toLocaleDateString("fa-IR") : "—";

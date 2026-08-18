@@ -1,22 +1,28 @@
-// src/pages/Register.jsx
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { register } from "../api";
+import { errorText } from "../utils/errors";
+
+interface RegisterForm {
+  workspace_name: string;
+  username: string;
+  password: string;
+}
 
 export default function Register() {
   const { loginUser } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<RegisterForm>({
     workspace_name: "",
     username: "",
     password: "",
   });
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
@@ -27,16 +33,18 @@ export default function Register() {
       toast.success("کارگاه شما ساخته شد. خوش آمدید!");
       navigate("/devices", { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.error || "خطا در ثبت‌نام";
-      toast.error(msg);
+      toast.error(errorText(err, "خطا در ثبت‌نام"));
     } finally {
       setLoading(false);
     }
   };
 
-  const field = (key) => ({
+  // Shared by the three inputs, which differ only in their validation
+  // attributes and placeholder.
+  const field = (key: keyof RegisterForm) => ({
     value: form[key],
-    onChange: (e) => setForm({ ...form, [key]: e.target.value }),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm({ ...form, [key]: e.target.value }),
     className:
       "w-full border border-border rounded-lg px-3 py-2 focus:outline-none " +
       "focus:ring-2 focus:ring-primary bg-surface text-text-primary",

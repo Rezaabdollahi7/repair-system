@@ -1,9 +1,9 @@
-// src/pages/Login.jsx
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { login } from "../api";
 import toast from "react-hot-toast";
+import { errorText } from "../utils/errors";
 
 export default function Login() {
   const { loginUser } = useAuth();
@@ -12,7 +12,7 @@ export default function Login() {
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
@@ -21,8 +21,7 @@ export default function Login() {
       toast.success("خوش آمدید!");
       navigate("/devices", { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.error || "خطا در ورود";
-      toast.error(msg);
+      toast.error(errorText(err, "خطا در ورود"));
     } finally {
       setLoading(false);
     }

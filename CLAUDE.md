@@ -294,8 +294,6 @@ business features**. Payment integration is the last phase and is explicitly out
 ### Still planned
 
 - **react-hook-form** — frontend forms
-- **TypeScript on the frontend** — the backend is fully converted; the frontend
-  is not
 
 ## Working Conventions
 

@@ -90,6 +90,34 @@ workspace.
 - [ ] 5.6 Fineti import: give `importFromExcel` and `importDeviceImages` a `--workspace-id` parameter so they can onboard a customer migrating from Fineti. Stays an operator-run script; wrap it in an admin UI only if it turns out to be frequent.
 - [x] 5.7 Operator recovery: a documented procedure for restoring access to a workspace whose owner is locked out — a runbook plus, if it proves frequent, a script keyed on workspaceId. The old resetAdmin script is not the basis for this: it only ever knew one hardcoded username, which stops existing once each workspace has its own super admin. Password self-service for customers is task 8.6 (SMS OTP).
 
+## Frontend TypeScript Migration (done, outside the phase numbering)
+
+Sequenced deliberately before 5.4 so the export page would be TypeScript from
+its first line rather than converted later. Two decisions taken up front:
+incremental with `allowJs` so the app kept running throughout, and
+`strict: true` from the start — "loose now, strict later" means never, and
+code written with `any` does not get revisited.
+
+- [x] TS.1 Toolchain: `tsconfig.json` (allowJs, strict, verbatimModuleSyntax),
+      `vite-env.d.ts` declaring VITE_API_URL explicitly, a hand-written
+      `jalaali-js.d.ts` covering the three functions actually called, an
+      eslint block for `**/*.{ts,tsx}` with `no-explicit-any: error`, and
+      `tsc --noEmit` wired into `pnpm build` — the frontend has no tests, so
+      the compiler is the only automated gate it has
+- [x] TS.2 `utils/` and `api/index.ts`. Response types are written from the
+      controllers rather than guessed: an interface written ahead of reading
+      its controller reads as a contract while being a guess
+- [x] TS.3 `context/` — AuthContext and ThemeContext. ModalContext is
+      deliberately left until after the components it renders
+- [x] TS.4 `components/` — 27 files, in four groups: leaves, image and date,
+      the CRUD modals resource by resource, then the rest. `types/api.ts`
+      fills in as each controller is read
+- [x] TS.5 `Layout` and `ProtectedRoute`
+- [x] TS.6 `ModalContext`, once all thirteen modals it renders were typed
+- [x] TS.7 `pages/` — 14 files
+- [x] TS.8 `App`, `main`, `vite.config`, HomeIcon moved out of `public/`, and
+      `allowJs` removed. A new `.js` under `src/` is now a compile error
+
 ## Phase 6 — Testing
 
 - [ ] 6.1 Unit tests for all controllers (one test file per controller, covering CRUD + auth/authorization edge cases)
@@ -128,7 +156,77 @@ so a screen that breaks has one obvious cause rather than three.
 - [ ] 9.3 Let the purchase invoice form create a complete item inline. It creates a reduced one today, so the same catalogue has two entry points with different results
 - [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price. It currently returns the stock but leaves the average untouched, so it drifts — a weighted average can't be reversed from the invoice alone. Either recompute from that item's full purchase history, or stop allowing deletion and record a return invoice instead, which is what accounting practice would do.
 - [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement, column choice and print styling, replacing the pile of `sale_invoice_show_*` booleans in settings. Numbering is deliberately not part of this — a number is accounting data and should stay boring; this is about what the customer actually sees
+- [ ] 9.5 ... Also: PersianDatePicker accepts `className`, `required` and
+      `clearable` and reads none of them, and several modals accept a
+      `zIndex` they never apply — both are layout concerns that belong with
+      this work rather than scattered across a bug list
 - [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8 fixed the prefixes per invoice kind. Touches the schema, the settings form and the response shape, so it belongs with the other frontend work
+
+## Phase 10 — Frontend Bug Fixes
+
+Found while converting the frontend to TypeScript and deliberately left
+alone: a conversion that also changes behaviour is a conversion nobody can
+review. Each is small and independent, so they can be picked off in any
+order.
+
+### Broken today
+
+- [ ] 10.1 `formatPersianPhone` never formats a landline: the branch tests
+      `digits.length === 10` while its own example (`02112345678`) has eleven,
+      so every landline falls through to the mobile grouping
+- [ ] 10.2 `TransactionsReport` reads `recent_transactions` off the dashboard
+      endpoint, which the controller caps at ten rows — a page called
+      "transaction report" showing the same handful as the dashboard widget.
+      Needs a paginated `GET /reports/transactions`
+- [ ] 10.3 The same page links to `/items/:id`, which is not a route: items
+      open in a modal, so the link falls through to the catch-all and
+      redirects to `/devices`
+- [ ] 10.4 `PersonnelList` renders pagination controls that do nothing:
+      `GET /personnel` returns a plain array and its schema accepts `limit`
+      only to ignore it. Either paginate server-side or drop the controls
+- [ ] 10.5 `ItemList` applies its low-stock filter after the page has been
+      fetched, so it only ever sees the ten rows on screen — a shop with
+      dozens of low-stock items can see an empty page. `getLowStockItems()`
+      already does this server-side
+- [ ] 10.6 `ItemDetailModal` has no edit or delete button, unlike the device
+      and customer modals. `handleDelete` and its ConfirmModal are already
+      wired up; only the button that opens it is missing
+- [ ] 10.7 Creating a device with no customer sends `customer_id: ""`, which
+      `z.coerce.number().positive()` turns into 0 and rejects. Verify, then
+      either preprocess the empty string away or send null
+
+### Inconsistent
+
+- [ ] 10.8 The dashboard and the three report pages sit outside
+      `ProtectedRoute minRole="admin"` while the sidebar marks them
+      `adminOnly`, so a technician cannot see the links but can reach the
+      pages by typing the URL
+- [ ] 10.9 `received`, the schema's default device status, appears in none of
+      the four status maps in the frontend, so a device nobody has touched
+      shows its raw status string
+- [ ] 10.10 `Pagination` labels look swapped — "بعدی" sends `page - 1` and
+      "قبلی" sends `page + 1` — and shows its range as `{to}–{from}`. It also
+      hardcodes the word "دستگاه" while being used on every list
+- [ ] 10.11 `ProtectedRoute` uses a raw `text-gray-500` where every other
+      component uses `text-text-secondary`, so it ignores the theme
+
+### Wasteful
+
+- [ ] 10.12 `FilterPanel` fetches the entire personnel list once per selected
+      technician whose name it does not yet know — three selected means three
+      identical requests
+- [ ] 10.13 `SearchableSelect` filters its options locally _and_ asks the
+      server through `onSearch`, so a server-side match can be filtered back
+      out. Its effect also depends on `onSearch`, which loops if a caller
+      passes an inline function
+- [ ] 10.14 The bundle is a single 713 kB chunk. Lazy-loading the pages
+      through React Router would cut what a first visit downloads, which
+      matters on an Iranian mobile connection
+- [ ] 10.15 `errorText` is defined identically in five components before
+      `utils/errors.ts` existed; fold them into the shared one
+- [ ] 10.16 Add type-aware linting (`parserOptions.project`) now that the
+      whole frontend is TypeScript. It was left off during the migration
+      because it type-checks the entire program on every run
 
 ---
 

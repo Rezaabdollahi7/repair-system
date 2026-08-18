@@ -3,8 +3,8 @@
 > این سند برای ادامه‌ی کار مهاجرت Dofixo از تک‌مستأجری به SaaS در یک نشست جدید نوشته
 > شده است. همه‌چیزی که برای ادامه لازم است اینجاست: وضعیت فعلی، تصمیمات گرفته‌شده و
 > دلیلشان، تسک‌های باقی‌مانده، بدهی‌های فنی، و دام‌هایی که در مسیر به آن‌ها خوردیم.
->
-> **تاریخ آخرین به‌روزرسانی:** فاز ۵ — تسک‌های ۵.۱، ۵.۲، ۵.۵ و ۵.۷
+
+> **تاریخ آخرین به‌روزرسانی:** مهاجرت TypeScript فرانت‌اند (کامل)
 
 ---
 
@@ -37,6 +37,7 @@
 | ۴ — Object Storage             | ✅ کامل                                          |
 | ۵ — بکاپ و خروجی داده          | 🔄 ۵.۱، ۵.۲، ۵.۵، ۵.۷ تمام · ۵.۳، ۵.۴، ۵.۶ مانده |
 | ۶.۴ — تست یکپارچگی             | ✅ (همراه ۲.۷)                                   |
+| TypeScript فرانت‌اند           | ✅ کامل                                          |
 
 **وضعیت اپ:** کاملاً کار می‌کند. ثبت‌نام خودکار، session با کوکی refresh،
 ایزولاسیون اثبات‌شده، عکس‌ها روی object storage، و بکاپ رمزنگاری‌شده‌ی شبانه.
@@ -51,6 +52,25 @@
 | 5.7 بازیابی دسترسی کاربر   | `ops/reset-password.sh` + `ops/reset-password.md`            |
 
 ---
+
+### مهاجرت TypeScript فرانت — چه چیزی عوض شد
+
+بیرون از شماره‌گذاری فازها، قبل از ۵.۴ انجام شد تا صفحه‌ی خروجی داده از خط
+اول TypeScript باشد. تدریجی با `allowJs`، و `strict: true` از همان ابتدا.
+
+| بخش             | فایل | نکته                                                   |
+| --------------- | ---- | ------------------------------------------------------ |
+| زیرساخت         | ۴    | tsconfig · eslint · vite-env · اعلان `jalaali-js`      |
+| `utils/` `api/` | ۳    | `types/api.ts` شکل هر endpoint را از کنترلرش می‌گوید   |
+| `context/`      | ۳    | ModalContext آخر، بعد از ۱۳ مودالی که رندر می‌کند      |
+| `components/`   | ۲۷   | چهار دسته: برگ‌ها، عکس و تاریخ، مودال‌های CRUD، بقیه   |
+| `pages/`        | ۱۴   | —                                                      |
+| ریشه            | ۴    | App · main · vite.config · HomeIcon از `public/` بیرون |
+
+**`allowJs` بسته شد.** یک فایل `.js` جدید در `src/` حالا خطای کامپایل است.
+
+**`tsc --noEmit` داخل `pnpm build` است.** فرانت تست خودکار ندارد، پس کامپایلر
+تنها دروازه‌ای است که دارد. اگر بیرون از build بماند، در عمل زده نمی‌شود.
 
 ## ۳. پشته‌ی فنی
 
@@ -68,9 +88,18 @@ Jest 30 + ts-jest 29.4 + supertest
 
 ### Frontend
 
-```
-React 19 · Vite 8 · React Router 7 · Tailwind 4
+````
+```markdown
+React 19 · Vite 8 · React Router 7 · Tailwind 4 · TypeScript 5.9
 Axios · react-hot-toast · react-to-print · jalaali-js · @heroicons/react
+````
+
+⚠️ **فرانت هیچ زیرساخت تستی ندارد.** TypeScript تنها بررسی خودکارش است.
+Vitest هنوز تسک باز فاز ۶ است.
+
+⚠️ **TypeScript روی ۵.۹ پین است، نه ۷.** `typescript-eslint@8` با TS 7 بارگذاری
+نمی‌شود (issue #10940) و کل اجرای lint را می‌خواباند، نه فقط بلوک TS را.
+
 ```
 
 ⚠️ **فرانت هنوز JavaScript است (۵۱ فایل) و هیچ زیرساخت تستی ندارد.** تبدیل به
@@ -79,29 +108,34 @@ TypeScript تسک بعدی است.
 ### ابزارهای عملیاتی روی هاست
 
 ```
+
 age (رمزنگاری بکاپ) · aws-cli (آپلود به Arvan) · docker compose
+
 ```
 
 ### ساختار مخزن
 
 ```
+
 backend/
-├── prisma/               schema.prisma (۲۱ مدل) · seed.ts · rls-check.sql · ۶ مهاجرت
+├── prisma/ schema.prisma (۲۱ مدل) · seed.ts · rls-check.sql · ۶ مهاجرت
 ├── src/
-│   ├── lib/              prisma.ts · storage.ts · workspaceContext.ts
-│   ├── controllers/      ۱۴ کنترلر
-│   ├── routes/           همه TypeScript جز index.js
-│   ├── middleware/       auth.ts · authorize.ts · requestContext.ts · validate.ts
-│   ├── schemas/ · utils/ · types/
-│   └── __tests__/        ۲۹ فایل (۳۷۱ تست) + integration/ (۶ فایل، ۷۰ تست)
+│ ├── lib/ prisma.ts · storage.ts · workspaceContext.ts
+│ ├── controllers/ ۱۴ کنترلر
+│ ├── routes/ همه TypeScript جز index.js
+│ ├── middleware/ auth.ts · authorize.ts · requestContext.ts · validate.ts
+│ ├── schemas/ · utils/ · types/
+│ └── **tests**/ ۲۹ فایل (۳۷۱ تست) + integration/ (۶ فایل، ۷۰ تست)
 frontend/
-└── src/                  api/ · context/ · utils/ · components/ (۲۷) · pages/ (۱۴)
+└── src/ api/ · context/ (۳) · utils/ (۳) · types/ (۲)
+components/ (۲۷) · pages/ (۱۴) · همه TypeScript
 ops/
-├── backup-database.sh    بکاپ شبانه (cron)
-├── extract-workspace.sh  استخراج یک کارگاه از بکاپ
-├── reset-password.sh     بازیابی دسترسی کاربر
+├── backup-database.sh بکاپ شبانه (cron)
+├── extract-workspace.sh استخراج یک کارگاه از بکاپ
+├── reset-password.sh بازیابی دسترسی کاربر
 ├── restore-database.md · restore-workspace.md · reset-password.md
 └── backup.env.example
+
 ```
 
 **دو فایل `.js` در بک‌اند:** `routes/index.js` و `utils/persianToEnglish.js`.
@@ -149,6 +183,22 @@ superuser است. رد شد چون با ۳ هسته و ۴ گیگ رم حدود �
 ⚠️ **در فاز ۷ حتماً `shared_buffers` را از پیش‌فرض ۱۲۸ مگابایت بالا ببرید.** مشکل
 «کم بودن سرور» نیست، «استفاده نکردن از سرور» است.
 
+### شکل پاسخ API — آنچه تایپ‌ها ثبت کردند
+
+`types/api.ts` از روی کنترلرها نوشته شد نه حدس. سه ناهمگونی عمدی که حالا
+مکتوب‌اند:
+
+- بیشتر API **`snake_case`** است؛ `items` و `categories` **`camelCase`**
+- **جز `sell_price`** که در بدنه‌ی ساخت و ویرایش کالا snake_case است
+- **جز دو endpoint کالا** — `transactions` و `search/for-invoice` — که
+  snake_case می‌دهند برخلاف همسایه‌هایشان
+
+و سه endpoint که پاکت صفحه‌بندی **ندارند** و آرایه‌ی خام می‌دهند:
+`GET /personnel` · `GET /categories` · `GET /services`
+
+**فیلدهای دستگاه روی فاکتور فروش پخش می‌شوند نه تودرتو**، و وقتی فاکتور به
+دستگاهی وصل نباشد کلاً غایب‌اند. `serial_number` فقط در تک‌فاکتور می‌آید.
+
 ### تنانسی
 
 **دیتابیس مشترک، اسکیمای مشترک.** ایزولاسیون از طریق `workspaceId` روی هر جدول
@@ -168,11 +218,13 @@ tenant-scoped. **دو لایه:** فیلتر اپلیکیشنی + RLS. هیچ‌
 ### زنجیره‌ی `app.workspace_id`
 
 ```
-requestContext (middleware)  →  AsyncLocalStorage باز می‌شود (خالی)
-authenticate                 →  setContextWorkspaceId(payload.workspaceId)
-Prisma extension             →  currentWorkspaceId() را می‌خواند
-                             →  set_config('app.workspace_id', id, TRUE)
-```
+
+requestContext (middleware) → AsyncLocalStorage باز می‌شود (خالی)
+authenticate → setContextWorkspaceId(payload.workspaceId)
+Prisma extension → currentWorkspaceId() را می‌خواند
+→ set_config('app.workspace_id', id, TRUE)
+
+````
 
 **اگر context نباشد، extension خطا پرتاب می‌کند** — نه اینکه بگذارد RLS ساکت صفر
 ردیف برگرداند.
@@ -198,7 +250,7 @@ await runInWorkspaceTransaction(workspaceId, async (tx) => { ... });
 
 // ✅ ثبت‌نام: کارگاه هنوز وجود ندارد
 await runInNewWorkspaceTransaction(name, async (tx, workspaceId) => { ... });
-```
+````
 
 عملیات داخل تراکنش دوباره وارد extension می‌شود و تراکنش دومی روی اتصال دوم باز
 می‌کند؛ `set_config` آنجا می‌نشیند و کار اصلی بدون context ادامه می‌دهد.
@@ -442,7 +494,8 @@ application-consistent، بازیابی‌شان همه‌یا‌هیچ است،
 
 ### ۱. فرانت هیچ تست خودکاری ندارد
 
-تأیید فازهای ۳ و ۴ در سمت فرانت تماماً دستی بود. مهم‌ترین شکاف پروژه.
+مهم‌ترین شکاف پروژه. حالا TypeScript دارد که شکل داده را تضمین می‌کند، ولی
+هیچ چیز رفتار را تضمین نمی‌کند. هر تأیید در این مهاجرت دستی بود.
 
 ### ۲. تک نقطه‌ی خرابی
 
@@ -511,6 +564,17 @@ bash هستند و در Jest نمی‌گنجند. تنها تضمینشان تم
 ### ۲۱. سه ستون تخفیف در `SaleInvoiceItem` بلااستفاده‌اند
 
 ### ۲۲. `dist` خودش را پاک نمی‌کند · `pnpm-workspace.yaml` داخل `backend/` است
+
+### ۲۳. شانزده مورد فرانت در فاز ۱۰
+
+حین مهاجرت TypeScript پیدا شدند و عمداً دست‌نخورده ماندند: تبدیلی که رفتار
+را هم عوض کند، تبدیلی است که کسی نمی‌تواند مرورش کند. شماره‌دار در
+`Roadmap.md` فاز ۱۰ — از باگ فرمت تلفن ثابت تا فیلتر کم‌موجود که فقط صفحه‌ی
+جاری را می‌بیند.
+
+### ۲۴. باندل تک‌chunk ۷۱۳ کیلوبایتی → **۱۰.۱۴**
+
+روی اینترنت موبایل ایران قابل توجه است.
 
 ---
 
@@ -713,6 +777,35 @@ z.preprocess((value) => (value === "" ? undefined : value), z.coerce.date().opti
 
 `۰۹۱۲` (U+06F0) و `٠٩١٢` (U+0660). `persianToEnglish` فقط اولی را می‌شناسد؛
 `schemas/auth.ts` هر دو را.
+
+### interfaceهای هم‌نام در TypeScript ادغام می‌شوند، خطا نمی‌دهند
+
+برخلاف `type`. یک تعریف تکراری بی‌سروصدا با قبلی جمع می‌شود و تایپی می‌سازد
+که هیچ پاسخ واقعی با آن جور نیست. در `types/api.ts` یک بار پیش آمد: نسخه‌ی
+قدیمی `Customer` حذف نشد و `updated_at` ای که ستون ندارد باقی ماند.
+
+### `git mv` یعنی `docker compose restart frontend`
+
+Vite مسیر قدیمی را در گراف ماژول نگه می‌دارد و ۴۰۴ می‌دهد که شبیه import
+شکسته به‌نظر می‌رسد، نه شبیه فایل جابه‌جاشده.
+
+### narrowing روی `obj.prop` وارد closure نمی‌شود
+
+`if (tx.reference_id !== null)` بعد قابل استفاده در `onClick` نیست: TypeScript
+فرض می‌کند تا اجرای closure ممکن است عوض شده باشد. راه‌حل، گرفتنش در یک
+`const` محلی قبل از JSX است.
+
+### «از → به» برای فایل‌های بلند امن نیست
+
+`RULES.md` §۶ توصیه‌اش می‌کند، ولی وقتی ویرایش‌ها بیش از سه‌چهار جای فایل را
+لمس می‌کنند، جا ماندن خط قدیمی تقریباً حتمی است — در این مهاجرت دو بار پیش
+آمد (`DeviceDetailModal` و `Settings`). برای این فایل‌ها، کل فایل با
+`cat > path << 'EOF'` تک‌قدم و بی‌خطر است.
+
+### `EAI_AGAIN` روی مسیر Arvan یعنی DNS، نه کلید
+
+اپراتور موبایل دامنه‌های آروان را جور دیگری جواب می‌دهد. آنچه کاربر می‌بیند
+«هیچ عکسی پردازش نشد» است، که به‌نظر می‌رسد عکس مشکل داشته نه شبکه.
 
 ---
 

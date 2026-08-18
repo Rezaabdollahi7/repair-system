@@ -1,16 +1,13 @@
-// src/pages/PersonnelList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
-import {
-  getPersonnel,
-  deletePersonnel,
-  togglePersonnelActive,
-} from "../api/index";
+import { getPersonnel, deletePersonnel, togglePersonnelActive } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
 import ConfirmModal from "../components/ConfirmModal";
 import Pagination from "../components/Pagination";
 import { formatPersianPhone } from "../utils/formatters";
+import { useDebounce } from "../utils/helpers";
+import { errorText } from "../utils/errors";
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -20,29 +17,21 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
-
-function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
+import type { Personnel, QueryParams } from "../types/api";
 
 export default function PersonnelList() {
   const { user, isAtLeast } = useAuth();
   const { openPersonnelEdit, refreshList } = useModal();
-  const [personnel, setPersonnel] = useState([]);
+  const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<Personnel | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [toggleTarget, setToggleTarget] = useState(null);
+  const [toggleTarget, setToggleTarget] = useState<Personnel | null>(null);
   const [toggling, setToggling] = useState(false);
   const debouncedSearch = useDebounce(searchInput);
 
@@ -50,23 +39,19 @@ export default function PersonnelList() {
   const canDelete = user?.role === "super_admin";
 
   const fetchPersonnel = useCallback(
-    async (search, currentPage, currentLimit) => {
+    async (search: string, currentPage: number, currentLimit: number) => {
       setLoading(true);
       try {
-        const params = { page: currentPage, limit: currentLimit };
+        const params: QueryParams = { page: currentPage, limit: currentLimit };
         if (search) params.search = search;
         const res = await getPersonnel(params);
 
-        const api = res.data;
-        if (api && typeof api === "object" && !Array.isArray(api)) {
-          setPersonnel(api.data || []);
-          setTotal(api.total || 0);
-          setTotalPages(api.totalPages || 1);
-        } else {
-          setPersonnel(Array.isArray(api) ? api : []);
-          setTotal(Array.isArray(api) ? api.length : 0);
-          setTotalPages(1);
-        }
+        // This endpoint is not paginated: it answers with the whole list and
+        // ignores page and limit. The controls below therefore show a single
+        // page, which is what they have always done.
+        setPersonnel(res.data);
+        setTotal(res.data.length);
+        setTotalPages(1);
       } catch {
         toast.error("خطا در دریافت لیست پرسنل");
         setPersonnel([]);
@@ -78,7 +63,7 @@ export default function PersonnelList() {
   );
 
   useEffect(() => {
-    fetchPersonnel(debouncedSearch, page, limit);
+    void fetchPersonnel(debouncedSearch, page, limit);
   }, [debouncedSearch, page, limit, fetchPersonnel]);
 
   const isFirstRender = useRef(true);
@@ -90,10 +75,9 @@ export default function PersonnelList() {
     setPage(1);
   }, [debouncedSearch]);
 
-  // Register refresh callback
   useEffect(() => {
     refreshList(() => {
-      fetchPersonnel(debouncedSearch, page, limit);
+      void fetchPersonnel(debouncedSearch, page, limit);
     });
   }, [refreshList, fetchPersonnel, debouncedSearch, page, limit]);
 
@@ -104,7 +88,7 @@ export default function PersonnelList() {
       await togglePersonnelActive(toggleTarget.id);
       toast.success(`کاربر ${toggleTarget.is_active ? "غیرفعال" : "فعال"} شد`);
       setToggleTarget(null);
-      fetchPersonnel(debouncedSearch, page, limit);
+      void fetchPersonnel(debouncedSearch, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
     } finally {
@@ -119,9 +103,9 @@ export default function PersonnelList() {
       await deletePersonnel(deleteTarget.id);
       toast.success("پرسنل حذف شد");
       setDeleteTarget(null);
-      fetchPersonnel(debouncedSearch, page, limit);
+      void fetchPersonnel(debouncedSearch, page, limit);
     } catch (err) {
-      toast.error(err.response?.data?.error || "خطا در حذف پرسنل");
+      toast.error(errorText(err, "خطا در حذف پرسنل"));
     } finally {
       setDeleting(false);
     }

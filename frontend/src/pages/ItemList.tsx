@@ -1,4 +1,3 @@
-// src/pages/ItemList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getItems, deleteItem, getCategories, searchItems } from "../api";
 import Pagination from "../components/Pagination";
@@ -6,10 +5,10 @@ import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { FolderPlusIcon } from "@heroicons/react/24/solid";
 import CategoryManageModal from "../components/CategoryManageModal";
 
 import {
+  FolderPlusIcon,
   PlusIcon,
   EyeIcon,
   PencilSquareIcon,
@@ -19,17 +18,11 @@ import {
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
+import { useDebounce } from "../utils/helpers";
+import { errorText } from "../utils/errors";
+import type { Category, Item, QueryParams } from "../types/api";
 
-function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
-
-function StockBadge({ current, min }) {
+function StockBadge({ current, min }: { current: number; min: number }) {
   if (current === 0) {
     return (
       <span className="px-2 py-1 rounded-full text-xs font-medium bg-danger-soft text-danger mx-auto">
@@ -52,11 +45,11 @@ function StockBadge({ current, min }) {
 }
 
 export default function ItemList() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   const { isAtLeast } = useAuth();
@@ -67,7 +60,7 @@ export default function ItemList() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<Item | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 400);
@@ -75,32 +68,32 @@ export default function ItemList() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const fetchItems = useCallback(
-    async (searchTerm, categoryId, lowStock, currentPage, currentLimit) => {
+    async (
+      searchTerm: string,
+      categoryId: string,
+      lowStock: boolean,
+      currentPage: number,
+      currentLimit: number,
+    ) => {
       setLoading(true);
       try {
-        let res;
-        const params = { page: currentPage, limit: currentLimit };
+        const params: QueryParams = { page: currentPage, limit: currentLimit };
         if (categoryId) params.categoryId = categoryId;
-        if (searchTerm) {
-          params.q = searchTerm;
-          res = await searchItems(params);
-        } else {
-          res = await getItems(params);
-        }
 
-        const apiData = res.data;
-        let itemsData = apiData.data || apiData || [];
-        const totalItems = apiData.total || itemsData.length;
-        setTotal(totalItems);
-        setTotalPages(
-          apiData.totalPages || Math.ceil(totalItems / currentLimit),
+        const res = searchTerm
+          ? await searchItems({ ...params, q: searchTerm })
+          : await getItems(params);
+
+        setTotal(res.data.total);
+        setTotalPages(res.data.totalPages);
+
+        // Applied after the page has been fetched, so it only ever sees the
+        // rows already on screen. getLowStockItems does this server-side.
+        setItems(
+          lowStock
+            ? res.data.data.filter((item) => item.currentStock <= item.minStock)
+            : res.data.data,
         );
-        if (lowStock) {
-          itemsData = itemsData.filter(
-            (item) => item.currentStock <= item.minStock,
-          );
-        }
-        setItems(itemsData);
       } catch {
         toast.error("خطا در دریافت لیست کالاها");
         setItems([]);
@@ -113,15 +106,12 @@ export default function ItemList() {
 
   useEffect(() => {
     getCategories()
-      .then((res) => {
-        const cats = res.data?.data || res.data || [];
-        setCategories(Array.isArray(cats) ? cats : []);
-      })
+      .then((res) => setCategories(res.data))
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetchItems(
+    void fetchItems(
       debouncedSearch,
       selectedCategory,
       showLowStockOnly,
@@ -146,10 +136,9 @@ export default function ItemList() {
     setPage(1);
   }, [debouncedSearch, selectedCategory, showLowStockOnly]);
 
-  // Register refresh callback
   useEffect(() => {
     refreshList(() => {
-      fetchItems(
+      void fetchItems(
         debouncedSearch,
         selectedCategory,
         showLowStockOnly,
@@ -404,6 +393,7 @@ export default function ItemList() {
         onConfirm={async () => {
           setDeleting(true);
           try {
+            if (!deleteTarget) return;
             await deleteItem(deleteTarget.id);
             toast.success("کالا با موفقیت حذف شد");
             setDeleteTarget(null);
@@ -415,7 +405,7 @@ export default function ItemList() {
               limit,
             );
           } catch (error) {
-            toast.error(error.response?.data?.error || "خطا در حذف کالا");
+            toast.error(errorText(error, "خطا در حذف کالا"));
           } finally {
             setDeleting(false);
           }

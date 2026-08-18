@@ -1,9 +1,9 @@
-// src/pages/CustomerList.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getCustomers, deleteCustomer } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
+import { useDebounce } from "../utils/helpers";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
@@ -15,18 +15,10 @@ import {
   UserIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
-
-function useDebounce(value, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
+import type { CustomerListRow, QueryParams } from "../types/api";
 
 export default function CustomerList() {
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState<CustomerListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
@@ -34,7 +26,9 @@ export default function CustomerList() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerListRow | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
 
   const { openCustomerDetail, openCustomerEdit, refreshList } = useModal();
@@ -42,24 +36,16 @@ export default function CustomerList() {
   const debouncedSearch = useDebounce(searchInput);
 
   const fetchCustomers = useCallback(
-    async (search, currentPage, currentLimit) => {
+    async (search: string, currentPage: number, currentLimit: number) => {
       setLoading(true);
       try {
-        const params = { page: currentPage, limit: currentLimit };
+        const params: QueryParams = { page: currentPage, limit: currentLimit };
         if (search) params.search = search;
 
         const res = await getCustomers(params);
-        const api = res.data;
-
-        if (api && typeof api === "object" && !Array.isArray(api)) {
-          setCustomers(api.data || []);
-          setTotal(api.total || 0);
-          setTotalPages(api.totalPages || 1);
-        } else {
-          setCustomers(Array.isArray(api) ? api : []);
-          setTotal(Array.isArray(api) ? api.length : 0);
-          setTotalPages(1);
-        }
+        setCustomers(res.data.data);
+        setTotal(res.data.total);
+        setTotalPages(res.data.totalPages);
       } catch {
         toast.error("خطا در دریافت لیست مشتریان");
         setCustomers([]);
@@ -71,7 +57,7 @@ export default function CustomerList() {
   );
 
   useEffect(() => {
-    fetchCustomers(debouncedSearch, page, limit);
+    void fetchCustomers(debouncedSearch, page, limit);
   }, [debouncedSearch, page, limit, fetchCustomers]);
 
   const isFirstRender = useRef(true);
@@ -83,13 +69,12 @@ export default function CustomerList() {
     setPage(1);
   }, [debouncedSearch]);
 
-  // Register refresh callback
+  // Lets a modal refresh this list when the last of them closes.
   useEffect(() => {
     refreshList(() => {
-      fetchCustomers(debouncedSearch, page, limit);
+      void fetchCustomers(debouncedSearch, page, limit);
     });
   }, [refreshList, fetchCustomers, debouncedSearch, page, limit]);
-
   return (
     <div dir="rtl">
       <div className="flex justify-between items-center mb-6">
@@ -232,6 +217,7 @@ export default function CustomerList() {
         onConfirm={async () => {
           setDeleting(true);
           try {
+            if (!deleteTarget) return;
             await deleteCustomer(deleteTarget.id);
             toast.success("مشتری حذف شد");
             setDeleteTarget(null);

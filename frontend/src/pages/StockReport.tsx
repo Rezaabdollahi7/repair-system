@@ -1,24 +1,32 @@
-// src/pages/StockReport.jsx
 import { useState, useEffect } from "react";
 import { getStockReport, getCategories } from "../api";
 import toast from "react-hot-toast";
-import {
-  ArrowRightIcon,
-  ChartBarIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/solid";
+import { ChartBarIcon } from "@heroicons/react/24/solid";
 import { useModal } from "../context/ModalContext";
 import { formatPersianCurrency } from "../utils/formatters";
+import type {
+  Category,
+  QueryParams,
+  StockReport as StockReportData,
+  StockStatus,
+} from "../types/api";
+
+interface StockFilters {
+  categoryId: string;
+  lowStockOnly: boolean;
+}
 
 export default function StockReport() {
-  const [report, setReport] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [report, setReport] = useState<StockReportData | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<StockFilters>({
     categoryId: "",
     lowStockOnly: false,
   });
 
+  // Read from the URL rather than a route param: the dashboard's low-stock
+  // warning links straight here with the filter already applied.
   const searchParams = new URLSearchParams(window.location.search);
   const lowStockParam = searchParams.get("lowStock") === "true";
 
@@ -30,15 +38,16 @@ export default function StockReport() {
     }
 
     getCategories()
-      .then((res) => setCategories(res.data?.data || res.data || []))
+      .then((res) => setCategories(res.data))
       .catch(() => {});
 
     fetchReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lowStockParam]);
 
   const fetchReport = () => {
     setLoading(true);
-    const params = {};
+    const params: QueryParams = {};
     if (filters.categoryId) params.categoryId = filters.categoryId;
     if (filters.lowStockOnly) params.lowStockOnly = true;
 
@@ -48,7 +57,10 @@ export default function StockReport() {
       .finally(() => setLoading(false));
   };
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = <K extends keyof StockFilters>(
+    key: K,
+    value: StockFilters[K],
+  ) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -56,7 +68,7 @@ export default function StockReport() {
     fetchReport();
   };
 
-  const getStockStatusBadge = (status) => {
+  const getStockStatusBadge = (status: StockStatus) => {
     if (status === "critical") {
       return (
         <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-danger-soft text-danger rounded-full text-xs">

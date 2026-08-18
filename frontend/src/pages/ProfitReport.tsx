@@ -1,20 +1,18 @@
-// src/pages/ProfitReport.jsx
 import { useState, useEffect } from "react";
 import { getProfitReport } from "../api";
 import toast from "react-hot-toast";
-import {
-  ArrowRightIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ChartPieIcon,
-} from "@heroicons/react/24/solid";
+import { ArrowTrendingUpIcon, ChartPieIcon } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
 import { useModal } from "../context/ModalContext";
 import { formatPersianCurrency } from "../utils/formatters";
+import type {
+  ProfitReport as ProfitReportData,
+  QueryParams,
+} from "../types/api";
 
 export default function ProfitReport() {
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState<ProfitReportData | null>(null);
+  const [, setLoading] = useState(true);
   const { openItemDetail } = useModal();
   const [dateRange, setDateRange] = useState({
     from_date: "",
@@ -23,11 +21,12 @@ export default function ProfitReport() {
 
   useEffect(() => {
     fetchReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchReport = () => {
     setLoading(true);
-    const params = {};
+    const params: QueryParams = {};
     if (dateRange.from_date) params.from_date = dateRange.from_date;
     if (dateRange.to_date) params.to_date = dateRange.to_date;
 
@@ -37,7 +36,7 @@ export default function ProfitReport() {
       .finally(() => setLoading(false));
   };
 
-  const formatPercent = (value) => Number(value || 0).toFixed(1) + "%";
+  const formatPercent = (value: number) => Number(value || 0).toFixed(1) + "%";
 
   return (
     <div dir="rtl" className="px-2 sm:px-0 mx-auto">
@@ -157,7 +156,9 @@ export default function ProfitReport() {
                     </td>
                     <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-border">
                       <button
-                        onClick={() => openItemDetail(item.item_id)}
+                        onClick={() => {
+                          if (item.item_id) openItemDetail(item.item_id);
+                        }}
                         className="text-primary hover:underline"
                       >
                         {item.item_name}

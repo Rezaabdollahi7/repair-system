@@ -1,22 +1,25 @@
-// src/pages/TransactionsReport.jsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getDashboardStats } from "../api";
 import toast from "react-hot-toast";
 import { ArrowRightIcon } from "@heroicons/react/24/solid";
+import type { DashboardTransaction } from "../types/api";
 
 export default function TransactionsReport() {
-  const [transactions, setTransactions] = useState([]);
+  // Reads the dashboard's recent_transactions, which the controller caps at
+  // ten rows — so this page shows the same handful the dashboard already
+  // does, not a full transaction history.
+  const [transactions, setTransactions] = useState<DashboardTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getDashboardStats()
-      .then((res) => setTransactions(res.data.recent_transactions || []))
+      .then((res) => setTransactions(res.data.recent_transactions))
       .catch(() => toast.error("خطا در دریافت تراکنش‌ها"))
       .finally(() => setLoading(false));
   }, []);
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = (type: string) => {
     if (type === "purchase")
       return { label: "خرید", color: "text-success", bg: "bg-success-soft" };
     if (type === "sale")

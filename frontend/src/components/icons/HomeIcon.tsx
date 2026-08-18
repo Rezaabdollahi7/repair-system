@@ -1,5 +1,11 @@
-// src/components/icons/HomeIcon.jsx
-export default function HomeIcon({ className = "w-6 h-6", ...props }) {
+/**
+ * The sidebar's home icon. Heroicons has one, but this outline was chosen
+ * over it — the import in Layout keeps theirs commented out.
+ */
+export default function HomeIcon({
+  className = "w-6 h-6",
+  ...props
+}: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 24 24"

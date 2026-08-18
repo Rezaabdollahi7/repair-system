@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import HomeIcon from "../../public/icons/HomeIcon.jsx";
+import HomeIcon from "./icons/HomeIcon";
 import {
   Bars3Icon,
   WrenchScrewdriverIcon,

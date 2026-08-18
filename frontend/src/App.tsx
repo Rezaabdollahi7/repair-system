@@ -61,7 +61,6 @@ function App() {
                     <Route path="backups" element={<BackupList />} />
                   </Route>
 
-                  {/* <Route index element={<Dashboard />} /> */}
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="reports/stock" element={<StockReport />} />
                   <Route path="reports/profit" element={<ProfitReport />} />

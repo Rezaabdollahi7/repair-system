@@ -7,8 +7,6 @@
     "moduleDetection": "force",
     "jsx": "react-jsx",
 
-    "allowJs": true,
-    "checkJs": false,
 
     "strict": true,
     "noImplicitOverride": true,
@@ -24,5 +22,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

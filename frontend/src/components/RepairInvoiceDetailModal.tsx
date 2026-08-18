@@ -1,5 +1,5 @@
-// src/components/RepairInvoiceDetailModal.jsx
 import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   getRepairInvoice,
   deleteRepairInvoice,
@@ -26,9 +26,30 @@ import {
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
+import type {
+  Id,
+  PaymentStatus,
+  RepairInvoiceDetail,
+  RepairInvoiceStatus,
+} from "../types/api";
 
-function StatusBadge({ status }) {
-  const map = {
+/** The server answers with { error } on every failing path. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
+interface BadgeStyle {
+  label: string;
+  color: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+function StatusBadge({ status }: { status: RepairInvoiceStatus }) {
+  const map: Record<string, BadgeStyle> = {
     draft: {
       label: "پیش‌نویس",
       color: "bg-surface-alt text-text-secondary",
@@ -53,7 +74,6 @@ function StatusBadge({ status }) {
   const s = map[status] || {
     label: status,
     color: "bg-surface-alt",
-    icon: null,
   };
   const Icon = s.icon;
   return (
@@ -66,8 +86,8 @@ function StatusBadge({ status }) {
   );
 }
 
-function PaymentStatusBadge({ status }) {
-  const map = {
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
       color: "bg-success-soft text-success",
@@ -99,7 +119,13 @@ function PaymentStatusBadge({ status }) {
   );
 }
 
-function InfoRow({ label, value, highlight = false }) {
+interface InfoRowProps {
+  label: string;
+  value: React.ReactNode;
+  highlight?: boolean;
+}
+
+function InfoRow({ label, value, highlight = false }: InfoRowProps) {
   return (
     <div className="flex justify-between py-2 border-b border-border last:border-0">
       <span className="text-sm text-text-secondary">{label}</span>
@@ -112,15 +138,22 @@ function InfoRow({ label, value, highlight = false }) {
   );
 }
 
+interface RepairInvoiceDetailModalProps {
+  invoiceId?: Id | null;
+  isOpen: boolean;
+  onClose: () => void;
+  zIndex?: number;
+}
+
 export default function RepairInvoiceDetailModal({
   invoiceId,
   isOpen,
   onClose,
-}) {
+}: RepairInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
   const { openItemDetail, openDeviceDetail, openRepairInvoiceEdit } =
     useModal();
-  const [invoice, setInvoice] = useState(null);
+  const [invoice, setInvoice] = useState<RepairInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -130,13 +163,16 @@ export default function RepairInvoiceDetailModal({
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showStatusConfirm, setShowStatusConfirm] = useState(null);
+  const [showStatusConfirm, setShowStatusConfirm] =
+    useState<RepairInvoiceStatus | null>(null);
 
   useEffect(() => {
     if (isOpen && invoiceId) fetchInvoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, invoiceId]);
 
   const fetchInvoice = async () => {
+    if (!invoiceId) return;
     setLoading(true);
     try {
       const res = await getRepairInvoice(invoiceId);
@@ -150,6 +186,7 @@ export default function RepairInvoiceDetailModal({
   };
 
   const handleDelete = async () => {
+    if (!invoiceId) return;
     setDeleting(true);
     try {
       await deleteRepairInvoice(invoiceId);
@@ -157,27 +194,28 @@ export default function RepairInvoiceDetailModal({
       setShowDeleteConfirm(false);
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در حذف فاکتور");
+      toast.error(errorText(error, "خطا در حذف فاکتور"));
     } finally {
       setDeleting(false);
     }
   };
 
   const handleStatusChange = async () => {
-    if (!showStatusConfirm) return;
+    if (!showStatusConfirm || !invoiceId) return;
     const newStatus = showStatusConfirm;
     setShowStatusConfirm(null);
     try {
       await changeRepairInvoiceStatus(invoiceId, newStatus);
-      toast.success(`وضعیت فاکتور تغییر کرد`);
-      fetchInvoice();
+      toast.success("وضعیت فاکتور تغییر کرد");
+      void fetchInvoice();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در تغییر وضعیت");
+      toast.error(errorText(error, "خطا در تغییر وضعیت"));
     }
   };
 
-  const handleAddPayment = async (e) => {
+  const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!invoiceId || !invoice) return;
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0)
       return toast.error("مبلغ باید بیشتر از صفر باشد");
@@ -194,15 +232,15 @@ export default function RepairInvoiceDetailModal({
       setShowPaymentModal(false);
       setPaymentAmount("");
       setPaymentNote("");
-      fetchInvoice();
+      void fetchInvoice();
     } catch (error) {
-      toast.error(error.response?.data?.error || "خطا در ثبت پرداخت");
+      toast.error(errorText(error, "خطا در ثبت پرداخت"));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const formatDate = (date) =>
+  const formatDate = (date: string | null | undefined) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
   if (!isOpen) return null;
@@ -248,7 +286,7 @@ export default function RepairInvoiceDetailModal({
                     <button
                       onClick={() => {
                         onClose();
-                        openRepairInvoiceEdit(invoiceId);
+                        if (invoiceId) openRepairInvoiceEdit(invoiceId);
                       }}
                       className="px-4 py-2 bg-success text-text-inverse rounded-lg hover:bg-success-hover flex items-center gap-2"
                     >
@@ -491,7 +529,8 @@ export default function RepairInvoiceDetailModal({
                                     <button
                                       onClick={() => {
                                         onClose();
-                                        openItemDetail(item.item_id);
+                                        if (item.item_id)
+                                          openItemDetail(item.item_id);
                                       }}
                                       className="text-primary hover:underline"
                                     >
@@ -641,7 +680,7 @@ export default function RepairInvoiceDetailModal({
       </div>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
+      {showPaymentModal && invoice && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
           <div className="bg-surface rounded-lg p-6 w-full max-w-md" dir="rtl">
             <h3 className="text-lg font-bold text-text-primary mb-4">
@@ -685,7 +724,7 @@ export default function RepairInvoiceDetailModal({
                   <textarea
                     value={paymentNote}
                     onChange={(e) => setPaymentNote(e.target.value)}
-                    rows="2"
+                    rows={2}
                     className="w-full border border-border rounded-lg px-4 py-2 bg-surface text-text-primary"
                   />
                 </div>

@@ -8,6 +8,3 @@ export function useDebounce<T>(value: T, delay = 400): T {
   }, [value, delay]);
   return debounced;
 }
-
-export const getBaseUrl = (): string =>
-  import.meta.env.VITE_API_URL || "http://localhost:5001";

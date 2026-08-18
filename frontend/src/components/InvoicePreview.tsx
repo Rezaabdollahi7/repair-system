@@ -1,4 +1,3 @@
-// src/components/InvoicePreview.jsx
 import { useState, useEffect, useRef } from "react";
 import { getSettings } from "../api";
 import {
@@ -8,12 +7,22 @@ import {
 } from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
 import { formatPersianCurrency } from "../utils/formatters";
-import { getBaseUrl } from "../utils/helpers";
+import type { AppSettings, RepairInvoiceDetail } from "../types/api";
 
-export default function InvoicePreview({ invoice, isOpen, onClose }) {
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const printRef = useRef(null);
+interface InvoicePreviewProps {
+  invoice: RepairInvoiceDetail | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function InvoicePreview({
+  invoice,
+  isOpen,
+  onClose,
+}: InvoicePreviewProps) {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [, setLoading] = useState(true);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -23,22 +32,21 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  const formatDate = (date) =>
+  const formatDate = (date: string | null | undefined) =>
     date ? new Date(date).toLocaleDateString("fa-IR") : "—";
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: invoice?.invoice_number || "فاکتور",
-    onAfterPrint: () => console.log("Print completed"),
   });
 
+  // The browser's print dialog offers Save as PDF, so this is the same action
+  // under a name people look for.
   const handleDownloadPDF = () => {
-    handlePrint(); // مرورگر خودش گزینه Save as PDF داره
+    handlePrint();
   };
 
   if (!isOpen || !invoice) return null;
-
-  const baseUrl = getBaseUrl();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -84,7 +92,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                 <div className="flex items-start gap-4">
                   {settings?.company_logo && (
                     <img
-                      src={baseUrl + settings.company_logo}
+                      src={settings.company_logo}
                       alt="Logo"
                       className="h-16 w-auto object-contain"
                     />
@@ -318,7 +326,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                 <div className="text-center space-y-2">
                   {settings?.signature_image && (
                     <img
-                      src={baseUrl + settings.signature_image}
+                      src={settings.signature_image}
                       alt="Signature"
                       className="h-16 w-auto object-contain mx-auto"
                     />
@@ -328,7 +336,7 @@ export default function InvoicePreview({ invoice, isOpen, onClose }) {
                 <div className="text-center space-y-2">
                   {settings?.stamp_image && (
                     <img
-                      src={baseUrl + settings.stamp_image}
+                      src={settings.stamp_image}
                       alt="Stamp"
                       className="h-20 w-auto object-contain mx-auto"
                     />

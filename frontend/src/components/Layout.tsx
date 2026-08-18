@@ -1,11 +1,9 @@
-// src/components/Layout.jsx
 import { useState } from "react";
-import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import HomeIcon from "../../public/icons/HomeIcon.jsx";
 import {
   Bars3Icon,
-  // HomeIcon,
   WrenchScrewdriverIcon,
   UsersIcon,
   UserGroupIcon,
@@ -17,28 +15,42 @@ import {
   ChevronRightIcon,
   Cog6ToothIcon,
   ChartPieIcon,
-  CogIcon,
-  PlusIcon,
   XMarkIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/solid";
-import { useModal } from "../context/ModalContext";
+
+type IconComponent = React.ComponentType<{ className?: string }>;
+
+/** A divider carries nothing but its own kind. */
+interface MenuDivider {
+  divider: true;
+}
+
+interface MenuLink {
+  divider?: false;
+  name: string;
+  path: string;
+  icon: IconComponent;
+  adminOnly: boolean;
+}
+
+type MenuEntry = MenuDivider | MenuLink;
 
 export default function Layout() {
   const location = useLocation();
   const { isAtLeast, user, logoutUser } = useAuth();
-  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  const isActive = (path) => location.pathname.startsWith(path);
+  const isActive = (path: string) => location.pathname.startsWith(path);
 
+  // No navigate() afterwards: logoutUser already routes to /login once the
+  // server has been told, and navigating here raced it.
   const handleLogout = () => {
-    logoutUser();
-    navigate("/login");
+    void logoutUser();
   };
 
-  const menuItems = [
+  const menuItems: MenuEntry[] = [
     { name: "داشبورد", path: "/dashboard", icon: HomeIcon, adminOnly: true },
     {
       name: "دستگاه‌ها",
@@ -98,120 +110,20 @@ export default function Layout() {
 
   const filteredMenuItems = menuItems.filter((item) => {
     if (item.divider) return true;
-    if (item.superAdminOnly) return user?.role === "super_admin";
     if (item.adminOnly) return isAtLeast("admin");
     return true;
   });
 
+  // Drops a divider that ended up leading, trailing, or beside another one
+  // after the role filter removed what sat between them.
   const cleanMenuItems = filteredMenuItems.filter((item, index, arr) => {
     if (!item.divider) return true;
     if (index === 0) return false;
     if (index === arr.length - 1) return false;
-    const prevItem = arr[index - 1];
-    if (prevItem?.divider) return false;
-    const nextItem = arr[index + 1];
-    if (nextItem?.divider) return false;
+    if (arr[index - 1]?.divider) return false;
+    if (arr[index + 1]?.divider) return false;
     return true;
   });
-
-  function FloatingActionButton() {
-    const [isOpen, setIsOpen] = useState(false);
-    const {
-      openPurchaseInvoiceCreate,
-      openSaleInvoiceCreate,
-      openRepairInvoiceCreate,
-      openDeviceEdit,
-      openCustomerEdit,
-      openItemEdit,
-    } = useModal();
-
-    const actions = [
-      {
-        label: "فاکتور خرید",
-        icon: ShoppingCartIcon,
-        color: "bg-warning hover:opacity-80",
-        onClick: () => openPurchaseInvoiceCreate(),
-      },
-      {
-        label: "فاکتور فروش",
-        icon: CurrencyDollarIcon,
-        color: "bg-success hover:opacity-80",
-        onClick: () => openSaleInvoiceCreate(),
-      },
-      {
-        label: "فاکتور تعمیر",
-        icon: WrenchScrewdriverIcon,
-        color: "bg-primary hover:opacity-80",
-        onClick: () => openRepairInvoiceCreate(),
-      },
-      {
-        label: "دستگاه جدید",
-        icon: CogIcon,
-        color: "bg-primary hover:opacity-80",
-        onClick: () => openDeviceEdit(null),
-      },
-      {
-        label: "مشتری جدید",
-        icon: HomeIcon,
-        color: "bg-danger-soft text-danger hover:opacity-80",
-        onClick: () => openCustomerEdit(null),
-      },
-      {
-        label: "کالای جدید",
-        icon: CubeIcon,
-        color: "bg-success hover:opacity-80",
-        onClick: () => openItemEdit(null),
-      },
-    ];
-
-    return (
-      <div className="fixed bottom-4 left-1 sm:bottom-14 sm:left-10 z-40 flex flex-col items-center gap-3 hidden">
-        {isOpen && (
-          <div
-            className="fixed inset-0 -z-30"
-            onClick={() => setIsOpen(false)}
-          />
-        )}
-        <div className="flex flex-col-reverse items-center gap-2 sm:gap-3">
-          {actions.map((action, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                action.onClick();
-                setIsOpen(false);
-              }}
-              className={`flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-full text-text-inverse shadow-lg transition-all duration-300 ${action.color} ${
-                isOpen
-                  ? "opacity-100 translate-y-0 scale-100"
-                  : "opacity-0 translate-y-4 scale-75 pointer-events-none"
-              }`}
-              style={{ transitionDelay: isOpen ? `${index * 50}ms` : "0ms" }}
-              title={action.label}
-            >
-              <action.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                {action.label}
-              </span>
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`p-3 sm:p-4 rounded-full shadow-2xl text-text-inverse transition-all duration-300 z-40 ${
-            isOpen
-              ? "bg-danger hover:bg-danger-hover rotate-45"
-              : "bg-primary hover:bg-primary-hover rotate-0"
-          }`}
-        >
-          {isOpen ? (
-            <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          ) : (
-            <PlusIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          )}
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-bg" dir="rtl">
@@ -436,7 +348,6 @@ export default function Layout() {
         </header>
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-auto">
           <Outlet />
-          {isAtLeast("admin") && <FloatingActionButton />}
         </main>
       </div>
     </div>

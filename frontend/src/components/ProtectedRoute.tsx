@@ -1,8 +1,12 @@
-// src/components/ProtectedRoute.jsx
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import type { RoleName } from "../types/api";
 
-export default function ProtectedRoute({ minRole }) {
+interface ProtectedRouteProps {
+  minRole?: RoleName;
+}
+
+export default function ProtectedRoute({ minRole }: ProtectedRouteProps) {
   const { user, loading, isAtLeast } = useAuth();
 
   if (loading) {

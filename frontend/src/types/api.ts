@@ -866,3 +866,13 @@ export interface DashboardStats {
     issued_unpaid_amount: number;
   };
 }
+
+/**
+ * Settings as the settings form holds them: every field present, filled from
+ * the server and falling back to a default. AppSettings has everything
+ * optional because the endpoint answers with a partial object when the row
+ * is missing.
+ */
+export type SettingsForm = Required<
+  Omit<AppSettings, "id" | "created_at" | "updated_at">
+>;

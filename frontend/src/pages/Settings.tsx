@@ -1,4 +1,3 @@
-// src/pages/Settings.jsx
 import { useState, useEffect } from "react";
 import { getSettings, updateSettings, uploadSettingImage } from "../api";
 import toast from "react-hot-toast";
@@ -7,19 +6,32 @@ import { Navigate } from "react-router-dom";
 import {
   BuildingOfficeIcon,
   PhotoIcon,
-  CurrencyDollarIcon,
   DocumentTextIcon,
   CheckCircleIcon,
   Cog6ToothIcon,
-  DocumentIcon,
 } from "@heroicons/react/24/solid";
 import ThemeSwitcher from "../components/ThemeSwitcher";
+import type { SettingsForm } from "../types/api";
 
-function ImageUploadBox({ label, imagePath, type, onUpload }) {
+type UploadType = "logo" | "stamp" | "signature";
+
+interface ImageUploadBoxProps {
+  label: string;
+  imagePath: string | null;
+  type: UploadType;
+  onUpload: (path: string) => void;
+}
+
+function ImageUploadBox({
+  label,
+  imagePath,
+  type,
+  onUpload,
+}: ImageUploadBoxProps) {
   const [uploading, setUploading] = useState(false);
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
@@ -72,7 +84,19 @@ function ImageUploadBox({ label, imagePath, type, onUpload }) {
   );
 }
 
-function ToggleSwitch({ label, description, checked, onChange }) {
+interface ToggleSwitchProps {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+function ToggleSwitch({
+  label,
+  description,
+  checked,
+  onChange,
+}: ToggleSwitchProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
       <div>
@@ -98,83 +122,52 @@ function ToggleSwitch({ label, description, checked, onChange }) {
   );
 }
 
+const EMPTY_SETTINGS: SettingsForm = {
+  company_name: "",
+  company_address: "",
+  company_phone: "",
+  company_email: "",
+  company_website: "",
+  company_logo: "",
+  stamp_image: "",
+  signature_image: "",
+  default_tax_rate: 0,
+  default_warranty_months: 3,
+  invoice_prefix: "INV-",
+  invoice_footer_text: "",
+  sale_invoice_paper_size: "A5",
+  sale_invoice_show_logo: true,
+  sale_invoice_show_company_info: true,
+  sale_invoice_show_email: false,
+  sale_invoice_show_website: false,
+  sale_invoice_show_device_info: false,
+  sale_invoice_show_customer_phone: false,
+  sale_invoice_show_discount: false,
+  sale_invoice_show_tax: false,
+  sale_invoice_show_stamp: false,
+  sale_invoice_show_signature: false,
+  sale_invoice_show_warranty: false,
+  sale_invoice_show_technician: false,
+  sale_invoice_header_text: "",
+  sale_invoice_footer_text: "با تشکر از اعتماد شما",
+};
+
 export default function Settings() {
   const { user, isAtLeast } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("ui"); // ← تب پیش‌فرض "تنظیمات ظاهری"
-  const [settings, setSettings] = useState({
-    company_name: "",
-    company_address: "",
-    company_phone: "",
-    company_email: "",
-    company_website: "",
-    company_logo: "",
-    stamp_image: "",
-    signature_image: "",
-    default_tax_rate: 0,
-    default_warranty_months: 3,
-    invoice_prefix: "INV-",
-    invoice_footer_text: "",
-    sale_invoice_paper_size: "A5",
-    sale_invoice_show_logo: true,
-    sale_invoice_show_company_info: true,
-    sale_invoice_show_email: false,
-    sale_invoice_show_website: false,
-    sale_invoice_show_device_info: false,
-    sale_invoice_show_customer_phone: false,
-    sale_invoice_show_discount: false,
-    sale_invoice_show_tax: false,
-    sale_invoice_show_stamp: false,
-    sale_invoice_show_signature: false,
-    sale_invoice_show_warranty: false,
-    sale_invoice_show_technician: false,
-    sale_invoice_header_text: "",
-    sale_invoice_footer_text: "با تشکر از اعتماد شما",
-  });
+  const [activeTab, setActiveTab] = useState("ui");
+  const [settings, setSettings] = useState<SettingsForm>(EMPTY_SETTINGS);
 
   const isSuperAdmin = user?.role === "super_admin";
 
-  // بررسی دسترسی - فقط ادمین‌ها (admin و super_admin) می‌توانند وارد شوند
-  if (!isAtLeast("admin")) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   useEffect(() => {
-    // فقط سوپر ادمین تنظیمات را دریافت کند (کاربران عادی نیازی ندارند)
+    // Only a super admin fetches these: everyone else sees the appearance
+    // tab, which needs nothing from the server.
     if (isSuperAdmin) {
       getSettings()
         .then((res) => {
-          const data = res.data;
-          setSettings({
-            ...data,
-            sale_invoice_show_logo: Boolean(data.sale_invoice_show_logo),
-            sale_invoice_show_company_info: Boolean(
-              data.sale_invoice_show_company_info,
-            ),
-            sale_invoice_show_email: Boolean(data.sale_invoice_show_email),
-            sale_invoice_show_website: Boolean(data.sale_invoice_show_website),
-            sale_invoice_show_device_info: Boolean(
-              data.sale_invoice_show_device_info,
-            ),
-            sale_invoice_show_customer_phone: Boolean(
-              data.sale_invoice_show_customer_phone,
-            ),
-            sale_invoice_show_discount: Boolean(
-              data.sale_invoice_show_discount,
-            ),
-            sale_invoice_show_tax: Boolean(data.sale_invoice_show_tax),
-            sale_invoice_show_stamp: Boolean(data.sale_invoice_show_stamp),
-            sale_invoice_show_signature: Boolean(
-              data.sale_invoice_show_signature,
-            ),
-            sale_invoice_show_warranty: Boolean(
-              data.sale_invoice_show_warranty,
-            ),
-            sale_invoice_show_technician: Boolean(
-              data.sale_invoice_show_technician,
-            ),
-          });
+          setSettings({ ...EMPTY_SETTINGS, ...res.data });
         })
         .catch(() => {
           toast.error("خطا در دریافت تنظیمات");
@@ -183,12 +176,21 @@ export default function Settings() {
           setLoading(false);
         });
     } else {
-      // برای کاربران عادی، فقط تنظیمات ظاهری را نمایش می‌دهیم
       setLoading(false);
     }
   }, [isSuperAdmin]);
 
-  const handleChange = (e) => {
+  // After the hooks, not before: an early return above them would leave React
+  // with a different hook count for a technician than for an admin.
+  if (!isAtLeast("admin")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value, type } = e.target;
     setSettings((prev) => ({
       ...prev,
@@ -196,15 +198,15 @@ export default function Settings() {
     }));
   };
 
-  const handleToggle = (name, value) => {
+  const handleToggle = (name: keyof SettingsForm, value: boolean) => {
     setSettings((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleImageUpload = (type, path) => {
+  const handleImageUpload = (type: keyof SettingsForm, path: string) => {
     setSettings((prev) => ({ ...prev, [type]: path }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
       toast.error("شما مجوز ذخیره تنظیمات را ندارید");
@@ -213,32 +215,11 @@ export default function Settings() {
     setSaving(true);
 
     try {
-      const payload = {
-        ...settings,
-        sale_invoice_show_logo: settings.sale_invoice_show_logo ? 1 : 0,
-        sale_invoice_show_company_info: settings.sale_invoice_show_company_info
-          ? 1
-          : 0,
-        sale_invoice_show_email: settings.sale_invoice_show_email ? 1 : 0,
-        sale_invoice_show_website: settings.sale_invoice_show_website ? 1 : 0,
-        sale_invoice_show_device_info: settings.sale_invoice_show_device_info
-          ? 1
-          : 0,
-        sale_invoice_show_customer_phone:
-          settings.sale_invoice_show_customer_phone ? 1 : 0,
-        sale_invoice_show_discount: settings.sale_invoice_show_discount ? 1 : 0,
-        sale_invoice_show_tax: settings.sale_invoice_show_tax ? 1 : 0,
-        sale_invoice_show_stamp: settings.sale_invoice_show_stamp ? 1 : 0,
-        sale_invoice_show_signature: settings.sale_invoice_show_signature
-          ? 1
-          : 0,
-        sale_invoice_show_warranty: settings.sale_invoice_show_warranty ? 1 : 0,
-        sale_invoice_show_technician: settings.sale_invoice_show_technician
-          ? 1
-          : 0,
-      };
-
-      await updateSettings(payload);
+      // Sent as booleans. The flags used to be converted to 1/0 on the way
+      // out and back with Boolean() on the way in, which the SQLite schema
+      // needed; the column is a real boolean now and the server answers with
+      // one.
+      await updateSettings(settings);
       toast.success("تنظیمات با موفقیت ذخیره شد");
     } catch {
       toast.error("خطا در ذخیره تنظیمات");
@@ -255,10 +236,8 @@ export default function Settings() {
     );
   }
 
-  // تعریف تب‌ها بر اساس نقش کاربر
   const tabs = [
     { id: "ui", label: "تنظیمات ظاهری", icon: Cog6ToothIcon },
-    // فقط سوپر ادمین به این تب‌ها دسترسی دارد
     ...(isSuperAdmin
       ? [
           { id: "company", label: "اطلاعات شرکت", icon: BuildingOfficeIcon },
@@ -269,10 +248,11 @@ export default function Settings() {
       : []),
   ];
 
-  // اگر تب فعال در لیست تب‌ها نباشد، به "ui" تغییر دهید
-  if (!tabs.some((tab) => tab.id === activeTab)) {
-    setActiveTab("ui");
-  }
+  // Derived rather than corrected with setState during render, which forces
+  // an immediate second render and can loop.
+  const currentTab = tabs.some((tab) => tab.id === activeTab)
+    ? activeTab
+    : "ui";
 
   return (
     <div dir="rtl" className="px-2 sm:px-4 mx-auto">
@@ -295,7 +275,7 @@ export default function Settings() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors ${
-                  activeTab === tab.id
+                  currentTab === tab.id
                     ? "border-primary text-primary"
                     : "border-transparent text-text-secondary hover:text-text-primary"
                 }`}
@@ -311,15 +291,13 @@ export default function Settings() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-        {/* تب تنظیمات ظاهری - برای همه قابل مشاهده است */}
-        {activeTab === "ui" && (
+        {currentTab === "ui" && (
           <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
             <ThemeSwitcher />
           </div>
         )}
 
-        {/* تب‌های زیر فقط برای سوپر ادمین قابل مشاهده هستند */}
-        {isSuperAdmin && activeTab === "company" && (
+        {isSuperAdmin && currentTab === "company" && (
           <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
             <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
               <BuildingOfficeIcon className="w-5 h-5 text-text-secondary" />
@@ -363,7 +341,7 @@ export default function Settings() {
                   name="company_address"
                   value={settings.company_address || ""}
                   onChange={handleChange}
-                  rows="2"
+                  rows={2}
                   className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                   placeholder="آدرس کامل تعمیرگاه..."
                 />
@@ -400,7 +378,7 @@ export default function Settings() {
           </div>
         )}
 
-        {isSuperAdmin && activeTab === "images" && (
+        {isSuperAdmin && currentTab === "images" && (
           <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
             <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
               <PhotoIcon className="w-5 h-5 text-text-secondary" />
@@ -430,7 +408,7 @@ export default function Settings() {
           </div>
         )}
 
-        {isSuperAdmin && activeTab === "invoice" && (
+        {isSuperAdmin && currentTab === "invoice" && (
           <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
             <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
               <DocumentTextIcon className="w-5 h-5 text-text-secondary" />
@@ -490,7 +468,7 @@ export default function Settings() {
                 name="invoice_footer_text"
                 value={settings.invoice_footer_text || ""}
                 onChange={handleChange}
-                rows="2"
+                rows={2}
                 className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                 placeholder="مثلاً: با تشکر از اعتماد شما - تحویل گرفته شد"
               />
@@ -498,7 +476,7 @@ export default function Settings() {
           </div>
         )}
 
-        {isSuperAdmin && activeTab === "template" && (
+        {isSuperAdmin && currentTab === "template" && (
           <div className="bg-surface shadow rounded-lg p-4 sm:p-6 overflow-x-auto">
             <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
               <Cog6ToothIcon className="w-5 h-5 text-text-secondary" />
@@ -651,7 +629,7 @@ export default function Settings() {
                       name="sale_invoice_header_text"
                       value={settings.sale_invoice_header_text || ""}
                       onChange={handleChange}
-                      rows="2"
+                      rows={2}
                       className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                       placeholder="متن دلخواه برای بالای فاکتور..."
                     />
@@ -667,7 +645,7 @@ export default function Settings() {
                         "با تشکر از اعتماد شما"
                       }
                       onChange={handleChange}
-                      rows="2"
+                      rows={2}
                       className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
                       placeholder="متن دلخواه برای پایین فاکتور..."
                     />
@@ -678,7 +656,6 @@ export default function Settings() {
           </div>
         )}
 
-        {/* دکمه ذخیره - فقط برای سوپر ادمین نمایش داده شود */}
         {isSuperAdmin && (
           <div className="flex justify-center">
             <button

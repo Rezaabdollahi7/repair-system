@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getDashboardStats } from "../api";
@@ -14,13 +13,44 @@ import {
   CalendarIcon,
   CogIcon,
   DocumentTextIcon,
-  CreditCardIcon,
   BanknotesIcon,
   HomeIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency } from "../utils/formatters";
+import type {
+  DashboardStats,
+  DashboardTopItem,
+  DashboardTransaction,
+} from "../types/api";
 
-function StatCard({ title, value, icon: Icon, color, subtitle }) {
+/** Two more than the four the schema's default status list carries. */
+const DEVICE_STATUS_LABELS: Record<string, string> = {
+  pending: "در انتظار",
+  diagnosing: "در حال بررسی",
+  waiting_for_parts: "منتظر قطعه",
+  repairing: "در حال تعمیر",
+  repaired: "تعمیر شده",
+  delivered: "تحویل شده",
+  unrepairable: "غیرقابل تعمیر",
+  ready_for_pickup: "آماده تحویل",
+  not_repaired: "تعمیر نشد",
+};
+
+interface StatCardProps {
+  title: string;
+  value: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  subtitle?: React.ReactNode;
+}
+
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color,
+  subtitle,
+}: StatCardProps) {
   return (
     <div className="bg-surface rounded-lg shadow p-6">
       <div className="flex items-center justify-between">
@@ -39,8 +69,8 @@ function StatCard({ title, value, icon: Icon, color, subtitle }) {
   );
 }
 
-function RecentTransactionItem({ tx }) {
-  const getTypeLabel = (type) => {
+function RecentTransactionItem({ tx }: { tx: DashboardTransaction }) {
+  const getTypeLabel = (type: string) => {
     if (type === "purchase") return { label: "خرید", color: "text-success" };
     if (type === "sale") return { label: "فروش", color: "text-danger" };
     return { label: "تنظیم", color: "text-text-secondary" };
@@ -74,7 +104,12 @@ function RecentTransactionItem({ tx }) {
   );
 }
 
-function TopItemItem({ item, index }) {
+interface TopItemItemProps {
+  item: DashboardTopItem;
+  index: number;
+}
+
+function TopItemItem({ item, index }: TopItemItemProps) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
       <div className="flex items-center gap-3">
@@ -99,7 +134,7 @@ function TopItemItem({ item, index }) {
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -158,34 +193,21 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {stats.devices?.by_status?.length > 0 && (
+      {stats.devices.by_status.length > 0 && (
         <div className="bg-surface rounded-lg shadow p-4 mb-12">
           <h3 className="text-sm font-medium text-text-primary mb-3">
             توزیع وضعیت دستگاه‌ها
           </h3>
           <div className="flex flex-wrap gap-2">
-            {stats.devices.by_status.map((item) => {
-              const statusMap = {
-                pending: "در انتظار",
-                diagnosing: "در حال بررسی",
-                waiting_for_parts: "منتظر قطعه",
-                repairing: "در حال تعمیر",
-                repaired: "تعمیر شده",
-                delivered: "تحویل شده",
-                unrepairable: "غیرقابل تعمیر",
-                ready_for_pickup: "آماده تحویل",
-                not_repaired: "تعمیر نشد",
-              };
-              return (
-                <span
-                  key={item.status}
-                  className="px-3 py-1 bg-surface-alt rounded-full text-sm text-text-primary"
-                >
-                  {statusMap[item.status] || item.status}:{" "}
-                  <strong>{item.count}</strong>
-                </span>
-              );
-            })}
+            {stats.devices.by_status.map((item) => (
+              <span
+                key={item.status}
+                className="px-3 py-1 bg-surface-alt rounded-full text-sm text-text-primary"
+              >
+                {DEVICE_STATUS_LABELS[item.status] || item.status}:{" "}
+                <strong>{item.count}</strong>
+              </span>
+            ))}
           </div>
         </div>
       )}

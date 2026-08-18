@@ -704,3 +704,165 @@ export interface AppService {
   is_active: boolean;
   sort_order: number;
 }
+
+/**
+ * The stock report's per-row verdict. Computed in JS, not stored: both the
+ * status and the low-stock filter compare two columns against each other,
+ * which Prisma cannot express.
+ */
+export type StockStatus = "critical" | "low" | "good";
+
+export interface StockReportRow {
+  id: number;
+  code: string;
+  name: string;
+  unit: string;
+  current_stock: number;
+  min_stock: number;
+  avg_purchase_price: number;
+  category_name: string | null;
+  stock_status: StockStatus;
+}
+
+export interface StockReport {
+  data: StockReportRow[];
+  summary: {
+    total_items: number;
+    low_stock_count: number;
+    critical_count: number;
+    total_inventory_value: number;
+  };
+}
+
+export interface PurchaseReportRow {
+  id: number;
+  invoice_number: string;
+  supplier_name: string | null;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  item_count: number;
+  total_quantity: number;
+}
+
+export interface PurchaseReport {
+  data: PurchaseReportRow[];
+  summary: {
+    total_invoices: number;
+    total_purchase_amount: number;
+    total_paid_amount: number;
+    total_remaining: number;
+  };
+}
+
+export interface SaleReportRow {
+  id: number;
+  invoice_number: string;
+  customer_name: string;
+  customer_phone: string | null;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  item_count: number;
+  total_quantity: number;
+}
+
+export interface SaleReport {
+  data: SaleReportRow[];
+  summary: {
+    total_invoices: number;
+    total_sales_amount: number;
+    total_received_amount: number;
+    total_remaining: number;
+  };
+}
+
+/**
+ * Profit is computed per catalogue item. Custom sale lines carry no item_id
+ * and so no known cost, and are excluded entirely — the figures here are not
+ * the whole of what the shop sold.
+ *
+ * Cost uses the item's *current* average purchase price, not the price at
+ * the time of sale, so a past margin shifts when the item is restocked at a
+ * different price.
+ */
+export interface ProfitReportRow {
+  item_id: number | null;
+  item_name: string | null;
+  item_code: string | null;
+  total_quantity: number;
+  total_revenue: number;
+  total_cost: number;
+  profit: number;
+  profit_margin: number;
+}
+
+export interface ProfitReport {
+  data: ProfitReportRow[];
+  summary: {
+    total_revenue: number;
+    total_cost: number;
+    total_profit: number;
+    profit_margin: number;
+  };
+}
+
+/** A row of the dashboard's recent-transactions list. */
+export interface DashboardTransaction {
+  id: number;
+  item_id: number;
+  type: string;
+  quantity: number;
+  unit_price: number;
+  created_at: string;
+  item_name: string;
+  item_code: string;
+}
+
+export interface DashboardTopItem {
+  id: number | null;
+  name: string | null;
+  code: string | null;
+  sold_quantity: number;
+  revenue: number;
+}
+
+/**
+ * GET /reports/dashboard.
+ *
+ * Note "today" and "month" boundaries are UTC, so a Tehran day rolls over at
+ * 03:30 local time.
+ */
+export interface DashboardStats {
+  items: {
+    total: number;
+    low_stock: number;
+  };
+  today: {
+    purchase: number;
+    sale: number;
+    net: number;
+  };
+  month: {
+    purchase: number;
+    sale: number;
+    net: number;
+  };
+  recent_transactions: DashboardTransaction[];
+  top_items: DashboardTopItem[];
+  devices: {
+    total: number;
+    today: number;
+    repairing: number;
+    by_status: { status: string; count: number }[];
+  };
+  repair_invoices: {
+    today_count: number;
+    today_revenue: number;
+    month_revenue: number;
+    pending_payment_count: number;
+    issued_unpaid_amount: number;
+  };
+}

@@ -59,6 +59,11 @@ import type {
   RepairPaymentBody,
   RepairPaymentResponse,
   AppService,
+  DashboardStats,
+  StockReport,
+  PurchaseReport,
+  SaleReport,
+  ProfitReport,
 } from "../types/api";
 
 /**
@@ -357,15 +362,16 @@ export const quickSale = (id: Id, data: QuickSaleBody) =>
   api.post<QuickStockResponse>(`/items/${id}/quick-sale`, data);
 
 // Reports
-export const getDashboardStats = () => api.get("/reports/dashboard");
+export const getDashboardStats = () =>
+  api.get<DashboardStats>("/reports/dashboard");
 export const getStockReport = (params?: QueryParams) =>
-  api.get("/reports/stock", { params });
+  api.get<StockReport>("/reports/stock", { params });
 export const getPurchaseReport = (params?: QueryParams) =>
-  api.get("/reports/purchases", { params });
+  api.get<PurchaseReport>("/reports/purchases", { params });
 export const getSaleReport = (params?: QueryParams) =>
-  api.get("/reports/sales", { params });
+  api.get<SaleReport>("/reports/sales", { params });
 export const getProfitReport = (params?: QueryParams) =>
-  api.get("/reports/profit", { params });
+  api.get<ProfitReport>("/reports/profit", { params });
 
 // Settings
 export const getSettings = () => api.get<AppSettings>("/settings");

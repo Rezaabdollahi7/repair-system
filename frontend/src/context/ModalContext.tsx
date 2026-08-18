@@ -1,10 +1,10 @@
-// src/context/ModalContext.jsx
 import {
   createContext,
   useContext,
   useState,
   useRef,
   useCallback,
+  type ReactNode,
 } from "react";
 import DeviceDetailModal from "../components/DeviceDetailModal";
 import DeviceFormModal from "../components/DeviceFormModal";
@@ -19,16 +19,76 @@ import PurchaseInvoiceDetailModal from "../components/PurchaseInvoiceDetailModal
 import PurchaseInvoiceFormModal from "../components/PurchaseInvoiceFormModal";
 import RepairInvoiceFormModal from "../components/RepairInvoiceFormModal";
 import RepairInvoiceDetailModal from "../components/RepairInvoiceDetailModal";
+import type { Id } from "../types/api";
 
-const ModalContext = createContext();
+/**
+ * Which modal a stack entry renders. The strings are matched in the switch
+ * below, so a typo is a compile error rather than a modal that never opens.
+ */
+type ModalType =
+  | "deviceDetail"
+  | "deviceEdit"
+  | "customerDetail"
+  | "customerEdit"
+  | "personnelEdit"
+  | "itemEdit"
+  | "itemDetail"
+  | "saleInvoiceDetail"
+  | "saleInvoiceCreate"
+  | "saleInvoiceEdit"
+  | "purchaseInvoiceDetail"
+  | "purchaseInvoiceCreate"
+  | "repairInvoiceDetail"
+  | "repairInvoiceCreate"
+  | "repairInvoiceEdit";
 
-export function ModalProvider({ children }) {
-  const [modalStack, setModalStack] = useState([]);
-  const refreshCallbackRef = useRef(null);
+/**
+ * The detail modals hand an edit action back so the stack can push the form
+ * on top of them rather than replacing what the user was looking at.
+ */
+interface ModalProps {
+  onEdit?: (id: Id) => void;
+}
 
-  const openModal = useCallback((type, id, props = {}) => {
-    setModalStack((prev) => [...prev, { type, id, props }]);
-  }, []);
+interface ModalEntry {
+  type: ModalType;
+  id: Id | null;
+  props: ModalProps;
+}
+
+interface ModalContextValue {
+  openDeviceDetail: (deviceId: Id) => void;
+  openDeviceEdit: (deviceId: Id | null) => void;
+  openCustomerDetail: (customerId: Id) => void;
+  openCustomerEdit: (customerId: Id | null) => void;
+  openPersonnelEdit: (personnelId: Id | null) => void;
+  openItemEdit: (itemId: Id | null) => void;
+  openItemDetail: (itemId: Id) => void;
+  openSaleInvoiceDetail: (invoiceId: Id) => void;
+  openSaleInvoiceCreate: (deviceId?: Id | null) => void;
+  openSaleInvoiceEdit: (invoiceId: Id) => void;
+  openPurchaseInvoiceDetail: (invoiceId: Id) => void;
+  openPurchaseInvoiceCreate: () => void;
+  openRepairInvoiceDetail: (invoiceId: Id) => void;
+  openRepairInvoiceCreate: (deviceId?: Id | null) => void;
+  openRepairInvoiceEdit: (invoiceId: Id) => void;
+  closeModal: () => void;
+  closeAllModals: () => void;
+  refreshList: (callback: (() => void) | null) => void;
+}
+
+const ModalContext = createContext<ModalContextValue | null>(null);
+
+export function ModalProvider({ children }: { children: ReactNode }) {
+  const [modalStack, setModalStack] = useState<ModalEntry[]>([]);
+  const refreshCallbackRef = useRef<(() => void) | null>(null);
+
+  const openModal = useCallback(
+    (type: ModalType, id: Id | null, props: ModalProps = {}) => {
+      setModalStack((prev) => [...prev, { type, id, props }]);
+    },
+    [],
+  );
 
   const closeModal = useCallback(() => {
     setModalStack((prev) => {
@@ -37,7 +97,8 @@ export function ModalProvider({ children }) {
       newStack.pop();
       return newStack;
     });
-    // refresh callback فقط وقتی آخرین Modal بسته شد اجرا بشه
+    // Only once the last modal has closed: refreshing under a modal that is
+    // still open would reload a list nobody is looking at.
     if (modalStack.length <= 1 && refreshCallbackRef.current) {
       refreshCallbackRef.current();
     }
@@ -50,47 +111,41 @@ export function ModalProvider({ children }) {
     }
   }, []);
 
-  const setRefreshCallback = useCallback((callback) => {
+  const setRefreshCallback = useCallback((callback: (() => void) | null) => {
     refreshCallbackRef.current = callback;
   }, []);
 
-  const openPersonnelEdit = (personnelId) =>
+  const openPersonnelEdit = (personnelId: Id | null) =>
     openModal("personnelEdit", personnelId);
-  const openDeviceDetail = (deviceId) =>
+  const openDeviceDetail = (deviceId: Id) =>
     openModal("deviceDetail", deviceId, {
       onEdit: (id) => openModal("deviceEdit", id),
     });
-  const openDeviceEdit = (deviceId) => openModal("deviceEdit", deviceId);
-  const openItemEdit = (itemId) => openModal("itemEdit", itemId);
-  const openItemDetail = (itemId) => openModal("itemDetail", itemId);
-  const openCustomerDetail = (customerId) =>
+  const openDeviceEdit = (deviceId: Id | null) =>
+    openModal("deviceEdit", deviceId);
+  const openItemEdit = (itemId: Id | null) => openModal("itemEdit", itemId);
+  const openItemDetail = (itemId: Id) => openModal("itemDetail", itemId);
+  const openCustomerDetail = (customerId: Id) =>
     openModal("customerDetail", customerId, {
       onEdit: (id) => openModal("customerEdit", id),
     });
-  const openCustomerEdit = (customerId) =>
+  const openCustomerEdit = (customerId: Id | null) =>
     openModal("customerEdit", customerId);
-  const openSaleInvoiceDetail = (invoiceId) =>
+  const openSaleInvoiceDetail = (invoiceId: Id) =>
     openModal("saleInvoiceDetail", invoiceId);
-  const openSaleInvoiceCreate = (deviceId) =>
-    openModal("saleInvoiceCreate", deviceId || null);
-  // ===== تابع جدید برای ویرایش فاکتور فروش =====
-  const openSaleInvoiceEdit = (invoiceId) =>
+  const openSaleInvoiceCreate = (deviceId?: Id | null) =>
+    openModal("saleInvoiceCreate", deviceId ?? null);
+  const openSaleInvoiceEdit = (invoiceId: Id) =>
     openModal("saleInvoiceEdit", invoiceId);
-  const openPurchaseInvoiceDetail = (invoiceId) =>
+  const openPurchaseInvoiceDetail = (invoiceId: Id) =>
     openModal("purchaseInvoiceDetail", invoiceId);
   const openPurchaseInvoiceCreate = () =>
     openModal("purchaseInvoiceCreate", null);
-  const openRepairInvoiceDetail = (id) => openModal("repairInvoiceDetail", id);
-  const openRepairInvoiceCreate = (deviceId) =>
-    openModal("repairInvoiceCreate", deviceId || null);
-  const openRepairInvoiceEdit = (id) => openModal("repairInvoiceEdit", id);
-
-  // آخرین Modal توی stack
-  const current =
-    modalStack.length > 0
-      ? modalStack[modalStack.length - 1]
-      : { type: null, id: null, props: {} };
-
+  const openRepairInvoiceDetail = (id: Id) =>
+    openModal("repairInvoiceDetail", id);
+  const openRepairInvoiceCreate = (deviceId?: Id | null) =>
+    openModal("repairInvoiceCreate", deviceId ?? null);
+  const openRepairInvoiceEdit = (id: Id) => openModal("repairInvoiceEdit", id);
   return (
     <ModalContext.Provider
       value={{
@@ -277,7 +332,6 @@ export function ModalProvider({ children }) {
             return (
               <RepairInvoiceFormModal
                 key={`${modal.type}-${modal.id}-${index}`}
-                invoiceId={modal.id}
                 isOpen={true}
                 onClose={closeModal}
                 onSuccess={closeModal}
@@ -294,5 +348,10 @@ export function ModalProvider({ children }) {
 }
 
 export function useModal() {
-  return useContext(ModalContext);
+  const ctx = useContext(ModalContext);
+  // Guarded like useAuth and useTheme: without it a caller outside the
+  // provider gets `undefined` and fails one line later on a property access,
+  // which says nothing about what actually went wrong.
+  if (!ctx) throw new Error("useModal must be used inside ModalProvider");
+  return ctx;
 }

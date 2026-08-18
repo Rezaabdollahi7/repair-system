@@ -87,7 +87,6 @@ interface RepairInvoiceFormModalProps {
   onClose: () => void;
   initialInvoiceId?: Id | null;
   initialDeviceId?: Id | null;
-  invoiceId?: Id | null;
   onSuccess?: () => void;
   zIndex?: number;
 }

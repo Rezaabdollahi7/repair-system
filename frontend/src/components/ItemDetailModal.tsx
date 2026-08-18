@@ -548,56 +548,64 @@ export default function ItemDetailModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {transactions.map((tx) => (
-                        <tr key={tx.id}>
-                          <td className="px-4 py-2 text-sm text-text-primary">
-                            {new Date(tx.created_at).toLocaleDateString(
-                              "fa-IR",
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-sm">
-                            {tx.type === "purchase" ? (
-                              <span className="text-success">خرید</span>
-                            ) : tx.type === "sale" ? (
-                              <span className="text-danger">فروش</span>
-                            ) : (
-                              <span className="text-text-secondary">
-                                تنظیم موجودی
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-sm">
-                            <span
-                              className={
-                                tx.quantity > 0 ? "text-success" : "text-danger"
-                              }
-                            >
-                              {tx.quantity > 0 ? "+" : ""}
-                              {tx.quantity}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-text-primary">
-                            {tx.unit_price
-                              ? formatPersianCurrency(tx.unit_price)
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-text-secondary">
-                            {tx.purchase_invoice_number &&
-                            tx.reference_id !== null ? (
-                              <button
-                                onClick={() =>
-                                  openPurchaseInvoiceDetail(tx.reference_id)
+                      {transactions.map((tx) => {
+                        // Captured in a local: TypeScript drops the narrowing
+                        // on a property once it crosses into the onClick
+                        // closure below.
+                        const invoiceId = tx.reference_id;
+                        return (
+                          <tr key={tx.id}>
+                            <td className="px-4 py-2 text-sm text-text-primary">
+                              {new Date(tx.created_at).toLocaleDateString(
+                                "fa-IR",
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-sm">
+                              {tx.type === "purchase" ? (
+                                <span className="text-success">خرید</span>
+                              ) : tx.type === "sale" ? (
+                                <span className="text-danger">فروش</span>
+                              ) : (
+                                <span className="text-text-secondary">
+                                  تنظیم موجودی
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-sm">
+                              <span
+                                className={
+                                  tx.quantity > 0
+                                    ? "text-success"
+                                    : "text-danger"
                                 }
-                                className="text-primary hover:underline"
                               >
-                                {tx.purchase_invoice_number}
-                              </button>
-                            ) : (
-                              tx.note || "—"
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                                {tx.quantity > 0 ? "+" : ""}
+                                {tx.quantity}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-sm text-text-primary">
+                              {tx.unit_price
+                                ? formatPersianCurrency(tx.unit_price)
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-text-secondary">
+                              {tx.purchase_invoice_number &&
+                              invoiceId !== null ? (
+                                <button
+                                  onClick={() =>
+                                    openPurchaseInvoiceDetail(invoiceId)
+                                  }
+                                  className="text-primary hover:underline"
+                                >
+                                  {tx.purchase_invoice_number}
+                                </button>
+                              ) : (
+                                tx.note || "—"
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

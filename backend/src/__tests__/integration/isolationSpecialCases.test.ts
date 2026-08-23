@@ -8,7 +8,26 @@ import {
   truncateAll,
   type TwoWorkspaces,
 } from "./helpers";
+import { runWithWorkspace } from "../../lib/workspaceContext";
+import { buildWorkbook } from "../../utils/export/workbook";
+import ExcelJS from "exceljs";
 
+// The export build runs after its response has been sent and reaches for
+// object storage; the integration setup only points S3 at an invalid host, so
+// without this the upload fails after Jest has torn the environment down.
+//
+// Mocked here rather than in the setup file: this is the only suite that
+// starts a build, and a global mock would silently apply to suites whose
+// files say nothing about it.
+jest.mock("../../lib/storage", () => ({
+  exportKey: (workspaceId: number, filename: string) =>
+    `workspaces/${workspaceId}/exports/${filename}`,
+  putObject: jest.fn().mockResolvedValue(undefined),
+  getObject: jest.fn().mockResolvedValue(Buffer.from("")),
+  signedUrlFor: jest.fn().mockResolvedValue("https://example.test/signed"),
+  deleteObject: jest.fn().mockResolvedValue(undefined),
+  deleteObjects: jest.fn().mockResolvedValue(undefined),
+}));
 let workspaces: TwoWorkspaces;
 
 beforeEach(async () => {
@@ -57,6 +76,112 @@ describe("settings", () => {
       select: { companyName: true },
     });
     expect(other.companyName).toBe("تعمیرگاه ب");
+  });
+});
+
+describe("data exports", () => {
+  // The table-driven checks cover the list and the delete. Three things they
+  // cannot: the download endpoint's shape, the guard against a second build,
+  // and — the one that matters — whether the workbook itself is scoped.
+  beforeEach(async () => {
+    await owner.customer.createMany({
+      data: [
+        { workspaceId: workspaces.a.workspaceId, name: "مشتری الف" },
+        { workspaceId: workspaces.b.workspaceId, name: "مشتری ب" },
+      ],
+    });
+  });
+
+  it("refuses to sign a download for another workspace's export", async () => {
+    const other = await owner.backup.create({
+      data: {
+        workspaceId: workspaces.b.workspaceId,
+        filename: "export-b.zip",
+        status: "ready",
+        filepath: `workspaces/${workspaces.b.workspaceId}/exports/b.zip`,
+      },
+      select: { id: true },
+    });
+
+    const res = await request(app)
+      .get(`/api/exports/${other.id}/download`)
+      .set("Authorization", `Bearer ${workspaces.a.token}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.url).toBeUndefined();
+  });
+
+  it("will not start a second build while one is pending", async () => {
+    await owner.backup.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        filename: "in-progress.zip",
+        status: "pending",
+      },
+    });
+
+    const res = await request(app)
+      .post("/api/exports")
+      .set("Authorization", `Bearer ${workspaces.a.token}`)
+      .send({ include_images: false });
+
+    expect(res.status).toBe(409);
+  });
+
+  it("ignores a pending row left behind by a dead build", async () => {
+    // Older than the staleness window, so nothing is going to finish it.
+    await owner.backup.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        filename: "abandoned.zip",
+        status: "pending",
+        createdAt: new Date(Date.now() - 31 * 60 * 1000),
+      },
+    });
+
+    const res = await request(app)
+      .post("/api/exports")
+      .set("Authorization", `Bearer ${workspaces.a.token}`)
+      .send({ include_images: false });
+
+    expect(res.status).toBe(202);
+    // The build starts on setImmediate; let it finish before the test ends,
+    // or it runs on into a torn-down environment.
+    // The build starts on setImmediate; let it finish before the test ends,
+    // or it runs on into a torn-down environment.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  });
+
+  it("builds a workbook holding only the caller's rows", async () => {
+    // Called directly rather than through the endpoint: the build runs after
+    // the response, so a request-level test would assert against a file that
+    // does not exist yet. The workspace context is opened the same way the
+    // background job opens it.
+    const workbook = await runWithWorkspace(workspaces.a.workspaceId, () =>
+      buildWorkbook(),
+    );
+
+    // Read back through ExcelJS rather than searched as bytes: xlsx is a zip,
+    // so the text is compressed and a substring check finds nothing.
+    const book = new ExcelJS.Workbook();
+    // Cast because exceljs's bundled types predate Buffer becoming generic in
+    // @types/node; the two are the same object at runtime.
+    await book.xlsx.load(
+      workbook as unknown as Parameters<typeof book.xlsx.load>[0],
+    );
+
+    const sheet = book.getWorksheet("مشتریان");
+    expect(sheet).toBeDefined();
+
+    // Column 1 is the name; `values` is 1-based with the header at index 1.
+    // `values` is 1-based and sparse — index 0 is unused and index 1 is the
+    // header — so the rows start at 2.
+    const names = (sheet!.getColumn(1).values as unknown[])
+      .slice(2)
+      .map((value) => String(value));
+
+    expect(names).toContain("مشتری الف");
+    expect(names).not.toContain("مشتری ب");
   });
 });
 

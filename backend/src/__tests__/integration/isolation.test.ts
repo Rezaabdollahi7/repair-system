@@ -198,6 +198,31 @@ const resources: Resource[] = [
     updatePath: (id) => `/api/repair-invoices/${id}/status`,
     updateBody: { status: "issued" },
   },
+  {
+    name: "exports",
+    path: "/api/exports",
+    create: async (workspaceId) => {
+      const row = await owner.backup.create({
+        // ready, not pending: a pending row is treated as a build in
+        // progress and refuses to be deleted, which would fail the delete
+        // check for the wrong reason.
+        data: {
+          workspaceId,
+          filename: `export-${workspaceId}.zip`,
+          status: "ready",
+          filepath: `workspaces/${workspaceId}/exports/test.zip`,
+        },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) => (await owner.backup.count({ where: { id } })) === 1,
+    // The single-row endpoint is /:id/download, which answers with a signed
+    // URL rather than the row, and there is no update: an export is built
+    // once and then only fetched or removed.
+    skipGetOne: true,
+    skipUpdate: true,
+  },
 ];
 
 let workspaces: TwoWorkspaces;

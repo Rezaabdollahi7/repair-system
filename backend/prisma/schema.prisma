@@ -609,12 +609,26 @@ model Settings {
   @@map("settings")
 }
 
+/// Rows here are per-workspace data exports, not platform backups: durability
+/// is a cron on the host (ops/backup-database.sh), deliberately outside the
+/// app. The table keeps its old name to avoid a rename migration that buys
+/// nothing.
 model Backup {
   id              Int      @id @default(autoincrement())
   workspaceId     Int      @map("workspace_id")
   filename        String
   sizeBytes       BigInt   @default(0) @map("size_bytes")
   includesUploads Boolean  @default(false) @map("includes_uploads")
+  /// pending until the background build finishes, then ready or failed. A row
+  /// left pending means the process died mid-build — recoverable by asking
+  /// for another export, and visible rather than silent.
+  status          String   @default("pending")
+  /// The object key, null until the upload succeeds. Signed per request like
+  /// every other object, never stored as a URL.
+  filepath        String?
+  /// Why it failed, for the operator. Shown to the workshop as a generic
+  /// message: the detail is a stack trace, not something a shop owner acts on.
+  error           String?
   createdBy       Int?     @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at")
 

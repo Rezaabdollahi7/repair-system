@@ -73,3 +73,18 @@ export function restoreWorkspaceContext(
 
   storage.run({ workspaceId }, () => next());
 }
+
+/**
+ * Opens a context for work that happens outside a request.
+ *
+ * The export builder runs after its response has been sent, so the store the
+ * request opened is gone by then — the same shape of problem multer causes,
+ * arriving from the other direction. Without this every query in the build
+ * would reach the extension with no workspace and throw.
+ *
+ * The workspace comes from the row the request already wrote under its own
+ * verified token, never from anything the caller supplied.
+ */
+export function runWithWorkspace<T>(workspaceId: number, fn: () => T): T {
+  return storage.run({ workspaceId }, fn);
+}

@@ -21,10 +21,19 @@ if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
 
 // Region is a formality for ArvanCloud: the endpoint decides where the data
 // lives. The SDK requires the field regardless.
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+
 const s3 = new S3Client({
   region: process.env.S3_REGION ?? "default",
   endpoint,
   credentials: { accessKeyId, secretAccessKey },
+  // Without these a stalled connection hangs forever: the export builder has
+  // no request to time out behind it, so a build could sit in `pending` with
+  // nothing to end it. Generous enough that a slow link still finishes.
+  requestHandler: new NodeHttpHandler({
+    connectionTimeout: 10_000,
+    requestTimeout: 60_000,
+  }),
 });
 
 export const BUCKET = bucket;
@@ -60,6 +69,14 @@ export function settingsImageKey(
   return `workspaces/${workspaceId}/settings/${filename}`;
 }
 
+/**
+ * Exports live under the same workspace prefix as everything else, so the
+ * one rule that keeps shops apart in object storage holds here too.
+ */
+export function exportKey(workspaceId: number, filename: string): string {
+  return `workspaces/${workspaceId}/exports/${filename}`;
+}
+
 export async function putObject(
   key: string,
   body: Buffer,
@@ -89,6 +106,30 @@ export function signedUrlFor(key: string): Promise<string> {
   return getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key }), {
     expiresIn: URL_TTL_SECONDS,
   });
+}
+
+/**
+ * Reads an object back into memory.
+ *
+ * Needed by the export builder, which has to put the bytes inside a zip
+ * rather than hand the browser a URL. Kept here rather than fetching a
+ * signed URL over HTTP: this module is the only one that knows the SDK, and
+ * a round trip through a presigned URL would be the same bytes over a longer
+ * path.
+ */
+export async function getObject(key: string): Promise<Buffer> {
+  const result = await s3.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+  );
+
+  if (!result.Body) {
+    throw new Error(`Object ${key} has no body`);
+  }
+
+  // transformToByteArray is the SDK's own helper; it consumes the stream in
+  // whichever form the runtime provides.
+  const bytes = await result.Body.transformToByteArray();
+  return Buffer.from(bytes);
 }
 
 /**

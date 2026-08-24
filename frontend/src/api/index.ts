@@ -64,6 +64,8 @@ import type {
   PurchaseReport,
   SaleReport,
   ProfitReport,
+  DataExport,
+  ExportCreateBody,
 } from "../types/api";
 
 /**
@@ -418,5 +420,14 @@ export const searchItemsForInvoice = (q: string) =>
 // Users - technicians only
 export const getTechnicians = () =>
   api.get<Personnel[]>("/personnel", { params: { role: "technician" } });
+
+// Data exports
+export const getExports = () => api.get<DataExport[]>("/exports");
+export const createExport = (data: ExportCreateBody) =>
+  api.post<DataExport>("/exports", data);
+export const getExportDownload = (id: Id) =>
+  api.get<{ url: string }>(`/exports/${id}/download`);
+export const deleteExport = (id: Id) =>
+  api.delete<MessageResponse>(`/exports/${id}`);
 
 export default api;

@@ -16,6 +16,7 @@ import {
   Cog6ToothIcon,
   ChartPieIcon,
   XMarkIcon,
+  ArrowDownTrayIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/solid";
 
@@ -94,9 +95,9 @@ export default function Layout() {
       adminOnly: true,
     },
     {
-      name: "پشتیبان‌گیری",
-      path: "/backups",
-      icon: ArchiveBoxIcon,
+      name: "خروجی اطلاعات",
+      path: "/exports",
+      icon: ArrowDownTrayIcon,
       adminOnly: true,
     },
     { divider: true },

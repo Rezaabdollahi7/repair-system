@@ -876,3 +876,26 @@ export interface DashboardStats {
 export type SettingsForm = Required<
   Omit<AppSettings, "id" | "created_at" | "updated_at">
 >;
+
+/**
+ * A per-workspace data export. Built in the background, so a freshly
+ * requested row is `pending` and the client polls until it turns `ready`.
+ *
+ * `error` is a generic Persian message when the build failed — the real
+ * cause is a stack trace in the server log, not something a workshop acts on.
+ */
+export interface DataExport {
+  id: number;
+  filename: string;
+  size_bytes: number;
+  includes_images: boolean;
+  status: "pending" | "ready" | "failed";
+  error: string | null;
+  created_by: number | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface ExportCreateBody {
+  include_images: boolean;
+}

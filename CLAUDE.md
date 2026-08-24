@@ -47,9 +47,12 @@ frontend/   React SPA (Vite)
 
 - `src/pages/` — one component per top-level page/route (Dashboard, DeviceList, CustomerList, etc.)
 - `src/components/` — shared/reusable components, including per-entity modals
-  (`*FormModal.jsx`, `*DetailModal.jsx`) following a consistent CRUD-modal pattern
+  (`*FormModal.tsx`, `*DetailModal.tsx`) following a consistent CRUD-modal pattern
 - `src/context/` — `AuthContext`, `ModalContext`, `ThemeContext`
-- `src/api/index.js` — centralized Axios API client
+- `src/api/index.ts` — centralized Axios API client
+- `src/types/api.ts` — response shapes, written from the controllers rather
+  than guessed. The API is deliberately inconsistent (snake_case mostly,
+  camelCase for items and categories) and these types mirror that
 - `src/utils/` — formatters and helpers (Jalali date handling included)
 
 ## Domain Model (current feature set)
@@ -84,8 +87,8 @@ converted at the application layer for display.
 express-rate-limit, Jest + ts-jest + supertest, pnpm.
 
 **Frontend:** React 19, Vite, React Router 7, Tailwind CSS 4, Axios,
-react-hot-toast, react-to-print, jalaali-js, pnpm. Still JavaScript, not yet
-TypeScript.
+react-hot-toast, react-to-print, jalaali-js, pnpm. TypeScript throughout,
+pinned to 5.9 — typescript-eslint 8 refuses to load against TS 7.
 
 ## SaaS Migration (in progress — branch `feature/multi-tenant-migration`)
 
@@ -102,6 +105,11 @@ business features**. Payment integration is the last phase and is explicitly out
 
 - **Shared database, shared schema.** No per-tenant schemas or separate databases.
 - Isolation is done via a `workspaceId` column on every tenant-scoped table.
+- **One table is deliberately not tenant-scoped: OTP codes (8.6).** A code is
+  sent to a phone number before any workspace exists, so there is nothing to
+  scope it by. It carries a `USING (true)` policy rather than no RLS at all,
+  so `rls-check.sql` shows it as intentional rather than forgotten. It holds
+  no tenant data — a phone number, a hashed code, an expiry.
 - **Postgres Row-Level Security (RLS)** enforces isolation at the database level, in addition to
   application-level filtering — defense in depth. Every query must set/scope by `workspaceId`.
   - Application-level filtering is implemented via a **Prisma Client Extension** (not Prisma
@@ -263,7 +271,9 @@ business features**. Payment integration is the last phase and is explicitly out
   anything is switched over — a dump missing those would restore the data and
   none of the isolation.
   - `ops/reset-password.sh` is the only way back in for a locked-out user until
-    SMS OTP (8.6). It shows the account first so the operator can read it back
+    SMS OTP (8.6). The SMS provider is **sms.ir**, bought and awaiting template
+    approval; the roadmap said Kavenegar before that decision was made.
+    It shows the account first so the operator can read it back
     to the caller, asks for the phone number twice, then sets a random password
     and deletes that user's refresh tokens — if the call was prompted by
     someone else being in the account, this cuts them off.
@@ -271,7 +281,9 @@ business features**. Payment integration is the last phase and is explicitly out
   says to ring the registered number rather than answering an incoming call:
   that is the only step that proves anything, and everything else is
   supporting evidence.
-- **Object storage**: ArvanCloud (not yet provisioned).
+- **Object storage**: ArvanCloud, bucket `reza-app-test-1` — a test bucket.
+  Production needs its own, with a lifecycle rule on `workspaces/*/exports/`
+  since data exports otherwise accumulate forever (7.8).
 - **Docker**: used for both development and production. Prefer docker-compose for local dev;
   production should also run containerized (a reverse proxy such as Nginx/Caddy is expected but
   not yet decided in detail).
@@ -294,6 +306,8 @@ business features**. Payment integration is the last phase and is explicitly out
 ### Still planned
 
 - **react-hook-form** — frontend forms
+- **Vitest** — the frontend has no automated tests at all; TypeScript is its
+  only check, and it verifies shape rather than behaviour
 
 ## Working Conventions
 

@@ -87,8 +87,9 @@ workspace.
 - [x] 5.3 Per-workspace data export: customers, devices, items and invoices as an Excel workbook plus a zip of that workspace's device images. Generated on demand, scoped by workspaceId, never a SQL dump — a dump is unreadable to a workshop owner and risks leaking schema or other tenants' rows.
       Built in the background and recorded in the `backups` table, which gains `status`, `filepath` and `error`. `/api/exports` replaces the 501 stubs at `/api/backups`, which stay until 5.4 retires the page that calls them
 - [x] 5.4 Rework `BackupList.jsx` into an export page: request an export, see past exports, download. No restore button.
+      Now `ExportList.tsx` at `/exports`; the 501 stubs at `/api/backups` and their controller are removed
 - [x] 5.5 Write an operator runbook for restoring a single workspace from a platform dump. A manual, support-mediated procedure rather than a feature — selectively replacing one tenant's rows in a shared schema while others are live is too dangerous to expose.
-- [ ] 5.6 Fineti import: give `importFromExcel` and `importDeviceImages` a `--workspace-id` parameter so they can onboard a customer migrating from Fineti. Stays an operator-run script; wrap it in an admin UI only if it turns out to be frequent.
+- [~] 5.6 Fineti import: give `importFromExcel` and `importDeviceImages` a `--workspace-id` parameter so they can onboard a customer migrating from Fineti. Stays an operator-run script; wrap it in an admin UI only if it turns out to be frequent.
 - [x] 5.7 Operator recovery: a documented procedure for restoring access to a workspace whose owner is locked out — a runbook plus, if it proves frequent, a script keyed on workspaceId. The old resetAdmin script is not the basis for this: it only ever knew one hardcoded username, which stops existing once each workspace has its own super admin. Password self-service for customers is task 8.6 (SMS OTP).
 
 ## Frontend TypeScript Migration (done, outside the phase numbering)
@@ -126,6 +127,32 @@ code written with `any` does not get revisited.
 - [ ] 6.3 Unit tests specifically for tenant-isolation (see 2.7) and auth (token issuance/refresh/expiry)
 - [x] 6.4 (Later, optional) Integration tests against a real test Postgres database
 
+## Phone Verification (before phase 7)
+
+Pulled out of 8.6 and ahead of deployment. Sign-up today is an open endpoint
+with nothing but a rate limiter between it and unlimited tenants, and every
+"I forgot my password" is a phone call to an operator. Both stop being
+acceptable the day `app.dofixo.ir` is public.
+
+**Provider is sms.ir**, bought, with a verify template awaiting approval.
+Kavenegar was the plan before that decision.
+
+- [ ] OTP.1 `otp_codes` table: phone, hashed code, expiry, attempt count.
+      Deliberately not tenant-scoped — a code is sent before any workspace
+      exists. Carries a `USING (true)` policy so `rls-check.sql` reads it as
+      intentional rather than missed
+- [ ] OTP.2 An sms.ir client behind a driver interface, with a `console`
+      driver for development: testing sign-up should not cost money or need
+      a real handset
+- [ ] OTP.3 `POST /auth/send-otp` with limits on both the phone number and
+      the IP. Every message costs money, and an endpoint without a ceiling
+      is a way to empty the SMS account
+- [ ] OTP.4 Sign-up requires a verified code before a workspace is created
+- [ ] OTP.5 Password reset through OTP, retiring the phone call in
+      `ops/reset-password.md`. The script stays for the case where someone
+      has lost the number itself
+- [ ] OTP.6 Frontend: the code step on sign-up, and a "forgot password" flow
+
 ## Phase 7 — Dockerization & Deployment
 
 - [ ] 7.1 Write production `Dockerfile` for backend
@@ -149,7 +176,9 @@ Not being built yet — sequenced last on purpose. Revisit together when ready.
 - [ ] 8.3 Implement read-only enforcement once a subscription/trial lapses (middleware that blocks writes but allows reads)
 - [ ] 8.4 Zibal payment gateway integration (checkout, callback/webhook, plan activation)
 - [ ] 8.5 Plan selection UI (monthly / 3-month / 6-month / annual — same features, different price/duration)
-- [ ] 8.6 Kavenegar SMS integration for phone verification (sign-up OTP, and/or password reset)
+- [~] 8.6 Moved out of this phase — see "Phone Verification" below. It is a
+  deployment prerequisite, not a billing feature: sign-up is an open
+  endpoint until it exists
 
 ## Phase 9 — UI Consolidation (after the migration settles)
 
@@ -160,11 +189,8 @@ so a screen that breaks has one obvious cause rather than three.
 - [ ] 9.2 Move the profit summary onto the dashboard and retire the profit report page, where it currently goes unseen
 - [ ] 9.3 Let the purchase invoice form create a complete item inline. It creates a reduced one today, so the same catalogue has two entry points with different results
 - [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price. It currently returns the stock but leaves the average untouched, so it drifts — a weighted average can't be reversed from the invoice alone. Either recompute from that item's full purchase history, or stop allowing deletion and record a return invoice instead, which is what accounting practice would do.
-- [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement, column choice and print styling, replacing the pile of `sale_invoice_show_*` booleans in settings. Numbering is deliberately not part of this — a number is accounting data and should stay boring; this is about what the customer actually sees
-- [ ] 9.5 ... Also: PersianDatePicker accepts `className`, `required` and
-      `clearable` and reads none of them, and several modals accept a
-      `zIndex` they never apply — both are layout concerns that belong with
-      this work rather than scattered across a bug list
+- [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement, column choice and print styling, replacing the pile of `sale_invoice_show_*` booleans in settings. Numbering is deliberately not part of this — a number is accounting data and should stay boring; this is about what the customer actually sees.
+      Also: PersianDatePicker accepts `className`, `required` and `clearable` and reads none of them, and several modals accept a `zIndex` they never apply — layout concerns that belong here rather than scattered across a bug list
 - [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8 fixed the prefixes per invoice kind. Touches the schema, the settings form and the response shape, so it belongs with the other frontend work
 
 ## Phase 10 — Frontend Bug Fixes

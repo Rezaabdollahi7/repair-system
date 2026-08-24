@@ -141,7 +141,7 @@ Kavenegar was the plan before that decision.
       Deliberately not tenant-scoped — a code is sent before any workspace
       exists. Carries a `USING (true)` policy so `rls-check.sql` reads it as
       intentional rather than missed
-- [ ] OTP.2 An sms.ir client behind a driver interface, with a `console`
+- [x] OTP.2 An sms.ir client behind a driver interface, with a `console`
       driver for development: testing sign-up should not cost money or need
       a real handset
 - [ ] OTP.3 `POST /auth/send-otp` with limits on both the phone number and

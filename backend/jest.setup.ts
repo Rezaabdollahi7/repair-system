@@ -13,3 +13,9 @@ process.env.S3_ENDPOINT ??= "https://s3.example.invalid";
 process.env.S3_BUCKET ??= "dofixo-test";
 process.env.S3_ACCESS_KEY ??= "test-key";
 process.env.S3_SECRET_KEY ??= "test-secret";
+// Same again for lib/sms. No suite imports it yet, so nothing fails today —
+// but the moment authController does (OTP.3), every suite that mounts app.ts
+// would die at import with an error naming an SMS variable, which reads as
+// anything but the missing line here.
+process.env.SMS_API_KEY ??= "test-key";
+process.env.SMS_TEMPLATE_ID ??= "123456";

@@ -137,7 +137,7 @@ acceptable the day `app.dofixo.ir` is public.
 **Provider is sms.ir**, bought, with a verify template awaiting approval.
 Kavenegar was the plan before that decision.
 
-- [ ] OTP.1 `otp_codes` table: phone, hashed code, expiry, attempt count.
+- [x] OTP.1 `otp_codes` table: phone, hashed code, expiry, attempt count.
       Deliberately not tenant-scoped — a code is sent before any workspace
       exists. Carries a `USING (true)` policy so `rls-check.sql` reads it as
       intentional rather than missed

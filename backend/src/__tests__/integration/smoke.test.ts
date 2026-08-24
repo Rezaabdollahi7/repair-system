@@ -37,26 +37,62 @@ describe("integration plumbing", () => {
     expect(role).toBe("dofixo_app");
   });
 
-  it("has row-level security enabled on the test database", async () => {
-    // Counted against the tables rather than pinned to a number: a hard 19
-    // has to be edited every time a model is added, and the edit is easy to
-    // make without checking whether the policy was actually written.
-    const result = await owner.$queryRaw<
-      {
-        tables: bigint;
-        policies: bigint;
-      }[]
-    >`
-      SELECT
-        (SELECT count(*) FROM information_schema.columns
-          WHERE table_schema = 'public' AND column_name = 'workspace_id')
-          AS tables,
-        (SELECT count(*) FROM pg_policies WHERE schemaname = 'public')
-          AS policies
+  // Two questions instead of one arithmetic identity. Counting policies
+  // against tables held while every table was tenant-scoped; otp_codes is
+  // not, so the sum now needs a second exception and a reader has to work
+  // out which term each one belongs to. These ask directly, and each names
+  // the table it is unhappy about instead of reporting a number that is off
+  // by one.
+  it("leaves no tenant-scoped table unprotected", async () => {
+    const unprotected = await owner.$queryRaw<{ relname: string }[]>`
+      SELECT c.relname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind = 'r'
+        AND EXISTS (
+          SELECT 1 FROM information_schema.columns col
+          WHERE col.table_schema = 'public'
+            AND col.table_name = c.relname
+            AND col.column_name = 'workspace_id'
+        )
+        AND (
+          NOT c.relrowsecurity
+          OR NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+        )
+      ORDER BY c.relname
     `;
 
-    // Every tenant-scoped table, plus workspaces itself.
-    expect(Number(result[0].policies)).toBe(Number(result[0].tables) + 1);
+    expect(unprotected.map((row) => row.relname)).toEqual([]);
+  });
+
+  it("shares only the tables that were chosen to be shared", async () => {
+    // The mirror image, which the query above cannot see: a table with no
+    // workspace_id is invisible to it, so one added by accident would pass
+    // in silence. Four are expected, each for its own reason — the tenant
+    // itself, reference data, Prisma's bookkeeping, and codes sent before
+    // any workspace exists (OTP.1).
+    const shared = await owner.$queryRaw<{ relname: string }[]>`
+      SELECT c.relname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind = 'r'
+        AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns col
+          WHERE col.table_schema = 'public'
+            AND col.table_name = c.relname
+            AND col.column_name = 'workspace_id'
+        )
+      ORDER BY c.relname
+    `;
+
+    expect(shared.map((row) => row.relname)).toEqual([
+      "_prisma_migrations",
+      "otp_codes",
+      "roles",
+      "workspaces",
+    ]);
   });
 
   it("seeds two workspaces that can be told apart", async () => {

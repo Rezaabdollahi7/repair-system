@@ -27,6 +27,37 @@ WHERE n.nspname = 'public'
   )
 ORDER BY c.relname;
 
+-- Part 1b — the mirror image: tables with NO workspace_id.
+-- Part 1 cannot see these, so a table that is shared by accident would pass
+-- it silently. Read this list rather than counting rows — four are expected,
+-- and each for a different reason:
+--
+--   workspaces           the tenant itself, scoped by its own id
+--   roles                reference data, identical for every workspace
+--   _prisma_migrations   not application data; dofixo_app has no grant on it
+--   otp_codes            a code is sent before a workspace exists (OTP.1)
+--
+-- A fifth name appearing here is the thing this query exists to catch.
+SELECT
+  c.relname AS "table without workspace_id",
+  c.relrowsecurity AS "rls on",
+  COALESCE(
+    (SELECT string_agg(p.polname, ', ') FROM pg_policy p WHERE p.polrelid = c.oid),
+    '(none)'
+  ) AS "policies"
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relkind = 'r'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns col
+    WHERE col.table_schema = 'public'
+      AND col.table_name = c.relname
+      AND col.column_name = 'workspace_id'
+  )
+ORDER BY c.relname;
+
 -- Part 2 — probe data, inserted as the owner, which bypasses RLS.
 -- Fixed ids well above anything the sequences have reached, so they can be
 -- referenced literally below.

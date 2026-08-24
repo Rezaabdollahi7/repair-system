@@ -40,6 +40,13 @@ enum WorkspaceStatus {
   @@map("workspace_status")
 }
 
+enum OtpPurpose {
+  register
+  reset
+
+  @@map("otp_purpose")
+}
+
 // ── Tenancy ──────────────────────────────────────────────────
 
 // A repair shop. No slug: the app is served from one shared domain, so a
@@ -163,6 +170,55 @@ model RefreshToken {
   // Serves both "revoke every session this user has" and the expiry sweep.
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+// ── Phone verification ───────────────────────────────────────
+
+// The only table in the schema without a workspaceId, and deliberately so:
+// a code is sent to a phone number before any workspace exists, so there is
+// nothing to scope it by. It holds no tenant data — a phone number, a hash,
+// an expiry and two counters. It carries a `USING (true)` policy rather than
+// no RLS, so prisma/rls-check.sql reads it as intentional (see part 1b there).
+model OtpCode {
+  id      Int        @id @default(autoincrement())
+  phone   String
+  // Required, because the two purposes have opposite preconditions: for
+  // `register` the phone must NOT already exist, for `reset` it must. A
+  // single-purpose code would let one flow's message be spent on the other.
+  purpose OtpPurpose
+
+  // SHA-256 of the five-digit code.
+  //
+  // Be clear about what this does and does not buy: five digits is a hundred
+  // thousand possibilities and the hash is unsalted, so anyone holding a
+  // database dump can build the whole rainbow table in seconds. It is not
+  // what makes this safe. The actual defences are the three-minute lifetime,
+  // the three-attempt ceiling, and single use — do not remove any of them on
+  // the reasoning that the column is hashed.
+  //
+  // Not unique, unlike refresh_tokens.token_hash: two people can legitimately
+  // be sent the same five digits, and lookup is by phone + purpose anyway.
+  codeHash String @map("code_hash")
+
+  expiresAt DateTime @map("expires_at")
+  // Burns the row at three. Checked alongside expiry and consumption, so a
+  // code that ran out of attempts is dead even while it is still in date.
+  attempts  Int      @default(0)
+  // Set when the code is spent, and also when a newer code supersedes it:
+  // re-sending invalidates whatever came before, so only ever one live code
+  // exists per phone and purpose.
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  // Finds the live code for a phone, and — with phone as the leading column —
+  // also serves the hourly send count.
+  @@index([phone, purpose, createdAt(sort: Desc)])
+  // For the sweep. Rows are removed by age, NOT by expiry: a code expires
+  // after three minutes but has to keep counting against the hourly send
+  // limit for an hour. Sweeping on expires_at would silently disable that
+  // limit while looking like ordinary housekeeping.
+  @@index([createdAt])
+  @@map("otp_codes")
 }
 
 // ── Customers & devices ──────────────────────────────────────

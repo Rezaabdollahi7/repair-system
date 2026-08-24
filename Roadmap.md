@@ -144,7 +144,7 @@ Kavenegar was the plan before that decision.
 - [x] OTP.2 An sms.ir client behind a driver interface, with a `console`
       driver for development: testing sign-up should not cost money or need
       a real handset
-- [ ] OTP.3 `POST /auth/send-otp` with limits on both the phone number and
+- [x] OTP.3 `POST /auth/send-otp` with limits on both the phone number and
       the IP. Every message costs money, and an endpoint without a ceiling
       is a way to empty the SMS account
 - [ ] OTP.4 Sign-up requires a verified code before a workspace is created

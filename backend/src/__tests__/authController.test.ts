@@ -9,6 +9,7 @@ import {
   runWithRequestContext,
 } from "../lib/workspaceContext";
 import { JWT_SECRET } from "../middleware/auth";
+import { SmsError, sendVerificationCode } from "../lib/sms";
 
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
@@ -27,9 +28,39 @@ jest.mock("../lib/prisma", () => ({
       updateMany: jest.fn(),
       deleteMany: jest.fn(),
     },
+    // Exempt from the extension's workspace guard (see UNSCOPED_MODELS in
+    // lib/prisma): a code is sent before any workspace exists.
+    otpCode: {
+      count: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+      deleteMany: jest.fn(),
+    },
   },
   runInNewWorkspaceTransaction: jest.fn(),
 }));
+
+// Mocked so no test can reach sms.ir. Every assertion below about "no message
+// was sent" is only worth anything because this mock records the calls.
+jest.mock("../lib/sms", () => {
+  class SmsError extends Error {
+    providerStatus: number | null;
+    constructor(message: string, providerStatus: number | null) {
+      super(message);
+      this.name = "SmsError";
+      this.providerStatus = providerStatus;
+    }
+  }
+
+  return {
+    __esModule: true,
+    sendVerificationCode: jest.fn(),
+    SmsError,
+    SMS_STATUS: { SUCCESS: 1, BLACKLISTED: 115, CREDIT_EXHAUSTED: 102 },
+  };
+});
 
 // Mocked separately from the controller: what a new workspace is furnished
 // with is its own concern, covered in newWorkspace.test.ts. These tests are
@@ -43,7 +74,10 @@ const db = prisma as unknown as {
   $queryRaw: jest.Mock;
   user: Record<string, jest.Mock>;
   refreshToken: Record<string, jest.Mock>;
+  otpCode: Record<string, jest.Mock>;
 };
+
+const sendSms = sendVerificationCode as unknown as jest.Mock;
 
 const runInNewWorkspace = runInNewWorkspaceTransaction as unknown as jest.Mock;
 const populate = populateWorkspace as unknown as jest.Mock;
@@ -584,5 +618,158 @@ describe("authController.logout", () => {
 
     expect(res.clearCookie).toHaveBeenCalled();
     expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendOtp", () => {
+  function otpRequest(phone: string, purpose: "register" | "reset") {
+    return { valid: { body: { phone, purpose } } } as unknown as Request;
+  }
+
+  beforeEach(() => {
+    db.otpCode.count.mockResolvedValue(0);
+    db.otpCode.deleteMany.mockResolvedValue({ count: 0 });
+    db.otpCode.updateMany.mockResolvedValue({ count: 0 });
+    db.otpCode.create.mockResolvedValue({ id: 1 });
+    db.otpCode.delete.mockResolvedValue({ id: 1 });
+    sendSms.mockResolvedValue({ messageId: 1, cost: 1 });
+  });
+
+  // The three tests below all assert the same thing from different angles:
+  // that no message left the building. Each of these paths costs real money
+  // if it regresses, and none of them would fail loudly — the endpoint would
+  // go on answering 200 while quietly spending the SMS account.
+  it("rejects a number that already exists, before sending anything", async () => {
+    db.$queryRaw.mockResolvedValue([{ id: 1, workspace_id: 2 }]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(sendSms).not.toHaveBeenCalled();
+  });
+
+  it("answers reset for an unknown number with success and no message", async () => {
+    // The costly one. Answering honestly would be no worse for privacy —
+    // register already discloses the same fact — but it would turn this
+    // endpoint into a way to text any number in the country at our expense.
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "reset"), res);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.any(String) }),
+    );
+    expect(res.status).not.toHaveBeenCalledWith(404);
+    expect(sendSms).not.toHaveBeenCalled();
+    expect(db.otpCode.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a fourth request in the hour", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+    db.otpCode.count.mockResolvedValue(3);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(sendSms).not.toHaveBeenCalled();
+  });
+
+  it("counts against the phone across both purposes", async () => {
+    // Deliberately not keyed on purpose as well: what is rationed is messages
+    // to that handset, and asking for the other kind of code must not buy a
+    // second allowance.
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    const where = db.otpCode.count.mock.calls[0][0].where;
+    expect(where.phone).toBe("09123456789");
+    expect(where.purpose).toBeUndefined();
+  });
+
+  it("sweeps by created_at, never by expiry", async () => {
+    // The subtlest thing in this endpoint. A code dies after three minutes
+    // but has to keep counting towards the hourly ceiling for a full hour —
+    // sweeping on expires_at would disable the limit while reading as
+    // ordinary housekeeping.
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    const where = db.otpCode.deleteMany.mock.calls[0][0].where;
+    expect(where.createdAt).toBeDefined();
+    expect(where.expiresAt).toBeUndefined();
+  });
+
+  it("invalidates the previous code for that phone and purpose", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    expect(db.otpCode.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          phone: "09123456789",
+          purpose: "register",
+          consumedAt: null,
+        }),
+      }),
+    );
+  });
+
+  it("stores a hash, never the code, and sends the code itself", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    const [, code] = sendSms.mock.calls[0];
+    expect(code).toMatch(/^\d{5}$/);
+
+    const stored = db.otpCode.create.mock.calls[0][0].data;
+    expect(stored.codeHash).toHaveLength(64);
+    expect(stored.codeHash).not.toContain(code);
+  });
+
+  it("deletes the row when the message fails to send", async () => {
+    // Left behind, it would count against the caller's hourly allowance for
+    // a code they never received — three failures and they are locked out of
+    // an account they can still prove they own.
+    db.$queryRaw.mockResolvedValue([]);
+    sendSms.mockRejectedValue(new SmsError("credit exhausted", 102));
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    expect(db.otpCode.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(res.status).toHaveBeenCalledWith(502);
+  });
+
+  it("tells the user only about the failure they can act on", async () => {
+    // Blacklisted is theirs; credit, key and template are ours, and inviting
+    // a shop owner to retry those wastes their afternoon.
+    db.$queryRaw.mockResolvedValue([]);
+    sendSms.mockRejectedValue(new SmsError("blacklisted", 115));
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("never returns the code, the expiry or the remaining allowance", async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.sendOtp(otpRequest("09123456789", "register"), res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(Object.keys(body)).toEqual(["message"]);
   });
 });

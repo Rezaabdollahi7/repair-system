@@ -48,10 +48,28 @@ function setWorkspace(workspaceId: number) {
  * land on different connections from the pool and the policy would see
  * nothing.
  */
+/**
+ * Models that carry no workspace_id and are therefore exempt from the check
+ * below. Exactly one today, and it should stay that way: adding a name here
+ * takes a table out from under the context rule, so it needs the same
+ * justification a fourth SECURITY DEFINER function would.
+ *
+ * OtpCode: a verification code is sent to a phone number before any
+ * workspace exists, so there is nothing to scope it by. Its RLS policy is
+ * `USING (true)` — deliberately shared, not unprotected (OTP.1).
+ */
+const UNSCOPED_MODELS = new Set(["OtpCode"]);
+
 const prisma = basePrisma.$extends({
   query: {
     $allModels: {
-      async $allOperations({ args, query }) {
+      async $allOperations({ model, args, query }) {
+        // Straight through, with no set_config and no transaction: there is
+        // no id to set, and the policy does not read one.
+        if (UNSCOPED_MODELS.has(model)) {
+          return query(args);
+        }
+
         const workspaceId = currentWorkspaceId();
 
         // Fails loudly rather than letting RLS answer with an empty result.

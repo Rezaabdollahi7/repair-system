@@ -10,7 +10,7 @@ import { z } from "zod";
  * rely on for search, so widening it would change behaviour well beyond
  * this field.
  */
-function toEnglishDigits(value: string): string {
+export function toEnglishDigits(value: string): string {
   return value.replace(/[۰-۹٠-٩]/g, (digit) => {
     const code = digit.charCodeAt(0);
     return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
@@ -51,6 +51,34 @@ function normalizePhone(value: unknown): unknown {
 export const phoneSchema = z.preprocess(
   normalizePhone,
   z.string().regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: ۰۹۱۲۳۴۵۶۷۸۹)"),
+);
+
+/**
+ * Which flow the code is for. Required, not defaulted, because the two have
+ * opposite preconditions: `register` needs the number to be unused, `reset`
+ * needs it to exist. A code issued for one and spent on the other would let
+ * an unverified number reach a password reset.
+ */
+export const otpPurposeSchema = z.enum(["register", "reset"], {
+  message: "نوع درخواست معتبر نیست",
+});
+
+export const sendOtpSchema = z.object({
+  phone: phoneSchema,
+  purpose: otpPurposeSchema,
+});
+
+export type SendOtpBody = z.infer<typeof sendOtpSchema>;
+
+/**
+ * Five digits as typed, leading zero included — the code is generated with
+ * padStart, so 00042 is a code like any other. Not coerced to a number,
+ * which would eat that zero.
+ */
+export const otpCodeSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" ? toEnglishDigits(value.trim()) : value,
+  z.string().regex(/^\d{5}$/, "کد باید پنج رقم باشد"),
 );
 
 const password = z

@@ -9,6 +9,14 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage, isUniqueConstraintError } from "../utils/errors";
 import { populateWorkspace } from "../utils/newWorkspace";
 import { setContextWorkspaceId } from "../lib/workspaceContext";
+import { SmsError, SMS_STATUS, sendVerificationCode } from "../lib/sms";
+import {
+  OTP_SEND_LIMIT,
+  OTP_SEND_WINDOW_MS,
+  generateOtpCode,
+  hashOtpCode,
+  otpExpiry,
+} from "../utils/otp";
 import {
   ACCESS_TOKEN_TTL,
   REFRESH_COOKIE_NAME,
@@ -21,6 +29,7 @@ import type {
   ChangePasswordBody,
   LoginBody,
   RegisterBody,
+  SendOtpBody,
 } from "../schemas/auth";
 
 // Includes the password hash because login has to compare against it. Every
@@ -128,6 +137,124 @@ async function issueSession(
   res.cookie(REFRESH_COOKIE_NAME, token, refreshCookieOptions(expiresAt));
   return issueAccessToken(user);
 }
+
+// POST /api/auth/send-otp
+export const sendOtp = async (req: Request, res: Response) => {
+  try {
+    const { phone, purpose } = (req as ValidatedRequest).valid
+      .body as SendOtpBody;
+
+    // Through app_login_lookup, the same aperture login uses: no workspace is
+    // known here either. Only whether a row came back is used — the aperture
+    // is not widened, and the four columns it already returns are enough.
+    const [existing] = await prisma.$queryRaw<LoginCandidate[]>`
+      SELECT * FROM app_login_lookup(${phone})
+    `;
+
+    // The two purposes have opposite preconditions, which is why `purpose` is
+    // required rather than inferred.
+    if (purpose === "register" && existing) {
+      // Told plainly, not hidden: register already answers 409 for a taken
+      // number, so concealing it here would protect nothing while letting
+      // someone fill in the whole form and pay for a message before finding
+      // out.
+      return res
+        .status(409)
+        .json({ error: "این شماره موبایل قبلاً ثبت شده است" });
+    }
+
+    const sent = { message: "کد تأیید برای شما ارسال شد" };
+
+    if (purpose === "reset" && !existing) {
+      // Success, and no message. Not for privacy — the register path above
+      // reveals the same fact — but for cost: without this, the endpoint is a
+      // way to send SMS to any number in the country at our expense.
+      return res.json(sent);
+    }
+
+    const windowStart = new Date(Date.now() - OTP_SEND_WINDOW_MS);
+
+    // Counted on the phone number alone, across both purposes: what is being
+    // rationed is messages to that handset, and it does not get a second
+    // allowance by asking for the other kind of code.
+    const recent = await prisma.otpCode.count({
+      where: { phone, createdAt: { gt: windowStart } },
+    });
+
+    if (recent >= OTP_SEND_LIMIT) {
+      return res.status(429).json({
+        error: "تعداد درخواست کد بیش از حد مجاز است. یک ساعت دیگر تلاش کنید",
+      });
+    }
+
+    // Housekeeping while we are here, like the refresh sweep — no cron for a
+    // table this small. By created_at, NOT expires_at: a code dies after
+    // three minutes but has to keep counting against the ceiling above for an
+    // hour, and sweeping on expiry would quietly disable it while looking
+    // like ordinary tidying.
+    await prisma.otpCode.deleteMany({
+      where: { createdAt: { lt: windowStart } },
+    });
+
+    // Asking again invalidates whatever came before, so only one code per
+    // phone and purpose is ever live. Otherwise a code the user abandoned
+    // stays usable for its full three minutes alongside the one they are
+    // reading off their screen.
+    await prisma.otpCode.updateMany({
+      where: { phone, purpose, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+
+    const code = generateOtpCode();
+
+    const record = await prisma.otpCode.create({
+      data: {
+        phone,
+        purpose,
+        codeHash: hashOtpCode(code),
+        expiresAt: otpExpiry(),
+      },
+      select: { id: true },
+    });
+
+    try {
+      await sendVerificationCode(phone, code);
+    } catch (error) {
+      // The row goes: no message was delivered, so it must not sit there
+      // counting against an allowance the caller never spent. Deleted rather
+      // than marked consumed, which would leave it in the hourly count.
+      await prisma.otpCode.delete({ where: { id: record.id } });
+
+      // The code is never logged, on this path or any other: three minutes is
+      // long enough for anyone with log access to use it.
+      console.error("send-otp failed:", errorMessage(error));
+
+      if (
+        error instanceof SmsError &&
+        error.providerStatus === SMS_STATUS.BLACKLISTED
+      ) {
+        // The one provider failure the user can act on — every other status
+        // is our credit, our key or our template, and telling a shop owner
+        // about those only invites them to retry something that cannot work.
+        return res.status(400).json({
+          error: "ارسال پیامک به این شماره ممکن نیست. با پشتیبانی تماس بگیرید",
+        });
+      }
+
+      return res
+        .status(502)
+        .json({ error: "ارسال پیامک ناموفق بود. دوباره تلاش کنید" });
+    }
+
+    // Nothing but the message. Not the expiry, which the form counts down on
+    // its own, and not how much of the allowance is left — that would tell
+    // whoever is probing exactly where the ceiling is.
+    res.json(sent);
+  } catch (error) {
+    console.error("send-otp error:", errorMessage(error));
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
 
 // POST /api/auth/register
 export const register = async (req: Request, res: Response) => {

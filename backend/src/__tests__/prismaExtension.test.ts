@@ -34,10 +34,40 @@ describe("the Prisma client extension", () => {
       /runInWorkspaceTransaction/,
     );
   });
-
   it("takes the workspace as an argument rather than from the context", () => {
     // The helper runs on the unextended client, so it can't read the async
     // context — the caller passes the workspace from the verified token.
     expect(runInWorkspaceTransaction).toHaveLength(2);
+  });
+
+  // OtpCode is the one model exempt from the guard: a verification code is
+  // sent before any workspace exists (OTP.1), so there is no id to demand.
+  describe("the OtpCode exemption", () => {
+    it("lets otpCode through without a workspace", async () => {
+      // Asserted as "not the guard" rather than "succeeds": with the
+      // exemption in place the query reaches the driver, and the connection
+      // string here is a throwaway, so it fails at the socket instead. Any
+      // error EXCEPT the guard's is what this test is looking for.
+      await expect(prisma.otpCode.findMany()).rejects.not.toThrow(
+        /No workspace context/,
+      );
+    });
+
+    it("exempts otpCode alone", async () => {
+      // The half that matters more. A predicate written slightly wrong —
+      // inverted, or matching a prefix — would take every model out from
+      // under the guard, and nothing else in this suite would notice,
+      // because a query that no longer throws simply returns rows.
+      await expect(prisma.otpCode.count()).rejects.not.toThrow(
+        /No workspace context/,
+      );
+
+      await expect(prisma.customer.findMany()).rejects.toThrow(
+        /No workspace context/,
+      );
+      await expect(prisma.refreshToken.findMany()).rejects.toThrow(
+        /No workspace context/,
+      );
+    });
   });
 });

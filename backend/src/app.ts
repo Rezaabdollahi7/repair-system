@@ -47,6 +47,11 @@ app.use(requestContext);
 // traffic patterns are known.
 const apiLimitMax = Number(process.env.RATE_LIMIT_API ?? 1000);
 const loginLimitMax = Number(process.env.RATE_LIMIT_LOGIN ?? 10);
+// Deliberately three per hour rather than per fifteen minutes: this is the
+// same ceiling the otp_codes table enforces per phone number, and two limits
+// on the same action disagreeing about their window is a support call nobody
+// can answer.
+const otpLimitMax = Number(process.env.RATE_LIMIT_OTP ?? 3);
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -72,10 +77,34 @@ const loginLimiter = rateLimit({
   },
 });
 
+/**
+ * A separate bucket from login, not the same limiter reused.
+ *
+ * Every message costs money, so this is the one endpoint where the limit
+ * protects a bank balance rather than a password. Sharing login's bucket
+ * would also mean ten bad password attempts locked a stranger out of signing
+ * up from the same café wifi.
+ *
+ * This is the IP half only. The phone-number half lives in otp_codes, and
+ * both are needed: an IP limit alone lets a botnet spend the SMS account,
+ * and a phone limit alone lets one host walk through a list of numbers.
+ */
+const otpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: otpLimitMax,
+  skip: () => otpLimitMax === 0,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "تعداد درخواست کد بیش از حد مجاز است. بعداً دوباره تلاش کنید",
+  },
+});
+
 app.use("/api/auth/login", loginLimiter);
-// Sign-up gets the same tight limit: until SMS verification exists (8.6),
-// nothing else stands between an open endpoint and unlimited tenants.
+// Sign-up keeps the tight limit even now that OTP.4 puts a verified code in
+// front of it: the code is the identity check, this is the volume one.
 app.use("/api/auth/register", loginLimiter);
+app.use("/api/auth/send-otp", otpLimiter);
 app.use("/api", apiLimiter);
 app.use("/api", routes);
 

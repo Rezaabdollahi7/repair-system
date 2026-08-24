@@ -6,10 +6,15 @@ import {
   changePasswordSchema,
   loginSchema,
   registerSchema,
+  sendOtpSchema,
 } from "../schemas/auth";
 
 const router = express.Router();
 
+// No authenticate: the caller has no account yet, or cannot get into the one
+// they have. Its own rate limiter is mounted in app.ts — a separate bucket
+// from login, because this one guards a bank balance rather than a password.
+router.post("/send-otp", validate({ body: sendOtpSchema }), ctrl.sendOtp);
 router.post("/register", validate({ body: registerSchema }), ctrl.register);
 router.post("/login", validate({ body: loginSchema }), ctrl.login);
 // No authenticate on either: both are reached with an expired access token,

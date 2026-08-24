@@ -310,3 +310,62 @@ describe("personnel", () => {
     expect(res.body.id).toBe(workspaces.a.userId);
   });
 });
+
+// otp_codes is here rather than in isolation.test.ts because it is not a
+// tenant-scoped resource and the table-driven suite there has nothing to say
+// about it: there is no workspace to be denied from.
+//
+// What is worth proving is the opposite of everything else in these files —
+// that the sharing is real and deliberate. A future migration that "fixes"
+// this table by adding a workspace_id and a real policy would break sign-up
+// for every new customer, because a code is sent before a workspace exists.
+describe("otp_codes is deliberately shared", () => {
+  it("is readable with no workspace context at all", async () => {
+    // Every other table answers this with zero rows. This one has to answer
+    // with the row, or send-otp cannot look up what it just wrote.
+    await owner.otpCode.create({
+      data: {
+        phone: "09120000009",
+        purpose: "register",
+        codeHash: "a".repeat(64),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    const found = await prisma.otpCode.findMany({
+      where: { phone: "09120000009" },
+    });
+
+    expect(found).toHaveLength(1);
+  });
+
+  it("carries RLS with a permissive policy, not no RLS", async () => {
+    // The distinction the whole design rests on: both behave identically, but
+    // only one records in the catalogue that the sharing was chosen.
+    const [table] = await owner.$queryRaw<
+      { relrowsecurity: boolean; policies: bigint }[]
+    >`
+      SELECT
+        c.relrowsecurity,
+        (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policies
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relname = 'otp_codes'
+    `;
+
+    expect(table.relrowsecurity).toBe(true);
+    expect(Number(table.policies)).toBe(1);
+  });
+
+  it("has no workspace_id column to scope by", async () => {
+    // Stated as a test so that adding one is a decision somebody makes, not
+    // a side effect of a schema tidy-up.
+    const columns = await owner.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'otp_codes'
+        AND column_name = 'workspace_id'
+    `;
+
+    expect(columns).toHaveLength(0);
+  });
+});

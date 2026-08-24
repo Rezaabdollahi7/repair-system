@@ -3,6 +3,9 @@
 // dotenv doesn't overwrite variables that are already set, so these win.
 process.env.RATE_LIMIT_API = "1000";
 process.env.RATE_LIMIT_LOGIN = "10";
+// Three is the real production value and the tests need to hit it, unlike
+// the two above which are raised out of the way.
+process.env.RATE_LIMIT_OTP = "3";
 // The tests mock Prisma and never open a connection, but lib/prisma throws
 // at import time without this.
 process.env.DATABASE_URL_APP ??=

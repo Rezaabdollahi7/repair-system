@@ -135,6 +135,10 @@ code written with `any` does not get revisited.
 - [ ] 7.5 Provision one ParsPack VPS (irVPS5-class: 4 vCPU, 8GB RAM, 100GB SSD), Iran location. Splitting the database onto its own host is deliberately deferred — it costs latency now and buys nothing until there is more than one app instance
 - [ ] 7.6 First manual deployment to production infrastructure
 - [ ] 7.7 (Later) Introduce a simple GitHub Actions workflow that runs the test suite on push — a first, minimal step into CI/CD, before considering automated deploys
+- [ ] 7.8 Give the production bucket a lifecycle rule for `workspaces/*/exports/`.
+      Data exports accumulate: every one a workshop asks for stays until
+      someone deletes it, and nobody will. Thirty days is longer than anyone
+      needs a file they already downloaded
 
 ## Phase 8 — Subscriptions & Billing (last phase, on hold)
 

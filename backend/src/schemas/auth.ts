@@ -104,6 +104,14 @@ export const registerSchema = z.object({
 
 export type RegisterBody = z.infer<typeof registerSchema>;
 
+export const resetPasswordSchema = z.object({
+  phone: phoneSchema,
+  code: otpCodeSchema,
+  new_password: password,
+});
+
+export type ResetPasswordBody = z.infer<typeof resetPasswordSchema>;
+
 export const loginSchema = z.object({
   username: phoneSchema,
   password: z.string().min(1, "نام کاربری و رمز عبور الزامی است"),

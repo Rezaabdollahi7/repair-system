@@ -1,7 +1,10 @@
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import prisma, { runInNewWorkspaceTransaction } from "../lib/prisma";
+import prisma, {
+  runInNewWorkspaceTransaction,
+  runInWorkspaceTransaction,
+} from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { JWT_SECRET } from "../middleware/auth";
 import { ValidatedRequest } from "../middleware/validate";
@@ -30,6 +33,7 @@ import type {
   ChangePasswordBody,
   LoginBody,
   RegisterBody,
+  ResetPasswordBody,
   SendOtpBody,
 } from "../schemas/auth";
 
@@ -265,6 +269,105 @@ export const sendOtp = async (req: Request, res: Response) => {
     res.json(sent);
   } catch (error) {
     console.error("send-otp error:", errorMessage(error));
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+// POST /api/auth/reset-password
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { phone, code, new_password } = (req as ValidatedRequest).valid
+      .body as ResetPasswordBody;
+
+    // The same aperture login and send-otp use. Not widened: the four columns
+    // it already returns are the id to write to, the workspace to write
+    // under, and the active flag read below.
+    const [account] = await prisma.$queryRaw<LoginCandidate[]>`
+      SELECT * FROM app_login_lookup(${phone})
+    `;
+
+    const candidate = await prisma.otpCode.findFirst({
+      where: { phone, purpose: "reset" },
+      orderBy: { id: "desc" },
+      select: {
+        id: true,
+        codeHash: true,
+        expiresAt: true,
+        attempts: true,
+        consumedAt: true,
+      },
+    });
+
+    const verdict = checkOtp(candidate, code);
+
+    // Outside the transaction below, for the reason OTP.4 found: an increment
+    // that rolls back with a failure is a ceiling that never arrives.
+    if (!verdict.ok && candidate) {
+      await prisma.otpCode.update({
+        where: { id: candidate.id },
+        data: { attempts: { increment: 1 } },
+      });
+    }
+
+    // Checked after the code, not before. send-otp already answered success
+    // for an unknown number without sending anything, so there is no live
+    // code to present here — and answering differently now would say which
+    // numbers have accounts, undoing that.
+    if (!verdict.ok || !account) {
+      return res.status(400).json({
+        error:
+          verdict.ok || verdict.reason !== "burned"
+            ? "کد تأیید معتبر نیست"
+            : "کد تأیید باطل شده است. کد جدید درخواست کنید",
+      });
+    }
+
+    // A disabled account is disabled, and a new password would not change
+    // that — login refuses it either way. Refused here so the caller is not
+    // walked through choosing a password that gets them nowhere.
+    if (!account.is_active) {
+      return res.status(403).json({ error: "حساب کاربری غیرفعال است" });
+    }
+
+    const verified = candidate as NonNullable<typeof candidate>;
+    const hashed = await bcrypt.hash(new_password, 10);
+
+    // One transaction, unlike sign-up, because the workspace is already
+    // known — and the order inside it matters. The code is spent first: were
+    // the password written first and the consumption then failed, the
+    // password would be changed and the code still live.
+    await runInWorkspaceTransaction(account.workspace_id, async (tx) => {
+      const spent = await tx.otpCode.updateMany({
+        where: { id: verified.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+
+      if (spent.count === 0) {
+        throw new OtpAlreadyUsedError();
+      }
+
+      await tx.user.update({
+        where: { id: account.id },
+        data: { password: hashed },
+      });
+
+      // Every session goes, not just the ones that look suspicious. If this
+      // reset was prompted by somebody else being in the account, this is
+      // the step that puts them out — and there is no way to tell their
+      // session from the owner's.
+      await tx.refreshToken.deleteMany({ where: { userId: account.id } });
+    });
+
+    // No session issued. Sign-up hands one back because the password was
+    // chosen and proven in the same request; here the point was to end every
+    // session, and starting a new one in the same breath undoes half of it.
+    res.json({ message: "رمز عبور تغییر کرد. با رمز جدید وارد شوید" });
+  } catch (error) {
+    if (error instanceof OtpAlreadyUsedError) {
+      return res.status(400).json({ error: "کد تأیید معتبر نیست" });
+    }
+
+    console.error("reset-password error:", errorMessage(error));
     res.status(500).json({ error: errorMessage(error) });
   }
 };

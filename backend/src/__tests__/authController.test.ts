@@ -2,7 +2,10 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import * as controller from "../controllers/authController";
-import prisma, { runInNewWorkspaceTransaction } from "../lib/prisma";
+import prisma, {
+  runInNewWorkspaceTransaction,
+  runInWorkspaceTransaction,
+} from "../lib/prisma";
 import { populateWorkspace } from "../utils/newWorkspace";
 import {
   currentWorkspaceId,
@@ -42,6 +45,7 @@ jest.mock("../lib/prisma", () => ({
     },
   },
   runInNewWorkspaceTransaction: jest.fn(),
+  runInWorkspaceTransaction: jest.fn(),
 }));
 
 // Mocked so no test can reach sms.ir. Every assertion below about "no message
@@ -82,6 +86,7 @@ const db = prisma as unknown as {
 const sendSms = sendVerificationCode as unknown as jest.Mock;
 
 const runInNewWorkspace = runInNewWorkspaceTransaction as unknown as jest.Mock;
+const runInWorkspace = runInWorkspaceTransaction as unknown as jest.Mock;
 const populate = populateWorkspace as unknown as jest.Mock;
 
 /** A workspace id that is not WORKSPACE_ID, so a mix-up would be visible. */
@@ -922,5 +927,170 @@ describe("sendOtp", () => {
 
     const body = res.json.mock.calls[0][0];
     expect(Object.keys(body)).toEqual(["message"]);
+  });
+});
+
+describe("resetPassword", () => {
+  const CODE = "54321";
+  const NEW_PASSWORD = "brandnew123";
+
+  function otpRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 77,
+      codeHash: hashOtpCode(CODE),
+      expiresAt: new Date(Date.now() + 60_000),
+      attempts: 0,
+      consumedAt: null,
+      ...overrides,
+    };
+  }
+
+  function resetRequest(overrides: Record<string, unknown> = {}) {
+    return mockRequest({
+      body: {
+        phone: "09123456789",
+        code: CODE,
+        new_password: NEW_PASSWORD,
+        ...overrides,
+      },
+    });
+  }
+
+  /** A transaction client carrying the same mocks the extended client uses. */
+  const tx = {
+    otpCode: db.otpCode,
+    user: db.user,
+    refreshToken: db.refreshToken,
+  };
+
+  beforeEach(() => {
+    db.$queryRaw.mockResolvedValue([candidateRow()]);
+    db.otpCode.findFirst.mockResolvedValue(otpRow());
+    db.otpCode.update.mockResolvedValue({ id: 77 });
+    db.otpCode.updateMany.mockResolvedValue({ count: 1 });
+    db.user.update.mockResolvedValue({ id: 1 });
+    db.refreshToken.deleteMany.mockResolvedValue({ count: 2 });
+
+    runInWorkspace.mockImplementation(
+      (_workspaceId: number, fn: (client: unknown) => unknown) => fn(tx),
+    );
+  });
+
+  it("changes the password and ends every session", async () => {
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest(), res);
+
+    const stored = db.user.update.mock.calls[0][0].data.password;
+    expect(await bcrypt.compare(NEW_PASSWORD, stored)).toBe(true);
+
+    // Not only the suspicious ones — there is no way to tell an intruder's
+    // session from the owner's, and this reset may well have been prompted
+    // by one.
+    expect(db.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 1 },
+    });
+  });
+
+  it("spends the code before writing the password", async () => {
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest(), res);
+
+    const consumed = db.otpCode.updateMany.mock.invocationCallOrder[0];
+    const written = db.user.update.mock.invocationCallOrder[0];
+
+    // The other order would leave the password changed and the code still
+    // live if the consumption failed.
+    expect(consumed).toBeLessThan(written);
+  });
+
+  it("hands back no session", async () => {
+    // Unlike sign-up. The point of this endpoint was to end every session;
+    // opening a new one in the same breath undoes half of it.
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest(), res);
+
+    expect(res.cookie).not.toHaveBeenCalled();
+    expect(db.refreshToken.create).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0]).not.toHaveProperty("token");
+  });
+
+  it("writes nothing when the code is wrong", async () => {
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest({ code: "00000" }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.user.update).not.toHaveBeenCalled();
+    expect(db.refreshToken.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("counts the attempt outside the transaction", async () => {
+    await controller.resetPassword(
+      resetRequest({ code: "00000" }),
+      mockResponse(),
+    );
+
+    expect(db.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 77 },
+      data: { attempts: { increment: 1 } },
+    });
+    expect(runInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("says the same thing for an unknown number as for a wrong code", async () => {
+    // send-otp already answers success for a number with no account and
+    // sends nothing. Answering differently here would say which numbers have
+    // accounts and undo that.
+    const wrongCode = mockResponse();
+    await controller.resetPassword(resetRequest({ code: "00000" }), wrongCode);
+
+    db.$queryRaw.mockResolvedValue([]);
+    db.otpCode.findFirst.mockResolvedValue(null);
+    const unknownNumber = mockResponse();
+    await controller.resetPassword(resetRequest(), unknownNumber);
+
+    expect(wrongCode.json.mock.calls[0][0]).toEqual(
+      unknownNumber.json.mock.calls[0][0],
+    );
+  });
+
+  it("refuses a disabled account rather than resetting it", async () => {
+    db.$queryRaw.mockResolvedValue([candidateRow({ is_active: false })]);
+
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest(), res);
+
+    // A new password changes nothing for an account login refuses anyway;
+    // better to say so than walk them through choosing one.
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses an expired code", async () => {
+    db.otpCode.findFirst.mockResolvedValue(
+      otpRow({ expiresAt: new Date(Date.now() - 1000) }),
+    );
+
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest(), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the code was spent between the check and the write", async () => {
+    db.otpCode.updateMany.mockResolvedValue({ count: 0 });
+
+    const res = mockResponse();
+    await controller.resetPassword(resetRequest(), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("reads a reset code, never a register one", async () => {
+    // The two are separate rows for separate flows: a code issued to verify
+    // a new number must not open an existing account.
+    await controller.resetPassword(resetRequest(), mockResponse());
+
+    expect(db.otpCode.findFirst.mock.calls[0][0].where.purpose).toBe("reset");
   });
 });

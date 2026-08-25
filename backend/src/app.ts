@@ -105,6 +105,11 @@ app.use("/api/auth/login", loginLimiter);
 // front of it: the code is the identity check, this is the volume one.
 app.use("/api/auth/register", loginLimiter);
 app.use("/api/auth/send-otp", otpLimiter);
+// Login's bucket, not the OTP one: this endpoint spends no money, and
+// guessing a code here is the same shape of attack as guessing a password.
+// The three-attempt ceiling on the row is the real guard; this is the
+// volume one.
+app.use("/api/auth/reset-password", loginLimiter);
 app.use("/api", apiLimiter);
 app.use("/api", routes);
 

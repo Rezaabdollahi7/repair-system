@@ -148,7 +148,7 @@ Kavenegar was the plan before that decision.
       the IP. Every message costs money, and an endpoint without a ceiling
       is a way to empty the SMS account
 - [x] OTP.4 Sign-up requires a verified code before a workspace is created
-- [ ] OTP.5 Password reset through OTP, retiring the phone call in
+- [x] OTP.5 Password reset through OTP, retiring the phone call in
       `ops/reset-password.md`. The script stays for the case where someone
       has lost the number itself
 - [ ] OTP.6 Frontend: the code step on sign-up, and a "forgot password" flow

@@ -4,8 +4,10 @@ import prisma from "../../lib/prisma";
 import { hashRefreshToken } from "../../utils/refreshToken";
 import {
   disconnectOwner,
+  issueCode,
   owner,
   seedTwoWorkspaces,
+  TEST_OTP_CODE,
   truncateAll,
   type TwoWorkspaces,
 } from "./helpers";
@@ -26,10 +28,14 @@ const signUp = {
   workspace_name: "تعمیرگاه سوم",
   username: "09351112233",
   password: "testpass123",
+  code: TEST_OTP_CODE,
 };
 
 /** Signs up and returns the session cookie the browser would have kept. */
 async function newSession() {
+  // Sign-up needs a verified code since OTP.4. Nothing in this file is about
+  // verification, so the code is arranged rather than tested here.
+  await issueCode(signUp.username);
   const res = await request(app).post("/api/auth/register").send(signUp);
   expect(res.status).toBe(201);
 
@@ -148,6 +154,9 @@ describe("POST /api/auth/refresh", () => {
     const { cookie } = await newSession();
 
     // A second account, in a different workspace, signed in throughout.
+    // Its own code: they are keyed by phone number, so the one newSession
+    // used above is for somebody else.
+    await issueCode("09351112244");
     const other = await request(app)
       .post("/api/auth/register")
       .send({

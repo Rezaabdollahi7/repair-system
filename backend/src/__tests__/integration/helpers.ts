@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../../generated/prisma/client";
 import { JWT_SECRET } from "../../middleware/auth";
+import { hashOtpCode } from "../../utils/otp";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (!connectionString) {
@@ -131,4 +132,32 @@ export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
 /** Closes the fixture connection so Jest doesn't hang on an open pool. */
 export async function disconnectOwner() {
   await owner.$disconnect();
+}
+
+/** The code the helper below writes, unless a test asks for another. */
+export const TEST_OTP_CODE = "12345";
+
+/**
+ * Writes a live verification code for a phone number.
+ *
+ * Here rather than in one test file because sign-up now needs one, and every
+ * suite that creates a user goes through sign-up — refreshToken.test.ts found
+ * that out the hard way. A third copy of this would be the point at which
+ * they start to drift.
+ *
+ * Not through /auth/send-otp: that reaches sms.ir. The row is the real thing
+ * either way — same hash, same columns, read back under the same policy.
+ *
+ * The phone must be in its normalised form (09…), because that is what
+ * phoneSchema hands the controller whatever the client typed.
+ */
+export async function issueCode(phone: string, code = TEST_OTP_CODE) {
+  await owner.otpCode.create({
+    data: {
+      phone,
+      purpose: "register",
+      codeHash: hashOtpCode(code),
+      expiresAt: new Date(Date.now() + 60_000),
+    },
+  });
 }

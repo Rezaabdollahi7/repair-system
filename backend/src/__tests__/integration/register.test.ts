@@ -8,6 +8,7 @@ import {
   truncateAll,
   type TwoWorkspaces,
 } from "./helpers";
+import { issueCode, TEST_OTP_CODE } from "./helpers";
 
 // Not mocked: app_create_workspace is a SECURITY DEFINER function and the
 // rows that follow it are written under the policies. Neither exists in a
@@ -30,9 +31,17 @@ const signUp = {
   workspace_name: "تعمیرگاه سوم",
   username: "09351112233",
   password: "testpass123",
+  code: TEST_OTP_CODE,
 };
 
-function register(body: Record<string, unknown> = signUp) {
+/**
+ * Signs up, issuing the code first unless the caller is testing what happens
+ * without one. Every existing test below predates OTP.4 and assumes sign-up
+ * just works, so the code is arranged for them rather than written into each.
+ */
+async function register(body: Record<string, unknown> = signUp) {
+  const phone = String(body.username ?? signUp.username);
+  await issueCode(phone);
   return request(app).post("/api/auth/register").send(body);
 }
 
@@ -104,7 +113,13 @@ describe("sign-up", () => {
   it("normalises the phone, so either script signs in", async () => {
     // Persian digits going in, latin digits coming back out — and the login
     // below proves the two forms reach the same row.
-    const created = await register({ ...signUp, username: "۰۹۳۵۱۱۱۲۲۳۳" });
+    // The code is stored against the normalised number, because that is what
+    // send-otp would have written after phoneSchema ran on its input too.
+    await issueCode("09351112233");
+    const created = await request(app)
+      .post("/api/auth/register")
+      .send({ ...signUp, username: "۰۹۳۵۱۱۱۲۲۳۳" });
+    expect(created.body.user.username).toBe("09351112233");
     expect(created.body.user.username).toBe("09351112233");
 
     const login = await request(app)
@@ -205,5 +220,71 @@ describe("a new workspace is isolated from the ones already there", () => {
 
     expect(invoice.status).toBe(201);
     expect(invoice.body.invoice_number).toBe("PUR-0001");
+  });
+});
+
+// The unit tests cover which codes are refused. What only a real database can
+// show is that the transaction committed: the code is spent, and stays spent.
+describe("the code is spent against a real database", () => {
+  it("marks the code consumed when the workspace is created", async () => {
+    const res = await register();
+    expect(res.status).toBe(201);
+
+    const row = await owner.otpCode.findFirstOrThrow({
+      where: { phone: signUp.username },
+      orderBy: { id: "desc" },
+      select: { consumedAt: true },
+    });
+
+    // Written inside the same transaction as the workspace, so seeing it
+    // here means both landed.
+    expect(row.consumedAt).not.toBeNull();
+  });
+
+  it("will not create a second workspace from the same code", async () => {
+    await register();
+    const before = await owner.workspace.count();
+
+    // Straight to the endpoint, without issuing a fresh code: the row from
+    // the first sign-up is there, and consumed.
+    const second = await request(app)
+      .post("/api/auth/register")
+      .send({ ...signUp, username: "09351112244" });
+
+    expect(second.status).toBe(400);
+    expect(await owner.workspace.count()).toBe(before);
+  });
+
+  it("creates nothing without a code at all", async () => {
+    const before = await owner.workspace.count();
+
+    const res = await request(app).post("/api/auth/register").send(signUp);
+
+    expect(res.status).toBe(400);
+    expect(await owner.workspace.count()).toBe(before);
+  });
+
+  it("leaves the code usable when the number was taken in between", async () => {
+    // The reason the code is spent inside the transaction rather than before
+    // it. Someone registers this number in the seconds between send-otp and
+    // register; the sign-up fails on the unique constraint, and the code has
+    // to come back with it — otherwise a legitimate caller has burned one of
+    // three allowances on somebody else's race.
+    await register();
+
+    await issueCode(signUp.username, "54321");
+    const taken = await request(app)
+      .post("/api/auth/register")
+      .send({ ...signUp, workspace_name: "تعمیرگاه پنجم", code: "54321" });
+
+    expect(taken.status).toBe(409);
+
+    const row = await owner.otpCode.findFirstOrThrow({
+      where: { phone: signUp.username },
+      orderBy: { id: "desc" },
+      select: { consumedAt: true },
+    });
+
+    expect(row.consumedAt).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ import { SmsError, SMS_STATUS, sendVerificationCode } from "../lib/sms";
 import {
   OTP_SEND_LIMIT,
   OTP_SEND_WINDOW_MS,
+  checkOtp,
   generateOtpCode,
   hashOtpCode,
   otpExpiry,
@@ -138,6 +139,18 @@ async function issueSession(
   return issueAccessToken(user);
 }
 
+/**
+ * Thrown when the code was spent between the check and the transaction.
+ * A distinct type rather than a flag, so the catch below can tell it from a
+ * database failure and answer 400 instead of 500.
+ */
+class OtpAlreadyUsedError extends Error {
+  constructor() {
+    super("otp already used");
+    this.name = "OtpAlreadyUsedError";
+  }
+}
+
 // POST /api/auth/send-otp
 export const sendOtp = async (req: Request, res: Response) => {
   try {
@@ -261,18 +274,79 @@ export const register = async (req: Request, res: Response) => {
   try {
     const body = (req as ValidatedRequest).valid.body as RegisterBody;
 
+    // Newest first: re-sending marks the previous rows consumed, but reading
+    // the newest anyway means a stale row can never be the one examined.
+    const candidate = await prisma.otpCode.findFirst({
+      where: { phone: body.username, purpose: "register" },
+      orderBy: { id: "desc" },
+      select: {
+        id: true,
+        codeHash: true,
+        expiresAt: true,
+        attempts: true,
+        consumedAt: true,
+      },
+    });
+
+    const verdict = checkOtp(candidate, body.code);
+
+    // Counted here, outside the transaction below, and on purpose: an
+    // increment inside it would be rolled back along with the failed sign-up,
+    // and the ceiling would never be reached however many codes were tried.
+    if (!verdict.ok && candidate) {
+      await prisma.otpCode.update({
+        where: { id: candidate.id },
+        data: { attempts: { increment: 1 } },
+      });
+    }
+
+    if (!verdict.ok) {
+      // Burned is the one failure worth telling apart. The others — wrong,
+      // expired, already used, no code at all — get one message, because
+      // distinguishing them tells whoever is guessing which numbers have a
+      // live code. Burned has to be said plainly or the user retypes the
+      // correct code until it expires and never learns why it stopped working.
+      return res.status(400).json({
+        error:
+          verdict.reason === "burned"
+            ? "کد تأیید باطل شده است. کد جدید درخواست کنید"
+            : "کد تأیید معتبر نیست",
+      });
+    }
+
     // The workspace comes from app_create_workspace, which the helper calls:
     // the application role has no INSERT on workspaces, because creating a
     // tenant is not an ordinary request. Everything inside the callback is
     // ordinary tenant data and is written under the policies.
     const owner = await runInNewWorkspaceTransaction(
       body.workspace_name,
-      (tx, workspaceId) =>
-        populateWorkspace(tx, workspaceId, {
+      async (tx, workspaceId) => {
+        // Spent inside the transaction so a sign-up that fails afterwards —
+        // a number taken in the seconds since send-otp, most likely — leaves
+        // the code usable rather than costing the caller one of three.
+        //
+        // Conditional on consumedAt still being null, so two requests racing
+        // with the same code cannot both create a workspace: the second
+        // updates nothing and is turned away.
+        // Narrowed into a local because checkOtp's verdict says candidate is
+        // non-null but its type does not, and TypeScript will not carry the
+        // narrowing into the closure below in any case.
+        const verified = candidate as NonNullable<typeof candidate>;
+        const spent = await tx.otpCode.updateMany({
+          where: { id: verified.id, consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+
+        if (spent.count === 0) {
+          throw new OtpAlreadyUsedError();
+        }
+
+        return populateWorkspace(tx, workspaceId, {
           workspaceName: body.workspace_name,
           username: body.username,
           password: body.password,
-        }),
+        });
+      },
     );
 
     // The helper set the workspace inside its transaction, which has now
@@ -288,6 +362,10 @@ export const register = async (req: Request, res: Response) => {
       user: toUserResponse(owner),
     });
   } catch (error) {
+    if (error instanceof OtpAlreadyUsedError) {
+      return res.status(400).json({ error: "کد تأیید معتبر نیست" });
+    }
+
     // Username is unique platform-wide, so this is a real person being told
     // something true — not a leak. The number is their own.
     if (isUniqueConstraintError(error)) {

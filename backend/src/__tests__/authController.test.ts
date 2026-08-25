@@ -10,6 +10,7 @@ import {
 } from "../lib/workspaceContext";
 import { JWT_SECRET } from "../middleware/auth";
 import { SmsError, sendVerificationCode } from "../lib/sms";
+import { hashOtpCode } from "../utils/otp";
 
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
@@ -33,6 +34,7 @@ jest.mock("../lib/prisma", () => ({
     otpCode: {
       count: jest.fn(),
       create: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -170,9 +172,13 @@ beforeEach(() => {
 
   // Runs the callback the way the real helper does: the workspace exists by
   // then, so its id is handed to the callback rather than read from context.
+  // The transaction client carries otpCode now: register spends the code
+  // inside the transaction, so a sign-up that fails afterwards leaves it
+  // usable. Handed the same mock the extended client uses, so an assertion
+  // reads the call wherever it was made.
   runInNewWorkspace.mockImplementation(
     (_name: string, fn: (tx: unknown, workspaceId: number) => unknown) =>
-      fn({}, NEW_WORKSPACE_ID),
+      fn({ otpCode: db.otpCode }, NEW_WORKSPACE_ID),
   );
   // Every successful sign-in writes one of these.
   db.refreshToken.create.mockResolvedValue({ id: 1 });
@@ -182,11 +188,26 @@ beforeEach(() => {
 });
 
 describe("authController.register", () => {
+  const CODE = "12345";
+
   const body = {
     workspace_name: "تعمیرگاه رضا",
     username: "09123456789",
     password: "testpass123",
+    code: CODE,
   };
+
+  /** A live, unused code for the number in `body`. */
+  function otpRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 55,
+      codeHash: hashOtpCode(CODE),
+      expiresAt: new Date(Date.now() + 60_000),
+      attempts: 0,
+      consumedAt: null,
+      ...overrides,
+    };
+  }
 
   function ownerRow() {
     return userRow({
@@ -196,6 +217,12 @@ describe("authController.register", () => {
       username: body.username,
     });
   }
+
+  beforeEach(() => {
+    db.otpCode.findFirst.mockResolvedValue(otpRow());
+    db.otpCode.update.mockResolvedValue({ id: 55 });
+    db.otpCode.updateMany.mockResolvedValue({ count: 1 });
+  });
 
   /**
    * register publishes the new workspace into the async context so the
@@ -222,7 +249,7 @@ describe("authController.register", () => {
       body.workspace_name,
       expect.any(Function),
     );
-    expect(populate).toHaveBeenCalledWith({}, NEW_WORKSPACE_ID, {
+    expect(populate).toHaveBeenCalledWith(expect.anything(), NEW_WORKSPACE_ID, {
       workspaceName: body.workspace_name,
       username: body.username,
       password: body.password,
@@ -282,6 +309,130 @@ describe("authController.register", () => {
     const res = await register(mockRequest({ body }));
 
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  describe("the code is the proof the number is real", () => {
+    it("creates nothing when the code is wrong", async () => {
+      const res = await register(
+        mockRequest({ body: { ...body, code: "00000" } }),
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(runInNewWorkspace).not.toHaveBeenCalled();
+      expect(populate).not.toHaveBeenCalled();
+    });
+
+    it("creates nothing when no code was ever sent", async () => {
+      db.otpCode.findFirst.mockResolvedValue(null);
+
+      const res = await register(mockRequest({ body }));
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(runInNewWorkspace).not.toHaveBeenCalled();
+    });
+
+    it("refuses an expired code", async () => {
+      db.otpCode.findFirst.mockResolvedValue(
+        otpRow({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+
+      const res = await register(mockRequest({ body }));
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(runInNewWorkspace).not.toHaveBeenCalled();
+    });
+
+    it("refuses a code already spent", async () => {
+      db.otpCode.findFirst.mockResolvedValue(
+        otpRow({ consumedAt: new Date() }),
+      );
+
+      const res = await register(mockRequest({ body }));
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(runInNewWorkspace).not.toHaveBeenCalled();
+    });
+
+    it("counts the attempt outside the transaction", async () => {
+      // The whole reason the increment sits where it does. Inside the
+      // sign-up transaction it would roll back with the failure, and three
+      // wrong guesses would leave the counter at zero — a ceiling that never
+      // arrives, on a five-digit code.
+      await register(mockRequest({ body: { ...body, code: "00000" } }));
+
+      expect(db.otpCode.update).toHaveBeenCalledWith({
+        where: { id: 55 },
+        data: { attempts: { increment: 1 } },
+      });
+    });
+
+    it("says plainly when the row is burned", async () => {
+      // The one failure told apart from the rest: retrying cannot work, and
+      // a user not told so retypes the correct code until it expires.
+      db.otpCode.findFirst.mockResolvedValue(otpRow({ attempts: 3 }));
+
+      const res = await register(mockRequest({ body }));
+
+      expect(res.json.mock.calls[0][0].error).toContain("باطل");
+    });
+
+    it("gives one message for every other failure", async () => {
+      // Telling expired from wrong from unused would say which numbers have
+      // a live code waiting.
+      const wrong = await register(
+        mockRequest({ body: { ...body, code: "00000" } }),
+      );
+
+      db.otpCode.findFirst.mockResolvedValue(
+        otpRow({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+      const expired = await register(mockRequest({ body }));
+
+      db.otpCode.findFirst.mockResolvedValue(null);
+      const missing = await register(mockRequest({ body }));
+
+      expect(wrong.json.mock.calls[0][0]).toEqual(
+        expired.json.mock.calls[0][0],
+      );
+      expect(wrong.json.mock.calls[0][0]).toEqual(
+        missing.json.mock.calls[0][0],
+      );
+    });
+
+    it("stops counting attempts against a burned row", async () => {
+      db.otpCode.findFirst.mockResolvedValue(otpRow({ attempts: 3 }));
+
+      await register(mockRequest({ body }));
+
+      // Still incremented — the row is dead either way, and not writing
+      // would need a second branch for no benefit. What matters is that it
+      // is refused before the transaction.
+      expect(runInNewWorkspace).not.toHaveBeenCalled();
+    });
+
+    it("spends the code inside the transaction, guarded against a race", async () => {
+      populate.mockResolvedValue(ownerRow());
+
+      await register(mockRequest({ body }));
+
+      // consumedAt: null in the where clause is what stops two requests
+      // arriving together with the same code from both creating a workspace.
+      expect(db.otpCode.updateMany).toHaveBeenCalledWith({
+        where: { id: 55, consumedAt: null },
+        data: { consumedAt: expect.any(Date) },
+      });
+    });
+
+    it("refuses when the code was spent between the check and the write", async () => {
+      populate.mockResolvedValue(ownerRow());
+      db.otpCode.updateMany.mockResolvedValue({ count: 0 });
+
+      const res = await register(mockRequest({ body }));
+
+      // 400, not 500: the second of two racing requests is a user error,
+      // not a server fault.
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
   });
 });
 

@@ -94,6 +94,12 @@ export const registerSchema = z.object({
     .max(100, "نام کارگاه بیش از حد طولانی است"),
   username: phoneSchema,
   password,
+  // The code is the proof the number is real, and it is spent in the same
+  // request that creates the workspace. No intermediate token: a "verified"
+  // credential handed back to the client would be one more thing to issue,
+  // store and reason about, and this way there is no server-side state
+  // between the two calls at all.
+  code: otpCodeSchema,
 });
 
 export type RegisterBody = z.infer<typeof registerSchema>;

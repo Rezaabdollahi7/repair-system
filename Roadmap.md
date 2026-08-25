@@ -147,7 +147,7 @@ Kavenegar was the plan before that decision.
 - [x] OTP.3 `POST /auth/send-otp` with limits on both the phone number and
       the IP. Every message costs money, and an endpoint without a ceiling
       is a way to empty the SMS account
-- [ ] OTP.4 Sign-up requires a verified code before a workspace is created
+- [x] OTP.4 Sign-up requires a verified code before a workspace is created
 - [ ] OTP.5 Password reset through OTP, retiring the phone call in
       `ops/reset-password.md`. The script stays for the case where someone
       has lost the number itself

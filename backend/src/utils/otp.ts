@@ -55,3 +55,64 @@ export function hashOtpCode(code: string): string {
 export function otpExpiry(from = Date.now()): Date {
   return new Date(from + OTP_TTL_MS);
 }
+
+/**
+ * Why a code was refused. Only BURNED is told apart in the response: the
+ * others all mean "try again with the right code", while a burned row means
+ * trying again cannot work, and a user who is not told that will retype the
+ * correct code until it expires.
+ */
+export type OtpFailure = "invalid" | "burned";
+
+export interface OtpRow {
+  id: number;
+  codeHash: string;
+  expiresAt: Date;
+  attempts: number;
+  consumedAt: Date | null;
+}
+
+/**
+ * Whether a row may still be used, given a code.
+ *
+ * Pure, and deliberately so: the caller decides what to write and when,
+ * because the two writes belong in different places — the attempt counter
+ * outside the sign-up transaction so a rollback cannot undo it, and the
+ * consumption inside it so a failed sign-up does not spend the code.
+ */
+export function checkOtp(
+  row: OtpRow | null,
+  code: string,
+): { ok: true } | { ok: false; reason: OtpFailure } {
+  if (!row) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  // Checked before the code itself: a burned row is dead whatever is typed
+  // into it, and counting further attempts against it tells a guesser they
+  // are still being listened to.
+  if (row.attempts >= OTP_MAX_ATTEMPTS) {
+    return { ok: false, reason: "burned" };
+  }
+
+  if (row.consumedAt !== null) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  if (row.expiresAt.getTime() <= Date.now()) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  // timingSafeEqual over the hashes, which are always the same length. The
+  // guard against guessing is the attempt ceiling, not this — but a plain
+  // comparison would leak a little for free, and refusing free leaks is
+  // cheaper than arguing about how much they matter.
+  const expected = Buffer.from(row.codeHash, "hex");
+  const given = Buffer.from(hashOtpCode(code), "hex");
+
+  if (!crypto.timingSafeEqual(expected, given)) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  return { ok: true };
+}

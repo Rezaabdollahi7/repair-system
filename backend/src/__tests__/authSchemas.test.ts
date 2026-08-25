@@ -1,10 +1,13 @@
-import { loginSchema, registerSchema } from "../schemas/auth";
+import { loginSchema, otpCodeSchema, registerSchema } from "../schemas/auth";
 import { personnelCreateSchema } from "../schemas/personnel";
 
 const validRegistration = {
   workspace_name: "تعمیرگاه رضا",
   username: "09123456789",
   password: "testpass123",
+  // Required since OTP.4: the code is the proof the number is real, and it
+  // is spent in the same request that creates the workspace.
+  code: "12345",
 };
 
 describe("phone normalisation", () => {
@@ -124,5 +127,34 @@ describe("personnel and sign-up agree on what a username is", () => {
         password: "short12",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("otpCodeSchema", () => {
+  it("keeps a leading zero", () => {
+    // The one that would break quietly. Codes are generated with padStart,
+    // so 00042 is as likely as any other — and a z.coerce.number() added
+    // later would turn it into 42 and refuse it, for one user in ten, with
+    // nothing in the logs to say why.
+    expect(otpCodeSchema.parse("00042")).toBe("00042");
+  });
+
+  it("accepts a code typed on a Persian keyboard", () => {
+    // Same reasoning as phoneSchema: the rule is applied server-side so it
+    // holds however the client was written.
+    expect(otpCodeSchema.parse("۱۲۳۴۵")).toBe("12345");
+  });
+
+  it("accepts Arabic-Indic digits too", () => {
+    expect(otpCodeSchema.parse("٠٩٨٧٦")).toBe("09876");
+  });
+
+  it("trims surrounding whitespace", () => {
+    // Pasted from an SMS, a trailing space is routine.
+    expect(otpCodeSchema.parse(" 12345 ")).toBe("12345");
+  });
+
+  it.each(["1234", "123456", "abcde", "", "12 45"])("rejects %s", (input) => {
+    expect(otpCodeSchema.safeParse(input).success).toBe(false);
   });
 });

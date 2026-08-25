@@ -134,24 +134,40 @@ with nothing but a rate limiter between it and unlimited tenants, and every
 "I forgot my password" is a phone call to an operator. Both stop being
 acceptable the day `app.dofixo.ir` is public.
 
-**Provider is sms.ir**, bought, with a verify template awaiting approval.
-Kavenegar was the plan before that decision.
+**Provider is sms.ir**, with an approved verify template. Kavenegar was the
+plan before that decision.
 
 - [x] OTP.1 `otp_codes` table: phone, hashed code, expiry, attempt count.
       Deliberately not tenant-scoped — a code is sent before any workspace
       exists. Carries a `USING (true)` policy so `rls-check.sql` reads it as
       intentional rather than missed
-- [x] OTP.2 An sms.ir client behind a driver interface, with a `console`
-      driver for development: testing sign-up should not cost money or need
-      a real handset
-- [x] OTP.3 `POST /auth/send-otp` with limits on both the phone number and
-      the IP. Every message costs money, and an endpoint without a ceiling
-      is a way to empty the SMS account
+- [x] OTP.2 An sms.ir client in `lib/sms.ts`, the only module that knows the
+      provider exists. No driver interface and no console driver: the tests
+      mock the module, as they already do for `lib/storage`, and a second
+      implementation would be a code path nobody runs in production.
+      ⚠️ sms.ir has an IP allowlist in its panel, and a request from an
+      address not on it comes back `HTTP 401` — indistinguishable from a bad
+      key in the logs. The production server's address must be added before
+      7.6, or sign-up fails for everyone with a misleading error
+- [x] OTP.3 `POST /auth/send-otp`, three per hour on the phone number and
+      three on the IP. Both are needed: an IP limit alone lets a botnet spend
+      the account, a phone limit alone lets one host walk a list of numbers.
+      Failed sends count against neither — the row is deleted and the limiter
+      carries `skipFailedRequests` — because a provider outage must not lock
+      a caller out for an hour over messages that never left.
+      `OtpCode` is exempt from the Prisma extension's workspace guard
+      (`UNSCOPED_MODELS`), which is safe only because its policy is
+      `USING (true)`
 - [x] OTP.4 Sign-up requires a verified code before a workspace is created
-- [x] OTP.5 Password reset through OTP, retiring the phone call in
+- [x] OTP.5 Password reset through OTP. The code is spent before the password
+      is written, and every session for that user is deleted — an intruder's
+      cannot be told from the owner's. No session is issued afterwards, which
+      would undo half of that. `ops/reset-password.md` stays, now marked as
+      the exception rather than the route: it covers the case OTP.5 cannot,
+      where the number itself is gone
       `ops/reset-password.md`. The script stays for the case where someone
       has lost the number itself
-- [ ] OTP.6 Frontend: the code step on sign-up, and a "forgot password" flow
+- [x] OTP.6 Frontend: the code step on sign-up, and a "forgot password" flow
 
 ## Phase 7 — Dockerization & Deployment
 

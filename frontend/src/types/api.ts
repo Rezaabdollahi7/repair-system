@@ -50,6 +50,27 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+/** Which flow a code is for. The server refuses one used for the other. */
+export type OtpPurpose = "register" | "reset";
+
+export interface SendOtpBody {
+  phone: string;
+  purpose: OtpPurpose;
+}
+
+export interface RegisterBody {
+  workspace_name: string;
+  username: string;
+  password: string;
+  code: string;
+}
+
+export interface ResetPasswordBody {
+  phone: string;
+  code: string;
+  new_password: string;
+}
+
 /** logout and change-password answer with a Persian message. */
 export interface MessageResponse {
   message: string;

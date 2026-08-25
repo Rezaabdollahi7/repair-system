@@ -7,7 +7,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-
+import ForgotPassword from "./pages/ForgotPassword";
 import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
 import PersonnelList from "./pages/PersonnelList";
@@ -38,6 +38,7 @@ function App() {
               {/* Linked from dofixo.ir, so the marketing site can point
                   straight at app.dofixo.ir/register. */}
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Layout />}>

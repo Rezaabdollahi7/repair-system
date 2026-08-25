@@ -66,6 +66,9 @@ import type {
   ProfitReport,
   DataExport,
   ExportCreateBody,
+  SendOtpBody,
+  RegisterBody,
+  ResetPasswordBody,
 } from "../types/api";
 
 /**
@@ -137,6 +140,11 @@ const AUTH_PATHS = [
   "/auth/register",
   "/auth/refresh",
   "/auth/logout",
+  // Neither answers 401 today, so this changes nothing yet. Listed because
+  // the rule is "endpoints reached without a session", and a later 401 from
+  // one of them would otherwise trigger a refresh with no cookie to refresh.
+  "/auth/send-otp",
+  "/auth/reset-password",
 ];
 
 function isAuthPath(url = "") {
@@ -255,11 +263,15 @@ export const deleteDeviceImage = (deviceId: Id, imageId: Id) =>
 // Auth
 export const login = (credentials: { username: string; password: string }) =>
   api.post<AuthResponse>("/auth/login", credentials);
-export const register = (data: {
-  username: string;
-  password: string;
-  workspace_name: string;
-}) => api.post<AuthResponse>("/auth/register", data);
+export const register = (data: RegisterBody) =>
+  api.post<AuthResponse>("/auth/register", data);
+
+// Both are reached with no session at all, so they go through `api` rather
+// than authClient — there is no token to attach and no 401 to renew.
+export const sendOtp = (data: SendOtpBody) =>
+  api.post<MessageResponse>("/auth/send-otp", data);
+export const resetPassword = (data: ResetPasswordBody) =>
+  api.post<MessageResponse>("/auth/reset-password", data);
 export const logout = () => authClient.post<MessageResponse>("/auth/logout");
 export const getMe = () => api.get<AuthUser>("/auth/me");
 export const changeMyPassword = (data: {

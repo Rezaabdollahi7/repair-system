@@ -93,6 +93,11 @@ const otpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: otpLimitMax,
   skip: () => otpLimitMax === 0,
+  // Only successful sends count. A failure means no message left the
+  // building — the row is deleted for exactly that reason — and charging the
+  // caller for one costs them an hour over an outage they had no part in.
+  // The phone-number ceiling in otp_codes already works this way.
+  skipFailedRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

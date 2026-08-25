@@ -128,7 +128,16 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-sm text-center text-text-secondary mt-6">
+        <p className="text-sm text-center mt-4">
+          <Link
+            to="/forgot-password"
+            className="text-text-secondary hover:text-primary hover:underline"
+          >
+            رمز عبور را فراموش کرده‌اید؟
+          </Link>
+        </p>
+
+        <p className="text-sm text-center text-text-secondary mt-4">
           کارگاه ندارید؟{" "}
           <Link to="/register" className="text-primary hover:underline">
             ساخت کارگاه جدید

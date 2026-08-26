@@ -620,6 +620,12 @@ rate limiter مشترک با login است، و هر «رمزم را فراموش
     ports:
       - "127.0.0.1:5432:5432"   # نه "5432:5432"
 
+### دستورهای پروداکشن
+
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+docker compose -f docker-compose.prod.yml --profile tooling run --rm migrate
+docker compose -f docker-compose.prod.yml logs -f backend
+
 ### فاز ۸ — اشتراک و پرداخت
 
 ```markdown
@@ -1167,3 +1173,17 @@ CORS با `TRUST_PROXY="undefined"` شروع می‌شد که تست قبلی ر
   نه Sandbox) — بدون آن‌ها اپ اصلاً بالا نمی‌آید
 - `TRUST_PROXY=1` — حالا فقط مسئله‌ی کوکی نیست: با `0`، کل پلتفرم سه
   پیامک در ساعت می‌گیرد چون همه‌ی درخواست‌ها IP پروکسی را دارند
+
+⚠️ **`docker compose -f docker-compose.prod.yml down -v` روی سرور دیتابیس را
+پاک می‌کند.** volume نام‌دار است و `-v` حذفش می‌کند. در توسعه این دستور روال
+عادی seed دوباره است (بدهی ۱۵)، پس عادتی است که به پروداکشن منتقل می‌شود.
+روی سرور همیشه `down` بدون `-v`.
+
+⚠️ **`down -v` روی سرور دیتابیس را پاک می‌کند.** volume نام‌دار است و `-v`
+حذفش می‌کند. در توسعه این دستور روال عادی seed دوباره است (بدهی ۱۵)، پس
+عادتی است که ناخواسته به پروداکشن منتقل می‌شود. روی سرور همیشه `down` بدون `-v`.
+
+### الگوی `.env` در gitignore فایل‌های `.env.prod` را نمی‌گیرد
+
+`.env` فقط فایلی دقیقاً به همان نام را می‌گیرد. `.env.prod` باید جدا نوشته شود —
+و آن فایل رمز دیتابیس، `JWT_SECRET` و کلیدهای آروان و sms.ir را دارد.

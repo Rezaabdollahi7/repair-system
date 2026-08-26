@@ -1,0 +1,145 @@
+# Production stack for one host. Development uses docker-compose.yml, which
+# bind-mounts source and publishes every port; nothing is shared with it.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#   docker compose -f docker-compose.prod.yml --profile tooling run --rm migrate
+#
+# Only Caddy publishes ports. Postgres and the backend are reachable on the
+# internal network and nowhere else — a container that publishes nothing
+# cannot be exposed by a wrong bind, and Docker writes its port rules
+# straight into iptables where ufw does not see them.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    # The image ships shared_buffers at 128MB, which leaves most of an 8GB
+    # machine unused while Postgres reads from disk. effective_cache_size is
+    # not an allocation — it tells the planner how much of the OS page cache
+    # it may assume, which is what makes it prefer an index scan.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=2GB
+      - -c
+      - effective_cache_size=5GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=256MB
+    volumes:
+      - dofixo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    # Node as PID 1 ignores SIGTERM without a handler, so every restart would
+    # be a ten-second wait and then SIGKILL — potentially mid-transaction.
+    # tini forwards the signal.
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # DATABASE_URL is deliberately absent. It is the owner role, and a
+      # table's owner bypasses RLS — the credential that would undo phase 2
+      # has no business in the environment of a process serving requests.
+      # It exists only in the `migrate` service below.
+      DATABASE_URL_APP: postgresql://dofixo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      PORT: 5001
+      JWT_SECRET: ${JWT_SECRET}
+      # A hop count. One Caddy in front is one hop. At 0 every caller would
+      # arrive as Caddy's address and three OTP requests would lock the whole
+      # platform out for an hour.
+      TRUST_PROXY: "1"
+      RATE_LIMIT_API: ${RATE_LIMIT_API:-1000}
+      RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-10}
+      RATE_LIMIT_OTP: ${RATE_LIMIT_OTP:-3}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION:-default}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      SMS_API_KEY: ${SMS_API_KEY}
+      SMS_TEMPLATE_ID: ${SMS_TEMPLATE_ID}
+    healthcheck:
+      # node rather than curl: the slim image has no curl, and adding one
+      # for a health check is a package to keep patched forever.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runtime
+    restart: unless-stopped
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # caddy_data holds the certificates and the ACME account key. Without
+      # it every restart requests a fresh certificate, and Let's Encrypt
+      # allows five per domain per week — a few restarts on a bad day and
+      # there is no certificate until the window rolls.
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+  # Migrations and seeding. Never runs alongside the API — `--profile tooling`
+  # keeps it out of `up`, and `run --rm` starts it only when asked.
+  #
+  # This is the one place DATABASE_URL exists.
+  migrate:
+    profiles: ["tooling"]
+    build:
+      context: ./backend
+      target: tooling
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_URL_APP: postgresql://dofixo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+
+volumes:
+  dofixo_pgdata:
+  caddy_data:
+  caddy_config:

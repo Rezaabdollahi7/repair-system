@@ -171,11 +171,11 @@ plan before that decision.
 
 ## Phase 7 — Dockerization & Deployment
 
-- [ ] 7.1 Write production `Dockerfile` for backend
+- [x] 7.1 Write production `Dockerfile` for backend
 - [ ] 7.2 Write production `Dockerfile` for frontend (build + serve static, e.g. via Nginx)
 - [ ] 7.3 Write `docker-compose.prod.yml` — backend, frontend, reverse proxy **and Postgres**, on one host. Postgres gets its own named volume, and `shared_buffers` must be raised from the image default of 128MB, which wastes most of an 8GB machine
 - [ ] 7.4 Set up reverse proxy (Nginx or Caddy) with TLS for `app.dofixo.ir`
-- [ ] 7.5 Provision one ParsPack VPS (irVPS5-class: 4 vCPU, 8GB RAM, 100GB SSD), Iran location. Splitting the database onto its own host is deliberately deferred — it costs latency now and buys nothing until there is more than one app instance
+- [x] 7.5 Provision one ParsPack VPS (irVPS5-class: 4 vCPU, 8GB RAM, 100GB SSD), Iran location. Splitting the database onto its own host is deliberately deferred — it costs latency now and buys nothing until there is more than one app instance
 - [ ] 7.6 First manual deployment to production infrastructure
 - [ ] 7.7 (Later) Introduce a simple GitHub Actions workflow that runs the test suite on push — a first, minimal step into CI/CD, before considering automated deploys
 - [ ] 7.8 Give the production bucket a lifecycle rule for `workspaces/*/exports/`.

@@ -15,7 +15,20 @@ const app = express();
 // is enabled. TRUST_PROXY=1 in production (behind Nginx/Caddy) so each real
 // client gets its own bucket; TRUST_PROXY=0 in local dev, where there's no
 // proxy and trusting the header would let a client spoof its own IP.
-app.set("trust proxy", process.env.TRUST_PROXY === "1");
+// A hop count, not a boolean. `true` tells Express to trust the entire
+// X-Forwarded-For chain — a header the client writes — so a caller could
+// send a different value on every request and never land in the same
+// rate-limit bucket twice. That would defeat the per-IP half of the OTP
+// limit below, which is the half that protects an SMS balance.
+// One reverse proxy on the same host is one hop; no proxy is zero.
+const trustProxy = Number(process.env.TRUST_PROXY ?? 0);
+if (!Number.isInteger(trustProxy) || trustProxy < 0) {
+  throw new Error(
+    `TRUST_PROXY must be a non-negative integer (a hop count), got ` +
+      `"${process.env.TRUST_PROXY}". Use 1 behind one reverse proxy, 0 with none.`,
+  );
+}
+app.set("trust proxy", trustProxy);
 
 app.use(
   helmet({
@@ -26,12 +39,16 @@ app.use(
   }),
 );
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  }),
-);
+// Development only. The dev server (5173) and the API (5001) are separate
+// origins, so the browser needs CORS headers to let one talk to the other.
+// In production they are one origin behind the reverse proxy — 7.2 made the
+// frontend call a relative /api — so no CORS is needed at all, and
+// `origin: true` with credentials reflects back whatever origin asks, which
+// is not a thing to leave running once it has no purpose.
+if (process.env.NODE_ENV !== "production") {
+  app.use(cors({ origin: true, credentials: true }));
+}
+
 app.use(express.json());
 // The refresh token arrives as an httpOnly cookie rather than in the body,
 // so it cannot be read by script that has got onto the page.

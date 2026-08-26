@@ -22,3 +22,8 @@ process.env.S3_SECRET_KEY ??= "test-secret";
 // anything but the missing line here.
 process.env.SMS_API_KEY ??= "test-key";
 process.env.SMS_TEMPLATE_ID ??= "123456";
+
+// lib/prisma and lib/sms already throw at import time without theirs;
+// middleware/auth now does the same, and every suite that touches auth
+// imports it.
+process.env.JWT_SECRET ??= "unit-test-secret";

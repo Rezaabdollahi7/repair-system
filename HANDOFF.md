@@ -749,6 +749,12 @@ nginx پروداکشن `gzip on` دارد، پس آنچه کاربر واقعا�
 کامنت `code_hash` در اسکیما و مهاجرت همین را می‌گوید، چون کسی که فقط ستون
 را ببیند فکر می‌کند جدول امن است و ممکن است سقف تلاش را بردارد.
 
+### ۲۶. `prismaExtension.test.ts` به Postgres محلی وابسته است
+
+سوئیت mock است ولی `jest.setup.ts` یک `DATABASE_URL_APP` واقعی می‌دهد و
+تست عمداً روی سوکت شکست می‌خورد. روی ماشینی بدون Postgres شکل خطا فرق می‌کند
+و تست ممکن است به دلیل دیگری پاس شود. → ۶.۱
+
 ---
 
 ## ۷. قواعد کاری (`RULES.md`)
@@ -1059,6 +1065,16 @@ S3_ENDPOINT · S3_BUCKET · S3_ACCESS_KEY · S3_SECRET_KEY
 در ۷.۳ فهرست باید کامل باشد پیش از اولین `up`.
 
 ایمیج runtime ~۶۸۰ مگابایت (`node:26-slim` ~۲۰۰، بقیه sharp/libvips و aws-sdk).
+
+### انتساب `undefined` به `process.env` رشته‌ی `"undefined"` می‌سازد
+
+الگوی رایج `afterEach(() => { process.env.X = original })` وقتی متغیر از اول
+تعریف نشده باشد، به‌جای پاک کردنش رشته‌ی `"undefined"` می‌گذارد — و آن را برای
+هر چیزی که بعد اجرا شود جا می‌گذارد. در `productionHardening.test.ts` بلوک
+CORS با `TRUST_PROXY="undefined"` شروع می‌شد که تست قبلی رهایش کرده بود.
+
+    if (original === undefined) delete process.env.X;
+    else process.env.X = original;
 
 ---
 

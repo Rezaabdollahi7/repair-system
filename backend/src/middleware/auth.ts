@@ -3,9 +3,22 @@ import jwt from "jsonwebtoken";
 import { setContextWorkspaceId } from "../lib/workspaceContext";
 import type { AuthUser } from "../types/request";
 
-export const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+// No fallback, deliberately. A default here is a signing key published in
+// the repository: with JWT_SECRET unset, anyone could mint a token carrying
+// any workspaceId, and RLS would faithfully scope every query to whatever
+// the forged token claimed — the isolation from phase 2 defeated by an
+// empty environment variable, with the app looking entirely healthy.
+// Same reasoning as lib/prisma.ts and lib/sms.ts: refuse to start rather
+// than run unsafely.
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error(
+    "JWT_SECRET is not set. See backend/.env.example — there is no default " +
+      "because a default would be a signing key anyone can read.",
+  );
+}
 
+export const JWT_SECRET = jwtSecret;
 /**
  * Narrows a verified JWT payload to the shape the app relies on.
  *

@@ -1,3 +1,13 @@
 node_modules
 dist
+
 .env
+.env.*
+
+.git
+.gitignore
+*.log
+Dockerfile
+Dockerfile.dev
+.dockerignore
+README.md

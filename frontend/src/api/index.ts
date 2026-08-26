@@ -82,9 +82,13 @@ declare module "axios" {
   }
 }
 
-const baseURL =
-  (import.meta.env.VITE_API_URL || "http://localhost:5001") + "/api";
-
+// In production the app and the API are served from one origin behind the
+// reverse proxy, so a relative path is both correct and independent of which
+// domain the bundle ends up on — the built image is not tied to app.dofixo.ir.
+// VITE_API_URL is baked in at build time, so anything absolute here would be.
+const baseURL = import.meta.env.PROD
+  ? "/api"
+  : (import.meta.env.VITE_API_URL || "http://localhost:5001") + "/api";
 // withCredentials so the refresh cookie travels: the API is a different
 // origin from the dev server, and cross-origin requests drop cookies unless
 // asked to carry them.

@@ -112,9 +112,12 @@ services:
       - "443:443"
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Read-only: Caddy needs to read the key, never to write it. The path
+      # is outside the repository so a certificate is never one `git add`
+      # away from being committed.
+      - ${TLS_CERT_DIR}:/etc/caddy/certs:ro
       # caddy_data holds the certificates and the ACME account key. Without
       # it every restart requests a fresh certificate, and Let's Encrypt
       # allows five per domain per week — a few restarts on a bad day and

@@ -62,6 +62,19 @@ export function deviceImageKey(
   return `workspaces/${workspaceId}/devices/${deviceId}/${filename}`;
 }
 
+/**
+ * The thumbnail's key, built beside the full image's rather than derived
+ * from it at read time. What is stored on the row is what gets signed —
+ * see the note on filepath in CLAUDE.md.
+ */
+export function deviceThumbnailKey(
+  workspaceId: number,
+  deviceId: number,
+  filename: string,
+): string {
+  return `workspaces/${workspaceId}/devices/${deviceId}/thumbs/${filename}`;
+}
+
 export function settingsImageKey(
   workspaceId: number,
   filename: string,

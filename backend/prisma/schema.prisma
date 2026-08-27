@@ -285,6 +285,17 @@ model DeviceImage {
   deviceId    Int      @map("device_id")
   filename    String
   filepath    String
+
+  /// Full object key of a 480px copy, stored rather than derived from
+  /// filepath — for the same reason filepath is stored rather than rebuilt
+  /// from workspaceId and deviceId: a computed key stops resolving the
+  /// moment the layout changes or a workspace is restored under a new id,
+  /// which ops/extract-workspace.sh does by design.
+  ///
+  /// Null for rows written before 7.0. The frontend falls back to the full
+  /// image, so an old row renders correctly and merely costs more bytes.
+  thumbnailPath String? @map("thumbnail_path")
+
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 

@@ -235,6 +235,13 @@ business features**. Payment integration is the last phase and is explicitly out
 - Deletion failures are logged, never thrown: an orphaned object wastes a few
   kilobytes, whereas a propagated error leaves a row nobody can remove.
 
+- **How a photo is stored is measured, not assumed.** `lib/imageProfile.ts`
+  holds the numbers and the table they came from: 3400px, quality 85, plus a
+  480px thumbnail. Both keys are stored on the row — `filepath` and
+  `thumbnailPath` — and signed as-is rather than derived.
+- `.rotate()` is not optional. Without it sharp neither applies the EXIF
+  orientation tag nor preserves it, so most phone photos store sideways.
+
 ### Infrastructure
 
 - **One ParsPack VPS in Iran** runs everything: backend, frontend and Postgres,

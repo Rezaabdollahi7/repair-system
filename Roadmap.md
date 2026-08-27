@@ -70,7 +70,7 @@ Goal: move device/settings photos off local disk onto ArvanCloud object storage.
 
 - [x] 4.1 Provision ArvanCloud Object Storage bucket — `reza-app-test-1`, private, Simin region (`s3.ir-thr-at1`)
 - [x] 4.2 Add an S3-compatible client (`@aws-sdk/client-s3` + `s3-request-presigner`), wrapped in `src/lib/storage.ts`
-- [x] 4.3 Replace multer disk storage with direct-to-object-storage upload for device images and settings images. Both convert to webp in memory now; nothing touches disk at any point
+- [x] 4.3 Replace multer disk storage with direct-to-object-storage upload for device images and settings images. Both convert to webp in memory now; nothing touches disk at any point. The conversion profile itself was left until 7.0
 - [x] 4.4 imageController / settingsController / ImageUploader / ImageSlider / DeviceDetailModal / Settings all work from short-lived signed URLs instead of local paths
 - [~] 4.5 Moved to 5.6: restoring the image importer means guessing at a Fineti export's shape without a real one to look at, and it belongs beside importFromExcel rather than on its own
 - [~] 4.6 MinIO deferred: with a real bucket in hand, developing straight against Arvan avoids finding S3 compatibility gaps on deployment day. Revisit if working offline becomes necessary
@@ -171,11 +171,45 @@ plan before that decision.
 
 ## Phase 7 — Dockerization & Deployment
 
+- [x] 7.0 Image processing profile. `sharp` converted the format and nothing
+      else — no resize, no rotate, quality 92 — storing a 48MP phone photo at
+      3.9MB. Storage is the one cost that scales per tenant and never comes
+      down, so the profile was measured rather than guessed: fifteen real
+      repair photographs across five widths and five quality settings.
+      3400px at q85 was chosen by looking at the output, not the table —
+      below it the markings on small ICs stop being readable, which is the
+      whole reason these photographs exist. 6.5x smaller.
+      `.rotate()` was the real find: sharp neither applies the EXIF
+      orientation tag nor carries it across, so eleven of the fifteen were
+      being stored sideways. Each upload now also stores a 480px copy, since
+      the device modal renders every photo at once in a grid at most 128px
+      tall — several megabytes on every open, repeatedly, because a presigned
+      URL is unique per request and nothing the browser caches ever matches
 - [x] 7.1 Write production `Dockerfile` for backend
 - [x] 7.2 Write production `Dockerfile` for frontend (build + serve static, e.g. via Nginx)
 - [x] 7.3 Write `docker-compose.prod.yml` — backend, frontend, reverse proxy **and Postgres**, on one host. Postgres gets its own named volume, and `shared_buffers` must be raised from the image default of 128MB, which wastes most of an 8GB machine
-- [x] 7.4 Set up reverse proxy (Nginx or Caddy) with TLS for `app.dofixo.ir`
-- [x] 7.5 Provision one ParsPack VPS (irVPS5-class: 4 vCPU, 8GB RAM, 100GB SSD), Iran location. Splitting the database onto its own host is deliberately deferred — it costs latency now and buys nothing until there is more than one app instance
+- [x] 7.3a Production hardening of the app itself, found while writing the
+      compose file. JWT_SECRET fell back to a string committed to this
+      repository: unset in production, anyone could mint a token carrying any
+      workspaceId, and RLS would scope every query to exactly what the forged
+      token claimed. `trust proxy` was a boolean, which trusts the whole
+      client-written X-Forwarded-For chain — a caller could present a new
+      address per request and never reuse a rate-limit bucket, voiding the
+      per-IP half of the OTP limit. It is a hop count now. CORS is registered
+      only outside production, where 7.2 made the frontend call a relative /api
+- [x] 7.4 Reverse proxy with TLS for `app.dofixo.ir`. Caddy, with the
+      certificate loaded from disk rather than obtained through ACME: the
+      server has no international connectivity and cannot reach Let's
+      Encrypt. The certificate was issued through ParsPack using DNS-01
+      validation, which works precisely because the server takes no part in
+      it — the CA reads a TXT record and never contacts the host.
+      ⚠️ Nothing renews it. Expires 25 Nov 2026. If international access is
+      enabled, deleting the two `tls` lines hands it back to Caddy
+- [x] 7.5 Provision one VPS. ParsVDS IR_VPS_05 (4 cores, 9.7GB, 79GB NVMe,
+      Ubuntu 24.04) rather than ParsPack — same class, roughly half the
+      price. Splitting the database onto its own host is deliberately
+      deferred: it costs latency now and buys nothing until there is more
+      than one app instance
 - [ ] 7.6 First manual deployment to production infrastructure
 - [ ] 7.7 (Later) Introduce a simple GitHub Actions workflow that runs the test suite on push — a first, minimal step into CI/CD, before considering automated deploys
 - [ ] 7.8 Give the production bucket a lifecycle rule for `workspaces/*/exports/`.
@@ -266,9 +300,11 @@ order.
       server through `onSearch`, so a server-side match can be filtered back
       out. Its effect also depends on `onSearch`, which loops if a caller
       passes an inline function
-- [ ] 10.14 The bundle is a single 713 kB chunk. Lazy-loading the pages
-      through React Router would cut what a first visit downloads, which
-      matters on an Iranian mobile connection
+- [ ] 10.14 The bundle is a single 722 kB chunk — 172 kB after gzip, which
+      the production nginx does apply. Lazy-loading the pages through React
+      Router would still cut what a first visit downloads, but the real
+      figure is the compressed one
+
 - [ ] 10.15 `errorText` is defined identically in five components before
       `utils/errors.ts` existed; fold them into the shared one
 - [ ] 10.16 Add type-aware linting (`parserOptions.project`) now that the

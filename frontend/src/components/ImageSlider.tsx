@@ -120,9 +120,10 @@ export default function ImageSlider({
               }`}
             >
               <img
-                src={img.url}
+                src={img.thumbnail_url ?? img.url}
                 alt={`بند انگشتی ${i + 1}`}
                 className="w-16 h-12 object-cover"
+                loading="lazy"
               />
             </button>
           ))}

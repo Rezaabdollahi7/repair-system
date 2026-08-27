@@ -1,12 +1,13 @@
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import multer from "multer";
-import sharp from "sharp";
 import prisma from "../lib/prisma";
+import { processDeviceImage } from "../lib/imageProfile";
 import {
   deleteObject,
   deleteObjects,
   deviceImageKey,
+  deviceThumbnailKey,
   putObject,
   signedUrlFor,
 } from "../lib/storage";
@@ -20,7 +21,11 @@ import { workspaceIdOf } from "../utils/workspace";
 // now, which is what makes a rebuilt container harmless.
 export const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  // A 48-megapixel phone photo of a detailed scene passes 15MB easily, and
+  // the caller only sees a generic rejection. Raised now that the ceiling
+  // costs nothing downstream: the stored size is set by the resize, not by
+  // what arrived.
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
       return cb(new Error("فقط فایل تصویری مجاز است"));
@@ -66,14 +71,13 @@ export const uploadImages = async (req: Request, res: Response) => {
     for (const file of files) {
       const filename = `${randomUUID()}.webp`;
       const key = deviceImageKey(workspaceId, deviceId, filename);
+      const thumbKey = deviceThumbnailKey(workspaceId, deviceId, filename);
 
-      let converted: Buffer;
+      let processed: { full: Buffer; thumbnail: Buffer };
       try {
-        // Format conversion only — no resize, no rotate. quality 92 is
-        // visually lossless while cutting the file size noticeably, which
-        // matters more now that every view costs bandwidth twice: once to
-        // upload, once for each viewer to fetch.
-        converted = await sharp(file.buffer).webp({ quality: 92 }).toBuffer();
+        // Resized, rotated and re-encoded — see lib/imageProfile for the
+        // measurements the numbers came from.
+        processed = await processDeviceImage(file.buffer);
       } catch (conversionError) {
         console.error(
           `خطا در تبدیل عکس ${file.originalname}:`,
@@ -83,13 +87,31 @@ export const uploadImages = async (req: Request, res: Response) => {
       }
 
       try {
-        await putObject(key, converted, "image/webp");
+        // Full image first: if the thumbnail upload is the one that fails,
+        // the row can still be written with a null thumbnailPath and the
+        // frontend falls back to the full image. The reverse order would
+        // leave a thumbnail with nothing behind it.
+        await putObject(key, processed.full, "image/webp");
       } catch (uploadError) {
         // Skipped rather than aborting the batch: one failed object shouldn't
         // discard the images that did upload. No row is written, so nothing
         // points at an object that isn't there.
         console.error(`خطا در آپلود ${file.originalname}:`, uploadError);
         continue;
+      }
+
+      // A missing thumbnail costs bandwidth, not correctness, so a failure
+      // here is logged and the upload continues — unlike the full image,
+      // whose absence would be a broken picture.
+      let storedThumbKey: string | null = thumbKey;
+      try {
+        await putObject(thumbKey, processed.thumbnail, "image/webp");
+      } catch (thumbError) {
+        console.error(
+          `خطا در آپلود بند انگشتی ${file.originalname}:`,
+          thumbError,
+        );
+        storedThumbKey = null;
       }
 
       const image = await prisma.deviceImage.create({
@@ -101,6 +123,7 @@ export const uploadImages = async (req: Request, res: Response) => {
           // rather than rebuilt from workspaceId and deviceId, so a later
           // change to the key layout leaves existing images findable.
           filepath: key,
+          thumbnailPath: storedThumbKey,
           sortOrder: nextSortOrder,
         },
       });
@@ -113,6 +136,9 @@ export const uploadImages = async (req: Request, res: Response) => {
         filename: image.filename,
         sort_order: image.sortOrder,
         url: await signedUrlFor(key),
+        thumbnail_url: storedThumbKey
+          ? await signedUrlFor(storedThumbKey)
+          : null,
       });
     }
 
@@ -142,6 +168,7 @@ export const getImages = async (req: Request, res: Response) => {
         id: true,
         filename: true,
         filepath: true,
+        thumbnailPath: true,
         sortOrder: true,
         createdAt: true,
       },
@@ -157,6 +184,11 @@ export const getImages = async (req: Request, res: Response) => {
         sort_order: image.sortOrder,
         created_at: image.createdAt.toISOString(),
         url: await signedUrlFor(image.filepath),
+        // Null for rows written before 7.0, and for the rare upload whose
+        // thumbnail failed. The frontend falls back to the full image.
+        thumbnail_url: image.thumbnailPath
+          ? await signedUrlFor(image.thumbnailPath)
+          : null,
       })),
     );
 
@@ -178,7 +210,7 @@ export const deleteImage = async (req: Request, res: Response) => {
     // through it.
     const image = await prisma.deviceImage.findFirst({
       where: { id: imageId, deviceId, workspaceId: workspaceIdOf(req) },
-      select: { id: true, filepath: true },
+      select: { id: true, filepath: true, thumbnailPath: true },
     });
 
     if (!image) {
@@ -189,6 +221,11 @@ export const deleteImage = async (req: Request, res: Response) => {
     // an object that no longer exists, which shows up as a broken image; this
     // order risks an orphaned object, which nobody sees.
     await deleteObject(image.filepath);
+    if (image.thumbnailPath) {
+      // Both objects, or the thumbnails accumulate unreferenced — nobody
+      // would ever see them, and nothing would report them.
+      await deleteObject(image.thumbnailPath);
+    }
     await prisma.deviceImage.delete({ where: { id: image.id } });
 
     res.json({ message: "عکس حذف شد" });
@@ -209,8 +246,16 @@ export const deleteDeviceImages = async (
 ): Promise<void> => {
   const images = await prisma.deviceImage.findMany({
     where: { deviceId, workspaceId },
-    select: { filepath: true },
+    select: { filepath: true, thumbnailPath: true },
   });
 
-  await deleteObjects(images.map((image) => image.filepath));
+  // Thumbnails go in the same batch: filtering out the nulls covers rows
+  // written before 7.0, which have none.
+  const keys = images.flatMap((image) =>
+    image.thumbnailPath
+      ? [image.filepath, image.thumbnailPath]
+      : [image.filepath],
+  );
+
+  await deleteObjects(keys);
 };

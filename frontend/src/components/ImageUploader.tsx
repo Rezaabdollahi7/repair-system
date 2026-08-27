@@ -223,7 +223,10 @@ export default function ImageUploader({
           {existingImages.map((img, i) => (
             <div key={`existing-${img.id}`} className="relative group">
               <img
-                src={img.url}
+                // The grid cell is 112px tall; the full image is 3400px wide.
+                // The slider still opens the full one on click.
+                src={img.thumbnail_url ?? img.url}
+                alt={`عکس ${i + 1}`}
                 onClick={() => setSliderIndex(i)}
                 className="w-full h-28 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition"
               />

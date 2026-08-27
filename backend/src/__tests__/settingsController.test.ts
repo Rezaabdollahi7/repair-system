@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import sharp from "sharp";
+import { processSettingsImage } from "../lib/imageProfile";
 import * as controller from "../controllers/settingsController";
 import prisma from "../lib/prisma";
 import { deleteObject, putObject, signedUrlFor } from "../lib/storage";
@@ -11,7 +11,10 @@ jest.mock("../lib/prisma", () => ({
   },
 }));
 
-jest.mock("sharp");
+jest.mock("../lib/imageProfile", () => ({
+  __esModule: true,
+  processSettingsImage: jest.fn(),
+}));
 
 jest.mock("../lib/storage", () => ({
   __esModule: true,
@@ -104,9 +107,7 @@ beforeEach(() => {
   storage.put.mockResolvedValue(undefined);
   storage.deleteOne.mockResolvedValue(undefined);
   storage.sign.mockResolvedValue(SIGNED);
-  (sharp as unknown as jest.Mock).mockReturnValue({
-    webp: () => ({ toBuffer: jest.fn().mockResolvedValue(CONVERTED) }),
-  });
+  (processSettingsImage as unknown as jest.Mock).mockResolvedValue(CONVERTED);
   // uploadImage reads the row before writing, to remove the object it
   // replaces.
   db.settings.findUnique.mockResolvedValue({});

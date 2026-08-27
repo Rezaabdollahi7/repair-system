@@ -307,9 +307,13 @@ export default function DeviceDetailModal({
                         >
                           <img
                             // Signed by the server: the bucket is private, so
-                            // the key alone would be useless here.
-                            src={img.url}
+                            // the key alone would be useless here. The grid
+                            // is at most 128px tall and this modal shows
+                            // every photo at once, so it takes the thumbnail
+                            // — clicking one opens the full image.
+                            src={img.thumbnail_url ?? img.url}
                             alt={img.filename}
+                            loading="lazy"
                             className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-lg border border-border group-hover:border-primary group-hover:shadow-md transition-all"
                           />
                         </div>

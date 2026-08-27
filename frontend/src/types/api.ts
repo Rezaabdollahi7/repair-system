@@ -89,6 +89,12 @@ export interface DeviceImage {
   filename: string;
   sort_order: number;
   url: string;
+  /**
+   * A 480px copy, signed like `url` is. Null for rows written before 7.0 and
+   * for the rare upload whose thumbnail failed — callers fall back to `url`,
+   * which costs bytes rather than correctness.
+   */
+  thumbnail_url: string | null;
 }
 
 export interface UploadedDeviceImage extends DeviceImage {

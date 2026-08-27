@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import sharp from "sharp";
+import { processDeviceImage } from "../lib/imageProfile";
 import * as controller from "../controllers/imageController";
 import prisma from "../lib/prisma";
 import {
@@ -25,7 +25,13 @@ jest.mock("../lib/prisma", () => ({
   },
 }));
 
-jest.mock("sharp");
+// The profile is mocked rather than sharp underneath it: what this suite
+// checks is which keys the controller builds and which bytes go where, not
+// how sharp is driven. The numbers themselves are imageProfile's business.
+jest.mock("../lib/imageProfile", () => ({
+  __esModule: true,
+  processDeviceImage: jest.fn(),
+}));
 
 // Mocked wholesale rather than mocking the AWS SDK underneath it: what these
 // tests care about is which keys the controller builds and when it signs,
@@ -39,6 +45,11 @@ jest.mock("../lib/storage", () => ({
   // The real implementation, so a change to the key layout shows up here.
   deviceImageKey: (workspaceId: number, deviceId: number, filename: string) =>
     `workspaces/${workspaceId}/devices/${deviceId}/${filename}`,
+  deviceThumbnailKey: (
+    workspaceId: number,
+    deviceId: number,
+    filename: string,
+  ) => `workspaces/${workspaceId}/devices/${deviceId}/thumbs/${filename}`,
 }));
 
 const db = prisma as unknown as {
@@ -53,14 +64,13 @@ const storage = {
   sign: signedUrlFor as unknown as jest.Mock,
 };
 
-const mockedSharp = sharp as unknown as jest.Mock;
+const mockedProcess = processDeviceImage as unknown as jest.Mock;
 
 const CONVERTED = Buffer.from("webp-bytes");
+const THUMBNAIL = Buffer.from("thumb-bytes");
 
-function mockSharpSuccess() {
-  mockedSharp.mockReturnValue({
-    webp: () => ({ toBuffer: jest.fn().mockResolvedValue(CONVERTED) }),
-  });
+function mockProcessSuccess() {
+  mockedProcess.mockResolvedValue({ full: CONVERTED, thumbnail: THUMBNAIL });
 }
 
 function mockResponse() {
@@ -100,6 +110,7 @@ beforeEach(() => {
   storage.deleteOne.mockResolvedValue(undefined);
   storage.deleteMany.mockResolvedValue(undefined);
   storage.sign.mockResolvedValue("https://signed.example/object?sig=x");
+  mockProcessSuccess();
 });
 
 describe("imageController.uploadImages", () => {
@@ -132,7 +143,7 @@ describe("imageController.uploadImages", () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: 4 } });
     echoCreatedRow();
-    mockSharpSuccess();
+    mockProcessSuccess();
 
     await controller.uploadImages(
       mockRequest({ params: { id: 1 } }, [
@@ -152,7 +163,7 @@ describe("imageController.uploadImages", () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     echoCreatedRow();
-    mockSharpSuccess();
+    mockProcessSuccess();
 
     await controller.uploadImages(
       mockRequest({ params: { id: 1 } }, [fakeFile("a.png")]),
@@ -166,7 +177,7 @@ describe("imageController.uploadImages", () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     echoCreatedRow();
-    mockSharpSuccess();
+    mockProcessSuccess();
 
     await controller.uploadImages(
       mockRequest({ params: { id: 7 } }, [fakeFile("a.png")]),
@@ -187,7 +198,7 @@ describe("imageController.uploadImages", () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     echoCreatedRow();
-    mockSharpSuccess();
+    mockProcessSuccess();
 
     await controller.uploadImages(
       mockRequest({ params: { id: 1 } }, [fakeFile("a.png")]),
@@ -198,13 +209,18 @@ describe("imageController.uploadImages", () => {
     expect(key).toContain(`workspaces/${WORKSPACE_ID}/devices/1/`);
     expect(body).toBe(CONVERTED);
     expect(contentType).toBe("image/webp");
+
+    // Second call is the thumbnail, under its own prefix.
+    const [thumbKey, thumbBody] = storage.put.mock.calls[1];
+    expect(thumbKey).toContain(`workspaces/${WORKSPACE_ID}/devices/1/thumbs/`);
+    expect(thumbBody).toBe(THUMBNAIL);
   });
 
   it("answers with a signed url for each stored image", async () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     echoCreatedRow();
-    mockSharpSuccess();
+    mockProcessSuccess();
 
     const res = mockResponse();
     await controller.uploadImages(
@@ -221,9 +237,7 @@ describe("imageController.uploadImages", () => {
   it("writes no row when the conversion fails", async () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
-    mockedSharp.mockReturnValue({
-      webp: () => ({ toBuffer: jest.fn().mockRejectedValue(new Error("bad")) }),
-    });
+    mockedProcess.mockRejectedValue(new Error("bad"));
 
     const res = mockResponse();
     await controller.uploadImages(
@@ -239,7 +253,7 @@ describe("imageController.uploadImages", () => {
   it("writes no row when the upload fails", async () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
-    mockSharpSuccess();
+    mockProcessSuccess();
     storage.put.mockRejectedValue(new Error("network"));
 
     const res = mockResponse();
@@ -258,7 +272,7 @@ describe("imageController.uploadImages", () => {
     db.device.findFirst.mockResolvedValue({ id: 1 });
     db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
     echoCreatedRow();
-    mockSharpSuccess();
+    mockProcessSuccess();
     storage.put
       .mockRejectedValueOnce(new Error("network"))
       .mockResolvedValueOnce(undefined);
@@ -299,6 +313,8 @@ describe("imageController.getImages", () => {
         id: 5,
         filename: "a.webp",
         filepath: "some/legacy/layout/a.webp",
+        // Written before 7.0, so it has no thumbnail.
+        thumbnailPath: null,
         sortOrder: 1,
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
       },
@@ -316,6 +332,7 @@ describe("imageController.getImages", () => {
       sort_order: 1,
       created_at: "2026-01-01T00:00:00.000Z",
       url: "https://signed.example/object?sig=x",
+      thumbnail_url: null,
     });
   });
 });
@@ -343,6 +360,7 @@ describe("imageController.deleteImage", () => {
     db.deviceImage.findFirst.mockResolvedValue({
       id: 5,
       filepath: "workspaces/1/devices/1/a.webp",
+      thumbnailPath: "workspaces/1/devices/1/thumbs/a.webp",
     });
     db.deviceImage.delete.mockResolvedValue({ id: 5 });
 
@@ -357,16 +375,85 @@ describe("imageController.deleteImage", () => {
     expect(storage.deleteOne).toHaveBeenCalledWith(
       "workspaces/1/devices/1/a.webp",
     );
+    // Both objects, or the thumbnails accumulate unreferenced.
+    expect(storage.deleteOne).toHaveBeenCalledWith(
+      "workspaces/1/devices/1/thumbs/a.webp",
+    );
     expect(db.deviceImage.delete).toHaveBeenCalledWith({ where: { id: 5 } });
     expect(res.json).toHaveBeenCalledWith({ message: "عکس حذف شد" });
+  });
+
+  it("records the thumbnail key on the row", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1 });
+    db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
+    echoCreatedRow();
+
+    await controller.uploadImages(
+      mockRequest({ params: { id: 7 } }, [fakeFile("a.png")]),
+      mockResponse(),
+    );
+
+    const { filename, thumbnailPath } =
+      db.deviceImage.create.mock.calls[0][0].data;
+
+    // Stored, not derived at read time — for the same reason filepath is:
+    // a computed key stops resolving once the layout changes or a workspace
+    // is restored under a new id.
+    expect(thumbnailPath).toBe(
+      `workspaces/${WORKSPACE_ID}/devices/7/thumbs/${filename}`,
+    );
+  });
+
+  it("stores the image anyway when only the thumbnail fails", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1 });
+    db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
+    echoCreatedRow();
+    storage.put
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("network"));
+
+    const res = mockResponse();
+    await controller.uploadImages(
+      mockRequest({ params: { id: 1 } }, [fakeFile("a.png")]),
+      res,
+    );
+
+    // A missing thumbnail costs bandwidth, not correctness: the frontend
+    // falls back to the full image. Losing the photograph over it would be
+    // the wrong trade.
+    expect(db.deviceImage.create).toHaveBeenCalledTimes(1);
+    expect(
+      db.deviceImage.create.mock.calls[0][0].data.thumbnailPath,
+    ).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it("answers with both urls", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1 });
+    db.deviceImage.aggregate.mockResolvedValue({ _max: { sortOrder: null } });
+    echoCreatedRow();
+
+    const res = mockResponse();
+    await controller.uploadImages(
+      mockRequest({ params: { id: 1 } }, [fakeFile("a.png")]),
+      res,
+    );
+
+    const image = res.json.mock.calls[0][0].images[0];
+    expect(image.url).toBe("https://signed.example/object?sig=x");
+    expect(image.thumbnail_url).toBe("https://signed.example/object?sig=x");
   });
 });
 
 describe("imageController.deleteDeviceImages", () => {
   it("deletes every object in one call but leaves the rows to the cascade", async () => {
     db.deviceImage.findMany.mockResolvedValue([
-      { filepath: "workspaces/1/devices/1/a.webp" },
-      { filepath: "workspaces/1/devices/1/b.webp" },
+      {
+        filepath: "workspaces/1/devices/1/a.webp",
+        thumbnailPath: "workspaces/1/devices/1/thumbs/a.webp",
+      },
+      // No thumbnail: a row from before 7.0.
+      { filepath: "workspaces/1/devices/1/b.webp", thumbnailPath: null },
     ]);
 
     await controller.deleteDeviceImages(1, WORKSPACE_ID);
@@ -377,6 +464,7 @@ describe("imageController.deleteDeviceImages", () => {
     });
     expect(storage.deleteMany).toHaveBeenCalledWith([
       "workspaces/1/devices/1/a.webp",
+      "workspaces/1/devices/1/thumbs/a.webp",
       "workspaces/1/devices/1/b.webp",
     ]);
     expect(db.deviceImage.delete).not.toHaveBeenCalled();

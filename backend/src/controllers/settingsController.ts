@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import multer from "multer";
-import sharp from "sharp";
+import { processSettingsImage } from "../lib/imageProfile";
 import prisma from "../lib/prisma";
 import type { Prisma, Settings } from "../generated/prisma/client";
 import {
@@ -232,10 +232,7 @@ export const uploadImage = async (req: Request, res: Response) => {
       select: { [column]: true } as Record<string, boolean>,
     });
 
-    // webp keeps transparency, so a stamp or signature with a clear
-    // background survives the conversion intact.
-    const converted = await sharp(file.buffer).webp({ quality: 92 }).toBuffer();
-
+    const converted = await processSettingsImage(file.buffer);
     const key = settingsImageKey(workspaceId, `${type}-${randomUUID()}.webp`);
     await putObject(key, converted, "image/webp");
 

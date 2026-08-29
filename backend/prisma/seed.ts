@@ -34,22 +34,10 @@ async function main() {
     );
   }
 
-  // Roles are reference data shared by every workspace, so they're seeded
-  // once and carry no workspaceId. They also have to exist before any
-  // workspace, since its owner needs one.
-  const roles = [
-    { name: "super_admin", label: "سوپر ادمین" },
-    { name: "admin", label: "ادمین" },
-    { name: "technician", label: "تکنسین" },
-  ];
-
-  for (const role of roles) {
-    await prisma.role.upsert({
-      where: { name: role.name },
-      update: { label: role.label },
-      create: role,
-    });
-  }
+  // Roles are not seeded here any more — they are reference data and live in
+  // migration 20260828000000_seed_roles, so every database has them without
+  // a second step. Defining them in both places would drift the moment
+  // either changed.
 
   // No natural key to upsert on — a workspace name isn't unique — so an
   // existing one is left alone rather than duplicated on a re-seed.

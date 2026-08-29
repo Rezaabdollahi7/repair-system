@@ -87,7 +87,7 @@ export function settingsImageKey(
  * one rule that keeps shops apart in object storage holds here too.
  */
 export function exportKey(workspaceId: number, filename: string): string {
-  return `workspaces/${workspaceId}/exports/${filename}`;
+  return `exports/${workspaceId}/${filename}`;
 }
 
 export async function putObject(

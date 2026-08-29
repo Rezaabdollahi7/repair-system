@@ -210,12 +210,14 @@ plan before that decision.
       price. Splitting the database onto its own host is deliberately
       deferred: it costs latency now and buys nothing until there is more
       than one app instance
-- [ ] 7.6 First manual deployment to production infrastructure
+- [x] 7.6a Roles into a migration and export keys out of the workspace prefix.
+      Production setup is `migrate deploy` alone, and the lifecycle rule in
+      7.8 has a prefix it can target without expiring every shop's photographs
 - [ ] 7.7 (Later) Introduce a simple GitHub Actions workflow that runs the test suite on push — a first, minimal step into CI/CD, before considering automated deploys
-- [ ] 7.8 Give the production bucket a lifecycle rule for `workspaces/*/exports/`.
-      Data exports accumulate: every one a workshop asks for stays until
-      someone deletes it, and nobody will. Thirty days is longer than anyone
-      needs a file they already downloaded
+- [x] 7.8 Lifecycle rule on `exports/` in the production bucket: 30 days on
+      current versions, 7 on incomplete multipart uploads. Needed 7.6a first —
+      Arvan matches a plain prefix, and the old key layout had none that meant
+      "exports"
 
 ## Phase 8 — Subscriptions & Billing (last phase, on hold)
 

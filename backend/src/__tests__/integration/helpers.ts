@@ -64,6 +64,8 @@ export interface TwoWorkspaces {
  * shows up when there is something on the other side to leak.
  */
 export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
+  // Recreated here even though a migration inserts them: truncateAll() empties
+  // every table including roles, so they are gone by the time a test runs.
   const roles = [
     { name: "super_admin", label: "سوپر ادمین" },
     { name: "admin", label: "ادمین" },

@@ -47,6 +47,11 @@ services:
         max-file: "3"
 
   backend:
+    # Tagged explicitly: docker-compose.yml builds the development image under
+    # the same default name, and one overwriting the other is not something
+    # you notice until a container on the server is running tsx watch as root
+    # with NODE_ENV unset.
+    image: dofixo-backend:prod
     build:
       context: ./backend
       target: runtime
@@ -95,6 +100,7 @@ services:
     logging: *logging
 
   frontend:
+    image: dofixo-frontend:prod
     build:
       context: ./frontend
       target: runtime
@@ -132,6 +138,10 @@ services:
   # This is the one place DATABASE_URL exists.
   migrate:
     profiles: ["tooling"]
+    # Tagged and built on the workstation like the other two: the server has
+    # no source tree and no route to npm, so `build` here would fail on a
+    # missing context — which is what happened the first time this ran.
+    image: dofixo-migrate:prod
     build:
       context: ./backend
       target: tooling

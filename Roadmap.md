@@ -257,6 +257,39 @@ so a screen that breaks has one obvious cause rather than three.
       Also: PersianDatePicker accepts `className`, `required` and `clearable` and reads none of them, and several modals accept a `zIndex` they never apply — layout concerns that belong here rather than scattered across a bug list
 - [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8 fixed the prefixes per invoice kind. Touches the schema, the settings form and the response shape, so it belongs with the other frontend work
 
+## Authorization Gap (before phase 10)
+
+Found while looking at 10.8, which the roadmap had recorded as a routing bug
+in the frontend. It is not: the guard is missing on the server too, so a
+technician does not merely reach the page by typing a URL — a `curl` with
+their own token reads purchase prices, profit margins, sale invoices and the
+whole catalogue. RLS does not help, because the data belongs to their own
+workspace; the question is role, not tenant.
+
+Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
+`items` · `purchaseInvoices` · `saleInvoices` · `repairInvoices` · `reports`.
+`exports` and `personnel` already have it. `categories`, `services` and
+`images` are deliberately open — a technician needs them.
+
+- [ ] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
+      and on its own: closing only the frontend would hide the gap rather
+      than shut it
+- [ ] AUTH.2 Integration tests that hit each of the five with a technician's
+      token and expect 403. Not a unit test of the middleware — the middleware
+      already works, and what failed was nobody wiring it up. A route file
+      without a guard has to fail the suite
+- [ ] AUTH.3 Move `dashboard` and the three report pages inside
+      `ProtectedRoute minRole="admin"` in App.tsx, matching what the sidebar
+      already claims. The dashboard stays admin-only rather than being
+      served a reduced payload — that is a product decision for phase 9, and
+      if it is ever taken, the filtering belongs in the controller
+      ⚠️ `/reports/transactions` has no sidebar link but does have a route,
+      and it calls the dashboard endpoint. It has to move too, or a
+      technician lands on an error page instead of a redirect
+- [ ] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
+      guards it with `minRole="admin"`, so a technician sees a link that
+      redirects them away. One or the other is wrong; the route is right
+
 ## Phase 10 — Frontend Bug Fixes
 
 Found while converting the frontend to TypeScript and deliberately left
@@ -292,10 +325,8 @@ order.
 
 ### Inconsistent
 
-- [ ] 10.8 The dashboard and the three report pages sit outside
-      `ProtectedRoute minRole="admin"` while the sidebar marks them
-      `adminOnly`, so a technician cannot see the links but can reach the
-      pages by typing the URL
+- [x] 10.8 Turned out to be a server-side authorization gap rather than a
+      routing bug — see "Authorization Gap" above
 - [ ] 10.9 `received`, the schema's default device status, appears in none of
       the four status maps in the frontend, so a device nobody has touched
       shows its raw status string

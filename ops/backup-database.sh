@@ -10,8 +10,6 @@
 # machine and never should be — a server that has been broken into must not be
 # able to read its own backup history.
 #
-#   ./ops/backup-database.sh
-#
 # ⚠️ The VPS's own snapshots do not replace this. A machine snapshot is
 # crash-consistent rather than application-consistent, restoring one means
 # restoring the whole server, and a single workspace cannot be pulled out of
@@ -20,7 +18,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 log() {
   printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -39,14 +36,38 @@ CONFIG="$SCRIPT_DIR/backup.env"
 # shellcheck source=/dev/null
 set -a && . "$CONFIG" && set +a
 
-for var in POSTGRES_SERVICE POSTGRES_USER POSTGRES_DB AGE_PUBLIC_KEY \
+# COMPOSE_DIR and COMPOSE_FILE come from the config rather than being derived
+# from this script's location: on the server there is no repository, only the
+# compose file and this script side by side, and the file is named
+# docker-compose.prod.yml rather than the default.
+for var in COMPOSE_DIR COMPOSE_FILE COMPOSE_ENV_FILE \
+           POSTGRES_SERVICE POSTGRES_USER POSTGRES_DB AGE_PUBLIC_KEY \
            S3_ENDPOINT S3_BUCKET S3_PREFIX S3_ACCESS_KEY S3_SECRET_KEY; do
   [ -n "${!var:-}" ] || die "$var is not set in $CONFIG"
 done
 
-for tool in docker age aws; do
+# s3cmd rather than the AWS CLI: Ubuntu 24.04 dropped the awscli package, and
+# the official installer needs international connectivity this server does not
+# have.
+for tool in docker age s3cmd; do
   command -v "$tool" >/dev/null || die "$tool is not installed"
 done
+
+compose() {
+  docker compose -f "$COMPOSE_DIR/$COMPOSE_FILE" \
+    --env-file "$COMPOSE_DIR/$COMPOSE_ENV_FILE" "$@"
+}
+
+# s3cmd takes its credentials on the command line rather than from a config
+# file, so there is nothing on disk holding them beyond backup.env itself.
+s3() {
+  s3cmd \
+    --access_key="$S3_ACCESS_KEY" \
+    --secret_key="$S3_SECRET_KEY" \
+    --host="${S3_ENDPOINT#https://}" \
+    --host-bucket="%(bucket)s.${S3_ENDPOINT#https://}" \
+    "$@"
+}
 
 # ─── Working space ────────────────────────────────────────────
 
@@ -88,8 +109,7 @@ log "dumping $POSTGRES_DB"
 # -T so docker doesn't allocate a tty, which would corrupt the binary stream.
 # --clean --if-exists so the dump can be replayed over an existing database
 # without hand-dropping it first.
-cd "$REPO_ROOT"
-docker compose exec -T "$POSTGRES_SERVICE" \
+compose exec -T "$POSTGRES_SERVICE" \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
   | gzip -9 \
   | age -r "$AGE_PUBLIC_KEY" -o "$LOCAL"
@@ -112,18 +132,11 @@ log "dumped and encrypted: $NAME ($(numfmt --to=iec "$SIZE"))"
 
 # ─── Upload ───────────────────────────────────────────────────
 
-export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY"
-export AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY"
-export AWS_DEFAULT_REGION="default"
-
 REMOTE_DIR="s3://$S3_BUCKET/$S3_PREFIX/$TIER"
 
 log "uploading to $REMOTE_DIR/ (keeping $KEEP)"
 
-aws s3 cp "$LOCAL" "$REMOTE_DIR/$NAME" \
-  --endpoint-url "$S3_ENDPOINT" \
-  --only-show-errors \
-  || die "upload failed"
+s3 put "$LOCAL" "$REMOTE_DIR/$NAME" --quiet || die "upload failed"
 
 # ─── Prune ────────────────────────────────────────────────────
 
@@ -132,8 +145,11 @@ aws s3 cp "$LOCAL" "$REMOTE_DIR/$NAME" \
 #
 # Names sort chronologically because the timestamp is ISO-like and zero
 # padded, so plain sort is enough — no date parsing to get wrong.
-EXISTING="$(aws s3 ls "$REMOTE_DIR/" --endpoint-url "$S3_ENDPOINT" \
-  | awk '{print $4}' | grep -v '^$' | sort)" || die "listing failed"
+#
+# s3cmd ls prints the full s3:// URI in its last column, so the filename is
+# taken from the basename rather than the column itself.
+EXISTING="$(s3 ls "$REMOTE_DIR/" | awk '{print $NF}' | xargs -r -n1 basename \
+  | grep -v '^$' | sort)" || die "listing failed"
 
 COUNT="$(printf '%s\n' "$EXISTING" | grep -c . || true)"
 
@@ -145,8 +161,7 @@ if [ "$COUNT" -gt "$KEEP" ]; then
   while IFS= read -r old; do
     [ -n "$old" ] || continue
     log "pruning $TIER/$old"
-    aws s3 rm "$REMOTE_DIR/$old" --endpoint-url "$S3_ENDPOINT" --only-show-errors \
-      || log "WARNING: could not remove $old"
+    s3 rm "$REMOTE_DIR/$old" --quiet || log "WARNING: could not remove $old"
   done <<< "$DOOMED"
 fi
 

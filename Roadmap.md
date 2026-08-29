@@ -68,7 +68,9 @@ token handling.
 
 Goal: move device/settings photos off local disk onto ArvanCloud object storage.
 
-- [x] 4.1 Provision ArvanCloud Object Storage bucket — `reza-app-test-1`, private, Simin region (`s3.ir-thr-at1`)
+- [x] 4.1 Provision ArvanCloud Object Storage — private, Simin region
+      (`s3.ir-thr-at1`). `reza-app-test-1` for development; production got
+      `dofixo-prod` in 7.6
 - [x] 4.2 Add an S3-compatible client (`@aws-sdk/client-s3` + `s3-request-presigner`), wrapped in `src/lib/storage.ts`
 - [x] 4.3 Replace multer disk storage with direct-to-object-storage upload for device images and settings images. Both convert to webp in memory now; nothing touches disk at any point. The conversion profile itself was left until 7.0
 - [x] 4.4 imageController / settingsController / ImageUploader / ImageSlider / DeviceDetailModal / Settings all work from short-lived signed URLs instead of local paths
@@ -205,11 +207,21 @@ plan before that decision.
       it — the CA reads a TXT record and never contacts the host.
       ⚠️ Nothing renews it. Expires 25 Nov 2026. If international access is
       enabled, deleting the two `tls` lines hands it back to Caddy
-- [x] 7.5 Provision one VPS. ParsVDS IR_VPS_05 (4 cores, 9.7GB, 79GB NVMe,
+- [x] 7.5 Provision one VPS. ParsVDS IR\*VPS_05 (4 cores, 9.7GB, 79GB NVMe,
       Ubuntu 24.04) rather than ParsPack — same class, roughly half the
       price. Splitting the database onto its own host is deliberately
       deferred: it costs latency now and buys nothing until there is more
       than one app instance
+- [x] 7.6 First manual deployment. Images are built on the workstation and
+      moved with `docker save`: the server reaches neither Docker Hub nor
+      npm, so nothing is ever built there. All three services carry an
+      explicit `:prod` tag — without one the production build overwrites the
+      development image, and what ships is tsx watch running as root with
+      NODE_ENV unset.
+      Verified end to end: sign-up over real SMS, a photo uploaded with
+      rotation and a thumbnail, a data export, and a backup whose restore was
+      actually tested — 21 policies and all four app\*\* functions present in a
+      dump decrypted on the workstation. Only 80 and 443 answer from outside.
 - [x] 7.6a Roles into a migration and export keys out of the workspace prefix.
       Production setup is `migrate deploy` alone, and the lifecycle rule in
       7.8 has a prefix it can target without expiring every shop's photographs

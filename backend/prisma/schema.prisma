@@ -36,6 +36,10 @@ enum WorkspaceStatus {
   trial
   active
   expired
+  // A workspace whose tenant data was removed after 30 days past expiry.
+  // The row itself stays: payments and subscription events point at it, and
+  // a ledger that loses its subject is not a ledger. See 8.7.
+  deleted
 
   @@map("workspace_status")
 }
@@ -61,6 +65,17 @@ model Workspace {
   // asked of it is always "may this workspace still be written to".
   status    WorkspaceStatus @default(trial)
   expiresAt DateTime?       @map("expires_at")
+
+  // Read-only enforcement computes from expiresAt and the clock, never from
+  // `status`: a stored column is only as fresh as the last cron run, and a
+  // night the job fails to run must not hand every expired workspace another
+  // day of writes. `status` is for reporting and filtering.
+  //
+  // Our own workspaces and any demo account. Deliberately has no route and
+  // no schema validation anywhere — it is set with psql and nothing else,
+  // because a flag that cannot be reached cannot be abused.
+  neverExpires Boolean   @default(false) @map("never_expires")
+  deletedAt    DateTime? @map("deleted_at")
 
   // Invoice numbering, one counter per kind. Held here rather than derived
   // from COUNT(*): counting reads a value two concurrent requests can both
@@ -91,7 +106,17 @@ model Workspace {
   backups               Backup[]
   refreshTokens         RefreshToken[]
 
+  payments                  Payment[]
+  subscriptionEvents        SubscriptionEvent[]
+  discountCodeUses          DiscountCodeUse[]
+  referralCode              ReferralCode?
+  referralsMade             Referral[]                 @relation("ReferralReferrer")
+  referralReceived          Referral?                  @relation("ReferralReferred")
+  subscriptionNotifications SubscriptionNotification[]
+
   @@index([status])
+  // The nightly job scans by expiry, not by status.
+  @@index([expiresAt])
   @@map("workspaces")
 }
 
@@ -139,6 +164,7 @@ model User {
   repairInvoicePayments  RepairInvoicePayment[]
   backups                Backup[]
   refreshTokens          RefreshToken[]
+  payments               Payment[]
 
   @@index([workspaceId])
   @@index([roleId])
@@ -705,4 +731,291 @@ model Backup {
   @@index([workspaceId])
   @@index([createdBy])
   @@map("backups")
+}
+
+
+// ── Subscriptions & billing ──────────────────────────────────
+
+// Named subscription_payment_status, not payment_status: the invoice tables
+// already carry a `payment_status` column of their own with an unrelated
+// meaning, and two names one letter apart in the same database is a mistake
+// waiting for a tired evening.
+enum SubscriptionPaymentStatus {
+  // A request was made to Zibal; the customer may not have reached the
+  // gateway yet.
+  pending
+  // Zibal said the money moved, but we have not called verify. This is the
+  // orphaned payment: the state the nightly settlement job looks for.
+  paid
+  // Verified with Zibal and the subscription extended. The only successful
+  // terminal state.
+  verified
+  failed
+
+  @@map("subscription_payment_status")
+}
+
+enum SubscriptionEventType {
+  trial
+  payment
+  referral
+  // An operator correction, made with psql. Recorded like any other change
+  // so the expiry date is always explainable.
+  manual
+
+  @@map("subscription_event_type")
+}
+
+enum DiscountCodeType {
+  percent
+  fixed
+
+  @@map("discount_code_type")
+}
+
+// Every message the subscription cron can send. All five are listed now
+// rather than added when each is wired up: ALTER TYPE ... ADD VALUE cannot
+// be used in the same transaction that adds it, so a later migration that
+// both adds a value and writes it would fail.
+enum SubscriptionNotificationKind {
+  before_expiry_7
+  before_expiry_1
+  on_expiry
+  after_expiry_3
+  after_expiry_23
+
+  @@map("subscription_notification_kind")
+}
+
+/// Reference data shared by every workspace, like `roles`: no RLS, and the
+/// application role holds SELECT only. Plans are created and priced with
+/// psql, never through the app.
+///
+/// Never deleted, only deactivated — a plan a past payment points at has to
+/// stay readable for that receipt to render.
+model Plan {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  name         String
+  durationDays Int      @map("duration_days")
+  /// Rials, like every other amount in the schema. The frontend divides by
+  /// ten for display; the database never holds tomans.
+  priceRials   Decimal  @map("price_rials") @db.Decimal(18, 0)
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  payments Payment[]
+
+  @@map("plans")
+}
+
+/// The ledger. Rows are appended and never removed — the application role has
+/// no DELETE on this table, deliberately.
+///
+/// Price and duration are copied onto the row rather than read through planId
+/// at display time. Prices move with inflation, and a receipt from last year
+/// that renders at this year's price is not a receipt.
+model Payment {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @map("workspace_id")
+  planId      Int @map("plan_id")
+
+  /// Ours, sent to Zibal as orderId and shown in their panel.
+  orderId String  @unique @map("order_id")
+  /// Zibal's. int64 in their API, so BigInt rather than Int. Null until the
+  /// request succeeds.
+  trackId BigInt? @unique @map("track_id")
+
+  status SubscriptionPaymentStatus @default(pending)
+
+  basePriceRials   Decimal @map("base_price_rials") @db.Decimal(18, 0)
+  discountRials    Decimal @default(0) @map("discount_rials") @db.Decimal(18, 0)
+  /// What actually went to Zibal, and what verify must return. A mismatch
+  /// means something was tampered with between here and the gateway.
+  amountRials      Decimal @map("amount_rials") @db.Decimal(18, 0)
+  planDurationDays Int     @map("plan_duration_days")
+
+  refNumber  String? @map("ref_number")
+  /// Masked by Zibal before it reaches us (62741****44). Stored as given.
+  cardNumber String? @map("card_number")
+
+  paidAt        DateTime? @map("paid_at")
+  verifiedAt    DateTime? @map("verified_at")
+  /// Zibal's result or status code with its meaning, for the operator.
+  failureReason String?   @map("failure_reason")
+
+  /// Optional with SetNull, like every other createdBy in the schema. It was
+  /// briefly NOT NULL with Restrict, which meant a super admin could not
+  /// delete an employee who had ever paid — a foreign key error on an
+  /// operation with nothing to do with billing. The ledger is complete
+  /// without it: workspace, amount and date are what a payment is, and who
+  /// pressed the button is useful detail rather than part of the record.
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Restrict, not Cascade: deleting a workspace must fail loudly while its
+  /// payments exist. 8.7 removes tenant data and leaves the workspace row as
+  /// a tombstone, so this never fires — it is here for the day someone
+  /// writes a delete that forgets.
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  events      SubscriptionEvent[]
+  discountUse DiscountCodeUse?
+  referral    Referral?
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  /// The settlement job's query: everything still in `paid`.
+  @@index([status])
+  @@index([planId])
+  @@index([createdBy])
+  @@map("payments")
+}
+
+/// Why the expiry date is what it is.
+///
+/// Separate from Payment because most changes are not payments: the trial,
+/// a referral reward, an operator correction. With only Payment to go on,
+/// "why does my subscription end then" would have no answer for three of the
+/// four ways it moves.
+///
+/// Append-only: no UPDATE and no DELETE for the application role.
+model SubscriptionEvent {
+  id          Int                   @id @default(autoincrement())
+  workspaceId Int                   @map("workspace_id")
+  type        SubscriptionEventType
+  days        Int
+  /// Null for the very first event, where the workspace had no expiry yet.
+  previousExpiresAt DateTime? @map("previous_expires_at")
+  newExpiresAt      DateTime  @map("new_expires_at")
+  paymentId         Int?      @map("payment_id")
+  note              String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  payment   Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([paymentId])
+  @@map("subscription_events")
+}
+
+/// Reference data like Plan: created with psql, SELECT only for the app.
+///
+/// There is no usedCount column on purpose. A counter the application role
+/// cannot increment would need a write grant on reference data, and a
+/// counter that can drift from the rows it counts is worse than no counter:
+/// maxUses is checked against COUNT(*) on discount_code_uses.
+model DiscountCode {
+  id   Int              @id @default(autoincrement())
+  code String           @unique
+  type DiscountCodeType
+  /// Whole percent for `percent`, rials for `fixed`.
+  value Decimal @db.Decimal(18, 0)
+
+  expiresAt DateTime? @map("expires_at")
+  /// Null means unlimited. Without it, one code shared in a Telegram group
+  /// is a permanent discount.
+  maxUses   Int?      @map("max_uses")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  uses DiscountCodeUse[]
+
+  @@map("discount_codes")
+}
+
+/// One row per code actually spent.
+///
+/// ⚠️ Written when the payment verifies, NOT when it is requested. A card
+/// that declines three times would otherwise burn the customer's one use on
+/// money that never moved.
+///
+/// The composite unique is the "once per workspace" rule itself, held in the
+/// database rather than in a controller that could be bypassed by a second
+/// route later.
+model DiscountCodeUse {
+  id             Int      @id @default(autoincrement())
+  workspaceId    Int      @map("workspace_id")
+  discountCodeId Int      @map("discount_code_id")
+  paymentId      Int      @unique @map("payment_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  discountCode DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Restrict)
+  payment      Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([discountCodeId, workspaceId])
+  @@index([workspaceId])
+  @@map("discount_code_uses")
+}
+
+/// A workspace's invite code.
+///
+/// Readable by everyone, by policy: sign-up has to resolve a code belonging
+/// to a workspace the caller has no relationship with. That is not a leak —
+/// an invite code is a string its owner hands out on purpose, and the row
+/// carries nothing else. Writes stay scoped, and there is no UPDATE or
+/// DELETE grant: a code that changes is a link that stops working.
+///
+/// Alphabet excludes I, O, 0 and 1 — this code gets read aloud over the
+/// phone.
+model ReferralCode {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @unique @map("workspace_id")
+  code        String   @unique
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("referral_codes")
+}
+
+/// Who brought whom. Written at sign-up, rewarded after the invited
+/// workspace's first payment verifies.
+///
+/// referredWorkspaceId is unique: a workspace is invited once, ever. Without
+/// it, deleting and recreating the relationship would let one referrer be
+/// paid repeatedly for the same shop.
+///
+/// The policy on this table is two-sided — either party may read the row —
+/// which no other table in the schema needs.
+model Referral {
+  id                  Int       @id @default(autoincrement())
+  referrerWorkspaceId Int       @map("referrer_workspace_id")
+  referredWorkspaceId Int       @unique @map("referred_workspace_id")
+  /// The payment that triggered the reward. Null until it does.
+  paymentId           Int?      @unique @map("payment_id")
+  rewardedAt          DateTime? @map("rewarded_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  referrer Workspace @relation("ReferralReferrer", fields: [referrerWorkspaceId], references: [id], onDelete: Restrict)
+  referred Workspace @relation("ReferralReferred", fields: [referredWorkspaceId], references: [id], onDelete: Restrict)
+  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([referrerWorkspaceId])
+  @@map("referrals")
+}
+
+/// What the cron has already sent.
+///
+/// The composite unique is what makes the job safe to run twice: keyed on
+/// the expiry it was sent about, so a renewal opens a fresh set of messages
+/// while a second run on the same day sends nothing.
+model SubscriptionNotification {
+  id                Int                          @id @default(autoincrement())
+  workspaceId       Int                          @map("workspace_id")
+  kind              SubscriptionNotificationKind
+  expiresAtSnapshot DateTime                     @map("expires_at_snapshot")
+  sentAt            DateTime                     @default(now()) @map("sent_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, kind, expiresAtSnapshot])
+  @@index([workspaceId])
+  @@map("subscription_notifications")
 }

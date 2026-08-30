@@ -231,18 +231,75 @@ plan before that decision.
       Arvan matches a plain prefix, and the old key layout had none that meant
       "exports"
 
-## Phase 8 — Subscriptions & Billing (last phase, on hold)
+## Phase 8 — Subscriptions & Billing
 
-Not being built yet — sequenced last on purpose. Revisit together when ready.
+- [ ] 8.1 Schema and migration: Plan, Payment, SubscriptionEvent,
+      DiscountCode, DiscountCodeUse, ReferralCode, Referral,
+      SubscriptionNotification.
+      Plan and DiscountCode follow the `roles` pattern — reference data,
+      no RLS, SELECT only for the app role. The rest carry workspace_id
+      and their policy in the same migration.
+      Referral needs a two-sided policy (either party sees the row) and
+      ReferralCode a read-open/write-scoped pair, which keeps it out of
+      UNSCOPED_MODELS. No DELETE grant on payments: a ledger that can be
+      erased is not a ledger.
+      Also: seed the three plans, and update the policy count in
+      ops/restore-database.md from 21
 
-- [ ] 8.1 Add `Subscription` model (workspace, plan, status, startedAt, expiresAt)
-- [ ] 8.2 Implement 1 month free trial assignment on workspace creation
-- [ ] 8.3 Implement read-only enforcement once a subscription/trial lapses (middleware that blocks writes but allows reads)
-- [ ] 8.4 Zibal payment gateway integration (checkout, callback/webhook, plan activation)
-- [ ] 8.5 Plan selection UI (monthly / 3-month / 6-month / annual — same features, different price/duration)
-- [~] 8.6 Moved out of this phase — see "Phone Verification" below. It is a
-  deployment prerequisite, not a billing feature: sign-up is an open
-  endpoint until it exists
+- [ ] 8.2 Subscription engine in utils/: extendSubscription(),
+      from max(now, expiresAt) so a reward isn't spent in the past.
+      Every change writes a SubscriptionEvent — trial, payment, referral
+      and manual correction all pass through one function, so "why is my
+      expiry this date" always has an answer.
+      populateWorkspace() gains the 30-day trial and the referral code
+
+- [ ] 8.3 Read-only guard, 402 rather than 403: expired is not forbidden.
+      Computed from expiresAt and the clock, never from Workspace.status —
+      a stored column is only as fresh as the last cron run, and
+      authorization must not depend on a job having succeeded.
+      Grace: writes allowed for 3 days past expiry.
+      Open regardless: auth, payment, password and profile, and
+      GET /exports plus its download. POST /exports is closed —
+      a past export can be taken away, a new one cannot be built.
+      A `neverExpires` column for our own and demo workspaces, settable
+      only from the database: no route means no way to reach it
+
+- [ ] 8.4 Server-side pricing: plan price, discount code, referral
+      discount, larger of the two rather than both, rounded to 10,000
+      rials. The client sends a plan and a code, never an amount
+
+- [ ] 8.5 Zibal: request, verify, and settlement of orphaned payments.
+      The standard method, not lazy — lazy auto-refunds after 20 minutes,
+      which a daily cron can never beat, and its callback is a POST that
+      no frontend page can receive.
+      Result 201 ("already verified") is success, not an error, and must
+      not extend a second time. The amount that comes back is checked
+      against what was expected.
+      ⚠️ Depends on Referrer-Policy in the Caddyfile staying
+      strict-origin-when-cross-origin: no-referrer makes Zibal refuse to
+      open the gateway at all
+
+- [ ] 8.6 Referral: code at sign-up, reward after the invited workshop's
+      payment verifies, first purchase only.
+      The reward writes to another workspace, so it goes through
+      runWithWorkspace() — the id comes from our own row, never from the
+      client
+
+- [ ] 8.7 ops/subscription-cron.sh on the host, following
+      backup-database.sh. Reminders, SMS, read-only transitions, deletion
+      after 30 days, and settlement of unverified payments.
+      Idempotent: SubscriptionNotification records what was sent, so a
+      second run in one day sends nothing twice.
+      Deletion removes Arvan objects under workspaces/{id}/ as well —
+      rows alone would leave the photographs paid for forever
+
+- [ ] 8.8 Frontend: subscription page, plan selection, discount code
+      field, countdown banner, and the callback page that asks the
+      backend to verify rather than trusting the query string
+
+- [ ] 8.9 Frontend: referral page, payment history, printable receipt
+      following the InvoicePreview pattern — no new dependency, and the
+      browser's own "save as PDF" does the rest
 
 ## Phase 9 — UI Consolidation (after the migration settles)
 

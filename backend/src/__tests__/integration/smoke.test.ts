@@ -69,9 +69,12 @@ describe("integration plumbing", () => {
   it("shares only the tables that were chosen to be shared", async () => {
     // The mirror image, which the query above cannot see: a table with no
     // workspace_id is invisible to it, so one added by accident would pass
-    // in silence. Four are expected, each for its own reason — the tenant
-    // itself, reference data, Prisma's bookkeeping, and codes sent before
-    // any workspace exists (OTP.1).
+    // in silence. Each name below is here for its own reason — the tenant
+    // itself, reference data, Prisma's bookkeeping, codes sent before any
+    // workspace exists (OTP.1), and `referrals`, which is tenant data but
+    // names its two columns after the two sides of the relationship. That
+    // last one is protected by a policy the query above cannot verify, so
+    // it gets a test of its own below.
     const shared = await owner.$queryRaw<{ relname: string }[]>`
       SELECT c.relname
       FROM pg_class c
@@ -89,10 +92,42 @@ describe("integration plumbing", () => {
 
     expect(shared.map((row) => row.relname)).toEqual([
       "_prisma_migrations",
+      "discount_codes",
       "otp_codes",
+      "plans",
+      "referrals",
       "roles",
       "workspaces",
     ]);
+  });
+
+  // `referrals` falls through both queries above: it holds tenant data but
+  // has no column called workspace_id, so the first test never looks at it
+  // and the second only records that it was expected to be there. Asked
+  // directly, because a policy nothing checks is a policy that can be
+  // dropped in a later migration without a single test going red.
+  it("protects referrals, which the column-name check cannot see", async () => {
+    const [row] = await owner.$queryRaw<
+      {
+        relrowsecurity: boolean;
+        policies: bigint;
+      }[]
+    >`
+    SELECT
+      c.relrowsecurity,
+      (
+        SELECT count(*)
+        FROM pg_policy p
+        WHERE p.polrelid = c.oid
+      ) AS policies
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'referrals'
+  `;
+
+    expect(row.relrowsecurity).toBe(true);
+    expect(Number(row.policies)).toBe(1);
   });
 
   it("seeds two workspaces that can be told apart", async () => {

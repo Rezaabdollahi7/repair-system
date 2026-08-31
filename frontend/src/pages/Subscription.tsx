@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { getPaymentHistory, getQuote, startCheckout } from "../api";
+import PaymentReceipt from "../components/PaymentReceipt";
 import { useSubscription } from "../context/SubscriptionContext";
 import type {
   QuoteResponse,
@@ -35,7 +36,7 @@ export default function Subscription() {
   const [submitting, setSubmitting] = useState(false);
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [quoting, setQuoting] = useState(false);
-
+  const [receipt, setReceipt] = useState<SubscriptionPayment | null>(null);
   // Read once rather than on every render. A countdown measured in days does
   // not need the clock live, and calling Date.now() during render makes the
   // component's output depend on when React happened to re-run it.
@@ -273,6 +274,7 @@ export default function Subscription() {
                   <th className="pb-2 font-medium">پلن</th>
                   <th className="pb-2 font-medium">مبلغ</th>
                   <th className="pb-2 font-medium">وضعیت</th>
+                  <th className="pb-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -294,6 +296,17 @@ export default function Subscription() {
                     >
                       {PAYMENT_LABELS[payment.status] ?? payment.status}
                     </td>
+                    <td className="py-2 text-left">
+                      {payment.status === "verified" && (
+                        <button
+                          type="button"
+                          onClick={() => setReceipt(payment)}
+                          className="text-primary text-xs underline"
+                        >
+                          رسید
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -301,6 +314,11 @@ export default function Subscription() {
           </div>
         </div>
       )}
+      <PaymentReceipt
+        payment={receipt}
+        isOpen={receipt !== null}
+        onClose={() => setReceipt(null)}
+      />
     </div>
   );
 }

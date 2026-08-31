@@ -301,7 +301,7 @@ plan before that decision.
       field, countdown banner, and the callback page that asks the
       backend to verify rather than trusting the query string
 
-- [ ] 8.9 Frontend: referral page, payment history, printable receipt
+- [x] 8.9 Frontend: referral page, payment history, printable receipt
       following the InvoicePreview pattern — no new dependency, and the
       browser's own "save as PDF" does the rest
 

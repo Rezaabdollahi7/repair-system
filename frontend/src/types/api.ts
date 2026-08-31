@@ -48,6 +48,13 @@ export interface AuthUser {
 export interface AuthResponse {
   token: string;
   user: AuthUser;
+  /**
+   * Only on the sign-up response, and only meaningful when a referral code
+   * was sent: false means the code was not recognised. The registration
+   * still succeeded — a wrong code does not fail it — so this is what lets
+   * the form say so rather than leaving the customer expecting a discount.
+   */
+  referral_applied?: boolean;
 }
 
 /** Which flow a code is for. The server refuses one used for the other. */
@@ -63,6 +70,8 @@ export interface RegisterBody {
   username: string;
   password: string;
   code: string;
+  /** Optional, and a wrong one does not fail the registration. */
+  referral_code?: string;
 }
 
 export interface ResetPasswordBody {

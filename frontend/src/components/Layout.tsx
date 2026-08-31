@@ -19,6 +19,7 @@ import {
   XMarkIcon,
   ArrowDownTrayIcon,
   CreditCardIcon,
+  GiftIcon,
 } from "@heroicons/react/24/solid";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
@@ -105,6 +106,12 @@ export default function Layout() {
       name: "اشتراک",
       path: "/subscription",
       icon: CreditCardIcon,
+      adminOnly: true,
+    },
+    {
+      name: "دعوت از دوستان",
+      path: "/referral",
+      icon: GiftIcon,
       adminOnly: true,
     },
     { divider: true },

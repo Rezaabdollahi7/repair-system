@@ -22,6 +22,7 @@ import Settings from "./pages/Settings";
 import RepairInvoiceList from "./pages/RepairInvoiceList";
 import ExportList from "./pages/ExportList";
 import Subscription from "./pages/Subscription";
+import Referral from "./pages/Referral";
 import PaymentCallback from "./pages/PaymentCallback";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ModalProvider } from "./context/ModalContext";
@@ -80,6 +81,7 @@ function App() {
                       />
                       <Route path="exports" element={<ExportList />} />
                       <Route path="subscription" element={<Subscription />} />
+                      <Route path="referral" element={<Referral />} />
                     </Route>
 
                     <Route path="dashboard" element={<Dashboard />} />

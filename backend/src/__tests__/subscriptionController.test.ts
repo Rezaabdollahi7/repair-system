@@ -4,7 +4,12 @@ jest.mock("../lib/prisma", () => ({
   __esModule: true,
   default: {
     plan: { findUnique: jest.fn(), findMany: jest.fn() },
-    payment: { create: jest.fn(), update: jest.fn(), findFirst: jest.fn(), count: jest.fn() },
+    payment: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findFirst: jest.fn(),
+      count: jest.fn(),
+    },
     referral: { findUnique: jest.fn() },
     discountCode: { findUnique: jest.fn() },
     discountCodeUse: { findUnique: jest.fn(), count: jest.fn() },
@@ -36,7 +41,10 @@ jest.mock("../utils/subscription", () => ({
   extendSubscription: jest.fn().mockResolvedValue(new Date("2026-12-01")),
 }));
 
-const txMock = { payment: { update: jest.fn() } };
+const txMock = {
+  payment: { update: jest.fn() },
+  discountCodeUse: { create: jest.fn().mockResolvedValue({}) },
+};
 
 import prisma from "../lib/prisma";
 import { requestPayment, verifyPayment } from "../lib/zibal";
@@ -110,8 +118,8 @@ describe("checkout", () => {
 
     const createOrder = jest.mocked(prisma.payment.create).mock
       .invocationCallOrder[0];
-    const requestOrder = jest.mocked(requestPayment).mock
-      .invocationCallOrder[0];
+    const requestOrder =
+      jest.mocked(requestPayment).mock.invocationCallOrder[0];
 
     expect(createOrder).toBeLessThan(requestOrder);
   });
@@ -123,7 +131,9 @@ describe("checkout", () => {
 
     // Read back through planId instead, and a receipt from last year renders
     // at this year's price.
-    expect(jest.mocked(prisma.payment.create).mock.calls[0][0].data).toMatchObject({
+    expect(
+      jest.mocked(prisma.payment.create).mock.calls[0][0].data,
+    ).toMatchObject({
       basePriceRials: 19_900_000,
       amountRials: 19_900_000,
       planDurationDays: 90,
@@ -139,9 +149,9 @@ describe("checkout", () => {
     await checkout(mockReq({ plan_code: "quarterly" }) as never, res as never);
 
     expect(res.status).toHaveBeenCalledWith(502);
-    expect(jest.mocked(prisma.payment.update).mock.calls[0][0].data.status).toBe(
-      "failed",
-    );
+    expect(
+      jest.mocked(prisma.payment.update).mock.calls[0][0].data.status,
+    ).toBe("failed");
 
     logged.mockRestore();
   });
@@ -158,7 +168,9 @@ describe("checkout", () => {
 
   it("says so when a discount code was typed and rejected", async () => {
     // Silently charging full price leaves the customer believing it applied.
-    jest.mocked(prisma.discountCode.findUnique).mockResolvedValue(null as never);
+    jest
+      .mocked(prisma.discountCode.findUnique)
+      .mockResolvedValue(null as never);
     const res = mockRes();
 
     await checkout(
@@ -171,7 +183,9 @@ describe("checkout", () => {
   });
 
   it("applies the referral discount to a first purchase", async () => {
-    jest.mocked(prisma.referral.findUnique).mockResolvedValue({ id: 1 } as never);
+    jest
+      .mocked(prisma.referral.findUnique)
+      .mockResolvedValue({ id: 1 } as never);
     const res = mockRes();
 
     await checkout(mockReq({ plan_code: "quarterly" }) as never, res as never);
@@ -184,7 +198,9 @@ describe("checkout", () => {
   it("does not apply it to a second one", async () => {
     // The discount is owed on a first purchase; it is spent once one
     // verifies.
-    jest.mocked(prisma.referral.findUnique).mockResolvedValue({ id: 1 } as never);
+    jest
+      .mocked(prisma.referral.findUnique)
+      .mockResolvedValue({ id: 1 } as never);
     jest.mocked(prisma.payment.count).mockResolvedValue(1 as never);
     const res = mockRes();
 
@@ -193,6 +209,34 @@ describe("checkout", () => {
     expect(jest.mocked(requestPayment).mock.calls[0][0].amountRials).toBe(
       19_900_000,
     );
+  });
+
+  it("records which code was used, without spending it yet", async () => {
+    // Written to the payment row rather than to discount_code_uses: a card
+    // that declines three times must not burn the customer's one use on
+    // money that never moved.
+    jest.mocked(prisma.discountCode.findUnique).mockResolvedValue({
+      id: 3,
+      code: "NOWRUZ20",
+      type: "percent",
+      value: new Prisma.Decimal(20),
+      expiresAt: null,
+      maxUses: null,
+      isActive: true,
+    } as never);
+    jest
+      .mocked(prisma.discountCodeUse.findUnique)
+      .mockResolvedValue(null as never);
+
+    const res = mockRes();
+    await checkout(
+      mockReq({ plan_code: "quarterly", discount_code: "NOWRUZ20" }) as never,
+      res as never,
+    );
+
+    expect(
+      jest.mocked(prisma.payment.create).mock.calls[0][0].data,
+    ).toMatchObject({ discountCodeId: 3 });
   });
 });
 
@@ -254,9 +298,9 @@ describe("settlePayment", () => {
     );
 
     expect(extendSubscription).not.toHaveBeenCalled();
-    expect(jest.mocked(prisma.payment.update).mock.calls[0][0].data.status).toBe(
-      "failed",
-    );
+    expect(
+      jest.mocked(prisma.payment.update).mock.calls[0][0].data.status,
+    ).toBe("failed");
   });
 
   it("will not settle a payment from another workspace", async () => {
@@ -267,5 +311,46 @@ describe("settlePayment", () => {
     await expect(settlePayment(WORKSPACE_ID, 999n)).rejects.toThrow(
       "No payment",
     );
+  });
+
+  it("spends the code when the money actually moved", async () => {
+    // The bug this test exists for: discount_code_uses had a policy, a
+    // REVOKE and an integration test, and nothing anywhere created a row —
+    // so a code with maxUses of one could be used forever.
+    jest.mocked(prisma.payment.findFirst).mockResolvedValue({
+      ...pending,
+      discountCodeId: 3,
+    } as never);
+    jest.mocked(verifyPayment).mockResolvedValue({
+      newlyVerified: true,
+      amountRials: 19_900_000,
+      refNumber: "1",
+      cardNumber: null,
+      paidAt: new Date(),
+    } as never);
+
+    await settlePayment(WORKSPACE_ID, 999n);
+
+    expect(txMock.discountCodeUse.create).toHaveBeenCalledWith({
+      data: { workspaceId: WORKSPACE_ID, discountCodeId: 3, paymentId: 77 },
+    });
+  });
+
+  it("writes no use row when there was no code", async () => {
+    jest.mocked(prisma.payment.findFirst).mockResolvedValue({
+      ...pending,
+      discountCodeId: null,
+    } as never);
+    jest.mocked(verifyPayment).mockResolvedValue({
+      newlyVerified: true,
+      amountRials: 19_900_000,
+      refNumber: "1",
+      cardNumber: null,
+      paidAt: new Date(),
+    } as never);
+
+    await settlePayment(WORKSPACE_ID, 999n);
+
+    expect(txMock.discountCodeUse.create).not.toHaveBeenCalled();
   });
 });

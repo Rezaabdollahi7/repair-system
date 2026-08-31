@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import HomeIcon from "./icons/HomeIcon";
+import SubscriptionBanner from "./SubscriptionBanner";
 import {
   Bars3Icon,
   WrenchScrewdriverIcon,
@@ -17,7 +18,7 @@ import {
   ChartPieIcon,
   XMarkIcon,
   ArrowDownTrayIcon,
-  ArchiveBoxIcon,
+  CreditCardIcon,
 } from "@heroicons/react/24/solid";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
@@ -98,6 +99,12 @@ export default function Layout() {
       name: "خروجی اطلاعات",
       path: "/exports",
       icon: ArrowDownTrayIcon,
+      adminOnly: true,
+    },
+    {
+      name: "اشتراک",
+      path: "/subscription",
+      icon: CreditCardIcon,
       adminOnly: true,
     },
     { divider: true },
@@ -348,6 +355,7 @@ export default function Layout() {
           </div>
         </header>
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-auto">
+          <SubscriptionBanner />
           <Outlet />
         </main>
       </div>

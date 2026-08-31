@@ -297,7 +297,7 @@ plan before that decision.
       Deletion removes Arvan objects under workspaces/{id}/ as well —
       rows alone would leave the photographs paid for forever
 
-- [ ] 8.8 Frontend: subscription page, plan selection, discount code
+- [x] 8.8 Frontend: subscription page, plan selection, discount code
       field, countdown banner, and the callback page that asks the
       backend to verify rather than trusting the query string
 

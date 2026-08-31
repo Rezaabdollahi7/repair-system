@@ -69,6 +69,13 @@ import type {
   SendOtpBody,
   RegisterBody,
   ResetPasswordBody,
+  SubscriptionStatusResponse,
+  SubscriptionPayment,
+  VerifyResponse,
+  CheckoutResponse,
+  CheckoutBody,
+  ReferralResponse,
+  QuoteResponse,
 } from "../types/api";
 
 /**
@@ -445,5 +452,19 @@ export const getExportDownload = (id: Id) =>
   api.get<{ url: string }>(`/exports/${id}/download`);
 export const deleteExport = (id: Id) =>
   api.delete<MessageResponse>(`/exports/${id}`);
+
+// Subscription
+export const getSubscription = () =>
+  api.get<SubscriptionStatusResponse>("/subscription");
+export const startCheckout = (data: CheckoutBody) =>
+  api.post<CheckoutResponse>("/subscription/checkout", data);
+export const verifyPayment = (trackId: string) =>
+  api.post<VerifyResponse>("/subscription/verify", { track_id: trackId });
+export const getPaymentHistory = () =>
+  api.get<SubscriptionPayment[]>("/subscription/payments");
+export const getReferral = () =>
+  api.get<ReferralResponse>("/subscription/referral");
+export const getQuote = (data: CheckoutBody) =>
+  api.post<QuoteResponse>("/subscription/quote", data);
 
 export default api;

@@ -132,6 +132,73 @@ async function usableDiscountCode(code: string, workspaceId: number) {
   return row;
 }
 
+/**
+ * What a plan would cost, without starting anything.
+ *
+ * The same plan lookup, the same code validation and the same quotePrice
+ * checkout uses — so the figure on screen and the figure sent to Zibal
+ * cannot disagree. A second implementation for the preview is how they
+ * would.
+ */
+async function quoteFor(workspaceId: number, planCode: string, code?: string) {
+  const plan = await prisma.plan.findUnique({ where: { code: planCode } });
+
+  if (!plan || !plan.isActive) {
+    return null;
+  }
+
+  const referral = await prisma.referral.findUnique({
+    where: { referredWorkspaceId: workspaceId },
+    select: { id: true },
+  });
+
+  const paidBefore = await prisma.payment.count({
+    where: { workspaceId, status: "verified" },
+  });
+
+  const discountRow = code ? await usableDiscountCode(code, workspaceId) : null;
+
+  return {
+    plan,
+    codeAccepted: code ? discountRow !== null : null,
+    quote: quotePrice({
+      planPriceRials: plan.priceRials,
+      referralApplies: referral !== null && paidBefore === 0,
+      discountCode: discountRow
+        ? { type: discountRow.type, value: discountRow.value }
+        : undefined,
+    }),
+  };
+}
+
+// POST /api/subscription/quote
+export const quote = async (req: Request, res: Response) => {
+  try {
+    const { plan_code, discount_code } = (req as ValidatedRequest).valid
+      .body as CheckoutBody;
+
+    const result = await quoteFor(workspaceIdOf(req), plan_code, discount_code);
+
+    if (!result) {
+      return res.status(404).json({ error: "این پلن در دسترس نیست" });
+    }
+
+    // A rejected code is a 200 with a flag, not a 400. The customer is
+    // typing: refusing the whole request on every keystroke that is not yet
+    // a complete code would flash an error at them while they are still
+    // entering one.
+    res.json({
+      base_price_rials: result.quote.basePriceRials,
+      discount_rials: result.quote.discountRials,
+      amount_rials: result.quote.amountRials,
+      discount_kind: result.quote.discountKind,
+      code_accepted: result.codeAccepted,
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 // POST /api/subscription/checkout
 export const checkout = async (req: Request, res: Response) => {
   try {
@@ -197,6 +264,11 @@ export const checkout = async (req: Request, res: Response) => {
         amountRials: quote.amountRials,
         planDurationDays: plan.durationDays,
         createdBy: actor?.id ?? null,
+        // Which code this attempt used, carried on the row so settlement can
+        // spend it without re-deciding. Recorded here rather than written to
+        // discount_code_uses now: a card that declines three times must not
+        // burn the customer's one use on money that never moved.
+        discountCodeId: discountRow?.id ?? null,
       },
       select: { id: true },
     });
@@ -274,6 +346,7 @@ export async function settlePayment(
       status: true,
       amountRials: true,
       planDurationDays: true,
+      discountCodeId: true,
     },
   });
 
@@ -317,6 +390,19 @@ export async function settlePayment(
         verifiedAt: new Date(),
       },
     });
+
+    // The code is spent now, not at checkout: money has actually moved.
+    // In the same transaction as the extension, so a workspace cannot end
+    // up with the days and the code still unused.
+    if (payment.discountCodeId !== null) {
+      await tx.discountCodeUse.create({
+        data: {
+          workspaceId,
+          discountCodeId: payment.discountCodeId,
+          paymentId: payment.id,
+        },
+      });
+    }
 
     return extendSubscription(tx, workspaceId, {
       type: "payment",

@@ -835,7 +835,15 @@ model Payment {
   /// What actually went to Zibal, and what verify must return. A mismatch
   /// means something was tampered with between here and the gateway.
   amountRials      Decimal @map("amount_rials") @db.Decimal(18, 0)
-  planDurationDays Int     @map("plan_duration_days")
+    planDurationDays Int     @map("plan_duration_days")
+
+  /// Which code this attempt used, if any.
+  ///
+  /// Carried here rather than written to discount_code_uses at checkout,
+  /// because a card that declines three times must not burn the customer's
+  /// one use on money that never moved. The use row is created when the
+  /// payment verifies, in the same transaction as the extension.
+  discountCodeId Int? @map("discount_code_id")
 
   refNumber  String? @map("ref_number")
   /// Masked by Zibal before it reaches us (62741****44). Stored as given.
@@ -864,6 +872,10 @@ model Payment {
   plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
+  /// Restrict, like every other reference the ledger holds: a code a payment
+  /// points at must stay readable for that receipt to make sense.
+  discountCode DiscountCode? @relation(fields: [discountCodeId], references: [id], onDelete: Restrict)
+
   events      SubscriptionEvent[]
   discountUse DiscountCodeUse?
   referral    Referral?
@@ -873,6 +885,7 @@ model Payment {
   @@index([status])
   @@index([planId])
   @@index([createdBy])
+  @@index([discountCodeId])
   @@map("payments")
 }
 
@@ -924,7 +937,8 @@ model DiscountCode {
   isActive  Boolean   @default(true) @map("is_active")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  uses DiscountCodeUse[]
+  uses     DiscountCodeUse[]
+  payments Payment[]
 
   @@map("discount_codes")
 }

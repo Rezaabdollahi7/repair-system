@@ -90,16 +90,24 @@ describe("buying a subscription end to end", () => {
       select: { expiresAt: true },
     });
 
-    const checkout = await post(workspaces.a.token, "/api/subscription/checkout", {
-      plan_code: "quarterly",
-    });
+    const checkout = await post(
+      workspaces.a.token,
+      "/api/subscription/checkout",
+      {
+        plan_code: "quarterly",
+      },
+    );
 
     expect(checkout.status).toBe(200);
     expect(checkout.body.redirect_url).toContain("gateway.zibal.ir/start/4242");
 
-    const verified = await post(workspaces.a.token, "/api/subscription/verify", {
-      track_id: "4242",
-    });
+    const verified = await post(
+      workspaces.a.token,
+      "/api/subscription/verify",
+      {
+        track_id: "4242",
+      },
+    );
 
     expect(verified.status).toBe(200);
     expect(verified.body.extended).toBe(true);
@@ -239,7 +247,12 @@ describe("discount codes", () => {
 
   it("refuses one whose total uses have run out", async () => {
     // A code shared in a Telegram group is a permanent discount without this.
-    await createCode({ code: "LIMITED", type: "percent", value: 50, maxUses: 1 });
+    await createCode({
+      code: "LIMITED",
+      type: "percent",
+      value: 50,
+      maxUses: 1,
+    });
 
     const code = await owner.discountCode.findUniqueOrThrow({
       where: { code: "LIMITED" },
@@ -248,7 +261,9 @@ describe("discount codes", () => {
     const payment = await owner.payment.create({
       data: {
         workspaceId: workspaces.b.workspaceId,
-        planId: (await owner.plan.findUniqueOrThrow({ where: { code: "quarterly" } })).id,
+        planId: (
+          await owner.plan.findUniqueOrThrow({ where: { code: "quarterly" } })
+        ).id,
         orderId: "DFX-B-used",
         status: "verified",
         basePriceRials: 19_900_000,
@@ -271,6 +286,45 @@ describe("discount codes", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("burns the code once the payment verifies, and refuses it after", async () => {
+    // What none of the unit tests could show: the row reaching the database
+    // under its policy, and the composite unique refusing the second attempt.
+    await createCode({ code: "ONCE", type: "percent", value: 20 });
+
+    const first = await post(workspaces.a.token, "/api/subscription/checkout", {
+      plan_code: "quarterly",
+      discount_code: "ONCE",
+    });
+    expect(first.status).toBe(200);
+    expect(first.body.amount_rials).toBe(15_920_000);
+
+    // ⚠️ Overridden for this test: settlePayment refuses when the amount
+    // Zibal reports differs from the row, which is the one check standing
+    // between us and a subscription sold for whatever the customer decided
+    // to pay. The default mock answers with the undiscounted price.
+    jest.mocked(verifyPayment).mockResolvedValue({
+      newlyVerified: true,
+      amountRials: 15_920_000,
+      refNumber: "1",
+      cardNumber: null,
+      paidAt: new Date(),
+    } as never);
+
+    await post(workspaces.a.token, "/api/subscription/verify", {
+      track_id: "4242",
+    });
+
+    expect(await owner.discountCodeUse.count()).toBe(1);
+
+    const second = await post(
+      workspaces.a.token,
+      "/api/subscription/checkout",
+      { plan_code: "quarterly", discount_code: "ONCE" },
+    );
+
+    expect(second.status).toBe(400);
   });
 });
 

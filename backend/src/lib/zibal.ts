@@ -62,9 +62,13 @@ export const CALLBACK_URL = `${APP_URL}/subscription/callback`;
  * moves, which is exactly what makes it dangerous in production: the app would
  * look entirely healthy while activating subscriptions nobody paid for.
  *
- * The difference between test and live is one string in a file, so this is
- * the same guard JWT_SECRET got in 7.3a — refuse to start rather than run
- * wrongly. A container in a restart loop is a problem someone notices.
+ * ⚠️ The gateway is case-sensitive about this value. "zibal" works; "ZIBAL"
+ * comes back result 104, invalid merchant — which reads like a broken
+ * account rather than a capital letter. Support quoted it in capitals and
+ * the docs write it in lowercase, and finding out cost an evening.
+ *
+ * The check below lowercases deliberately: whichever spelling reaches
+ * production, it must not start.
  */
 if (
   process.env.NODE_ENV === "production" &&

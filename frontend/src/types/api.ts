@@ -926,3 +926,93 @@ export interface DataExport {
 export interface ExportCreateBody {
   include_images: boolean;
 }
+
+// ── Subscription (phase 8) ───────────────────────────────────
+
+export type SubscriptionStatus = "trial" | "active" | "expired" | "deleted";
+
+/** Rials, as every amount in this API is. Divide by ten to show tomans. */
+export interface SubscriptionPlan {
+  code: string;
+  name: string;
+  duration_days: number;
+  base_price_rials: number;
+  /** What this workspace would actually pay, referral discount included. */
+  amount_rials: number;
+}
+
+export interface SubscriptionStatusResponse {
+  status: SubscriptionStatus;
+  expires_at: string | null;
+  never_expires: boolean;
+  referral_applies: boolean;
+  plans: SubscriptionPlan[];
+}
+
+export interface CheckoutBody {
+  plan_code: string;
+  discount_code?: string;
+}
+
+export interface CheckoutResponse {
+  payment_id: number;
+  amount_rials: number;
+  /**
+   * ⚠️ Navigate to this with window.location, never fetch it. Zibal requires
+   * a Referer header matching the registered domain, and only a real
+   * navigation sends one.
+   */
+  redirect_url: string;
+}
+
+export interface VerifyResponse {
+  /** False when the payment had already been settled — a refreshed page. */
+  extended: boolean;
+  expires_at: string | null;
+}
+
+/**
+ * ⚠️ Not `PaymentStatus` — that name is taken by the invoice tables, whose
+ * statuses are paid/partial/pending and mean something else entirely. The
+ * backend enum is called subscription_payment_status for the same reason.
+ */
+export type SubscriptionPaymentStatus =
+  "pending" | "paid" | "verified" | "failed";
+
+export interface SubscriptionPayment {
+  id: number;
+  order_id: string;
+  plan_name: string;
+  status: SubscriptionPaymentStatus;
+  base_price_rials: number;
+  discount_rials: number;
+  amount_rials: number;
+  ref_number: string | null;
+  card_number: string | null;
+  paid_at: string | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface ReferralInvite {
+  created_at: string;
+  rewarded_at: string | null;
+}
+
+export interface ReferralResponse {
+  code: string | null;
+  reward_days: number;
+  discount_percent: number;
+  invited_count: number;
+  rewarded_count: number;
+  invites: ReferralInvite[];
+}
+
+export interface QuoteResponse {
+  base_price_rials: number;
+  discount_rials: number;
+  amount_rials: number;
+  discount_kind: "none" | "referral" | "code";
+  /** Null when no code was sent; false when one was sent and refused. */
+  code_accepted: boolean | null;
+}

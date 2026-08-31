@@ -16,6 +16,17 @@ function mockTx() {
     user: { create: jest.fn().mockResolvedValue({ id: 9 }) },
     settings: { create: jest.fn().mockResolvedValue({ id: 2 }) },
     service: { createMany: jest.fn().mockResolvedValue({ count: 4 }) },
+    // A brand new workspace has no expiry yet: app_create_workspace leaves
+    // it null and startTrial is what fills it in.
+    $queryRaw: jest.fn().mockResolvedValue([{ expires_at: null }]),
+    workspace: { update: jest.fn().mockResolvedValue({}) },
+    subscriptionEvent: { create: jest.fn().mockResolvedValue({}) },
+    referralCode: {
+      // No code is ever taken here, so createReferralCode succeeds on its
+      // first attempt. Its retry path has its own tests.
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+    },
   };
 }
 
@@ -95,6 +106,38 @@ describe("populateWorkspace", () => {
     expect(tx.role.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { name: "super_admin" },
       select: { id: true },
+    });
+  });
+
+  it("starts the month it was promised", async () => {
+    const tx = mockTx();
+    await run(tx);
+
+    // The trial goes through extendSubscription like every later change, so
+    // a workspace's subscription history starts with an event rather than a
+    // silent write nothing recorded.
+    expect(tx.workspace.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: WORKSPACE_ID },
+        data: expect.objectContaining({ status: "trial" }),
+      }),
+    );
+
+    expect(tx.subscriptionEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        type: "trial",
+        days: 30,
+      }),
+    });
+  });
+
+  it("gives the workspace an invite code", async () => {
+    const tx = mockTx();
+    await run(tx);
+
+    expect(tx.referralCode.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ workspaceId: WORKSPACE_ID }),
     });
   });
 });

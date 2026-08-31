@@ -233,7 +233,7 @@ plan before that decision.
 
 ## Phase 8 — Subscriptions & Billing
 
-- [ ] 8.1 Schema and migration: Plan, Payment, SubscriptionEvent,
+- [x] 8.1 Schema and migration: Plan, Payment, SubscriptionEvent,
       DiscountCode, DiscountCodeUse, ReferralCode, Referral,
       SubscriptionNotification.
       Plan and DiscountCode follow the `roles` pattern — reference data,
@@ -246,12 +246,16 @@ plan before that decision.
       Also: seed the three plans, and update the policy count in
       ops/restore-database.md from 21
 
-- [ ] 8.2 Subscription engine in utils/: extendSubscription(),
-      from max(now, expiresAt) so a reward isn't spent in the past.
+- [x] 8.2 Subscription engine in utils/: extendSubscription(), from
+      max(now, expiresAt) so a reward isn't spent in the past.
       Every change writes a SubscriptionEvent — trial, payment, referral
       and manual correction all pass through one function, so "why is my
       expiry this date" always has an answer.
-      populateWorkspace() gains the 30-day trial and the referral code
+      populateWorkspace() gains the 30-day trial and the referral code.
+      app_create_workspace stops granting a month of its own: it had done
+      so since 3.1, which became 61 days once startTrial existed. The
+      integration suite caught it — no mocked test could have, since the
+      second grant was inside a SQL function
 
 - [ ] 8.3 Read-only guard, 402 rather than 403: expired is not forbidden.
       Computed from expiresAt and the clock, never from Workspace.status —

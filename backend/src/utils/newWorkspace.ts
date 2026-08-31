@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
 import type { Prisma } from "../generated/prisma/client";
+import { createReferralCode } from "./referralCode";
+import { startTrial } from "./subscription";
 
 /**
  * The services a repair shop is assumed to charge for on day one.
@@ -34,7 +36,8 @@ export type NewWorkspaceOwner = Prisma.UserGetPayload<{
 
 /**
  * Fills a freshly created workspace with everything it needs to be usable:
- * its owner, a settings row and the default services.
+ * its owner, a settings row, the default services, a trial and an invite
+ * code.
  *
  * Takes a transaction client rather than the shared one, because all of this
  * has to land with the workspace itself — a tenant that exists with no user
@@ -80,6 +83,23 @@ export async function populateWorkspace(
   await tx.service.createMany({
     data: DEFAULT_SERVICES.map((service) => ({ ...service, workspaceId })),
   });
+
+  // A month, through the same function every later extension goes through,
+  // so the trial leaves a SubscriptionEvent like everything else. Without
+  // it, the first entry in a workspace's subscription history would be a
+  // gap.
+  //
+  // app_create_workspace leaves expiresAt null since migration
+  // 20260830060000 — it used to grant a calendar month itself, which meant
+  // 61 days once this line existed. The guard in 8.3 reads a null expiry as
+  // expired, so a workspace that got that far without reaching here would be
+  // locked from birth; safe, because both happen in one transaction.
+  await startTrial(tx, workspaceId);
+
+  // Every workspace can invite others from day one. Created here rather than
+  // when the referral page is first opened, so the code is a property of the
+  // workspace rather than something that may or may not exist yet.
+  await createReferralCode(tx, workspaceId);
 
   return owner;
 }

@@ -9,6 +9,7 @@ import {
   type TwoWorkspaces,
 } from "./helpers";
 import { issueCode, TEST_OTP_CODE } from "./helpers";
+import { TRIAL_DAYS } from "../../utils/subscription";
 
 // Not mocked: app_create_workspace is a SECURITY DEFINER function and the
 // rows that follow it are written under the policies. Neither exists in a
@@ -75,10 +76,15 @@ describe("sign-up", () => {
 
     // Enforcing the expiry is task 8.3; this only checks the date was
     // recorded, so no workspace exists without an answer to "until when".
+    //
+    // Compared against TRIAL_DAYS rather than a hand-written range, and
+    // tightly: this test is what caught the trial being granted twice, once
+    // by app_create_workspace and once by startTrial. A window wide enough
+    // to hold both numbers would have said nothing.
     const daysOut =
       (workspace.expiresAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
-    expect(daysOut).toBeGreaterThan(27);
-    expect(daysOut).toBeLessThan(32);
+    expect(daysOut).toBeGreaterThan(TRIAL_DAYS - 1);
+    expect(daysOut).toBeLessThanOrEqual(TRIAL_DAYS);
   });
 
   it("furnishes the workspace with a settings row and the default services", async () => {

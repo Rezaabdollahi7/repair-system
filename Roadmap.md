@@ -257,7 +257,7 @@ plan before that decision.
       integration suite caught it — no mocked test could have, since the
       second grant was inside a SQL function
 
-- [ ] 8.3 Read-only guard, 402 rather than 403: expired is not forbidden.
+- [x] 8.3 Read-only guard, 402 rather than 403: expired is not forbidden.
       Computed from expiresAt and the clock, never from Workspace.status —
       a stored column is only as fresh as the last cron run, and
       authorization must not depend on a job having succeeded.

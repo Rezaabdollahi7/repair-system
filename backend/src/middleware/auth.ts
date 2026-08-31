@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { setContextWorkspaceId } from "../lib/workspaceContext";
+import { requireWriteAccess } from "./subscription";
 import type { AuthUser } from "../types/request";
 
 // No fallback, deliberately. A default here is a signing key published in
@@ -58,11 +59,11 @@ function toAuthUser(payload: unknown): AuthUser | null {
   };
 }
 
-export function authenticate(
+export async function authenticate(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length)
@@ -98,5 +99,13 @@ export function authenticate(
   // tenant-scoped query throws.
   setContextWorkspaceId(user.workspaceId);
 
-  next();
+  // The subscription check runs from here rather than being mounted in each
+  // of the thirteen route files (8.3). It needs the context set above, so it
+  // cannot go earlier; and a guard that has to be remembered per file is the
+  // guard that was missing from five of them in phase 10.
+  //
+  // Not awaited into a try/catch: an error here is a database failure, and
+  // handing it to next() lets Express answer 500 rather than this middleware
+  // inventing a subscription verdict it has no basis for.
+  await requireWriteAccess(req, res, next);
 }

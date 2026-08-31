@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "../../generated/prisma/client";
 import { JWT_SECRET } from "../../middleware/auth";
 import { hashOtpCode } from "../../utils/otp";
+import { TRIAL_DAYS } from "../../utils/subscription";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (!connectionString) {
@@ -93,7 +94,20 @@ export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
     username: string,
   ): Promise<SeededWorkspace> {
     const workspace = await owner.workspace.create({
-      data: { name, status: "trial" },
+      data: {
+        name,
+        status: "trial",
+        // A live trial, because that is what a real workspace has:
+        // populateWorkspace calls startTrial, so one with no expiry does not
+        // exist outside this file. Left null, every write in every suite
+        // gets a 402 from the guard — which is the guard being right and the
+        // fixture being wrong.
+        //
+        // Set here rather than through startTrial: this client is the owner
+        // connection and writes into two workspaces at once, which is
+        // exactly what startTrial's transaction context cannot do.
+        expiresAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+      },
       select: { id: true },
     });
 

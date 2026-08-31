@@ -27,3 +27,10 @@ process.env.SMS_TEMPLATE_ID ??= "123456";
 // middleware/auth now does the same, and every suite that touches auth
 // imports it.
 process.env.JWT_SECRET ??= "unit-test-secret";
+
+// lib/zibal throws at import time without both, and app.ts reaches it
+// through the subscription routes — so every suite that mounts the app needs
+// them. Passing today only because dotenv finds them in a developer's .env,
+// which is exactly the arrangement that breaks on a fresh checkout or in CI.
+process.env.ZIBAL_MERCHANT ??= "test-merchant";
+process.env.APP_URL ??= "http://localhost:5173";

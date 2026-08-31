@@ -90,14 +90,21 @@ describe("trust proxy", () => {
 
 describe("CORS", () => {
   const original = process.env.NODE_ENV;
+  const originalMerchant = process.env.ZIBAL_MERCHANT;
 
   afterEach(() => {
     restoreEnv("NODE_ENV", original);
+    restoreEnv("ZIBAL_MERCHANT", originalMerchant);
     jest.resetModules();
   });
 
   it("sends no cross-origin headers in production", async () => {
     process.env.NODE_ENV = "production";
+    // A real-looking merchant, because lib/zibal refuses to load in
+    // production with Zibal's shared test one — and app.ts reaches it
+    // through the subscription routes. That guard has its own tests below;
+    // this block is about CORS.
+    process.env.ZIBAL_MERCHANT = "not-the-test-merchant";
     jest.resetModules();
 
     const request = (await import("supertest")).default;
@@ -126,5 +133,50 @@ describe("CORS", () => {
     expect(response.headers["access-control-allow-origin"]).toBe(
       "http://localhost:5173",
     );
+  });
+});
+
+describe("the Zibal test merchant cannot reach production", () => {
+  const originalEnv = process.env.NODE_ENV;
+  const originalMerchant = process.env.ZIBAL_MERCHANT;
+
+  afterEach(() => {
+    restoreEnv("NODE_ENV", originalEnv);
+    restoreEnv("ZIBAL_MERCHANT", originalMerchant);
+    jest.resetModules();
+  });
+
+  it("stops the whole app from loading, not just the payment module", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.ZIBAL_MERCHANT = "zibal";
+    jest.resetModules();
+
+    // Every capability works against Zibal's shared test account and no
+    // money moves, which is what makes it dangerous in production: the app
+    // would look entirely healthy while activating subscriptions nobody
+    // paid for. The difference is one string in one file.
+    //
+    // Asserted through app.ts rather than lib/zibal directly, because what
+    // matters is that the container refuses to boot — a process in a restart
+    // loop is a problem someone notices within the hour.
+    await expect(import("../app")).rejects.toThrow(/shared test merchant/);
+  });
+
+  it("allows it outside production, where it is the right value", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.ZIBAL_MERCHANT = "zibal";
+    jest.resetModules();
+
+    await expect(import("../app")).resolves.toBeDefined();
+  });
+
+  it("is case-insensitive about it", async () => {
+    // The docs write it lowercase and support wrote it uppercase, so both
+    // are values someone will genuinely paste into an env file.
+    process.env.NODE_ENV = "production";
+    process.env.ZIBAL_MERCHANT = "ZIBAL";
+    jest.resetModules();
+
+    await expect(import("../app")).rejects.toThrow(/shared test merchant/);
   });
 });

@@ -272,7 +272,7 @@ plan before that decision.
       discount, larger of the two rather than both, rounded to 10,000
       rials. The client sends a plan and a code, never an amount
 
-- [ ] 8.5 Zibal: request, verify, and settlement of orphaned payments.
+- [x] 8.5 Zibal: request, verify, and settlement of orphaned payments.
       The standard method, not lazy — lazy auto-refunds after 20 minutes,
       which a daily cron can never beat, and its callback is a POST that
       no frontend page can receive.

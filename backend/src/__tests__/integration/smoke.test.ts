@@ -133,6 +133,25 @@ describe("integration plumbing", () => {
   it("seeds two workspaces that can be told apart", async () => {
     expect(workspaces.a.workspaceId).not.toBe(workspaces.b.workspaceId);
   });
+
+  it("lets a discount code's total uses be counted, but not read", async () => {
+    // maxUses is enforced with COUNT(*) across every workspace. Under the
+    // isolation policy alone each caller counts only their own rows, sees
+    // zero, and a code with a ceiling becomes unlimited — which is how this
+    // was found.
+    const policies = await owner.$queryRaw<{ polname: string }[]>`
+      SELECT p.polname
+      FROM pg_policy p
+      JOIN pg_class c ON c.oid = p.polrelid
+      WHERE c.relname = 'discount_code_uses'
+      ORDER BY p.polname
+    `;
+
+    expect(policies.map((row) => row.polname)).toEqual([
+      "discount_code_use_count",
+      "workspace_isolation",
+    ]);
+  });
 });
 
 describe("a token reaches only its own workspace", () => {

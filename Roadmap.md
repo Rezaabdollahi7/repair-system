@@ -268,7 +268,7 @@ plan before that decision.
       A `neverExpires` column for our own and demo workspaces, settable
       only from the database: no route means no way to reach it
 
-- [ ] 8.4 Server-side pricing: plan price, discount code, referral
+- [x] 8.4 Server-side pricing: plan price, discount code, referral
       discount, larger of the two rather than both, rounded to 10,000
       rials. The client sends a plan and a code, never an amount
 

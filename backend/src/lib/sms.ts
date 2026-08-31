@@ -16,7 +16,7 @@ const SMS_ENDPOINT = "https://api.sms.ir/v1/send/verify";
  * Ten seconds is long enough for a slow provider and short enough that the
  * sign-up form does not appear frozen.
  */
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 20_000;
 
 /**
  * Read at import, not at send time, and with no fallback — the same stance

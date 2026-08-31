@@ -12,6 +12,30 @@
 const SMS_ENDPOINT = "https://api.sms.ir/v1/send/verify";
 
 /**
+ * Every template this application can send, by the name the code uses.
+ *
+ * Ids rather than message text: sms.ir approves each template in its panel
+ * and the body lives there, not here. Read from the environment rather than
+ * hardcoded because a sandbox template has a different id, and sending a
+ * production id from a test account comes back HTTP 400 — which reads in the
+ * logs like a malformed request rather than the wrong template.
+ */
+export const SMS_TEMPLATES = {
+  /** #DAYS# — sent at 7 days out and again at 1. */
+  BEFORE_EXPIRY: "SMS_TEMPLATE_BEFORE_EXPIRY",
+  /** No parameters. The day the subscription ends. */
+  ON_EXPIRY: "SMS_TEMPLATE_ON_EXPIRY",
+  /** #DAYS# — days left before the data is deleted. */
+  AFTER_EXPIRY: "SMS_TEMPLATE_AFTER_EXPIRY",
+  /** #DATE# — Jalali, with dashes. */
+  PAYMENT_OK: "SMS_TEMPLATE_PAYMENT_OK",
+  /** #DAYS# — days added to the referrer. */
+  REFERRAL_REWARD: "SMS_TEMPLATE_REFERRAL_REWARD",
+} as const;
+
+export type SmsTemplate = (typeof SMS_TEMPLATES)[keyof typeof SMS_TEMPLATES];
+
+/**
  * A user is waiting behind this request, and fetch on its own waits forever.
  * Ten seconds is long enough for a slow provider and short enough that the
  * sign-up form does not appear frozen.
@@ -38,11 +62,27 @@ function requireEnv(name: string): string {
 }
 
 const API_KEY = requireEnv("SMS_API_KEY");
-const TEMPLATE_ID = Number(requireEnv("SMS_TEMPLATE_ID"));
 
-if (!Number.isInteger(TEMPLATE_ID)) {
-  throw new Error("SMS_TEMPLATE_ID must be an integer.");
+/**
+ * Every template id is resolved at import, so a deployment missing one stops
+ * at boot rather than on the night the cron first needs it — which would be
+ * a subscription lapsing with no warning sent, discovered by a customer.
+ */
+function requireTemplateId(name: string): number {
+  const id = Number(requireEnv(name));
+
+  if (!Number.isInteger(id)) {
+    throw new Error(`${name} must be an integer template id.`);
+  }
+
+  return id;
 }
+
+const TEMPLATE_ID = requireTemplateId("SMS_TEMPLATE_ID");
+
+const TEMPLATE_IDS: Record<string, number> = Object.fromEntries(
+  Object.values(SMS_TEMPLATES).map((name) => [name, requireTemplateId(name)]),
+);
 
 /**
  * Provider status codes worth naming. sms.ir returns many more; these are the
@@ -107,16 +147,15 @@ function toProviderMobile(phone: string): string {
 }
 
 /**
- * Sends one verification code. Resolves on the provider's own success status,
- * throws SmsError otherwise.
+ * One POST, one template, whatever parameters it takes.
  *
- * The code never reaches a log line here, on success or failure — a code in
- * the logs is a code anyone with log access can use inside its three-minute
- * life.
+ * sms.ir's verify endpoint serves every approved template, not just
+ * verification codes — the name is theirs and means "templated", not "OTP".
  */
-export async function sendVerificationCode(
+async function send(
   phone: string,
-  code: string,
+  templateId: number,
+  parameters: { name: string; value: string }[],
 ): Promise<SmsResult> {
   const mobile = toProviderMobile(phone);
 
@@ -129,11 +168,7 @@ export async function sendVerificationCode(
         "x-api-key": API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        mobile,
-        templateId: TEMPLATE_ID,
-        parameters: [{ name: "Code", value: code }],
-      }),
+      body: JSON.stringify({ mobile, templateId, parameters }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
@@ -147,6 +182,9 @@ export async function sendVerificationCode(
   }
 
   if (!response.ok) {
+    // ⚠️ 401 here is indistinguishable from a bad key, and is usually this
+    // server's address missing from the panel's allowlist. 400 is usually a
+    // template id from the wrong account.
     throw new SmsError(`sms.ir returned HTTP ${response.status}`, null);
   }
 
@@ -181,4 +219,56 @@ export async function sendVerificationCode(
     messageId: Number(data.messageId ?? 0),
     cost: Number(data.cost ?? 0),
   };
+}
+
+/**
+ * Sends one of the subscription templates.
+ *
+ * ⚠️ Parameter values must not contain a slash. Whether sms.ir accepts one
+ * was never established, and the failure would be an HTTP 400 that reads
+ * like a wrong template id — so dates are formatted ۱۴۰۵-۰۹-۱۲ and this
+ * refuses anything else rather than finding out in production.
+ */
+export function sendTemplate(
+  phone: string,
+  template: SmsTemplate,
+  parameters: Record<string, string>,
+): Promise<SmsResult> {
+  const entries = Object.entries(parameters);
+
+  for (const [name, value] of entries) {
+    if (value.includes("/")) {
+      throw new SmsError(`Parameter ${name} must not contain a slash`, null);
+    }
+
+    // The panel's own ceiling. Longer values come back as status 114, which
+    // is a rejected message rather than an error worth waking anyone for.
+    if (value.length > 40) {
+      throw new SmsError(
+        `Parameter ${name} is longer than 40 characters`,
+        null,
+      );
+    }
+  }
+
+  return send(
+    phone,
+    TEMPLATE_IDS[template],
+    entries.map(([name, value]) => ({ name, value })),
+  );
+}
+
+/**
+ * Sends one verification code. Resolves on the provider's own success status,
+ * throws SmsError otherwise.
+ *
+ * The code never reaches a log line here, on success or failure — a code in
+ * the logs is a code anyone with log access can use inside its three-minute
+ * life.
+ */
+export function sendVerificationCode(
+  phone: string,
+  code: string,
+): Promise<SmsResult> {
+  return send(phone, TEMPLATE_ID, [{ name: "Code", value: code }]);
 }

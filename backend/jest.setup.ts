@@ -34,3 +34,11 @@ process.env.JWT_SECRET ??= "unit-test-secret";
 // which is exactly the arrangement that breaks on a fresh checkout or in CI.
 process.env.ZIBAL_MERCHANT ??= "test-merchant";
 process.env.APP_URL ??= "http://localhost:5173";
+
+// The five subscription templates (8.7). lib/sms resolves every id at import,
+// so a missing one stops every suite that mounts the app.
+process.env.SMS_TEMPLATE_BEFORE_EXPIRY ??= "398956";
+process.env.SMS_TEMPLATE_ON_EXPIRY ??= "764207";
+process.env.SMS_TEMPLATE_AFTER_EXPIRY ??= "450597";
+process.env.SMS_TEMPLATE_PAYMENT_OK ??= "344895";
+process.env.SMS_TEMPLATE_REFERRAL_REWARD ??= "549585";

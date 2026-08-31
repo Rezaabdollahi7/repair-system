@@ -312,7 +312,7 @@ cross-origin نیست.
 
 ```
 backend/
-├── prisma/    schema.prisma (۲۹ مدل) · seed.ts · rls-check.sql · ۱۳ مهاجرت
+├── prisma/    schema.prisma (۳۰ مدل) · seed.ts · rls-check.sql · ۱۳ مهاجرت
 ├── src/
 │   ├── lib/          prisma · storage · workspaceContext · sms · zibal · imageProfile
 │   ├── controllers/  ۱۵ کنترلر
@@ -1295,7 +1295,7 @@ APP_URL=http://localhost:5173 # callback از آن ساخته می‌شود
 ```
 DATABASE_URL_APP · JWT_SECRET · SMS_API_KEY · SMS_TEMPLATE_ID
 S3_ENDPOINT · S3_BUCKET · S3_ACCESS_KEY · S3_SECRET_KEY
-ZIBAL_MERCHANT · APP_URL
+ZIBAL_MERCHANT · APP_URL . SMS_TEMPLATE_*
 ```
 
 ⚠️ **`ZIBAL_MERCHANT` در پروداکشن نباید `ZIBAL` باشد** — اپ عمداً بالا
@@ -1627,6 +1627,9 @@ listing بعد از آپلود انجام می‌شود، پس فایل خودش
 
 `grep -c "CREATE FUNCTION app_"` صفر می‌دهد و به‌نظر می‌رسد بکاپ ناقص است.
 الگوی درست `CREATE FUNCTION` تنهاست، یا `public.app_`.
+
+### «دو فایل setup برای Jest هست، نه یکی» — هر متغیری که در import پرتاب می‌کند باید در هر دو باشد، و jest.integration.globalSetup.ts سومی است که TEST_DATABASE_URL را عمداً بدون پیش‌فرض می‌خواه
+
 
 ---
 

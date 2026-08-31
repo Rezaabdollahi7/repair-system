@@ -289,7 +289,7 @@ plan before that decision.
       runWithWorkspace() — the id comes from our own row, never from the
       client
 
-- [ ] 8.7 ops/subscription-cron.sh on the host, following
+- [x] 8.7 ops/subscription-cron.sh on the host, following
       backup-database.sh. Reminders, SMS, read-only transitions, deletion
       after 30 days, and settlement of unverified payments.
       Idempotent: SubscriptionNotification records what was sent, so a

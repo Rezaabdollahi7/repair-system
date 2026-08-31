@@ -11,6 +11,7 @@ import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage, isUniqueConstraintError } from "../utils/errors";
 import { populateWorkspace } from "../utils/newWorkspace";
+import { linkReferral } from "../utils/referral";
 import { setContextWorkspaceId } from "../lib/workspaceContext";
 import { SmsError, SMS_STATUS, sendVerificationCode } from "../lib/sms";
 import {
@@ -421,7 +422,7 @@ export const register = async (req: Request, res: Response) => {
     // the application role has no INSERT on workspaces, because creating a
     // tenant is not an ordinary request. Everything inside the callback is
     // ordinary tenant data and is written under the policies.
-    const owner = await runInNewWorkspaceTransaction(
+    const { owner, referralLinked } = await runInNewWorkspaceTransaction(
       body.workspace_name,
       async (tx, workspaceId) => {
         // Spent inside the transaction so a sign-up that fails afterwards —
@@ -444,11 +445,19 @@ export const register = async (req: Request, res: Response) => {
           throw new OtpAlreadyUsedError();
         }
 
-        return populateWorkspace(tx, workspaceId, {
+        const created = await populateWorkspace(tx, workspaceId, {
           workspaceName: body.workspace_name,
           username: body.username,
           password: body.password,
         });
+
+        // Inside the transaction, so a sign-up that fails afterwards does
+        // not leave a referral pointing at a workspace that was rolled back.
+        const referralLinked = body.referral_code
+          ? await linkReferral(tx, workspaceId, body.referral_code)
+          : false;
+
+        return { owner: created, referralLinked };
       },
     );
 
@@ -463,6 +472,9 @@ export const register = async (req: Request, res: Response) => {
     res.status(201).json({
       token: await issueSession(res, owner),
       user: toUserResponse(owner),
+      // False when a code was given and not recognised, so the form can say
+      // so rather than letting the customer discover it at checkout.
+      referral_applied: referralLinked,
     });
   } catch (error) {
     if (error instanceof OtpAlreadyUsedError) {

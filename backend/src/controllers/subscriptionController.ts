@@ -11,7 +11,12 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
 import { generateOrderId } from "../utils/orderId";
 import { quotePrice } from "../utils/pricing";
-import { extendSubscription } from "../utils/subscription";
+import { rewardReferrer } from "../utils/referral";
+import {
+  extendSubscription,
+  REFERRAL_DISCOUNT_PERCENT,
+  REFERRAL_REWARD_DAYS,
+} from "../utils/subscription";
 import { workspaceIdOf } from "../utils/workspace";
 import type { CheckoutBody, VerifyBody } from "../schemas/subscription";
 
@@ -320,6 +325,12 @@ export async function settlePayment(
     });
   });
 
+  // After the payment's own transaction, not inside it: the reward is
+  // written to the referrer's workspace, which needs its own context.
+  // Swallows its own errors — a customer who has just paid must not see a
+  // failure because somebody else's thirty days could not be written.
+  await rewardReferrer(workspaceId, payment.id);
+
   return { extended: true, expiresAt };
 }
 
@@ -375,6 +386,40 @@ export const payments = async (req: Request, res: Response) => {
         created_by_name: row.author?.fullName ?? null,
       })),
     );
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+// GET /api/subscription/referral — what the invite page needs
+export const referral = async (req: Request, res: Response) => {
+  try {
+    const workspaceId = workspaceIdOf(req);
+
+    const code = await prisma.referralCode.findUnique({
+      where: { workspaceId },
+      select: { code: true },
+    });
+
+    const invited = await prisma.referral.findMany({
+      where: { referrerWorkspaceId: workspaceId },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, rewardedAt: true },
+    });
+
+    res.json({
+      code: code?.code ?? null,
+      reward_days: REFERRAL_REWARD_DAYS,
+      discount_percent: REFERRAL_DISCOUNT_PERCENT,
+      // Nothing identifying about the invited workshops: who took the link
+      // is their business, and the referrer only needs to know it counted.
+      invited_count: invited.length,
+      rewarded_count: invited.filter((row) => row.rewardedAt !== null).length,
+      invites: invited.map((row) => ({
+        created_at: row.createdAt.toISOString(),
+        rewarded_at: row.rewardedAt?.toISOString() ?? null,
+      })),
+    });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }

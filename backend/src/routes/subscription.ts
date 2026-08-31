@@ -15,6 +15,7 @@ router.use(atLeast("admin"));
 
 router.get("/", ctrl.status);
 router.get("/payments", ctrl.payments);
+router.get("/referral", ctrl.referral);
 router.post("/checkout", validate({ body: checkoutSchema }), ctrl.checkout);
 router.post("/verify", validate({ body: verifySchema }), ctrl.verify);
 

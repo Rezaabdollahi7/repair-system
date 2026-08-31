@@ -283,7 +283,7 @@ plan before that decision.
       strict-origin-when-cross-origin: no-referrer makes Zibal refuse to
       open the gateway at all
 
-- [ ] 8.6 Referral: code at sign-up, reward after the invited workshop's
+- [x] 8.6 Referral: code at sign-up, reward after the invited workshop's
       payment verifies, first purchase only.
       The reward writes to another workspace, so it goes through
       runWithWorkspace() — the id comes from our own row, never from the

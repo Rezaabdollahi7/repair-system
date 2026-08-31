@@ -100,6 +100,17 @@ export const registerSchema = z.object({
   // store and reason about, and this way there is no server-side state
   // between the two calls at all.
   code: otpCodeSchema,
+  // Optional, and a wrong one does not fail the registration: turning
+  // someone away at the last step over a mistyped code costs a customer.
+  // The response says whether it was recognised, so the client can tell
+  // them rather than leaving them expecting a discount.
+  referral_code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(32)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
 export type RegisterBody = z.infer<typeof registerSchema>;

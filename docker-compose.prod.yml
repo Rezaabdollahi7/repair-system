@@ -85,6 +85,20 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       SMS_API_KEY: ${SMS_API_KEY}
       SMS_TEMPLATE_ID: ${SMS_TEMPLATE_ID}
+      # Phase 8. Each of these throws at import time, so a missing value is a
+      # container that never starts. `:?` moves the failure forward to
+      # `compose config`, where the message names the variable — instead of
+      # arriving in the log of a container already in a restart loop.
+      SMS_TEMPLATE_BEFORE_EXPIRY: ${SMS_TEMPLATE_BEFORE_EXPIRY:?required}
+      SMS_TEMPLATE_ON_EXPIRY: ${SMS_TEMPLATE_ON_EXPIRY:?required}
+      SMS_TEMPLATE_AFTER_EXPIRY: ${SMS_TEMPLATE_AFTER_EXPIRY:?required}
+      SMS_TEMPLATE_PAYMENT_OK: ${SMS_TEMPLATE_PAYMENT_OK:?required}
+      SMS_TEMPLATE_REFERRAL_REWARD: ${SMS_TEMPLATE_REFERRAL_REWARD:?required}
+      ZIBAL_MERCHANT: ${ZIBAL_MERCHANT:?required}
+      # Derived from APP_DOMAIN, not set separately: Zibal rejects a callback
+      # whose domain does not match the registered gateway with result 106,
+      # and a trailing slash is the usual way that happens.
+      APP_URL: https://${APP_DOMAIN}
     healthcheck:
       # node rather than curl: the slim image has no curl, and adding one
       # for a health check is a package to keep patched forever.

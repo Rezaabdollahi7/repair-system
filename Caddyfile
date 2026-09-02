@@ -1,0 +1,38 @@
+{$APP_DOMAIN} {
+	# Certificate loaded from disk, not obtained through ACME: this server
+	# has no international connectivity, so Caddy cannot reach Let's Encrypt.
+	# An explicit `tls` directive also tells Caddy not to manage this
+	# certificate at all — it will never attempt a renewal.
+	#
+	# ⚠️ Which means nothing renews it. Expires 25 Nov 2026.
+	# If international access is enabled, delete these two lines and Caddy
+	# goes back to handling it every 60 days on its own. The CAA record on
+	# app.dofixo.ir already permits letsencrypt.org.
+	tls /etc/caddy/certs/fullchain.pem /etc/caddy/certs/privatekey.pem
+
+	# /api goes to Express, everything else to the static bundle. The routing
+	# lives here and only here: nginx inside the frontend image deliberately
+	# knows nothing about the API, so a request that lands in the wrong place
+	# has one file to check rather than two.
+	handle /api/* {
+		reverse_proxy backend:5001
+	}
+
+	handle {
+		reverse_proxy frontend:8080
+	}
+
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

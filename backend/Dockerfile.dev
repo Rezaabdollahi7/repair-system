@@ -1,0 +1,28 @@
+# Development-only image. Installs deps once at build time; the actual
+# source is bind-mounted by docker-compose.yml so tsx watch sees host edits
+# live. This image is never used for production (see roadmap 7.1).
+FROM node:26-alpine
+
+WORKDIR /app
+
+# Pinned to match the pnpm version already in use on the host, so the
+# lockfile format stays consistent.
+RUN npm install -g pnpm@10.10.0
+
+# Copied separately from the rest of the source so this layer is cached
+# across rebuilds as long as dependencies don't change.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Overwritten by the bind mount at runtime, but keeps `docker build` usable
+# standalone (e.g. for a quick sanity check without compose).
+COPY . .
+
+EXPOSE 5001
+
+# Generated at start rather than build time: the client lands in
+# /app/src/generated, which the bind mount in docker-compose.yml shadows, so
+# anything generated during build would be hidden. The query engine binary
+# itself lives in node_modules and stays linux-native via the anonymous
+# volume.
+CMD ["sh", "-c", "pnpm exec prisma generate && pnpm dev"]

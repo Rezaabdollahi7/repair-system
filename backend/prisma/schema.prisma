@@ -1,0 +1,1035 @@
+// Modeled on the existing SQLite schema in the pre-migration codebase — same
+// entities and shape, not a redesign (see CLAUDE.md), with workspaceId added
+// on top in phase 2.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums are used only where the value set is provably closed: the CHECK
+// constraint the old SQLite schema already had, and the validStatuses array
+// in repairInvoiceController.
+
+enum InventoryTransactionType {
+  purchase
+  sale
+  adjustment
+
+  @@map("inventory_transaction_type")
+}
+
+enum RepairInvoiceStatus {
+  draft
+  issued
+  paid
+  cancelled
+
+  @@map("repair_invoice_status")
+}
+
+enum WorkspaceStatus {
+  trial
+  active
+  expired
+  // A workspace whose tenant data was removed after 30 days past expiry.
+  // The row itself stays: payments and subscription events point at it, and
+  // a ledger that loses its subject is not a ledger. See 8.7.
+  deleted
+
+  @@map("workspace_status")
+}
+
+enum OtpPurpose {
+  register
+  reset
+
+  @@map("otp_purpose")
+}
+
+// ── Tenancy ──────────────────────────────────────────────────
+
+// A repair shop. No slug: the app is served from one shared domain, so a
+// workspace is only ever identified by the id carried in the caller's token.
+model Workspace {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+// One expiresAt covers both the trial and a paid period: the question
+  // asked of it is always "may this workspace still be written to".
+  status    WorkspaceStatus @default(trial)
+  expiresAt DateTime?       @map("expires_at")
+
+  // Read-only enforcement computes from expiresAt and the clock, never from
+  // `status`: a stored column is only as fresh as the last cron run, and a
+  // night the job fails to run must not hand every expired workspace another
+  // day of writes. `status` is for reporting and filtering.
+  //
+  // Our own workspaces and any demo account. Deliberately has no route and
+  // no schema validation anywhere — it is set with psql and nothing else,
+  // because a flag that cannot be reached cannot be abused.
+  neverExpires Boolean   @default(false) @map("never_expires")
+  deletedAt    DateTime? @map("deleted_at")
+
+  // Invoice numbering, one counter per kind. Held here rather than derived
+  // from COUNT(*): counting reads a value two concurrent requests can both
+  // see, while `seq = seq + 1` takes a row lock and hands each caller a
+  // different number. Incremented inside the invoice's own transaction, so a
+  // rollback returns the number rather than leaving a gap in the books.
+  purchaseSeq Int @default(0) @map("purchase_seq")
+  saleSeq     Int @default(0) @map("sale_seq")
+  repairSeq   Int @default(0) @map("repair_seq")
+
+  users                 User[]
+  customers             Customer[]
+  devices               Device[]
+  deviceImages          DeviceImage[]
+  deviceAssignments     DeviceAssignment[]
+  categories            Category[]
+  items                 Item[]
+  inventoryTransactions InventoryTransaction[]
+  purchaseInvoices      PurchaseInvoice[]
+  purchaseInvoiceItems  PurchaseInvoiceItem[]
+  saleInvoices          SaleInvoice[]
+  saleInvoiceItems      SaleInvoiceItem[]
+  services              Service[]
+  repairInvoices        RepairInvoice[]
+  repairInvoiceItems    RepairInvoiceItem[]
+  repairInvoicePayments RepairInvoicePayment[]
+  settings              Settings?
+  backups               Backup[]
+  refreshTokens         RefreshToken[]
+
+  payments                  Payment[]
+  subscriptionEvents        SubscriptionEvent[]
+  discountCodeUses          DiscountCodeUse[]
+  referralCode              ReferralCode?
+  referralsMade             Referral[]                 @relation("ReferralReferrer")
+  referralReceived          Referral?                  @relation("ReferralReferred")
+  subscriptionNotifications SubscriptionNotification[]
+
+  @@index([status])
+  // The nightly job scans by expiry, not by status.
+  @@index([expiresAt])
+  @@map("workspaces")
+}
+
+// ── Auth & people ────────────────────────────────────────────
+
+// Not tenant-scoped: the three roles are reference data shared by every
+// workspace, not something a shop owns or can change.
+model Role {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  label     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  fullName    String   @map("full_name")
+  // Globally unique, not per workspace: the username is a phone number, and
+  // one person's number identifies one account across the platform.
+  username    String   @unique
+  password    String
+  phone       String?
+  avatar      String?
+  roleId      Int      @map("role_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  devicesAssigned        Device[]               @relation("DeviceTechnician")
+  assignmentsReceived    DeviceAssignment[]     @relation("AssignmentTechnician")
+  assignmentsMade        DeviceAssignment[]     @relation("AssignmentAuthor")
+  inventoryTransactions  InventoryTransaction[]
+  purchaseInvoices       PurchaseInvoice[]
+  saleInvoices           SaleInvoice[]
+  repairInvoicesCreated  RepairInvoice[]        @relation("RepairInvoiceAuthor")
+  repairInvoicesAssigned RepairInvoice[]        @relation("RepairInvoiceTechnician")
+  repairInvoicePayments  RepairInvoicePayment[]
+  backups                Backup[]
+  refreshTokens          RefreshToken[]
+  payments               Payment[]
+
+  @@index([workspaceId])
+  @@index([roleId])
+  @@map("users")
+}
+
+// Long-lived, revocable sessions. Separate from the access token because a
+// JWT cannot be taken back once issued: logging out, or noticing a stolen
+// session, has to change something the server checks.
+model RefreshToken {
+  id          Int       @id @default(autoincrement())
+  workspaceId Int       @map("workspace_id")
+  userId      Int       @map("user_id")
+  // SHA-256 of the token, never the token itself. A leaked database dump
+  // then contains nothing that can be replayed. Not bcrypt: this is a
+  // 32-byte random secret, not a human password, so there is no dictionary
+  // to defend against — and bcrypt would slow every single refresh.
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  // Kept rather than deleted on rotation: a revoked row being presented
+  // again is how a stolen token announces itself.
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  // Serves both "revoke every session this user has" and the expiry sweep.
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ── Phone verification ───────────────────────────────────────
+
+// The only table in the schema without a workspaceId, and deliberately so:
+// a code is sent to a phone number before any workspace exists, so there is
+// nothing to scope it by. It holds no tenant data — a phone number, a hash,
+// an expiry and two counters. It carries a `USING (true)` policy rather than
+// no RLS, so prisma/rls-check.sql reads it as intentional (see part 1b there).
+model OtpCode {
+  id      Int        @id @default(autoincrement())
+  phone   String
+  // Required, because the two purposes have opposite preconditions: for
+  // `register` the phone must NOT already exist, for `reset` it must. A
+  // single-purpose code would let one flow's message be spent on the other.
+  purpose OtpPurpose
+
+  // SHA-256 of the five-digit code.
+  //
+  // Be clear about what this does and does not buy: five digits is a hundred
+  // thousand possibilities and the hash is unsalted, so anyone holding a
+  // database dump can build the whole rainbow table in seconds. It is not
+  // what makes this safe. The actual defences are the three-minute lifetime,
+  // the three-attempt ceiling, and single use — do not remove any of them on
+  // the reasoning that the column is hashed.
+  //
+  // Not unique, unlike refresh_tokens.token_hash: two people can legitimately
+  // be sent the same five digits, and lookup is by phone + purpose anyway.
+  codeHash String @map("code_hash")
+
+  expiresAt DateTime @map("expires_at")
+  // Burns the row at three. Checked alongside expiry and consumption, so a
+  // code that ran out of attempts is dead even while it is still in date.
+  attempts  Int      @default(0)
+  // Set when the code is spent, and also when a newer code supersedes it:
+  // re-sending invalidates whatever came before, so only ever one live code
+  // exists per phone and purpose.
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  // Finds the live code for a phone, and — with phone as the leading column —
+  // also serves the hourly send count.
+  @@index([phone, purpose, createdAt(sort: Desc)])
+  // For the sweep. Rows are removed by age, NOT by expiry: a code expires
+  // after three minutes but has to keep counting against the hourly send
+  // limit for an hour. Sweeping on expires_at would silently disable that
+  // limit while looking like ordinary housekeeping.
+  @@index([createdAt])
+  @@map("otp_codes")
+}
+
+// ── Customers & devices ──────────────────────────────────────
+
+model Customer {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  name        String
+  phone       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  devices        Device[]
+  saleInvoices   SaleInvoice[]
+  repairInvoices RepairInvoice[]
+
+  // Leads with workspaceId so the index serves the scoped query the
+  // application always issues.
+  @@index([workspaceId, name])
+  @@index([workspaceId, phone])
+  @@map("customers")
+}
+
+model Device {
+  id           Int       @id @default(autoincrement())
+  workspaceId  Int       @map("workspace_id")
+  customerId   Int?      @map("customer_id")
+  personnelId  Int?      @map("personnel_id")
+  deviceName   String    @map("device_name")
+  brand        String?
+  model        String?
+  serialNumber String?   @map("serial_number")
+  entryDate    DateTime? @map("entry_date")
+  exitDate     DateTime? @map("exit_date")
+  status       String    @default("received")
+  description  String?
+  needsInvoice Boolean   @default(true) @map("needs_invoice")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // SetNull rather than Cascade: a repair history should survive deleting
+  // the customer or the technician who handled it.
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  personnel User?     @relation("DeviceTechnician", fields: [personnelId], references: [id], onDelete: SetNull)
+
+  images         DeviceImage[]
+  assignments    DeviceAssignment[]
+  repairInvoices RepairInvoice[]
+  saleInvoices   SaleInvoice[]
+
+  @@index([workspaceId, id(sort: Desc)])
+  @@index([workspaceId, status])
+  @@index([workspaceId, entryDate])
+  @@index([customerId])
+  @@index([personnelId])
+  @@map("devices")
+}
+
+model DeviceImage {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  deviceId    Int      @map("device_id")
+  filename    String
+  filepath    String
+
+  /// Full object key of a 480px copy, stored rather than derived from
+  /// filepath — for the same reason filepath is stored rather than rebuilt
+  /// from workspaceId and deviceId: a computed key stops resolving the
+  /// moment the layout changes or a workspace is restored under a new id,
+  /// which ops/extract-workspace.sh does by design.
+  ///
+  /// Null for rows written before 7.0. The frontend falls back to the full
+  /// image, so an old row renders correctly and merely costs more bytes.
+  thumbnailPath String? @map("thumbnail_path")
+
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([deviceId])
+  @@map("device_images")
+}
+
+model DeviceAssignment {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  deviceId    Int      @map("device_id")
+  personnelId Int      @map("personnel_id")
+  assignedAt  DateTime @default(now()) @map("assigned_at")
+  assignedBy  Int?     @map("assigned_by")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  personnel User      @relation("AssignmentTechnician", fields: [personnelId], references: [id], onDelete: Cascade)
+  author    User?     @relation("AssignmentAuthor", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@unique([deviceId, personnelId])
+  @@index([workspaceId])
+  @@index([personnelId])
+  @@map("device_assignments")
+}
+
+// ── Inventory ────────────────────────────────────────────────
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  items Item[]
+
+  // Unique within a workspace rather than globally: one shop naming a
+  // category shouldn't stop every other shop from using that name.
+  @@unique([workspaceId, name])
+  @@map("categories")
+}
+
+model Item {
+  id               Int      @id @default(autoincrement())
+  workspaceId      Int      @map("workspace_id")
+  categoryId       Int?     @map("category_id")
+  name             String
+  code             String?
+  unit             String   @default("عدد")
+  minStock         Int      @default(0) @map("min_stock")
+  currentStock     Int      @default(0) @map("current_stock")
+  avgPurchasePrice Decimal  @default(0) @map("avg_purchase_price") @db.Decimal(18, 2)
+  sellPrice        Decimal  @default(0) @map("sell_price") @db.Decimal(18, 0)
+  description      String?
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  transactions         InventoryTransaction[]
+  purchaseInvoiceItems PurchaseInvoiceItem[]
+  saleInvoiceItems     SaleInvoiceItem[]
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, code])
+  @@index([workspaceId, name])
+  @@index([categoryId])
+  @@map("items")
+}
+
+model InventoryTransaction {
+  id            Int                      @id @default(autoincrement())
+  workspaceId   Int                      @map("workspace_id")
+  itemId        Int                      @map("item_id")
+  type          InventoryTransactionType
+  quantity      Int
+  unitPrice     Decimal                  @default(0) @map("unit_price") @db.Decimal(18, 0)
+  // Polymorphic pointer (referenceType says which table), so no FK.
+  referenceId   Int?                     @map("reference_id")
+  referenceType String?                  @map("reference_type")
+  note          String?
+  createdBy     Int?                     @map("created_by")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([itemId])
+  @@index([createdBy])
+  @@map("inventory_transactions")
+}
+
+// ── Purchase invoices ────────────────────────────────────────
+
+model PurchaseInvoice {
+  id            Int      @id @default(autoincrement())
+  workspaceId   Int      @map("workspace_id")
+  invoiceNumber String   @map("invoice_number")
+  supplierName  String?  @map("supplier_name")
+  invoiceDate   DateTime @default(now()) @map("invoice_date")
+  totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
+  paidAmount    Decimal  @default(0) @map("paid_amount") @db.Decimal(18, 0)
+  paymentStatus String   @default("pending") @map("payment_status")
+  note          String?
+  createdBy     Int?     @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  items PurchaseInvoiceItem[]
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([createdBy])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceItem {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  invoiceId   Int      @map("invoice_id")
+  itemId      Int      @map("item_id")
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(18, 0)
+  totalPrice  Decimal  @map("total_price") @db.Decimal(18, 0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // Restrict, not SetNull: an item on a historical invoice shouldn't be
+  // deletable, or the invoice total stops being explainable.
+  item      Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([invoiceId])
+  @@index([itemId])
+  @@map("purchase_invoice_items")
+}
+
+// ── Sale invoices ────────────────────────────────────────────
+
+model SaleInvoice {
+  id            Int      @id @default(autoincrement())
+  workspaceId   Int      @map("workspace_id")
+  invoiceNumber String   @map("invoice_number")
+  customerId    Int?     @map("customer_id")
+  // Denormalized copies: they preserve what the invoice said at the time
+  // even if the customer record changes later.
+  customerName  String?  @map("customer_name")
+  customerPhone String?  @map("customer_phone")
+  deviceId      Int?     @map("device_id")
+  invoiceDate   DateTime @default(now()) @map("invoice_date")
+  totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
+  paidAmount    Decimal  @default(0) @map("paid_amount") @db.Decimal(18, 0)
+  paymentStatus String   @default("pending") @map("payment_status")
+  note          String?
+  createdBy     Int?     @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  device    Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  items SaleInvoiceItem[]
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([workspaceId, paymentStatus])
+  @@index([customerId])
+  @@index([deviceId])
+  @@index([createdBy])
+  @@map("sale_invoices")
+}
+
+model SaleInvoiceItem {
+  id             Int      @id @default(autoincrement())
+  workspaceId    Int      @map("workspace_id")
+  invoiceId      Int      @map("invoice_id")
+  itemId         Int?     @map("item_id")
+  name           String?
+  unit           String?
+  quantity       Int
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 0)
+  discountType   String?  @map("discount_type")
+  discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
+  totalPrice     Decimal  @map("total_price") @db.Decimal(18, 0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   SaleInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  item      Item?       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([invoiceId])
+  @@index([itemId])
+  @@map("sale_invoice_items")
+}
+
+// ── Services ─────────────────────────────────────────────────
+
+model Service {
+  id           Int      @id @default(autoincrement())
+  workspaceId  Int      @map("workspace_id")
+  name         String
+  description  String?
+  defaultPrice Decimal  @default(0) @map("default_price") @db.Decimal(18, 0)
+  unit         String   @default("خدمت")
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive, sortOrder])
+  @@map("services")
+}
+
+// ── Repair invoices ──────────────────────────────────────────
+
+model RepairInvoice {
+  id             Int                 @id @default(autoincrement())
+  workspaceId    Int                 @map("workspace_id")
+  invoiceNumber  String              @map("invoice_number")
+  deviceId       Int                 @map("device_id")
+  customerId     Int?                @map("customer_id")
+  customerName   String?             @map("customer_name")
+  customerPhone  String?             @map("customer_phone")
+  invoiceDate    DateTime            @default(now()) @map("invoice_date")
+  dueDate        DateTime?           @map("due_date")
+  status         RepairInvoiceStatus @default(draft)
+  subtotal       Decimal             @default(0) @db.Decimal(18, 0)
+  discountType   String?             @map("discount_type")
+  discountValue  Decimal             @default(0) @map("discount_value") @db.Decimal(18, 2)
+  discountAmount Decimal             @default(0) @map("discount_amount") @db.Decimal(18, 0)
+  taxRate        Decimal             @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount      Decimal             @default(0) @map("tax_amount") @db.Decimal(18, 0)
+  totalAmount    Decimal             @default(0) @map("total_amount") @db.Decimal(18, 0)
+  paidAmount     Decimal             @default(0) @map("paid_amount") @db.Decimal(18, 0)
+  paymentStatus  String              @default("pending") @map("payment_status")
+  warrantyMonths Int                 @default(0) @map("warranty_months")
+  warrantyUntil  DateTime?           @map("warranty_until")
+  technicianId   Int?                @map("technician_id")
+  notes          String?
+  createdBy      Int?                @map("created_by")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Restrict: deviceId is NOT NULL, so an invoice without its device would
+  // be meaningless.
+  device     Device    @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  technician User?     @relation("RepairInvoiceTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  author     User?     @relation("RepairInvoiceAuthor", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  items    RepairInvoiceItem[]
+  payments RepairInvoicePayment[]
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([workspaceId, status])
+  @@index([deviceId])
+  @@index([customerId])
+  @@index([technicianId])
+  @@index([createdBy])
+  @@map("repair_invoices")
+}
+
+model RepairInvoiceItem {
+  id             Int      @id @default(autoincrement())
+  workspaceId    Int      @map("workspace_id")
+  invoiceId      Int      @map("invoice_id")
+  itemType       String   @map("item_type")
+  // Deliberately NOT a relation: itemType distinguishes parts from services,
+  // so this column may point at either items or services.
+  itemId         Int?     @map("item_id")
+  name           String
+  description    String?
+  quantity       Decimal  @default(1) @db.Decimal(10, 2)
+  unit           String?
+  unitPrice      Decimal  @default(0) @map("unit_price") @db.Decimal(18, 0)
+  discountType   String?  @map("discount_type")
+  discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
+  totalPrice     Decimal  @default(0) @map("total_price") @db.Decimal(18, 0)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   RepairInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([invoiceId])
+  @@map("repair_invoice_items")
+}
+
+model RepairInvoicePayment {
+  id              Int      @id @default(autoincrement())
+  workspaceId     Int      @map("workspace_id")
+  invoiceId       Int      @map("invoice_id")
+  amount          Decimal  @db.Decimal(18, 0)
+  paymentMethod   String   @default("cash") @map("payment_method")
+  referenceNumber String?  @map("reference_number")
+  note            String?
+  paymentDate     DateTime @default(now()) @map("payment_date")
+  createdBy       Int?     @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice   RepairInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  author    User?         @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([invoiceId])
+  @@index([createdBy])
+  @@map("repair_invoice_payments")
+}
+
+// ── Settings & backups ───────────────────────────────────────
+
+// One row per workspace, enforced by the unique workspaceId — each shop
+// controls its own invoice appearance and defaults.
+model Settings {
+  id                    Int     @id @default(autoincrement())
+  workspaceId           Int     @unique @map("workspace_id")
+  companyName           String? @map("company_name")
+  companyAddress        String? @map("company_address")
+  companyPhone          String? @map("company_phone")
+  companyEmail          String? @map("company_email")
+  companyWebsite        String? @map("company_website")
+  companyLogo           String? @map("company_logo")
+  stampImage            String? @map("stamp_image")
+  signatureImage        String? @map("signature_image")
+  defaultTaxRate        Decimal @default(0) @map("default_tax_rate") @db.Decimal(5, 2)
+  defaultWarrantyMonths Int     @default(3) @map("default_warranty_months")
+  invoicePrefix         String  @default("INV-") @map("invoice_prefix")
+  invoiceFooterText     String? @map("invoice_footer_text")
+
+  saleInvoicePaperSize         String  @default("A5") @map("sale_invoice_paper_size")
+  saleInvoiceShowLogo          Boolean @default(true) @map("sale_invoice_show_logo")
+  saleInvoiceShowCompanyInfo   Boolean @default(true) @map("sale_invoice_show_company_info")
+  saleInvoiceShowEmail         Boolean @default(false) @map("sale_invoice_show_email")
+  saleInvoiceShowWebsite       Boolean @default(false) @map("sale_invoice_show_website")
+  saleInvoiceShowDeviceInfo    Boolean @default(false) @map("sale_invoice_show_device_info")
+  saleInvoiceShowCustomerPhone Boolean @default(false) @map("sale_invoice_show_customer_phone")
+  saleInvoiceShowDiscount      Boolean @default(false) @map("sale_invoice_show_discount")
+  saleInvoiceShowTax           Boolean @default(false) @map("sale_invoice_show_tax")
+  saleInvoiceShowStamp         Boolean @default(false) @map("sale_invoice_show_stamp")
+  saleInvoiceShowSignature     Boolean @default(false) @map("sale_invoice_show_signature")
+  saleInvoiceShowWarranty      Boolean @default(false) @map("sale_invoice_show_warranty")
+  saleInvoiceShowTechnician    Boolean @default(false) @map("sale_invoice_show_technician")
+  saleInvoiceHeaderText        String? @map("sale_invoice_header_text")
+  saleInvoiceFooterText        String? @default("با تشکر از اعتماد شما") @map("sale_invoice_footer_text")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+/// Rows here are per-workspace data exports, not platform backups: durability
+/// is a cron on the host (ops/backup-database.sh), deliberately outside the
+/// app. The table keeps its old name to avoid a rename migration that buys
+/// nothing.
+model Backup {
+  id              Int      @id @default(autoincrement())
+  workspaceId     Int      @map("workspace_id")
+  filename        String
+  sizeBytes       BigInt   @default(0) @map("size_bytes")
+  includesUploads Boolean  @default(false) @map("includes_uploads")
+  /// pending until the background build finishes, then ready or failed. A row
+  /// left pending means the process died mid-build — recoverable by asking
+  /// for another export, and visible rather than silent.
+  status          String   @default("pending")
+  /// The object key, null until the upload succeeds. Signed per request like
+  /// every other object, never stored as a URL.
+  filepath        String?
+  /// Why it failed, for the operator. Shown to the workshop as a generic
+  /// message: the detail is a stack trace, not something a shop owner acts on.
+  error           String?
+  createdBy       Int?     @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([createdBy])
+  @@map("backups")
+}
+
+
+// ── Subscriptions & billing ──────────────────────────────────
+
+// Named subscription_payment_status, not payment_status: the invoice tables
+// already carry a `payment_status` column of their own with an unrelated
+// meaning, and two names one letter apart in the same database is a mistake
+// waiting for a tired evening.
+enum SubscriptionPaymentStatus {
+  // A request was made to Zibal; the customer may not have reached the
+  // gateway yet.
+  pending
+  // Zibal said the money moved, but we have not called verify. This is the
+  // orphaned payment: the state the nightly settlement job looks for.
+  paid
+  // Verified with Zibal and the subscription extended. The only successful
+  // terminal state.
+  verified
+  failed
+
+  @@map("subscription_payment_status")
+}
+
+enum SubscriptionEventType {
+  trial
+  payment
+  referral
+  // An operator correction, made with psql. Recorded like any other change
+  // so the expiry date is always explainable.
+  manual
+
+  @@map("subscription_event_type")
+}
+
+enum DiscountCodeType {
+  percent
+  fixed
+
+  @@map("discount_code_type")
+}
+
+// Every message the subscription cron can send. All five are listed now
+// rather than added when each is wired up: ALTER TYPE ... ADD VALUE cannot
+// be used in the same transaction that adds it, so a later migration that
+// both adds a value and writes it would fail.
+enum SubscriptionNotificationKind {
+  before_expiry_7
+  before_expiry_1
+  on_expiry
+  after_expiry_3
+  after_expiry_23
+
+  @@map("subscription_notification_kind")
+}
+
+/// Reference data shared by every workspace, like `roles`: no RLS, and the
+/// application role holds SELECT only. Plans are created and priced with
+/// psql, never through the app.
+///
+/// Never deleted, only deactivated — a plan a past payment points at has to
+/// stay readable for that receipt to render.
+model Plan {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  name         String
+  durationDays Int      @map("duration_days")
+  /// Rials, like every other amount in the schema. The frontend divides by
+  /// ten for display; the database never holds tomans.
+  priceRials   Decimal  @map("price_rials") @db.Decimal(18, 0)
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  payments Payment[]
+
+  @@map("plans")
+}
+
+/// The ledger. Rows are appended and never removed — the application role has
+/// no DELETE on this table, deliberately.
+///
+/// Price and duration are copied onto the row rather than read through planId
+/// at display time. Prices move with inflation, and a receipt from last year
+/// that renders at this year's price is not a receipt.
+model Payment {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @map("workspace_id")
+  planId      Int @map("plan_id")
+
+  /// Ours, sent to Zibal as orderId and shown in their panel.
+  orderId String  @unique @map("order_id")
+  /// Zibal's. int64 in their API, so BigInt rather than Int. Null until the
+  /// request succeeds.
+  trackId BigInt? @unique @map("track_id")
+
+  status SubscriptionPaymentStatus @default(pending)
+
+  basePriceRials   Decimal @map("base_price_rials") @db.Decimal(18, 0)
+  discountRials    Decimal @default(0) @map("discount_rials") @db.Decimal(18, 0)
+  /// What actually went to Zibal, and what verify must return. A mismatch
+  /// means something was tampered with between here and the gateway.
+  amountRials      Decimal @map("amount_rials") @db.Decimal(18, 0)
+    planDurationDays Int     @map("plan_duration_days")
+
+  /// Which code this attempt used, if any.
+  ///
+  /// Carried here rather than written to discount_code_uses at checkout,
+  /// because a card that declines three times must not burn the customer's
+  /// one use on money that never moved. The use row is created when the
+  /// payment verifies, in the same transaction as the extension.
+  discountCodeId Int? @map("discount_code_id")
+
+  refNumber  String? @map("ref_number")
+  /// Masked by Zibal before it reaches us (62741****44). Stored as given.
+  cardNumber String? @map("card_number")
+
+  paidAt        DateTime? @map("paid_at")
+  verifiedAt    DateTime? @map("verified_at")
+  /// Zibal's result or status code with its meaning, for the operator.
+  failureReason String?   @map("failure_reason")
+
+  /// Optional with SetNull, like every other createdBy in the schema. It was
+  /// briefly NOT NULL with Restrict, which meant a super admin could not
+  /// delete an employee who had ever paid — a foreign key error on an
+  /// operation with nothing to do with billing. The ledger is complete
+  /// without it: workspace, amount and date are what a payment is, and who
+  /// pressed the button is useful detail rather than part of the record.
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Restrict, not Cascade: deleting a workspace must fail loudly while its
+  /// payments exist. 8.7 removes tenant data and leaves the workspace row as
+  /// a tombstone, so this never fires — it is here for the day someone
+  /// writes a delete that forgets.
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  /// Restrict, like every other reference the ledger holds: a code a payment
+  /// points at must stay readable for that receipt to make sense.
+  discountCode DiscountCode? @relation(fields: [discountCodeId], references: [id], onDelete: Restrict)
+
+  events      SubscriptionEvent[]
+  discountUse DiscountCodeUse?
+  referral    Referral?
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  /// The settlement job's query: everything still in `paid`.
+  @@index([status])
+  @@index([planId])
+  @@index([createdBy])
+  @@index([discountCodeId])
+  @@map("payments")
+}
+
+/// Why the expiry date is what it is.
+///
+/// Separate from Payment because most changes are not payments: the trial,
+/// a referral reward, an operator correction. With only Payment to go on,
+/// "why does my subscription end then" would have no answer for three of the
+/// four ways it moves.
+///
+/// Append-only: no UPDATE and no DELETE for the application role.
+model SubscriptionEvent {
+  id          Int                   @id @default(autoincrement())
+  workspaceId Int                   @map("workspace_id")
+  type        SubscriptionEventType
+  days        Int
+  /// Null for the very first event, where the workspace had no expiry yet.
+  previousExpiresAt DateTime? @map("previous_expires_at")
+  newExpiresAt      DateTime  @map("new_expires_at")
+  paymentId         Int?      @map("payment_id")
+  note              String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  payment   Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([paymentId])
+  @@map("subscription_events")
+}
+
+/// Reference data like Plan: created with psql, SELECT only for the app.
+///
+/// There is no usedCount column on purpose. A counter the application role
+/// cannot increment would need a write grant on reference data, and a
+/// counter that can drift from the rows it counts is worse than no counter:
+/// maxUses is checked against COUNT(*) on discount_code_uses.
+model DiscountCode {
+  id   Int              @id @default(autoincrement())
+  code String           @unique
+  type DiscountCodeType
+  /// Whole percent for `percent`, rials for `fixed`.
+  value Decimal @db.Decimal(18, 0)
+
+  expiresAt DateTime? @map("expires_at")
+  /// Null means unlimited. Without it, one code shared in a Telegram group
+  /// is a permanent discount.
+  maxUses   Int?      @map("max_uses")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  uses     DiscountCodeUse[]
+  payments Payment[]
+
+  @@map("discount_codes")
+}
+
+/// One row per code actually spent.
+///
+/// ⚠️ Written when the payment verifies, NOT when it is requested. A card
+/// that declines three times would otherwise burn the customer's one use on
+/// money that never moved.
+///
+/// The composite unique is the "once per workspace" rule itself, held in the
+/// database rather than in a controller that could be bypassed by a second
+/// route later.
+model DiscountCodeUse {
+  id             Int      @id @default(autoincrement())
+  workspaceId    Int      @map("workspace_id")
+  discountCodeId Int      @map("discount_code_id")
+  paymentId      Int      @unique @map("payment_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  discountCode DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Restrict)
+  payment      Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([discountCodeId, workspaceId])
+  @@index([workspaceId])
+  @@map("discount_code_uses")
+}
+
+/// A workspace's invite code.
+///
+/// Readable by everyone, by policy: sign-up has to resolve a code belonging
+/// to a workspace the caller has no relationship with. That is not a leak —
+/// an invite code is a string its owner hands out on purpose, and the row
+/// carries nothing else. Writes stay scoped, and there is no UPDATE or
+/// DELETE grant: a code that changes is a link that stops working.
+///
+/// Alphabet excludes I, O, 0 and 1 — this code gets read aloud over the
+/// phone.
+model ReferralCode {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @unique @map("workspace_id")
+  code        String   @unique
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("referral_codes")
+}
+
+/// Who brought whom. Written at sign-up, rewarded after the invited
+/// workspace's first payment verifies.
+///
+/// referredWorkspaceId is unique: a workspace is invited once, ever. Without
+/// it, deleting and recreating the relationship would let one referrer be
+/// paid repeatedly for the same shop.
+///
+/// The policy on this table is two-sided — either party may read the row —
+/// which no other table in the schema needs.
+model Referral {
+  id                  Int       @id @default(autoincrement())
+  referrerWorkspaceId Int       @map("referrer_workspace_id")
+  referredWorkspaceId Int       @unique @map("referred_workspace_id")
+  /// The payment that triggered the reward. Null until it does.
+  paymentId           Int?      @unique @map("payment_id")
+  rewardedAt          DateTime? @map("rewarded_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  referrer Workspace @relation("ReferralReferrer", fields: [referrerWorkspaceId], references: [id], onDelete: Restrict)
+  referred Workspace @relation("ReferralReferred", fields: [referredWorkspaceId], references: [id], onDelete: Restrict)
+  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([referrerWorkspaceId])
+  @@map("referrals")
+}
+
+/// What the cron has already sent.
+///
+/// The composite unique is what makes the job safe to run twice: keyed on
+/// the expiry it was sent about, so a renewal opens a fresh set of messages
+/// while a second run on the same day sends nothing.
+model SubscriptionNotification {
+  id                Int                          @id @default(autoincrement())
+  workspaceId       Int                          @map("workspace_id")
+  kind              SubscriptionNotificationKind
+  expiresAtSnapshot DateTime                     @map("expires_at_snapshot")
+  sentAt            DateTime                     @default(now()) @map("sent_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, kind, expiresAtSnapshot])
+  @@index([workspaceId])
+  @@map("subscription_notifications")
+}

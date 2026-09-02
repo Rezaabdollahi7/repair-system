@@ -1,0 +1,674 @@
+import { useState, useEffect } from "react";
+import { getSettings, updateSettings, uploadSettingImage } from "../api";
+import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { Navigate } from "react-router-dom";
+import {
+  BuildingOfficeIcon,
+  PhotoIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/solid";
+import ThemeSwitcher from "../components/ThemeSwitcher";
+import type { SettingsForm } from "../types/api";
+
+type UploadType = "logo" | "stamp" | "signature";
+
+interface ImageUploadBoxProps {
+  label: string;
+  imagePath: string | null;
+  type: UploadType;
+  onUpload: (path: string) => void;
+}
+
+function ImageUploadBox({
+  label,
+  imagePath,
+  type,
+  onUpload,
+}: ImageUploadBoxProps) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const res = await uploadSettingImage(type, file);
+      onUpload(res.data.path);
+      toast.success(`${label} با موفقیت آپلود شد`);
+    } catch {
+      toast.error("خطا در آپلود تصویر");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-text-primary mb-2">
+        {label}
+      </label>
+      <div className="border-2 border-dashed border-border rounded-lg p-3 sm:p-4 text-center">
+        {imagePath ? (
+          <div className="space-y-2">
+            <img
+              // Already a signed URL from the server: the bucket is private,
+              // so the stored key alone would be useless here.
+              src={imagePath}
+              alt={label}
+              className="max-h-32 mx-auto object-contain"
+            />
+            <p className="text-xs text-text-secondary">تصویر آپلود شده</p>
+          </div>
+        ) : (
+          <PhotoIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-text-secondary mb-2" />
+        )}
+        <label className="cursor-pointer inline-block mt-2">
+          <span className="bg-primary-soft text-primary px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm hover:opacity-80 transition">
+            {uploading ? "در حال آپلود..." : "انتخاب تصویر"}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            disabled={uploading}
+            className="hidden"
+          />
+        </label>
+        <p className="text-xs text-text-secondary mt-1">PNG, JPG تا ۵MB</p>
+      </div>
+    </div>
+  );
+}
+
+interface ToggleSwitchProps {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+function ToggleSwitch({
+  label,
+  description,
+  checked,
+  onChange,
+}: ToggleSwitchProps) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
+      <div>
+        <span className="text-sm font-medium text-text-primary">{label}</span>
+        {description && (
+          <p className="text-xs text-text-secondary">{description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+          checked ? "bg-primary" : "bg-border"
+        }`}
+      >
+        <span
+          className={`inline-block size-4 transform rounded-full bg-surface transition-transform ${
+            checked ? "-translate-x-1" : "-translate-x-6"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+const EMPTY_SETTINGS: SettingsForm = {
+  company_name: "",
+  company_address: "",
+  company_phone: "",
+  company_email: "",
+  company_website: "",
+  company_logo: "",
+  stamp_image: "",
+  signature_image: "",
+  default_tax_rate: 0,
+  default_warranty_months: 3,
+  invoice_prefix: "INV-",
+  invoice_footer_text: "",
+  sale_invoice_paper_size: "A5",
+  sale_invoice_show_logo: true,
+  sale_invoice_show_company_info: true,
+  sale_invoice_show_email: false,
+  sale_invoice_show_website: false,
+  sale_invoice_show_device_info: false,
+  sale_invoice_show_customer_phone: false,
+  sale_invoice_show_discount: false,
+  sale_invoice_show_tax: false,
+  sale_invoice_show_stamp: false,
+  sale_invoice_show_signature: false,
+  sale_invoice_show_warranty: false,
+  sale_invoice_show_technician: false,
+  sale_invoice_header_text: "",
+  sale_invoice_footer_text: "با تشکر از اعتماد شما",
+};
+
+export default function Settings() {
+  const { user, isAtLeast } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("ui");
+  const [settings, setSettings] = useState<SettingsForm>(EMPTY_SETTINGS);
+
+  const isSuperAdmin = user?.role === "super_admin";
+
+  useEffect(() => {
+    // Only a super admin fetches these: everyone else sees the appearance
+    // tab, which needs nothing from the server.
+    if (isSuperAdmin) {
+      getSettings()
+        .then((res) => {
+          setSettings({ ...EMPTY_SETTINGS, ...res.data });
+        })
+        .catch(() => {
+          toast.error("خطا در دریافت تنظیمات");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, [isSuperAdmin]);
+
+  // After the hooks, not before: an early return above them would leave React
+  // with a different hook count for a technician than for an admin.
+  if (!isAtLeast("admin")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value, type } = e.target;
+    setSettings((prev) => ({
+      ...prev,
+      [name]: type === "number" ? (value === "" ? 0 : Number(value)) : value,
+    }));
+  };
+
+  const handleToggle = (name: keyof SettingsForm, value: boolean) => {
+    setSettings((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageUpload = (type: keyof SettingsForm, path: string) => {
+    setSettings((prev) => ({ ...prev, [type]: path }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      toast.error("شما مجوز ذخیره تنظیمات را ندارید");
+      return;
+    }
+    setSaving(true);
+
+    try {
+      // Sent as booleans. The flags used to be converted to 1/0 on the way
+      // out and back with Boolean() on the way in, which the SQLite schema
+      // needed; the column is a real boolean now and the server answers with
+      // one.
+      await updateSettings(settings);
+      toast.success("تنظیمات با موفقیت ذخیره شد");
+    } catch {
+      toast.error("خطا در ذخیره تنظیمات");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64" dir="rtl">
+        <div className="text-text-secondary">در حال بارگذاری...</div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: "ui", label: "تنظیمات ظاهری", icon: Cog6ToothIcon },
+    ...(isSuperAdmin
+      ? [
+          { id: "company", label: "اطلاعات شرکت", icon: BuildingOfficeIcon },
+          { id: "images", label: "تصاویر", icon: PhotoIcon },
+          { id: "invoice", label: "پیش‌فرض فاکتور", icon: DocumentTextIcon },
+          { id: "template", label: "قالب فاکتور فروش", icon: Cog6ToothIcon },
+        ]
+      : []),
+  ];
+
+  // Derived rather than corrected with setState during render, which forces
+  // an immediate second render and can loop.
+  const currentTab = tabs.some((tab) => tab.id === activeTab)
+    ? activeTab
+    : "ui";
+
+  return (
+    <div dir="rtl" className="px-2 sm:px-4 mx-auto">
+      <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-4 sm:mb-6 flex gap-2 items-center">
+        <Cog6ToothIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
+        تنظیمات
+        {!isSuperAdmin && (
+          <span className="text-sm font-normal text-text-secondary mr-2">
+            (دسترسی محدود - فقط تنظیمات ظاهری)
+          </span>
+        )}
+      </h1>
+
+      <div className="border-b border-border mb-4 sm:mb-6 overflow-x-auto">
+        <nav className="flex gap-3 sm:gap-6 min-w-max">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors ${
+                  currentTab === tab.id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+        {currentTab === "ui" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <ThemeSwitcher />
+          </div>
+        )}
+
+        {isSuperAdmin && currentTab === "company" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <BuildingOfficeIcon className="w-5 h-5 text-text-secondary" />
+              اطلاعات شرکت
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  نام شرکت/تعمیرگاه
+                </label>
+                <input
+                  type="text"
+                  name="company_name"
+                  value={settings.company_name || ""}
+                  onChange={handleChange}
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  placeholder="مثلاً: تعمیرگاه تخصصی الکترونیک"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  شماره تماس
+                </label>
+                <input
+                  type="text"
+                  name="company_phone"
+                  value={settings.company_phone || ""}
+                  onChange={handleChange}
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  placeholder="مثلاً: 021-12345678, 09123456789"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  آدرس
+                </label>
+                <textarea
+                  name="company_address"
+                  value={settings.company_address || ""}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  placeholder="آدرس کامل تعمیرگاه..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  ایمیل
+                </label>
+                <input
+                  type="email"
+                  name="company_email"
+                  value={settings.company_email || ""}
+                  onChange={handleChange}
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  placeholder="info@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  وب‌سایت
+                </label>
+                <input
+                  type="text"
+                  name="company_website"
+                  value={settings.company_website || ""}
+                  onChange={handleChange}
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  placeholder="www.example.com"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isSuperAdmin && currentTab === "images" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <PhotoIcon className="w-5 h-5 text-text-secondary" />
+              تصاویر
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <ImageUploadBox
+                label="لوگوی شرکت"
+                imagePath={settings.company_logo}
+                type="logo"
+                onUpload={(path) => handleImageUpload("company_logo", path)}
+              />
+              <ImageUploadBox
+                label="مهر"
+                imagePath={settings.stamp_image}
+                type="stamp"
+                onUpload={(path) => handleImageUpload("stamp_image", path)}
+              />
+              <ImageUploadBox
+                label="امضا"
+                imagePath={settings.signature_image}
+                type="signature"
+                onUpload={(path) => handleImageUpload("signature_image", path)}
+              />
+            </div>
+          </div>
+        )}
+
+        {isSuperAdmin && currentTab === "invoice" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <DocumentTextIcon className="w-5 h-5 text-text-secondary" />
+              تنظیمات پیش‌فرض فاکتور
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  پیشوند شماره فاکتور
+                </label>
+                <input
+                  type="text"
+                  name="invoice_prefix"
+                  value={settings.invoice_prefix || "INV-"}
+                  onChange={handleChange}
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  نرخ مالیات پیش‌فرض (%)
+                </label>
+                <input
+                  type="number"
+                  name="default_tax_rate"
+                  value={settings.default_tax_rate || 0}
+                  onChange={handleChange}
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  مدت گارانتی پیش‌فرض (ماه)
+                </label>
+                <input
+                  type="number"
+                  name="default_warranty_months"
+                  value={settings.default_warranty_months || 3}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 sm:mt-4">
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                متن ثابت پایین فاکتور (برای فاکتور تعمیر)
+              </label>
+              <textarea
+                name="invoice_footer_text"
+                value={settings.invoice_footer_text || ""}
+                onChange={handleChange}
+                rows={2}
+                className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                placeholder="مثلاً: با تشکر از اعتماد شما - تحویل گرفته شد"
+              />
+            </div>
+          </div>
+        )}
+
+        {isSuperAdmin && currentTab === "template" && (
+          <div className="bg-surface shadow rounded-lg p-4 sm:p-6 overflow-x-auto">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+              <Cog6ToothIcon className="w-5 h-5 text-text-secondary" />
+              قالب فاکتور فروش
+            </h2>
+
+            <div className="space-y-4 sm:space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  اندازه کاغذ
+                </label>
+                <select
+                  name="sale_invoice_paper_size"
+                  value={settings.sale_invoice_paper_size || "A5"}
+                  onChange={handleChange}
+                  className="w-full sm:w-64 border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                >
+                  <option value="A4">A4 - حرفه‌ای (کامل)</option>
+                  <option value="A5">A5 - نیمه‌حرفه‌ای (متوسط)</option>
+                  <option value="Thermal">Thermal - رسید فروشگاهی</option>
+                </select>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-text-primary mb-3">
+                  بخش‌های قابل نمایش
+                </h3>
+                <div className="space-y-1 border border-border rounded-lg divide-y divide-border">
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش لوگو"
+                      checked={settings.sale_invoice_show_logo}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_logo", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش اطلاعات شرکت"
+                      checked={settings.sale_invoice_show_company_info}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_company_info", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش ایمیل"
+                      checked={settings.sale_invoice_show_email}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_email", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش وب‌سایت"
+                      checked={settings.sale_invoice_show_website}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_website", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش اطلاعات دستگاه"
+                      checked={settings.sale_invoice_show_device_info}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_device_info", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش شماره تماس مشتری"
+                      checked={settings.sale_invoice_show_customer_phone}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_customer_phone", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش تخفیف"
+                      checked={settings.sale_invoice_show_discount}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_discount", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش مالیات"
+                      checked={settings.sale_invoice_show_tax}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_tax", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش مهر"
+                      checked={settings.sale_invoice_show_stamp}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_stamp", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش امضا"
+                      checked={settings.sale_invoice_show_signature}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_signature", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش گارانتی"
+                      checked={settings.sale_invoice_show_warranty}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_warranty", val)
+                      }
+                    />
+                  </div>
+                  <div className="p-2 sm:p-3">
+                    <ToggleSwitch
+                      label="نمایش تعمیرکار"
+                      checked={settings.sale_invoice_show_technician}
+                      onChange={(val) =>
+                        handleToggle("sale_invoice_show_technician", val)
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-text-primary mb-3">
+                  متون سفارشی
+                </h3>
+                <div className="space-y-3 sm:space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-2">
+                      متن بالای فاکتور
+                    </label>
+                    <textarea
+                      name="sale_invoice_header_text"
+                      value={settings.sale_invoice_header_text || ""}
+                      onChange={handleChange}
+                      rows={2}
+                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      placeholder="متن دلخواه برای بالای فاکتور..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-2">
+                      متن پایین فاکتور
+                    </label>
+                    <textarea
+                      name="sale_invoice_footer_text"
+                      value={
+                        settings.sale_invoice_footer_text ||
+                        "با تشکر از اعتماد شما"
+                      }
+                      onChange={handleChange}
+                      rows={2}
+                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      placeholder="متن دلخواه برای پایین فاکتور..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <div className="flex justify-center">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
+            >
+              <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+              {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+}

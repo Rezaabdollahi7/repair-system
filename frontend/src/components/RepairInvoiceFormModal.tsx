@@ -1,0 +1,974 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
+import {
+  createRepairInvoice,
+  updateRepairInvoice,
+  getRepairInvoice,
+  searchDevicesForInvoice,
+  searchItemsForInvoice,
+  getServices,
+  getTechnicians,
+  getSettings,
+} from "../api";
+import toast from "react-hot-toast";
+import {
+  XMarkIcon,
+  PlusIcon,
+  TrashIcon,
+  CubeIcon,
+  WrenchScrewdriverIcon,
+  PencilSquareIcon,
+} from "@heroicons/react/24/solid";
+import SearchableSelect from "./SearchableSelect";
+import PersianDatePicker from "./PersianDatePicker";
+import { formatPersianCurrency } from "../utils/formatters";
+import ItemFormModal from "./ItemFormModal";
+import type { SelectOption, SelectValue } from "./SearchableSelect";
+import type {
+  AppService,
+  AppSettings,
+  Device,
+  DiscountType,
+  Id,
+  ItemForInvoice,
+  Personnel,
+  RepairInvoiceCreateBody,
+  RepairLineType,
+} from "../types/api";
+
+/** The server answers with { error } on every failing path. */
+function errorText(error: unknown, fallback: string): string {
+  return (
+    (axios.isAxiosError(error) &&
+      (error.response?.data as { error?: string } | undefined)?.error) ||
+    fallback
+  );
+}
+
+/** A line as the form holds it, before the server fills in the totals. */
+interface FormLine {
+  item_type: RepairLineType;
+  item_id?: SelectValue;
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  discount_type: DiscountType | "";
+  discount_value: number;
+}
+
+interface RepairForm {
+  device_id: SelectValue | "";
+  customer_name: string;
+  customer_id: number | string | null;
+  customer_phone: string;
+  invoice_date: string;
+  technician_id: number | string;
+  warranty_months: number;
+  tax_rate: number;
+  discount_type: DiscountType | "";
+  discount_value: number;
+  notes: string;
+}
+
+interface DeviceOption extends SelectOption {
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_id: number | null;
+}
+
+interface ItemOption extends SelectOption {
+  sell_price: number;
+  unit: string;
+}
+
+interface RepairInvoiceFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialInvoiceId?: Id | null;
+  initialDeviceId?: Id | null;
+  onSuccess?: () => void;
+  zIndex?: number;
+}
+
+export default function RepairInvoiceFormModal({
+  isOpen,
+  onClose,
+  initialInvoiceId = null,
+  initialDeviceId = null,
+  onSuccess,
+}: RepairInvoiceFormModalProps) {
+  const isEditMode = Boolean(initialInvoiceId);
+
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [showItemModal, setShowItemModal] = useState(false);
+
+  const emptyForm = (): RepairForm => ({
+    device_id: "",
+    customer_name: "",
+    customer_id: "",
+    customer_phone: "",
+    invoice_date: new Date().toISOString().split("T")[0],
+    technician_id: "",
+    warranty_months: 3,
+    tax_rate: 9,
+    discount_type: "",
+    discount_value: 0,
+    notes: "",
+  });
+
+  const [formData, setFormData] = useState<RepairForm>(emptyForm);
+
+  const [selectedItems, setSelectedItems] = useState<FormLine[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [items, setItems] = useState<ItemForInvoice[]>([]);
+  const [services, setServices] = useState<AppService[]>([]);
+  const [technicians, setTechnicians] = useState<Personnel[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    getSettings()
+      .then((res) => {
+        setSettings(res.data);
+        setFormData((prev) => ({
+          ...prev,
+          tax_rate: res.data.default_tax_rate || 9,
+          warranty_months: res.data.default_warranty_months || 3,
+        }));
+      })
+      .catch(() => {});
+
+    Promise.all([getServices(), getTechnicians()])
+      .then(([servicesRes, techRes]) => {
+        setServices(servicesRes.data);
+        setTechnicians(techRes.data);
+      })
+      .catch(() => {});
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!isEditMode && initialDeviceId) {
+      void searchDevicesForInvoice("").then((res) => {
+        const devicesList = res.data.data;
+        setDevices(devicesList);
+        const device = devicesList.find(
+          (d) => d.id === Number(initialDeviceId),
+        );
+        if (device) {
+          setFormData((prev) => ({
+            ...prev,
+            device_id: device.id,
+            customer_id: device.customer_id,
+            customer_name: device.customer_name || "",
+            customer_phone: device.customer_phone || "",
+          }));
+        }
+      });
+    }
+  }, [isOpen, isEditMode, initialDeviceId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEditMode && initialInvoiceId) {
+      getRepairInvoice(initialInvoiceId)
+        .then((res) => {
+          const invoice = res.data;
+          setFormData({
+            device_id: invoice.device_id,
+            customer_name: invoice.customer_name || "",
+            customer_id: invoice.customer_id,
+            customer_phone: invoice.customer_phone || "",
+            invoice_date:
+              invoice.invoice_date?.split("T")[0] ||
+              new Date().toISOString().split("T")[0],
+            technician_id: invoice.technician_id ?? "",
+            warranty_months: invoice.warranty_months || 3,
+            tax_rate: invoice.tax_rate || 9,
+            discount_type: invoice.discount_type || "",
+            discount_value: invoice.discount_value || 0,
+            notes: invoice.notes || "",
+          });
+
+          // Named `lines` rather than `items`, which would shadow the
+          // catalogue held in state above.
+          const lines: FormLine[] = invoice.items.map((line) => ({
+            item_type: line.item_type,
+            item_id: line.item_id ?? "",
+            name: line.name,
+            quantity: line.quantity,
+            unit: line.unit || "عدد",
+            unit_price: line.unit_price,
+            discount_type: line.discount_type || "",
+            discount_value: line.discount_value || 0,
+          }));
+          setSelectedItems(lines);
+
+          if (invoice.device_id) {
+            void searchDevicesForInvoice("").then((deviceRes) => {
+              const device = deviceRes.data.data.find(
+                (d) => d.id === invoice.device_id,
+              );
+              if (device) setDevices([device]);
+            });
+          }
+        })
+        .catch(() => {
+          toast.error("خطا در دریافت اطلاعات فاکتور");
+          onClose();
+        })
+        .finally(() => setInitialLoading(false));
+    }
+  }, [isOpen, initialInvoiceId, isEditMode, onClose]);
+
+  const refreshItems = async () => {
+    try {
+      // Through the invoice search, not getItems: the two answer in different
+      // cases, and everything below reads the snake_case one.
+      const res = await searchItemsForInvoice("");
+      setItems(res.data);
+    } catch {
+      toast.error("خطا در به‌روزرسانی لیست کالاها");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      ...emptyForm(),
+      warranty_months: settings?.default_warranty_months || 3,
+      tax_rate: settings?.default_tax_rate || 9,
+    });
+    setSelectedItems([]);
+    setErrors({});
+  };
+
+  const handleModalClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const deviceOptions: DeviceOption[] = devices.map((d) => ({
+    value: d.id,
+    label: `${d.id} - ${d.device_name} ${d.brand ? `(${d.brand})` : ""}`,
+    subLabel: `مشتری: ${d.customer_name || "—"} | مدل: ${d.model || "—"} | تلفن: ${d.customer_phone || "—"}`,
+    customer_name: d.customer_name,
+    customer_phone: d.customer_phone,
+    customer_id: d.customer_id,
+  }));
+
+  const itemOptions: ItemOption[] = items.map((i) => ({
+    value: i.id,
+    label: `[${i.code}] ${i.name}`,
+    subLabel: `موجودی: ${i.current_stock} ${i.unit} | قیمت فروش: ${Number(i.sell_price || 0).toLocaleString()} ریال`,
+    sell_price: i.sell_price,
+    unit: i.unit,
+  }));
+
+  const technicianOptions = technicians.map((t) => ({
+    value: t.id,
+    label: t.full_name || t.username,
+  }));
+
+  const calculateItemTotal = (item: FormLine) => {
+    const subtotal = item.quantity * item.unit_price;
+    let discount = 0;
+    if (item.discount_type === "percentage") {
+      discount = subtotal * (item.discount_value / 100);
+    } else if (item.discount_type === "fixed") {
+      discount = item.discount_value;
+    }
+    return subtotal - discount;
+  };
+
+  const calculateSubtotal = () =>
+    selectedItems.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+
+  const calculateDiscount = () => {
+    const subtotal = calculateSubtotal();
+    if (formData.discount_type === "percentage") {
+      return subtotal * (formData.discount_value / 100);
+    } else if (formData.discount_type === "fixed") {
+      return formData.discount_value;
+    }
+    return 0;
+  };
+
+  const calculateTax = () => {
+    const afterDiscount = calculateSubtotal() - calculateDiscount();
+    return afterDiscount * (formData.tax_rate / 100);
+  };
+
+  const calculateTotal = () =>
+    calculateSubtotal() - calculateDiscount() + calculateTax();
+
+  const handleDeviceSearch = async (query: string) => {
+    try {
+      const res = await searchDevicesForInvoice(query || "");
+      setDevices(res.data.data);
+    } catch {
+      toast.error("خطا در جستجوی دستگاه");
+    }
+  };
+
+  const handleItemSearch = async (query: string) => {
+    try {
+      const res = await searchItemsForInvoice(query || "");
+      setItems(res.data);
+    } catch {
+      toast.error("خطا در جستجوی کالا");
+    }
+  };
+
+  const handleDeviceSelect = (deviceId: SelectValue) => {
+    const device = devices.find((d) => d.id === deviceId);
+    if (device) {
+      setFormData((prev) => ({
+        ...prev,
+        device_id: deviceId,
+        customer_id: device.customer_id,
+        customer_name: device.customer_name || "",
+        customer_phone: device.customer_phone || "",
+      }));
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "number" ? (value === "" ? 0 : Number(value)) : value,
+    }));
+  };
+
+  const handleAddItem = (type: RepairLineType) => {
+    const base: FormLine = {
+      item_type: type,
+      name: "",
+      quantity: 1,
+      unit: type === "service" ? "خدمت" : "عدد",
+      unit_price: 0,
+      discount_type: "",
+      discount_value: 0,
+    };
+    setSelectedItems((prev) => [
+      ...prev,
+      type === "inventory" ? { ...base, item_id: "" } : base,
+    ]);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setSelectedItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleItemChange = (
+    index: number,
+    field: keyof FormLine,
+    value: SelectValue,
+  ) => {
+    setSelectedItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const updated = { ...item, [field]: value };
+
+        if (field === "item_id" && item.item_type === "inventory" && value) {
+          const selectedItem = items.find((it) => it.id === value);
+          if (selectedItem) {
+            updated.name = selectedItem.name;
+            updated.unit = selectedItem.unit;
+            updated.unit_price = selectedItem.sell_price || 0;
+          }
+        }
+
+        if (field === "name" && item.item_type === "service" && value) {
+          const selectedService = services.find(
+            (s) => s.name === value || s.id === value,
+          );
+          if (selectedService) {
+            updated.unit_price = selectedService.default_price || 0;
+            updated.unit = selectedService.unit || "خدمت";
+          }
+        }
+
+        return updated;
+      }),
+    );
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.device_id) {
+      newErrors.device_id = "دستگاه باید انتخاب شود";
+    }
+
+    if (selectedItems.length === 0) {
+      newErrors.items = "حداقل یک آیتم باید اضافه شود";
+    }
+
+    selectedItems.forEach((item, index) => {
+      if (!item.name?.trim()) {
+        newErrors[`item_${index}_name`] = "نام آیتم الزامی است";
+      }
+      if (!item.quantity || item.quantity <= 0) {
+        newErrors[`item_${index}_quantity`] = "تعداد باید بیشتر از صفر باشد";
+      }
+      if (
+        item.item_type === "inventory" &&
+        item.quantity >
+          (items.find((i) => i.id === item.item_id)?.current_stock || 0)
+      ) {
+        newErrors[`item_${index}_quantity`] = "موجودی کافی نیست";
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error("لطفاً خطاهای فرم را برطرف کنید");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload: RepairInvoiceCreateBody = {
+        device_id: formData.device_id,
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone,
+        invoice_date: formData.invoice_date,
+        technician_id: formData.technician_id || null,
+        warranty_months: formData.warranty_months,
+        tax_rate: formData.tax_rate,
+        discount_type: formData.discount_type || null,
+        discount_value: formData.discount_value,
+        notes: formData.notes,
+        items: selectedItems.map((item) => ({
+          item_type: item.item_type,
+          item_id: item.item_id ? Number(item.item_id) : null,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          discount_type: item.discount_type || null,
+          discount_value: item.discount_value,
+        })),
+      };
+
+      if (isEditMode && initialInvoiceId) {
+        await updateRepairInvoice(initialInvoiceId, payload);
+        toast.success("فاکتور با موفقیت ویرایش شد");
+      } else {
+        await createRepairInvoice(payload);
+        toast.success("فاکتور با موفقیت ایجاد شد");
+      }
+
+      resetForm();
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      toast.error(errorText(error, "خطا در ذخیره فاکتور"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  if (initialLoading) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-surface rounded-xl p-8">
+          <div className="text-center py-4 text-text-primary" dir="rtl">
+            در حال بارگذاری...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div
+        className="bg-surface rounded-xl shadow-xl w-full max-w-7xl my-2 sm:my-8"
+        dir="rtl"
+      >
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+          <h2 className="text-lg sm:text-xl font-bold text-text-primary">
+            {isEditMode ? "ویرایش فاکتور تعمیر" : "ثبت فاکتور تعمیر جدید"}
+          </h2>
+          <button
+            onClick={handleModalClose}
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-3 sm:p-6">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="lg:col-span-1 space-y-4 sm:space-y-6">
+                <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+                    <WrenchScrewdriverIcon className="w-5 h-5 text-text-secondary" />
+                    اطلاعات دستگاه
+                  </h2>
+
+                  <div className="space-y-3 sm:space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        انتخاب دستگاه <span className="text-danger">*</span>
+                      </label>
+                      <SearchableSelect
+                        options={deviceOptions}
+                        value={formData.device_id}
+                        onChange={handleDeviceSelect}
+                        onSearch={handleDeviceSearch}
+                        onOpen={() => handleDeviceSearch("")}
+                        placeholder="جستجو و انتخاب دستگاه..."
+                        error={errors.device_id}
+                        required
+                      />
+                    </div>
+                    {formData.device_id && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-text-primary mb-2">
+                            نام مشتری
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.customer_name || "—"}
+                            readOnly
+                            disabled
+                            className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-sm"
+                          />
+                          {!formData.customer_name && (
+                            <p className="text-warning text-xs mt-1">
+                              ⚠️ این دستگاه مشتری ثبت شده ندارد.
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-text-primary mb-2">
+                            شماره تماس
+                          </label>
+                          <input
+                            type="tel"
+                            value={formData.customer_phone || "—"}
+                            readOnly
+                            disabled
+                            className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
+                    جزئیات فاکتور
+                  </h2>
+
+                  <div className="space-y-3 sm:space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        تاریخ فاکتور
+                      </label>
+                      <PersianDatePicker
+                        value={formData.invoice_date}
+                        onChange={(val) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            invoice_date: val,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        تعمیرکار
+                      </label>
+                      <select
+                        name="technician_id"
+                        value={formData.technician_id}
+                        onChange={handleInputChange}
+                        className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 bg-surface text-text-primary text-sm"
+                      >
+                        <option value="">انتخاب تعمیرکار...</option>
+                        {technicianOptions.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        گارانتی (ماه)
+                      </label>
+                      <input
+                        type="number"
+                        name="warranty_months"
+                        value={formData.warranty_months}
+                        onChange={handleInputChange}
+                        min="0"
+                        className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        توضیحات
+                      </label>
+                      <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                        placeholder="توضیحات اضافی..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2">
+                <div className="bg-surface shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
+                    <h2 className="text-base sm:text-lg font-medium text-text-primary flex items-center gap-2">
+                      <CubeIcon className="w-5 h-5 text-text-secondary" />
+                      اقلام فاکتور
+                    </h2>
+
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setShowItemModal(true)}
+                        className="bg-success-soft text-success px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-success-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        تعریف کالای جدید
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem("inventory")}
+                        className="bg-success-soft text-success px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-success-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        از انبار
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem("service")}
+                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-primary-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        خدمت
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem("custom")}
+                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-primary-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      >
+                        <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        دلخواه
+                      </button>
+                    </div>
+                  </div>
+
+                  {errors.items && (
+                    <p className="text-sm text-danger mb-3 sm:mb-4">
+                      {errors.items}
+                    </p>
+                  )}
+
+                  {selectedItems.length === 0 ? (
+                    <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-lg">
+                      <p>هیچ آیتمی اضافه نشده است</p>
+                      <p className="text-xs sm:text-sm mt-1">
+                        از دکمه‌های بالا برای افزودن آیتم استفاده کنید
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 sm:space-y-4">
+                      {selectedItems.map((item, index) => (
+                        <div
+                          key={index}
+                          className="border border-border rounded-lg p-3 sm:p-4 bg-surface-alt"
+                        >
+                          <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-center">
+                            <div className="col-span-1 sm:col-span-2">
+                              <span
+                                className={`text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
+                                  item.item_type === "inventory"
+                                    ? "bg-success-soft text-success"
+                                    : item.item_type === "service"
+                                      ? "bg-primary-soft text-primary"
+                                      : "bg-primary-soft text-primary"
+                                }`}
+                              >
+                                {item.item_type === "inventory"
+                                  ? "انبار"
+                                  : item.item_type === "service"
+                                    ? "خدمت"
+                                    : "دلخواه"}
+                              </span>
+                            </div>
+
+                            <div className="col-span-7 sm:col-span-4">
+                              {item.item_type === "inventory" ? (
+                                <SearchableSelect
+                                  options={itemOptions}
+                                  value={item.item_id}
+                                  onChange={(val) =>
+                                    handleItemChange(index, "item_id", val)
+                                  }
+                                  onSearch={handleItemSearch}
+                                  onOpen={() => handleItemSearch("")}
+                                  placeholder="جستجوی کالا..."
+                                  error={errors[`item_${index}_name`]}
+                                />
+                              ) : item.item_type === "service" ? (
+                                <select
+                                  value={item.name}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      index,
+                                      "name",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                >
+                                  <option value="">انتخاب خدمت...</option>
+                                  {services.map((s) => (
+                                    <option key={s.id} value={s.name}>
+                                      {s.name}
+                                    </option>
+                                  ))}
+                                  <option value="__custom__">
+                                    خدمت دلخواه...
+                                  </option>
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      index,
+                                      "name",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="نام آیتم"
+                                  className="w-full border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                />
+                              )}
+                            </div>
+
+                            <div className="col-span-2 sm:col-span-1">
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    "quantity",
+                                    parseFloat(e.target.value) || 1,
+                                  )
+                                }
+                                min="0.01"
+                                step="0.01"
+                                className="w-full border border-border rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                              />
+                            </div>
+
+                            <div className="col-span-2 sm:col-span-1">
+                              <input
+                                type="text"
+                                value={item.unit}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    "unit",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full border border-border rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                              />
+                            </div>
+
+                            <div className="col-span-3 sm:col-span-2">
+                              <input
+                                type="number"
+                                value={item.unit_price}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    "unit_price",
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                min="0"
+                                className="w-full border border-border rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                              />
+                            </div>
+
+                            <div className="col-span-3 sm:col-span-1 text-left">
+                              <span className="text-xs sm:text-sm font-medium text-text-primary">
+                                {formatPersianCurrency(
+                                  calculateItemTotal(item),
+                                )}
+                              </span>
+                            </div>
+
+                            <div className="col-span-1 sm:col-span-1 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(index)}
+                                className="text-danger hover:text-danger"
+                              >
+                                <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {errors[`item_${index}_quantity`] && (
+                            <p className="text-xs text-danger mt-1">
+                              {errors[`item_${index}_quantity`]}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
+                    محاسبات
+                  </h2>
+
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex justify-between text-sm sm:text-base text-text-primary">
+                      <span>جمع کل:</span>
+                      <span className="font-medium">
+                        {formatPersianCurrency(calculateSubtotal())} ریال
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                      <select
+                        name="discount_type"
+                        value={formData.discount_type}
+                        onChange={handleInputChange}
+                        className="border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-surface text-text-primary"
+                      >
+                        <option value="">بدون تخفیف</option>
+                        <option value="percentage">درصدی</option>
+                        <option value="fixed">مبلغ ثابت</option>
+                      </select>
+                      {formData.discount_type && (
+                        <>
+                          <input
+                            type="number"
+                            name="discount_value"
+                            value={formData.discount_value}
+                            onChange={handleInputChange}
+                            min="0"
+                            className="border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm w-24 sm:w-32 bg-surface text-text-primary"
+                          />
+                          <span className="text-danger text-sm sm:mr-auto">
+                            -{formatPersianCurrency(calculateDiscount())} ریال
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                      <span className="text-sm text-text-primary">
+                        مالیات (%):
+                      </span>
+                      <input
+                        type="number"
+                        name="tax_rate"
+                        value={formData.tax_rate}
+                        onChange={handleInputChange}
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        className="border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm w-20 sm:w-24 bg-surface text-text-primary"
+                      />
+                      <span className="text-primary text-sm sm:mr-auto">
+                        +{formatPersianCurrency(calculateTax())} ریال
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between pt-2 sm:pt-3 border-t border-border text-base sm:text-lg font-bold">
+                      <span className="text-text-primary">مبلغ نهایی:</span>
+                      <span className="text-primary">
+                        {formatPersianCurrency(calculateTotal())} ریال
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={handleModalClose}
+                    className="px-3 sm:px-4 py-2 border border-border rounded-lg hover:bg-surface-alt text-text-primary text-sm sm:text-base order-2 sm:order-1"
+                  >
+                    انصراف
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2"
+                  >
+                    {loading
+                      ? "در حال ذخیره..."
+                      : isEditMode
+                        ? "ویرایش فاکتور"
+                        : "ثبت فاکتور"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* مودال ثبت کالا */}
+      <ItemFormModal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        onSuccess={() => {
+          refreshItems();
+          toast.success("کالا اضافه شد و در لیست موجود است");
+        }}
+      />
+    </div>
+  );
+}

@@ -14,7 +14,8 @@ const reportRoutes = require("./reports");
 const settingsRoutes = require("./settings");
 const repairInvoiceRoutes = require("./repairInvoices");
 const serviceRoutes = require("./services");
-const backupRoutes = require("./backups");
+const exportRoutes = require("./exports");
+const subscriptionRoutes = require("./subscription");
 
 router.use("/auth", authRoutes);
 router.use("/devices", deviceRoutes);
@@ -28,6 +29,7 @@ router.use("/reports", reportRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/repair-invoices", repairInvoiceRoutes);
 router.use("/services", serviceRoutes);
-router.use("/backups", backupRoutes);
+router.use("/exports", exportRoutes);
+router.use("/subscription", subscriptionRoutes);
 
 module.exports = router;

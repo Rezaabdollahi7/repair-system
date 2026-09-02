@@ -1,481 +1,376 @@
 <div align="center">
 
-# 🔧 سیستم مدیریت تعمیرات
+# 🔧 Dofixo
 
-### نرم‌افزار حرفه‌ای مدیریت تعمیرگاه
+### مدیریت چندمستاجره تعمیرگاه‌ها، ساخته‌شده برای کارگاه‌های ایرانی
 
-[![React](https://img.shields.io/badge/React-18.2-blue)](https://reactjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20-green)](https://nodejs.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-3-lightblue)](https://www.sqlite.org/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-06B6D4)](https://tailwindcss.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
-
-[📚 مستندات API](./docs/API.md) | [🗄️ ساختار دیتابیس](./docs/DATABASE.md) | [📋 تغییرات](./CHANGELOG.md)
+[![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-26-green)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)](https://www.postgresql.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-7-2D3748)](https://www.prisma.io/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-06B6D4)](https://tailwindcss.com/)
 
 [English](./README.md) | [فارسی](./README.fa.md)
+
+**نسخه زنده:** [app.dofixo.ir](https://app.dofixo.ir) · **وب‌سایت معرفی:** [dofixo.ir](https://dofixo.ir)
 
 </div>
 
 ---
 
-## 📋 درباره نرم‌افزار
+## 📋 درباره پروژه
 
-**سیستم مدیریت تعمیرات** یک راه‌حل جامع و یکپارچه برای انواع تعمیرگاه‌ها است. از پذیرش دستگاه و پیگیری وضعیت تعمیر گرفته تا مدیریت انبار، صدور فاکتور و گزارشات مالی - هر آنچه تیم شما نیاز دارد، در یک نرم‌افزار.
+**Dofixo** یک پلتفرم SaaS میزبانی‌شده و چندمستاجره برای کارگاه‌های تعمیراتی کوچک است؛ از تعمیر موبایل و لپ‌تاپ گرفته تا لوازم خانگی. هر تعمیرگاه ثبت‌نام می‌کند، فضای کاری ایزوله خودش را دریافت می‌کند و تمام عملیات خود را از پذیرش دستگاه تا صدور فاکتور و گزارش‌های مالی مدیریت می‌کند.
 
-**تمرکز اصلی:**
+رابط کاربری به‌طور کامل فارسی است: چیدمان RTL، تاریخ جلالی، اعداد فارسی و مبالغ ریالی.
 
-- پذیرش سریع و پیگیری وضعیت دستگاه‌ها
-- مدیریت کامل قطعات و موجودی انبار
-- صدور فاکتور حرفه‌ای با محاسبات تخفیف و مالیات
-- همکاری تیمی با سطوح دسترسی مختلف
+این مخزن در ابتدا یک برنامه تک‌مستاجره بود که با SQLite و در یک شبکه محلی اجرا می‌شد. اکنون به یک پلتفرم چندمستاجره مبتنی بر PostgreSQL با امنیت در سطح سطر، ثبت‌نام تأییدشده با پیامک، ذخیره‌سازی آبجکت، صورتحساب اشتراک و بکاپ‌های شبانه رمزنگاری‌شده تبدیل شده است.
 
 ---
 
-## ✨ ویژگی‌ها
+## 🏢 چندمستاجره بودن
+
+ایزوله‌سازی، مهم‌ترین محدودیت طراحی این کدبیس است. این موضوع در دو لایه مستقل پیاده‌سازی شده و هیچ‌کدام جایگزین دیگری نیست:
+
+**۱. فیلتر در لایه برنامه.** هر جدول وابسته به مستاجر دارای `workspaceId` است. یک Prisma Client Extension آن را به تمام کوئری‌ها اضافه می‌کند تا هیچ کنترلری نتواند آن را فراموش کند.
+
+**۲. Row-Level Security در PostgreSQL.** هر جدول وابسته به مستاجر دارای سیاست `workspace_isolation` است که مقدار `app.workspace_id` را از session می‌خواند. بنابراین حتی کوئری‌ای که از Extension عبور کرده باشد نیز داده‌ای برنمی‌گرداند.
+
+شناسه Workspace از JWT تأییدشده — و هرگز از body یا query parameter درخواست — از طریق `AsyncLocalStorage` به یک `set_config()` روی اتصال منتقل می‌شود:
+
+```text
+requestContext (middleware) → opens AsyncLocalStorage
+authenticate                → setContextWorkspaceId(payload.workspaceId)
+Prisma extension            → set_config('app.workspace_id', id, TRUE)
+```
+
+اگر Context وجود نداشته باشد، Extension خطا می‌دهد تا RLS به‌صورت بی‌صدا صفر ردیف برنگرداند؛ پاسخ اشتباه از خطا بدتر است.
+
+**دو نقش دیتابیس، عمداً.** برنامه با نقش `dofixo_app` متصل می‌شود که مالک هیچ جدولی نیست. در PostgreSQL، مالک جدول می‌تواند RLS را **دور بزند**؛ بنابراین اطلاعات مالک فقط در کانتینر Migration وجود دارد و هرگز در محیط پردازشی که درخواست‌ها را پاسخ می‌دهد قرار نمی‌گیرد.
+
+**سه تابع `SECURITY DEFINER`** به‌عنوان مسیرهای کنترل‌شده و آگاهانه برای عبور از RLS تعریف شده‌اند: `app_login_lookup`، `app_create_workspace` و `app_refresh_lookup`. هرکدام به این دلیل وجود دارند که فراخواننده هنوز Context مربوط به Workspace ندارد.
+
+---
+
+## ✨ امکانات
+
+### 🏪 Workspace و شروع کار
+
+- ثبت‌نام سلف‌سرویس با تأیید پیامکی (OTP)
+- نام کاربری همان شماره موبایل است؛ یک هویت، تأییدشده از همان ابتدا
+- ۳۰ روز دوره آزمایشی رایگان، بدون محدودیت امکانات و بدون نیاز به کارت
+- تنظیمات، برندینگ و شمارنده‌های فاکتور اختصاصی برای هر Workspace
+
+### 💳 اشتراک و پرداخت
+
+- سه پلن: ۹۰ روزه، ۱۸۰ روزه و ۴۲۵ روزه
+- درگاه پرداخت زیبال با محاسبه قیمت در سمت سرور
+- کدهای تخفیف درصدی یا مبلغ ثابت؛ بیشترین تخفیف اعمال می‌شود و تخفیف‌ها با هم جمع نمی‌شوند
+- سیستم معرفی: تعمیرگاه دعوت‌شده تخفیف می‌گیرد و معرف روزهای اضافه دریافت می‌کند
+- رسید پرداخت قابل چاپ با شماره مرجع درگاه
+- حالت فقط‌خواندنی پس از پایان اشتراک: ۳ روز مهلت، سپس خواندن مجاز است و عملیات نوشتن با `402` پاسخ داده می‌شود؛ اشتراک منقضی‌شده «ممنوع» نیست
+- Job شبانه برای یادآوری‌ها، تغییر وضعیت‌ها، حذف داده‌ها و تسویه پرداخت‌ها
 
 ### 📋 مدیریت دستگاه‌ها
 
-- ثبت سریع دستگاه (کمتر از ۳۰ ثانیه)
-- جستجو با شماره پذیرش، نام مشتری، برند یا مدل
-- فیلتر پیشرفته بر اساس وضعیت، بازه تاریخ و پرسنل
-- تغییر وضعیت با یک کلیک (در انتظار ← در حال بررسی ← در حال تعمیر ← تعمیر شده ← تحویل شده)
-- تخصیص تعمیرکار به دستگاه
-- آپلود و مشاهده عکس دستگاه با اسلایدر تمام‌صفحه
-- کلیک روی سطر برای مشاهده جزئیات
+- ثبت سریع دستگاه با شماره پذیرش اتمیک
+- جستجو بر اساس شماره پذیرش، مشتری، برند یا مدل
+- فیلتر بر اساس وضعیت، بازه زمانی و تکنسین مسئول
+- گردش وضعیت: Pending → Diagnosing → Repairing → Repaired → Delivered
+- تخصیص تکنسین همراه با تاریخچه
+- آپلود تصویر با چرخش آگاه از EXIF، تغییر اندازه و Thumbnail
+- اسلایدر تمام‌صفحه تصاویر
 
 ### 👥 مدیریت مشتریان
 
-- پروفایل کامل مشتری با اطلاعات تماس
-- تاریخچه کامل دستگاه‌ها و تعمیرات هر مشتری
-- آمار: تعداد دستگاه، تعمیرات موفق، میانگین زمان تعمیر
-- نمایش Timeline دستگاه‌های مشتری
-- جستجوی سریع با نام یا شماره تماس
+- پروفایل مشتری همراه با تاریخچه کامل تعمیرات
+- آمار هر مشتری: تعداد دستگاه‌ها، تعمیرات موفق و میانگین زمان تعمیر
+- جستجوی سریع با نام یا شماره تلفن
 
-### 👨‍🔧 مدیریت پرسنل
+### 👨‍🔧 پرسنل و نقش‌ها
 
-- مدیریت کاربران با نقش‌های مختلف (سوپر ادمین، ادمین، تکنسین)
-- فعال/غیرفعال‌سازی کاربران
-- دسترسی محدود بر اساس نقش
-- مدیریت رمز عبور و پروفایل
+- سه نقش: مدیر ارشد، مدیر و تکنسین
+- فعال و غیرفعال‌سازی بدون حذف
+- اعمال سطح دسترسی در سطح Route و رابط کاربری
 
-### 📦 مدیریت انبار
+### 📦 انبار
 
 - کاتالوگ قطعات با کد، نام، دسته‌بندی و واحد
-- پیگیری موجودی لحظه‌ای
-- هشدار کم‌موجودی با نشانگر رنگی
-- مدیریت دسته‌بندی‌ها با ویرایش inline
-- ثبت موجودی اولیه هنگام ایجاد کالا
+- رهگیری لحظه‌ای موجودی با هشدار کمبود موجودی
+- میانگین موزون قیمت خرید
 - خرید سریع و فروش سریع از صفحه جزئیات کالا
+- تاریخچه کامل تراکنش‌های هر کالا
 
-### 🛒 فاکتورهای خرید
+### 🧾 فاکتورها
 
-- ثبت خرید قطعات از تأمین‌کنندگان
-- افزایش خودکار موجودی هنگام خرید
-- محاسبه میانگین قیمت خرید (میانگین وزنی)
-- پیگیری وضعیت پرداخت (در انتظار / ناقص / کامل)
-- تعریف سریع کالا هنگام ثبت فاکتور
+سه نوع فاکتور که هرکدام شمارنده اتمیک مخصوص خود را دارند (`PUR-0001`، `SAL-0001` و `REP-0001`):
 
-### 💰 فاکتورهای فروش
+- **فاکتور خرید** — خرید از تأمین‌کننده، افزایش خودکار موجودی و رهگیری پرداخت
+- **فاکتور فروش** — فروش مستقیم قطعات، اعتبارسنجی موجودی، قیمت پیشنهادی و قالب قابل چاپ (A4 / A5 / حرارتی)
+- **فاکتور تعمیر** — متصل به یک دستگاه، سه نوع آیتم (موجودی، خدمات و سفارشی)، تخفیف و مالیات، مدت گارانتی، تاریخچه پرداخت و قابلیت چاپ همراه با لوگو، مهر و امضا
 
-- فروش مستقیم قطعات به مشتریان
-- کاهش خودکار موجودی با اعتبارسنجی
-- آیتم‌های دلخواه در کنار کالاهای انبار
-- پیشنهاد قیمت فروش (میانگین خرید + ۲۰٪)
-- فاکتور قابل چاپ با لوگوی تعمیرگاه
+### 📊 داشبورد و گزارش‌ها
 
-### 🔧 فاکتورهای تعمیر
+- KPIهای لحظه‌ای: دستگاه‌ها، درآمد و سود
+- توزیع وضعیت دستگاه‌ها و نمای کلی موجودی
+- خلاصه‌های مالی ماهانه و روزانه
+- گزارش سود و زیان هر کالا با فیلتر تاریخ
+- گزارش موجودی با فیلتر دسته‌بندی
+- گزارش تراکنش‌ها
 
-- ایجاد فاکتور تعمیر متصل به دستگاه
-- سه نوع آیتم: انبار، خدمت، دلخواه
-- پر کردن خودکار اطلاعات مشتری از دستگاه (غیرقابل ویرایش)
-- محاسبه تخفیف (درصدی یا ثابت) و مالیات
-- پیگیری مدت گارانتی
-- تخصیص تعمیرکار
-- فاکتور قابل چاپ با لوگو، مهر و امضا
-- پیگیری پرداخت با تاریخچه
+### 📤 خروجی داده‌ها
 
-### 📊 داشبورد و گزارشات
-
-- شاخص‌های کلیدی لحظه‌ای: دستگاه‌ها، درآمد، سود
-- نمای کلی وضعیت موجودی
-- توزیع وضعیت دستگاه‌ها
-- خلاصه مالی ماهانه و روزانه
-- هشدار کم‌موجودی
-- فید آخرین تراکنش‌ها
-- رتبه‌بندی پرفروش‌ترین کالاها
-- گزارش سود/زیان به تفکیک کالا با فیلتر تاریخ
-- گزارش وضعیت موجودی با فیلتر دسته‌بندی
-
-### ⚙️ تنظیمات و شخصی‌سازی
-
-- پروفایل شرکت (نام، آدرس، تماس)
-- آپلود لوگو، مهر و امضا
-- نرخ مالیات و مدت گارانتی پیش‌فرض
-- پیشوند شماره فاکتور
-- تنظیمات قالب فاکتور فروش (A4/A5/حرارتی، نمایش/مخفی کردن بخش‌ها)
-
-### 💾 پشتیبان‌گیری و بازیابی
-
-- ایجاد بکاپ دستی
-- انتخاب شامل بودن فایل‌های آپلود شده
-- دانلود فایل بکاپ
-- بازیابی با یک کلیک (همراه با بکاپ خودکار قبل از بازیابی)
-- زمان‌بندی بکاپ خودکار هفتگی
-- تاریخچه بکاپ با متادیتا
-
-### 🔐 امنیت و کنترل دسترسی
-
-- احراز هویت مبتنی بر JWT
-- دسترسی بر اساس نقش (سوپر ادمین / ادمین / تکنسین)
-- محافظت در سطح مسیر
-- رمزنگاری رمز عبور با bcrypt
-
-### 🌐 دسترسی چندگانه
-
-- سرور روی یک سیستم اجرا می‌شود
-- دسترسی تیم از طریق شبکه محلی (LAN)
-- قابل استفاده روی کامپیوتر، لپ‌تاپ، تبلت و موبایل
-- پشتیبانی از PWA برای نصب روی موبایل
+- خروجی کامل Workspace: یک فایل Excel هفت‌شیت به‌همراه فایل ZIP شامل تمام تصاویر دستگاه‌ها
+- ساخت در پس‌زمینه؛ تعمیرگاهی با هزار دستگاه ممکن است چند دقیقه زمان نیاز داشته باشد، بیشتر از زمانی که هر reverse proxy یک اتصال را باز نگه می‌دارد
+- دانلود از طریق Presigned URL با زمان اعتبار محدود
 
 ### 🎨 رابط کاربری
 
-- رابط کاملاً فارسی (راست‌به‌چپ)
-- اعداد و تاریخ شمسی
-- منوی کناری جمع‌شونده
-- دکمه شناور برای عملیات سریع
-- اسپینرهای بارگذاری و حالت‌های خالی
-- مودال‌های تأیید برای عملیات مخرب
-- طراحی واکنش‌گرا برای همه اندازه‌های صفحه
+- کاملاً فارسی و RTL، همراه با تقویم جلالی و اعداد فارسی
+- تم روشن و تاریک
+- سایدبار جمع‌شونده، دکمه عملیات شناور و مودال‌های تأیید
+- واکنش‌گرا از موبایل تا دسکتاپ
 
 ---
 
-## ⚙️ تکنولوژی‌ها
+## 🔐 امنیت
 
-### بک‌اند
+| بخش | رویکرد |
+| --- | --- |
+| **ایزوله‌سازی مستاجر** | فیلتر `workspaceId` **و** PostgreSQL RLS، به‌صورت مستقل |
+| **نقش دیتابیس** | برنامه با نقشی غیرمالک اجرا می‌شود که نمی‌تواند RLS را دور بزند |
+| **Access Token** | JWT، ۱۵ دقیقه، فقط در حافظه صفحه — هرگز در `localStorage` |
+| **Refresh Token** | ۳۰ روز، راز تصادفی ۳۲ بایتی (نه JWT)، ذخیره‌شده به‌صورت SHA-256 Hash |
+| **چرخش توکن** | استفاده مجدد از توکن لغوشده تمام Sessionهای آن کاربر را نامعتبر می‌کند |
+| **Cookieها** | `httpOnly`، `SameSite=Strict`، `Path=/api/auth` و `Secure` در Production |
+| **رمز عبور** | bcrypt |
+| **اعتبارسنجی ورودی** | Zod Schema برای تمام Routeها؛ Handlerها از `req.valid` می‌خوانند، نه `req.body` |
+| **Rate Limiting** | سقف‌های مستقل برای ورود، OTP و ترافیک عمومی API |
+| **Object Storage** | Bucketهای خصوصی و Presigned URL امضاشده برای هر درخواست پس از Scope شدن Row |
+| **Headerها** | `helmet` با `Referrer-Policy` برابر `strict-origin-when-cross-origin` |
+| **Secrets** | `JWT_SECRET`، `DATABASE_URL_APP` و API Keyها در صورت نبودن هنگام Import خطا می‌دهند — بدون مقدار پیش‌فرض |
+| **Backupها** | `pg_dump` شبانه، رمزنگاری با `age` و آپلود در Object Storage |
 
-- **Node.js (v20.x)** - Runtime جاوااسکریپت
-- **Express.js (v4.18)** - فریم‌ورک وب
-- **SQL.js** - SQLite در JavaScript/WebAssembly
-- **JWT (jsonwebtoken)** - احراز هویت
-- **bcryptjs** - هش کردن رمز عبور
-- **multer** - آپلود فایل
-- **node-cron** - وظایف زمان‌بندی شده (بکاپ خودکار)
-- **archiver** - ساخت فایل ZIP
-- **adm-zip** - استخراج فایل ZIP
-- **csv-parse** - پردازش CSV برای انتقال داده
-- **jalaali-js** - تبدیل تاریخ شمسی
+**هیچ مقدار پیش‌فرضی، هیچ‌جا وجود ندارد.** نبودن یک Secret باعث توقف برنامه هنگام Boot می‌شود. جایگزین آن برنامه‌ای است که اجرا می‌شود، ثبت‌نام می‌پذیرد و دقیقاً در مهم‌ترین درخواست ممکن شکست می‌خورد.
 
-### فرانت‌اند
+---
 
-- **React (v18.2)** - کتابخانه UI
-- **Vite (v5.4)** - ابزار ساخت و سرور توسعه
-- **React Router (v6)** - مسیریابی سمت کلاینت
-- **TailwindCSS (v3.4)** - CSS مبتنی بر Utility
-- **Axios** - کلاینت HTTP
-- **Heroicons** - کتابخانه آیکون
-- **react-to-print** - چاپ و خروجی PDF
-- **react-hot-toast** - اعلان‌های Toast
+## ⚙️ فناوری‌های استفاده‌شده
 
-### دیتابیس
+### Backend
 
-- **SQLite** - دیتابیس فایلی و محلی
-- بدون نیاز به نصب سرور
-- قابل حمل - دیتابیس یک فایل است
+```text
+Node 26 · TypeScript 5.9 · Express 5 · pnpm 10
+Prisma 7 + @prisma/adapter-pg + pg 8 · PostgreSQL 17
+Zod 4 · helmet 8 · express-rate-limit 8 · cookie-parser
+@aws-sdk/client-s3 + @aws-sdk/s3-request-presigner
+bcryptjs · jsonwebtoken · multer · sharp · jalaali-js · archiver 7
+Jest 30 + ts-jest + supertest
+```
+
+### Frontend
+
+```text
+React 19 · Vite 8 · React Router 7 · Tailwind 4 · TypeScript 5.9
+Axios · react-hot-toast · react-to-print · jalaali-js · @heroicons/react
+```
+
+### Infrastructure
+
+```text
+Docker Compose · Caddy (تنها سرویسی که پورت منتشر می‌کند)
+S3-compatible object storage (Bucketهای خصوصی)
+sms.ir (OTP و اعلان‌ها) · Zibal (پرداخت‌ها)
+age (رمزنگاری Backup) · s3cmd
+```
 
 ---
 
 ## 🏗️ ساختار پروژه
 
-```
-repair-management-system/
-├── backend/ # سرور API Node.js
-│ ├── src/
-│ │ ├── config/
-│ │ │ └── database.js # اتصال و schema دیتابیس
-│ │ ├── controllers/ # کنترلرهای مسیر (۱۴ فایل)
-│ │ ├── middleware/ # میدلور احراز هویت و دسترسی
-│ │ ├── routes/ # مسیرهای API (۱۴ فایل)
-│ │ ├── jobs/
-│ │ │ └── backupScheduler.js # بکاپ خودکار هفتگی
-│ │ ├── utils/ # توابع کمکی
-│ │ ├── scripts/ # اسکریپت‌های کاربردی
-│ │ └── server.js # نقطه ورود سرور Express
-│ ├── uploads/ # فایل‌های آپلود شده
-│ │ ├── devices/ # تصاویر دستگاه‌ها
-│ │ └── settings/ # لوگو، مهر، امضا
-│ ├── backups/ # فایل‌های بکاپ
-│ └── package.json
+```text
+Dofixo/
+├── backend/
+│   ├── prisma/
+│   │   ├── migrations/        14 migration
+│   │   ├── schema.prisma      30 model
+│   │   ├── rls-check.sql      یافتن جدول‌های فاقد سیاست RLS
+│   │   └── seed.ts            فقط برای محیط توسعه
+│   ├── src/
+│   │   ├── lib/               prisma · storage · workspaceContext
+│   │   │                      sms · zibal · imageProfile
+│   │   ├── controllers/       16 controller
+│   │   ├── routes/            مسیرهای REST
+│   │   ├── middleware/        auth · authorize · requestContext
+│   │   │                      validate · subscription
+│   │   ├── schemas/           Zod schema برای هر resource
+│   │   ├── scripts/           subscriptionCron.ts
+│   │   ├── utils/             subscription · pricing · referral
+│   │   │                      workspaceDeletion · jalali · export/
+│   │   └── __tests__/         unit suites + integration/
+│   ├── Dockerfile             multi-stage: runtime + tooling targets
+│   └── Dockerfile.dev
 │
-├── frontend/ # اپلیکیشن React
-│ ├── src/
-│ │ ├── components/ # کامپوننت‌های قابل استفاده مجدد (۲۵+ فایل)
-│ │ ├── pages/ # کامپوننت‌های صفحه (۱۴ فایل)
-│ │ ├── context/ # React Context (Auth و Modal)
-│ │ ├── api/ # کلاینت Axios
-│ │ ├── utils/ # فرمت‌کننده‌ها و توابع کمکی
-│ │ ├── App.jsx
-│ │ └── main.jsx
-│ ├── public/
-│ │ ├── favicon.svg
-│ │ ├── manifest.json # PWA manifest
-│ │ └── sw.js # Service Worker
-│ ├── index.html
-│ └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── api/               Axios client با refresh interception
+│   │   ├── components/        29 component
+│   │   ├── context/           Auth · Modal · Subscription · Theme
+│   │   ├── pages/             19 page
+│   │   ├── types/             api.ts شکل تمام endpointها را توصیف می‌کند
+│   │   └── utils/
+│   ├── Dockerfile             nginx-unprivileged
+│   └── nginx.conf
 │
-├── start.bat # اسکریپت راه‌اندازی سریع ویندوز
-└── README.md
+├── ops/
+│   ├── backup-database.sh     بکاپ شبانه رمزنگاری‌شده
+│   ├── subscription-cron.sh   job شبانه اشتراک
+│   ├── extract-workspace.sh   استخراج یک Workspace از Backup
+│   ├── reset-password.sh      بازیابی حساب اپراتور
+│   └── *.md                   runbookها
+│
+├── docker-compose.yml         development
+├── docker-compose.prod.yml    production
+└── Caddyfile
 ```
 
+**Frontend کاملاً TypeScript است.** گزینه `allowJs` بسته است؛ یک فایل `.js` جدید زیر `src/` یک خطای Compile محسوب می‌شود. دستور `tsc --noEmit` درون `pnpm build` اجرا می‌شود و این تنها Gate خودکار Frontend است.
 
+---
 
-## 🚀 راه‌اندازی سریع
+## 🚀 راه‌اندازی محیط توسعه
 
 ### پیش‌نیازها
-- [Node.js](https://nodejs.org/) (نسخه ۱۸ یا بالاتر)
-- npm (همراه با Node.js نصب می‌شود)
 
-### نصب
+- Docker و Docker Compose v2
+- Node.js 20+ و pnpm (برای اجرای دستورها خارج از کانتینر)
+
+### شروع کار
+
 ```bash
-# ۱. کلون کردن مخزن
-git clone https://github.com/Rezaabdollahi7/repair-management-system.git
-cd repair-management-system
+git clone <repository-url>
+cd Dofixo
 
-# ۲. نصب وابستگی‌های بک‌اند
+# Environment
+cp backend/.env.example backend/.env
+
+# Fill in: DATABASE_URL, DATABASE_URL_APP, JWT_SECRET,
+#          S3_*, SMS_*, ZIBAL_MERCHANT, APP_URL
+
+# Bring up Postgres, backend and frontend
+docker compose up -d --build
+
+# Apply migrations and seed a development workspace
+docker compose exec backend pnpm prisma migrate deploy
+docker compose exec backend pnpm prisma db seed
+```
+
+Frontend روی `http://localhost:5173` و API روی `http://localhost:5001` اجرا می‌شوند.
+
+Seed یک Workspace و یک مدیر ارشد را از `SEED_ADMIN_USERNAME` و `SEED_ADMIN_PASSWORD` ایجاد می‌کند. این Seed هرگز در Production اجرا نمی‌شود؛ در آنجا `migrate deploy` کافی است و سه نقش به‌عنوان داده مرجع داخل یک Migration منتشر می‌شوند.
+
+### دستورهای کاربردی
+
+```bash
+# Tests
 cd backend
-npm install
 
-# ۳. نصب وابستگی‌های فرانت‌اند
-cd ../frontend
-npm install
+pnpm test              # unit suites, mocked
+pnpm test:integration  # نیازمند Postgres و دیتابیس dofixo_test
+pnpm test:all          # هر دو
 
-# ۴. ایجاد فایل محیطی فرانت‌اند
-echo "VITE_API_URL=http://localhost:5001" > .env
-````
+# Quality gates
+pnpm lint && pnpm build
 
-### اجرای برنامه
+# After adding a dependency, rebuild — a plain restart keeps the old
+# node_modules, because an anonymous volume shadows /app/node_modules
+docker compose up -d --build --renew-anon-volumes backend
 
-```bash
-# ترمینال ۱ - بک‌اند
-cd backend/src
-node server.js
-# سرور روی http://localhost:5001 راه‌اندازی می‌شود
-
-# ترمینال ۲ - فرانت‌اند
-cd frontend
-npm run dev
-# فرانت‌اند روی http://localhost:5173 راه‌اندازی می‌شود
+# After a migration
+docker compose exec backend pnpm prisma generate
 ```
 
-### اطلاعات ورود پیش‌فرض
-
-```
-نام کاربری: superadmin
-رمز عبور: password
-```
-
-⚠️ **توجه:** رمز عبور پیش‌فرض را بلافاصله پس از اولین ورود تغییر دهید!
+⚠️ مقدار `DATABASE_URL` باید از `127.0.0.1` استفاده کند، نه `localhost`. Prisma 7 به Driver Adapter نیاز دارد و این دو به شکل متفاوتی Resolve می‌شوند.
 
 ---
 
-## 🌐 راه‌اندازی شبکه (دسترسی تیمی)
+## 🧪 تست
 
-برای دسترسی اعضای تیم از طریق شبکه محلی:
+**تست‌های واحد Backend** دیتابیس را Mock می‌کنند و Controllerها، Schemaها، قیمت‌گذاری، زمان‌بندی اشتراک، Clientهای SMS و Zibal و Middleware احراز مجوز را پوشش می‌دهند.
 
-```bash
-# ۱. IP کامپیوتر خود را پیدا کنید (مثلاً 192.168.1.150)
+**تست‌های Integration** در برابر PostgreSQL واقعی اجرا می‌شوند و مواردی را ثابت می‌کنند که Mock قادر به اثبات آن‌ها نیست: ایزوله‌سازی مستاجر در تمام REST Resourceها، شماره‌گذاری فاکتور در شرایط هم‌زمانی، چرخش توکن، ثبت‌نام، پاداش معرفی و چرخه کامل پرداخت.
 
-# ۲. فایل محیطی فرانت‌اند را به‌روز کنید
-# frontend/.env.development
-VITE_API_URL=http://192.168.1.150:5001
+یک REST Resource جدید فقط به یک خط در جدول `resources` در `isolation.test.ts` نیاز دارد، نه چهار تست جدید. مواردی که در این ساختار نمی‌گنجند (Singletonها و Aggregateها) در `isolationSpecialCases.test.ts` قرار می‌گیرند و باید توضیحی درباره دلیل آن داشته باشند.
 
-# ۳. بک‌اند را اجرا کنید
-cd backend/src
-node server.js
-
-# ۴. فرانت‌اند را اجرا کنید (قابل دسترس در شبکه)
-cd frontend
-npm run dev -- --host
-
-# ۵. اعضای تیم از طریق مرورگر به آدرس زیر متصل می‌شوند:
-# http://192.168.1.150:5173
-```
+⚠️ Frontend هنوز زیرساخت تست خودکار ندارد. TypeScript تنها Gate آن است.
 
 ---
 
-## 📱 نصب روی موبایل (PWA)
+## 📡 نمای کلی API
 
-۱. برنامه را در مرورگر Chrome روی موبایل باز کنید
-۲. منو (⋮) ← "افزودن به صفحه اصلی" یا "نصب برنامه"
-۳. برنامه نصب شده و مانند یک اپ native باز می‌شود
+تمام Routeها با `/api` شروع می‌شوند و به‌جز موارد مشخص‌شده، به Bearer Token نیاز دارند.
 
-## 📡 API ها
+| گروه | مسیرها |
+| --- | --- |
+| **Auth** | `login` · `register` · `send-otp` · `reset-password` · `refresh` · `logout` · `me` · `change-password` |
+| **Devices** | CRUD · تصاویر · تخصیص‌ها |
+| **Customers** | CRUD · دستگاه‌ها · آمار |
+| **Personnel** | CRUD · تغییر وضعیت فعال |
+| **Items** | CRUD · جستجو · کمبود موجودی · تراکنش‌ها · خرید/فروش سریع |
+| **Categories · Services** | CRUD |
+| **Invoices** | `purchase-invoices` · `sale-invoices` · `repair-invoices` (+ پرداخت‌ها، وضعیت) |
+| **Reports** | داشبورد · موجودی · خریدها · فروش‌ها · سود |
+| **Settings** | خواندن · بروزرسانی · آپلود تصویر |
+| **Exports** | درخواست · فهرست · دانلود |
+| **Subscription** | وضعیت · پیش‌فاکتور · پرداخت · تأیید · پرداخت‌ها · معرفی |
 
-### احراز هویت
-
-```
-POST   /api/auth/login              # ورود کاربر
-GET    /api/auth/me                 # دریافت کاربر جاری
-PUT    /api/auth/change-password    # تغییر رمز عبور
-```
-
-### دستگاه‌ها
-
-```
-GET    /api/devices                 # لیست دستگاه‌ها (جستجو، فیلتر، صفحه‌بندی)
-GET    /api/devices/:id             # جزئیات دستگاه
-POST   /api/devices                 # ایجاد دستگاه
-PUT    /api/devices/:id             # ویرایش دستگاه
-DELETE /api/devices/:id             # حذف دستگاه
-POST   /api/devices/:id/images      # آپلود تصاویر
-DELETE /api/devices/:id/images/:img # حذف تصویر
-```
-
-### مشتریان
-
-```
-GET    /api/customers               # لیست مشتریان
-GET    /api/customers/:id           # جزئیات مشتری
-POST   /api/customers               # ایجاد مشتری
-PUT    /api/customers/:id           # ویرایش مشتری
-DELETE /api/customers/:id           # حذف مشتری
-GET    /api/customers/:id/devices   # دستگاه‌های مشتری
-GET    /api/customers/:id/stats     # آمار مشتری
-```
-
-### پرسنل
-
-```
-GET    /api/personnel               # لیست پرسنل
-GET    /api/personnel/:id           # جزئیات پرسنل
-POST   /api/personnel               # ایجاد پرسنل
-PUT    /api/personnel/:id           # ویرایش پرسنل
-PUT    /api/personnel/:id/toggle-active # تغییر وضعیت فعال/غیرفعال
-DELETE /api/personnel/:id           # حذف پرسنل
-```
-
-### کالاها (انبار)
-
-```
-GET    /api/items                   # لیست کالاها
-GET    /api/items/:id               # جزئیات کالا
-POST   /api/items                   # ایجاد کالا
-PUT    /api/items/:id               # ویرایش کالا
-DELETE /api/items/:id               # حذف کالا
-GET    /api/items/search            # جستجوی کالا
-GET    /api/items/low-stock         # کالاهای کم‌موجود
-GET    /api/items/:id/transactions  # تاریخچه تراکنش کالا
-POST   /api/items/:id/quick-purchase # خرید سریع
-POST   /api/items/:id/quick-sale    # فروش سریع
-```
-
-### فاکتورهای خرید
-
-```
-GET    /api/purchase-invoices       # لیست فاکتورها
-GET    /api/purchase-invoices/:id   # جزئیات فاکتور
-POST   /api/purchase-invoices       # ایجاد فاکتور
-PUT    /api/purchase-invoices/:id/payment # بروزرسانی پرداخت
-DELETE /api/purchase-invoices/:id   # حذف فاکتور
-```
-
-### فاکتورهای فروش
-
-```
-GET    /api/sale-invoices           # لیست فاکتورها
-GET    /api/sale-invoices/:id       # جزئیات فاکتور
-POST   /api/sale-invoices           # ایجاد فاکتور
-PUT    /api/sale-invoices/:id/payment # بروزرسانی پرداخت
-DELETE /api/sale-invoices/:id       # حذف فاکتور
-```
-
-### فاکتورهای تعمیر
-
-```
-GET    /api/repair-invoices         # لیست فاکتورها
-GET    /api/repair-invoices/:id     # جزئیات فاکتور
-POST   /api/repair-invoices         # ایجاد فاکتور
-PUT    /api/repair-invoices/:id     # ویرایش فاکتور (فقط پیش‌نویس)
-DELETE /api/repair-invoices/:id     # حذف فاکتور
-PUT    /api/repair-invoices/:id/status # تغییر وضعیت (صدور/ابطال)
-POST   /api/repair-invoices/:id/payments # ثبت پرداخت
-```
-
-### گزارشات
-
-```
-GET    /api/reports/dashboard       # آمار داشبورد
-GET    /api/reports/stock           # گزارش موجودی
-GET    /api/reports/purchases       # گزارش خرید
-GET    /api/reports/sales           # گزارش فروش
-GET    /api/reports/profit          # گزارش سود/زیان
-```
-
-### تنظیمات
-
-```
-GET    /api/settings               # دریافت تنظیمات
-PUT    /api/settings               # ویرایش تنظیمات
-POST   /api/settings/upload/:type  # آپلود تصویر (لوگو/مهر/امضا)
-```
-
-### پشتیبان‌گیری
-
-```
-GET    /api/backups                 # لیست بکاپ‌ها
-POST   /api/backups                 # ایجاد بکاپ
-GET    /api/backups/:id/download    # دانلود بکاپ
-POST   /api/backups/:id/restore     # بازیابی بکاپ
-DELETE /api/backups/:id             # حذف بکاپ
-```
+هر Handler ورودی خود را با یک Zod Schema از طریق Middleware `validate()` اعتبارسنجی می‌کند و از `req.valid` می‌خواند. `workspaceId` و `role` همیشه از JWT تأییدشده دریافت می‌شوند.
 
 ---
 
-## 🔒 امنیت
+## 🚢 استقرار
 
-### اقدامات امنیتی پیاده‌سازی شده
+Production به‌صورت چهار کانتینر روی یک Host اجرا می‌شود: Postgres، Backend، Frontend و Caddy. Caddy تنها سرویسی است که پورت منتشر می‌کند. سرویس پنجم با نام `migrate` پشت یک Compose Profile قرار دارد و هرگز هم‌زمان با API اجرا نمی‌شود؛ این تنها جایی است که اطلاعات مالک دیتابیس در آن وجود دارد.
 
-- ✅ **امنیت رمز عبور** - هش bcrypt با ضریب ۱۰
-- ✅ **احراز هویت** - مبتنی بر JWT (انقضا ۷۲ ساعت)
-- ✅ **سطوح دسترسی** - کنترل دسترسی مبتنی بر نقش (۳ نقش)
-- ✅ **محافظت CORS** - تنظیم origins مجاز
-- ✅ **جلوگیری از SQL Injection** - کوئری‌های پارامتری
-- ✅ **اعتبارسنجی ورودی** - اعتبارسنجی سمت سرور
-- ✅ **مدیریت خطا** - بدون افشای اطلاعات حساس
-- ✅ **بکاپ خودکار هفتگی** - زمان‌بندی خودکار
+Imageها روی یک Workstation ساخته و با `docker save` منتقل می‌شوند، زیرا Host محیط Production به Docker Hub یا npm دسترسی ندارد.
+
+Runbook عملیاتی در `DEPLOY.md` قرار دارد که خارج از Version Control نگهداری می‌شود.
+
+`HANDOFF.md` مرجع اصلی وضعیت پروژه، تصمیم‌های معماری و دلایل پشت آن‌ها است.
+
+---
+
+## 📊 وضعیت پروژه
+
+| مرحله | وضعیت |
+| --- | --- |
+| 0 — زیرساخت و ابزارها | ✅ |
+| 1 — SQLite → PostgreSQL | ✅ |
+| 2 — چندمستاجره بودن | ✅ |
+| 3 — بازنویسی احراز هویت | ✅ |
+| 4 — Object Storage | ✅ |
+| 5 — Backup و خروجی داده | ✅ |
+| OTP — تأیید پیامکی | ✅ |
+| 7 — استقرار | ✅ |
+| 8 — اشتراک و پرداخت‌ها | ✅ |
+| 9 — یکپارچگی رابط کاربری | ⬜ |
+| 10 — رفع باگ‌های Frontend | ⬜ |
 
 ---
 
 ## 👨‍💻 سازنده
 
-**توسعه‌دهنده:** رضا عبدالهی  
-**شرکت:** زیمنس پارت  
-**ایمیل:** srezaabdollahi7@gmail.com  
-**گیت‌هاب:** [@Rezaabdollahi7](https://github.com/Rezaabdollahi7)
+**توسعه‌دهنده:** Reza Abdollahi
 
----
+**ایمیل:** srezaabdollahi7@gmail.com
 
-## 📄 مجوز
-
-این پروژه تحت مجوز MIT منتشر شده است - برای جزئیات به فایل [LICENSE](LICENSE) مراجعه کنید.
-
----
-
-## 🔗 لینک‌های مفید
-
-- 📚 [مستندات API](./docs/API.md)
-- 🗄️ [ساختار دیتابیس](./docs/DATABASE.md)
-- 📋 [تغییرات](./CHANGELOG.md)
-- 🐛 [گزارش مشکلات](https://github.com/Rezaabdollahi7/repair-management-system/issues)
+**GitHub:** [@Rezaabdollahi7](https://github.com/Rezaabdollahi7)
 
 ---
 
 <div align="center">
 
-**نسخه:** ۱.۰.۰  
-**آخرین بروزرسانی:** خرداد ۱۴۰۵  
-**وضعیت:** ✅ آماده استفاده
-
-ساخته شده با ❤️ برای تمام تعمیرگاه‌ها
+**وضعیت:** در حال اجرا در محیط Production
 
 </div>
-```

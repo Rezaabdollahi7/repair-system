@@ -5,14 +5,21 @@ package-lock.json
 # Environment
 .env
 .env.local
+.env.prod
+.env.*.local
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+workspace-*.sql
 
 # Backups
 backups/
+ops/backup.env
+#uploads
+backend/src/uploads/devices
+backend/src/uploads/settings
 
 # Build
 dist/
@@ -28,3 +35,5 @@ Thumbs.db
 .idea/
 
 prompts
+
+DEPLOY.md

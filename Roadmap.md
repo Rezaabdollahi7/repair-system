@@ -305,6 +305,36 @@ plan before that decision.
       following the InvoicePreview pattern — no new dependency, and the
       browser's own "save as PDF" does the rest
 
+- [ ] 8.10 Payment confirmation SMS. settlePayment extends the subscription
+      and rewards the referrer but never sends SMS_TEMPLATE_PAYMENT_OK —
+      the template is declared in lib/sms.ts, present in every env file and
+      approved in the sms.ir panel, so every signal said it was done. A
+      real payment on production verified, extended and issued a receipt
+      with a ref number, and no message was sent.
+
+      Send it after the transaction, not inside: the call takes up to 20s
+      and holding a row lock that long for a message is wrong. Swallow the
+      error like rewardReferrer does — a customer who has paid must not see
+      a failure because an SMS did not go — but log it, which is what made
+      this invisible.
+
+      ownerPhone() in utils/subscriptionJob.ts already resolves the super
+      admin's number and is the only place that knows the message goes to
+      them and not to an admin. Lift it into utils/subscription.ts rather
+      than copying it.
+
+      ⚠️ The #DATE# parameter is Jalali with dashes, never slashes.
+      sendTemplate refuses a slash, but as an SmsError at send time.
+
+      ⚠️ Check utils/referral.ts in the same task: the referral reward SMS
+      did not arrive either, and rewardReferrer swallows its errors. If it
+      swallows without logging, that is the RULES §6 violation that made
+      both of these silent.
+
+      A test asserting sendTemplate is called with PAYMENT_OK after a
+      successful settlePayment is the point of the task — nothing else
+      would have caught this.
+
 ## Phase 9 — UI Consolidation (after the migration settles)
 
 Product changes deliberately held until the data model and auth stop moving,

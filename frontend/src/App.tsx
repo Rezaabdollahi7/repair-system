@@ -82,15 +82,25 @@ function App() {
                       <Route path="exports" element={<ExportList />} />
                       <Route path="subscription" element={<Subscription />} />
                       <Route path="referral" element={<Referral />} />
-                    </Route>
 
-                    <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="reports/stock" element={<StockReport />} />
-                    <Route path="reports/profit" element={<ProfitReport />} />
-                    <Route
-                      path="reports/transactions"
-                      element={<TransactionsReport />}
-                    />
+                      {/* Admin-only to match the sidebar, and to match the
+                          server: /api/reports is guarded there too (AUTH.1),
+                          so leaving these open meant a technician reaching an
+                          error page instead of a redirect. The dashboard
+                          stays admin-only rather than serving a reduced
+                          payload — that is a phase 9 product decision, and if
+                          it is taken, the filtering belongs in the
+                          controller. */}
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="reports/stock" element={<StockReport />} />
+                      <Route path="reports/profit" element={<ProfitReport />} />
+                      {/* No sidebar link, but a real route that calls the
+                          dashboard endpoint — it has to move too. */}
+                      <Route
+                        path="reports/transactions"
+                        element={<TransactionsReport />}
+                      />
+                    </Route>
                   </Route>
                 </Route>
 

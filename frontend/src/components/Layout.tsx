@@ -119,7 +119,7 @@ export default function Layout() {
       name: "تنظیمات",
       path: "/settings",
       icon: Cog6ToothIcon,
-      adminOnly: false,
+      adminOnly: true,
     },
   ];
 

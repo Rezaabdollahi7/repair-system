@@ -373,10 +373,10 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
 `exports` and `personnel` already have it. `categories`, `services` and
 `images` are deliberately open — a technician needs them.
 
-- [ ] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
+- [x] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
       and on its own: closing only the frontend would hide the gap rather
       than shut it
-- [ ] AUTH.2 Integration tests that hit each of the five with a technician's
+- [x] AUTH.2 Integration tests that hit each of the five with a technician's
       token and expect 403. Not a unit test of the middleware — the middleware
       already works, and what failed was nobody wiring it up. A route file
       without a guard has to fail the suite

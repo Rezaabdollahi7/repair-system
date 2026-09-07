@@ -336,6 +336,16 @@ plan before that decision.
       successful settlePayment is the point of the task — nothing else
       would have caught this.
 
+
+- [ ] 8.11 The nightly job's raw query over `workspaces` returns nothing:
+      raw SQL carries no workspace context and the policy refuses every row.
+      Broken since 8.7 and invisible because an empty result reports exactly
+      like a quiet night.
+      A test that runs the job against a real database with two workspaces
+      and asserts it saw both is the point of the task — mocking `$queryRaw`
+      is what hid this.
+
+
 ## Phase 9 — UI Consolidation (after the migration settles)
 
 Product changes deliberately held until the data model and auth stop moving,

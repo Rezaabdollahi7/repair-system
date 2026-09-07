@@ -380,7 +380,7 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
       token and expect 403. Not a unit test of the middleware — the middleware
       already works, and what failed was nobody wiring it up. A route file
       without a guard has to fail the suite
-- [ ] AUTH.3 Move `dashboard` and the three report pages inside
+- [x] AUTH.3 Move `dashboard` and the three report pages inside
       `ProtectedRoute minRole="admin"` in App.tsx, matching what the sidebar
       already claims. The dashboard stays admin-only rather than being
       served a reduced payload — that is a product decision for phase 9, and
@@ -388,7 +388,7 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
       ⚠️ `/reports/transactions` has no sidebar link but does have a route,
       and it calls the dashboard endpoint. It has to move too, or a
       technician lands on an error page instead of a redirect
-- [ ] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
+- [x] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
       guards it with `minRole="admin"`, so a technician sees a link that
       redirects them away. One or the other is wrong; the route is right
 

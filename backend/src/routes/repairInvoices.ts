@@ -1,6 +1,7 @@
 import express from "express";
 import * as ctrl from "../controllers/repairInvoiceController";
 import { authenticate } from "../middleware/auth";
+import { atLeast } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import { idParamSchema } from "../schemas/common";
 import {
@@ -14,6 +15,10 @@ import {
 const router = express.Router();
 
 router.use(authenticate);
+
+// A repair invoice carries the price charged and the parts consumed. The
+// technician's own work lives on `devices`, which stays open to them.
+router.use(atLeast("admin"));
 
 router.get("/", validate({ query: repairInvoiceListQuerySchema }), ctrl.getAll);
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getById);

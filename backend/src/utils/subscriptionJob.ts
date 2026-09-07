@@ -4,8 +4,8 @@ import { sendTemplate, SmsError } from "../lib/sms";
 import { inquirePayment } from "../lib/zibal";
 import { settlePayment } from "../controllers/subscriptionController";
 import { errorMessage } from "./errors";
-import { verdictFor } from "./subscriptionSchedule";
 import { ownerPhone } from "./subscription";
+import { verdictFor } from "./subscriptionSchedule";
 import { deleteWorkspaceData } from "./workspaceDeletion";
 
 /**
@@ -46,13 +46,14 @@ export async function runSubscriptionJob(
     failures: 0,
   };
 
-  // The owner connection is not available here: this runs as the application
-  // role like everything else, and workspaces carries a policy scoped to the
-  // current context. Read through a raw query for exactly that reason — it
-  // is the one place a job legitimately needs to see every tenant.
+  // ⚠️ Through app_all_workspaces(), the fourth SECURITY DEFINER aperture,
+  // and not a plain raw query. A raw query carries no workspace context, so
+  // the policy on `workspaces` answered it with zero rows — silently, since
+  // an empty result reports exactly like a night with nothing to do. That is
+  // what it had been doing since 8.7 (debt 42).
   //
-  // ⚠️ Safe because it selects nothing but ids and flags: no tenant data
-  // crosses a boundary, and every subsequent read opens that workspace's own
+  // The function returns ids, flags and a date: no tenant data crosses a
+  // boundary here, and every read that follows opens that workspace's own
   // context.
   const workspaces = await prisma.$queryRaw<
     {
@@ -60,12 +61,7 @@ export async function runSubscriptionJob(
       never_expires: boolean;
       expires_at: Date | null;
     }[]
-  >`
-  SELECT id, never_expires, expires_at
-  FROM workspaces
-  WHERE deleted_at IS NULL
-  ORDER BY id
-`;
+  >`SELECT id, never_expires, expires_at FROM app_all_workspaces()`;
 
   for (const row of workspaces) {
     try {
@@ -91,7 +87,12 @@ export async function runSubscriptionJob(
       // Written after the message, not before: reporting a workspace as
       // expired while its warning failed to send would be the wrong half to
       // have succeeded.
-      const updated = await runWithWorkspace(row.id, () =>
+      // ⚠️ async with an await inside, not a bare arrow returning the query.
+      // A PrismaPromise is lazy: an arrow that returns one lets fn() return
+      // immediately, storage.run closes the context, and the query then
+      // executes outside it — which the extension answers by throwing. The
+      // integration suite caught exactly this in settleAbandonedPayments.
+      const updated = await runWithWorkspace(row.id, async () =>
         prisma.workspace.updateMany({
           where: { id: row.id, status: { not: verdict.status } },
           data: { status: verdict.status },
@@ -105,7 +106,12 @@ export async function runSubscriptionJob(
     }
   }
 
-  report.settled = await settleAbandonedPayments(now);
+  // Tombstoned workspaces are already out of the list, and one deleted in
+  // this very run has nothing left to settle.
+  report.settled = await settleAbandonedPayments(
+    workspaces.map((row) => row.id),
+    now,
+  );
 
   return report;
 }
@@ -118,6 +124,11 @@ export async function runSubscriptionJob(
  * BEFORE the message: a duplicate SMS costs money and looks careless, while
  * a message recorded but not sent costs one warning — and the next one is
  * days away either way.
+ *
+ * ⚠️ Deliberately not notifyOwner(): the ledger row is claimed between
+ * finding the number and sending, so the two cannot collapse into one call.
+ * A workspace with no super admin would claim the row and the message would
+ * never go.
  */
 async function notify(
   workspaceId: number,
@@ -179,47 +190,71 @@ async function notify(
  * since the only thing that normally triggers verification is the browser
  * returning to the callback page.
  */
-async function settleAbandonedPayments(now: Date): Promise<number> {
+async function settleAbandonedPayments(
+  workspaceIds: number[],
+  now: Date,
+): Promise<number> {
   const since = new Date(now.getTime() - SETTLEMENT_WINDOW_DAYS * MS_PER_DAY);
 
-  // Same raw-query reasoning as above: payments carries a workspace policy,
-  // and this job is looking across all of them. Only ids come back.
-  type PendingRow = { workspace_id: number; track_id: bigint };
-
-  const pending = await prisma.$queryRaw<PendingRow[]>`
-    SELECT workspace_id, track_id
-    FROM payments
-    WHERE status IN ('pending', 'paid')
-      AND track_id IS NOT NULL
-      AND created_at > ${since}
-    ORDER BY id
-  `;
-
+  // Deliberately NOT a second aperture. Once the workspace list exists, an
+  // ordinary query inside each workspace's own context answers this — and
+  // RULES.md §7 asks a new SECURITY DEFINER function to say why no ordinary
+  // query could. Here one can, so there is nothing to say.
+  //
+  // The cost is one query per workspace instead of one in total: 500 indexed
+  // queries, once a night. The benefit is one name in the aperture list
+  // rather than two, and every name there has to be defended forever.
+  //
+  // ⚠️ A tombstoned workspace is not in this list, so a payment left pending
+  // on one is never settled. Accepted: a deleted workspace is an operator's
+  // problem, not a nightly job's.
   let settled = 0;
 
-  for (const row of pending) {
-    try {
-      // Asked before confirmed: verify answers 202 both for a customer who
-      // wandered off and for a card that was declined, and only one of those
-      // is worth acting on.
-      const inquiry = await inquirePayment(row.track_id);
+  for (const workspaceId of workspaceIds) {
+    const pending = await runWithWorkspace(workspaceId, async () =>
+      prisma.payment.findMany({
+        where: {
+          status: { in: ["pending", "paid"] },
+          trackId: { not: null },
+          createdAt: { gt: since },
+        },
+        orderBy: { id: "asc" },
+        select: { trackId: true },
+      }),
+    );
 
-      if (!inquiry.paid) {
+    for (const row of pending) {
+      // Narrowed here rather than with ! at each use: the where clause
+      // already excludes nulls, but the type does not know that.
+      const trackId = row.trackId;
+
+      if (trackId === null) {
         continue;
       }
 
-      const result = await runWithWorkspace(row.workspace_id, () =>
-        settlePayment(row.workspace_id, row.track_id),
-      );
+      try {
+        // Asked before confirmed: verify answers 202 both for a customer who
+        // wandered off and for a card that was declined, and only one of
+        // those is worth acting on.
+        const inquiry = await inquirePayment(trackId);
 
-      if (result.extended) {
-        settled += 1;
+        if (!inquiry.paid) {
+          continue;
+        }
+
+        const result = await runWithWorkspace(workspaceId, async () =>
+          settlePayment(workspaceId, trackId),
+        );
+
+        if (result.extended) {
+          settled += 1;
+        }
+      } catch (error) {
+        console.error(
+          `settling payment ${trackId} failed:`,
+          errorMessage(error),
+        );
       }
-    } catch (error) {
-      console.error(
-        `settling payment ${row.track_id} failed:`,
-        errorMessage(error),
-      );
     }
   }
 

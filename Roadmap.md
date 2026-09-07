@@ -337,7 +337,7 @@ plan before that decision.
       would have caught this.
 
 
-- [ ] 8.11 The nightly job's raw query over `workspaces` returns nothing:
+- [x] 8.11 The nightly job's raw query over `workspaces` returns nothing:
       raw SQL carries no workspace context and the policy refuses every row.
       Broken since 8.7 and invisible because an empty result reports exactly
       like a quiet night.

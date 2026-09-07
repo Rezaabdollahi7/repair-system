@@ -5,6 +5,7 @@ import { inquirePayment } from "../lib/zibal";
 import { settlePayment } from "../controllers/subscriptionController";
 import { errorMessage } from "./errors";
 import { verdictFor } from "./subscriptionSchedule";
+import { ownerPhone } from "./subscription";
 import { deleteWorkspaceData } from "./workspaceDeletion";
 
 /**
@@ -25,24 +26,6 @@ export interface JobReport {
   deleted: number;
   settled: number;
   failures: number;
-}
-
-/**
- * The super admin's number. Only theirs: they own the shop and the money
- * comes out of their pocket, while an admin who happens to have the app open
- * has no business receiving a billing message — and every extra recipient is
- * another SMS bought.
- */
-async function ownerPhone(workspaceId: number): Promise<string | null> {
-  return runWithWorkspace(workspaceId, async () => {
-    const owner = await prisma.user.findFirst({
-      where: { isActive: true, role: { name: "super_admin" } },
-      orderBy: { id: "asc" },
-      select: { username: true },
-    });
-
-    return owner?.username ?? null;
-  });
 }
 
 /**

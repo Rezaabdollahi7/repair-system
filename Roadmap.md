@@ -305,7 +305,7 @@ plan before that decision.
       following the InvoicePreview pattern — no new dependency, and the
       browser's own "save as PDF" does the rest
 
-- [ ] 8.10 Payment confirmation SMS. settlePayment extends the subscription
+- [x] 8.10 Payment confirmation SMS. settlePayment extends the subscription
       and rewards the referrer but never sends SMS_TEMPLATE_PAYMENT_OK —
       the template is declared in lib/sms.ts, present in every env file and
       approved in the sms.ir panel, so every signal said it was done. A
@@ -326,10 +326,11 @@ plan before that decision.
       ⚠️ The #DATE# parameter is Jalali with dashes, never slashes.
       sendTemplate refuses a slash, but as an SmsError at send time.
 
-      ⚠️ Check utils/referral.ts in the same task: the referral reward SMS
-      did not arrive either, and rewardReferrer swallows its errors. If it
-      swallows without logging, that is the RULES §6 violation that made
-      both of these silent.
+         utils/referral.ts had the same hole and not the suspected cause:
+      rewardReferrer logged its failures correctly all along — it simply
+      never sent anything either. Both are one omission, not a swallowed
+      error, and both are closed here. ownerPhone moved from
+      subscriptionJob.ts to subscription.ts alongside a new notifyOwner().
 
       A test asserting sendTemplate is called with PAYMENT_OK after a
       successful settlePayment is the point of the task — nothing else

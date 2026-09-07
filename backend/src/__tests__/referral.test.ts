@@ -14,9 +14,21 @@ jest.mock("../utils/subscription", () => ({
   extendSubscription: jest.fn().mockResolvedValue(new Date("2026-12-01")),
 }));
 
+jest.mock("../utils/subscription", () => ({
+  ...jest.requireActual("../utils/subscription"),
+  extendSubscription: jest.fn().mockResolvedValue(new Date("2026-12-01")),
+  // Mocked here, exercised for real in subscriptionController.test.ts where
+  // lib/sms is the mock instead. Left real, ownerPhone would reach for
+  // prisma.user, which this suite's mock does not carry — and notifyOwner
+  // swallowing that would make every assertion below pass for the wrong
+  // reason.
+  notifyOwner: jest.fn().mockResolvedValue(true),
+}));
+
 import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import { linkReferral, rewardReferrer } from "../utils/referral";
-import { extendSubscription } from "../utils/subscription";
+import { SMS_TEMPLATES } from "../lib/sms";
+import { extendSubscription, notifyOwner } from "../utils/subscription";
 
 const REFERRER = 3;
 const REFERRED = 9;
@@ -91,6 +103,8 @@ describe("rewardReferrer", () => {
     jest
       .mocked(extendSubscription)
       .mockResolvedValue(new Date("2026-12-01") as never);
+
+    jest.mocked(notifyOwner).mockResolvedValue(true as never);
   });
 
   it("adds thirty days to the referrer, in their own workspace", async () => {
@@ -145,13 +159,13 @@ describe("rewardReferrer", () => {
 
     const claimOrder = jest.mocked(prisma.referral.updateMany).mock
       .invocationCallOrder[0];
-    const rewardOrder = jest.mocked(extendSubscription).mock
-      .invocationCallOrder[0];
+    const rewardOrder =
+      jest.mocked(extendSubscription).mock.invocationCallOrder[0];
 
     expect(claimOrder).toBeLessThan(rewardOrder);
-    expect(jest.mocked(prisma.referral.updateMany).mock.calls[0][0]).toMatchObject(
-      { where: { id: 5, rewardedAt: null } },
-    );
+    expect(
+      jest.mocked(prisma.referral.updateMany).mock.calls[0][0],
+    ).toMatchObject({ where: { id: 5, rewardedAt: null } });
   });
 
   it("stands down when another caller claimed it first", async () => {
@@ -173,9 +187,9 @@ describe("rewardReferrer", () => {
 
     await rewardReferrer(REFERRED, PAYMENT_ID);
 
-    expect(jest.mocked(prisma.referral.updateMany).mock.calls[1][0]).toMatchObject(
-      { data: { rewardedAt: null, paymentId: null } },
-    );
+    expect(
+      jest.mocked(prisma.referral.updateMany).mock.calls[1][0],
+    ).toMatchObject({ data: { rewardedAt: null, paymentId: null } });
 
     logged.mockRestore();
   });
@@ -188,6 +202,46 @@ describe("rewardReferrer", () => {
 
     await expect(rewardReferrer(REFERRED, PAYMENT_ID)).resolves.toBeUndefined();
     expect(logged).toHaveBeenCalled();
+
+    logged.mockRestore();
+  });
+
+  it("tells the referrer they earned thirty days", async () => {
+    // The other half of debt 40. rewardReferrer logged its failures
+    // correctly all along — what it never did was send anything, exactly
+    // like settlePayment, and for the same reason: the call was never
+    // written.
+    await rewardReferrer(REFERRED, PAYMENT_ID);
+
+    expect(jest.mocked(notifyOwner).mock.calls[0]).toEqual([
+      // The referrer's workspace, not the one that paid.
+      REFERRER,
+      SMS_TEMPLATES.REFERRAL_REWARD,
+      { DAYS: "30" },
+    ]);
+  });
+
+  it("sends after the days are added, never before", async () => {
+    // A message promising thirty days that were not written is worse than
+    // no message: the referrer has nothing to check it against.
+    await rewardReferrer(REFERRED, PAYMENT_ID);
+
+    const rewardOrder =
+      jest.mocked(extendSubscription).mock.invocationCallOrder[0];
+    const smsOrder = jest.mocked(notifyOwner).mock.invocationCallOrder[0];
+
+    expect(rewardOrder).toBeLessThan(smsOrder);
+  });
+
+  it("says nothing when the reward could not be written", async () => {
+    // The claim is put back and the row stays claimable, so a later run can
+    // try again — which a message sent now would have already spent.
+    jest.mocked(extendSubscription).mockRejectedValue(new Error("db down"));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await rewardReferrer(REFERRED, PAYMENT_ID);
+
+    expect(notifyOwner).not.toHaveBeenCalled();
 
     logged.mockRestore();
   });

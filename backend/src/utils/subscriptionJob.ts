@@ -9,14 +9,25 @@ import { verdictFor } from "./subscriptionSchedule";
 import { deleteWorkspaceData } from "./workspaceDeletion";
 
 /**
- * How far back the settlement sweep looks.
+ * How far back the sweep will still finish a payment.
  *
- * A payment older than this that is still unverified is one Zibal will have
- * long since abandoned; chasing it forever would mean a query that grows
- * without bound and a customer being surprised by a subscription starting
- * weeks after they gave up.
+ * A payment older than this whose money did move is not settled
+ * automatically: a customer surprised by a subscription starting three weeks
+ * after they gave up is worse served than one who gets a phone call. It is
+ * logged instead, loudly, because money that left an account and bought
+ * nothing is an operator's problem and must not be silent.
  */
 const SETTLEMENT_WINDOW_DAYS = 7;
+
+/**
+ * How long a payment is left alone before an unpaid one is written off.
+ *
+ * Zibal holds a payment session open for roughly fifteen to twenty minutes.
+ * An hour clears that with room to spare, so a customer still typing a second
+ * password is never told their payment failed — and since the job runs
+ * nightly, in practice every row has had hours.
+ */
+const ABANDON_AFTER_MS = 60 * 60 * 1000;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -25,6 +36,8 @@ export interface JobReport {
   statusUpdated: number;
   deleted: number;
   settled: number;
+  /** Rows written off because Zibal says the money never moved. */
+  closed: number;
   failures: number;
 }
 
@@ -43,6 +56,7 @@ export async function runSubscriptionJob(
     statusUpdated: 0,
     deleted: 0,
     settled: 0,
+    closed: 0,
     failures: 0,
   };
 
@@ -108,10 +122,13 @@ export async function runSubscriptionJob(
 
   // Tombstoned workspaces are already out of the list, and one deleted in
   // this very run has nothing left to settle.
-  report.settled = await settleAbandonedPayments(
+  const outcome = await resolveOpenPayments(
     workspaces.map((row) => row.id),
     now,
   );
+
+  report.settled = outcome.settled;
+  report.closed = outcome.closed;
 
   return report;
 }
@@ -182,19 +199,40 @@ async function notify(
   }
 }
 
+interface PaymentOutcome {
+  settled: number;
+  closed: number;
+}
+
 /**
- * Finishes payments whose customer never came back.
+ * Gives every payment still open an ending.
  *
- * The money left their account and Zibal is holding it unverified. Without
- * this they would be phone calls — and the app has no other way to notice,
- * since the only thing that normally triggers verification is the browser
- * returning to the callback page.
+ * Two different problems wear the same `pending` status, and only asking
+ * Zibal tells them apart. The money moved and nobody confirmed it — the
+ * browser never came back to the callback page, which is otherwise the only
+ * thing that triggers verification. Or the money never moved at all, because
+ * the customer looked at the gateway and closed the tab.
+ *
+ * The first is finished. The second is written off, because a row nothing
+ * ever touches again reads on the customer's payment history as a purchase
+ * forever in progress.
+ *
+ * ⚠️ There is no date filter on the query, deliberately. The old seven-day
+ * window kept it bounded, and also kept it from ever seeing the rows it most
+ * needed to see. Closing the unpaid ones bounds it far better: each is
+ * resolved on the first nightly run after its hour is up and never returns,
+ * so on any ordinary night this reads a handful of rows from that same day.
  */
-async function settleAbandonedPayments(
+async function resolveOpenPayments(
   workspaceIds: number[],
   now: Date,
-): Promise<number> {
-  const since = new Date(now.getTime() - SETTLEMENT_WINDOW_DAYS * MS_PER_DAY);
+): Promise<PaymentOutcome> {
+  const settlementSince = new Date(
+    now.getTime() - SETTLEMENT_WINDOW_DAYS * MS_PER_DAY,
+  );
+  const abandonedBefore = new Date(now.getTime() - ABANDON_AFTER_MS);
+
+  const outcome: PaymentOutcome = { settled: 0, closed: 0 };
 
   // Deliberately NOT a second aperture. Once the workspace list exists, an
   // ordinary query inside each workspace's own context answers this — and
@@ -205,25 +243,22 @@ async function settleAbandonedPayments(
   // queries, once a night. The benefit is one name in the aperture list
   // rather than two, and every name there has to be defended forever.
   //
-  // ⚠️ A tombstoned workspace is not in this list, so a payment left pending
-  // on one is never settled. Accepted: a deleted workspace is an operator's
+  // ⚠️ A tombstoned workspace is not in this list, so a payment left open on
+  // one is never resolved. Accepted: a deleted workspace is an operator's
   // problem, not a nightly job's.
-  let settled = 0;
-
   for (const workspaceId of workspaceIds) {
-    const pending = await runWithWorkspace(workspaceId, async () =>
+    const open = await runWithWorkspace(workspaceId, async () =>
       prisma.payment.findMany({
         where: {
           status: { in: ["pending", "paid"] },
           trackId: { not: null },
-          createdAt: { gt: since },
         },
         orderBy: { id: "asc" },
-        select: { trackId: true },
+        select: { id: true, trackId: true, createdAt: true },
       }),
     );
 
-    for (const row of pending) {
+    for (const row of open) {
       // Narrowed here rather than with ! at each use: the where clause
       // already excludes nulls, but the type does not know that.
       const trackId = row.trackId;
@@ -239,6 +274,42 @@ async function settleAbandonedPayments(
         const inquiry = await inquirePayment(trackId);
 
         if (!inquiry.paid) {
+          // Still inside the hour. The customer may be on the gateway right
+          // now, and telling them their payment failed while they are typing
+          // would be both wrong and unrecoverable.
+          if (row.createdAt >= abandonedBefore) {
+            continue;
+          }
+
+          const written = await runWithWorkspace(workspaceId, async () =>
+            prisma.payment.updateMany({
+              // Status repeated in the where clause, not just the id: the
+              // browser could have verified this row in the seconds since it
+              // was read, and overwriting a verified payment with `failed`
+              // would take away a subscription that was paid for.
+              where: { id: row.id, status: { in: ["pending", "paid"] } },
+              data: {
+                status: "failed",
+                failureReason: `abandoned: Zibal reports status ${inquiry.status}, money never moved`,
+              },
+            }),
+          );
+
+          outcome.closed += written.count;
+          continue;
+        }
+
+        // Paid, but too old to finish quietly. Not settled and not closed:
+        // the money is real, and an automatic extension weeks later is the
+        // surprise the window exists to prevent. Logged every night until an
+        // operator deals with it, which is the point — this is somebody's
+        // money sitting against nothing.
+        if (row.createdAt < settlementSince) {
+          console.error(
+            `payment ${row.id} (workspace ${workspaceId}, track ${trackId}) was paid ` +
+              `on ${row.createdAt.toISOString()} and is past the ${SETTLEMENT_WINDOW_DAYS}-day ` +
+              `settlement window — needs settling by hand`,
+          );
           continue;
         }
 
@@ -247,16 +318,16 @@ async function settleAbandonedPayments(
         );
 
         if (result.extended) {
-          settled += 1;
+          outcome.settled += 1;
         }
       } catch (error) {
         console.error(
-          `settling payment ${trackId} failed:`,
+          `resolving payment ${row.id} (track ${trackId}) failed:`,
           errorMessage(error),
         );
       }
     }
   }
 
-  return settled;
+  return outcome;
 }

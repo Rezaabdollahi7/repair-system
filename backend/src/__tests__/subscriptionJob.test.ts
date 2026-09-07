@@ -7,7 +7,7 @@ jest.mock("../lib/prisma", () => ({
     subscriptionNotification: { create: jest.fn() },
     // The settlement sweep reads payments through the ordinary client now,
     // one workspace at a time, rather than a second raw query (8.11).
-    payment: { findMany: jest.fn() },
+    payment: { findMany: jest.fn(), updateMany: jest.fn() },
   },
 }));
 
@@ -88,6 +88,9 @@ beforeEach(() => {
     .mocked(prisma.subscriptionNotification.create)
     .mockResolvedValue({} as never);
   jest.mocked(prisma.payment.findMany).mockResolvedValue([] as never);
+  jest
+    .mocked(prisma.payment.updateMany)
+    .mockResolvedValue({ count: 0 } as never);
   jest
     .mocked(sendTemplate)
     .mockResolvedValue({ messageId: 1, cost: 1 } as never);
@@ -235,8 +238,13 @@ describe("runSubscriptionJob", () => {
   });
 });
 
-describe("settling payments the customer abandoned", () => {
-  const abandoned = { trackId: 999n };
+describe("resolving payments the customer left open", () => {
+  /** Old enough that the hour's grace has passed. */
+  const abandoned = {
+    id: 1,
+    trackId: 999n,
+    createdAt: new Date(NOW.getTime() - 3 * 60 * 60 * 1000),
+  };
 
   it("finishes one Zibal says was paid", async () => {
     rawReturns([workspace(4, -20)], [abandoned]);
@@ -272,7 +280,7 @@ describe("settling payments the customer abandoned", () => {
     );
   });
 
-  it("leaves a declined card alone", async () => {
+  it("never extends a subscription for money that did not move", async () => {
     // Verify answers 202 both for a customer who wandered off and for a card
     // that failed, so the inquiry is what tells them apart.
     rawReturns([workspace(4, -20)], [abandoned]);
@@ -281,11 +289,102 @@ describe("settling payments the customer abandoned", () => {
       amountRials: 0,
       paid: false,
     } as never);
+    jest.mocked(prisma.payment.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
 
     const report = await runSubscriptionJob(NOW);
 
     expect(settlePayment).not.toHaveBeenCalled();
     expect(report.settled).toBe(0);
+  });
+
+  it("writes off one Zibal says was never paid", async () => {
+    // Without this the row stays pending forever: the settlement sweep only
+    // ever acted on money that moved, so a customer who opened the gateway
+    // and closed the tab was left with a purchase permanently in progress on
+    // their payment history.
+    rawReturns([workspace(4, -20)], [abandoned]);
+    jest.mocked(inquirePayment).mockResolvedValue({
+      status: 3,
+      amountRials: 0,
+      paid: false,
+    } as never);
+    jest.mocked(prisma.payment.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
+
+    const report = await runSubscriptionJob(NOW);
+
+    expect(report.closed).toBe(1);
+
+    const call = jest.mocked(prisma.payment.updateMany).mock.calls[0][0];
+
+    expect(call.data).toMatchObject({ status: "failed" });
+    // The status guard, not just the id: the browser could have verified
+    // this row in the seconds since it was read.
+    expect(call.where).toMatchObject({
+      id: 1,
+      status: { in: ["pending", "paid"] },
+    });
+  });
+
+  it("leaves a payment started minutes ago alone", async () => {
+    // The customer may be on the gateway right now typing a second password.
+    // Telling them it failed would be both wrong and unrecoverable.
+    rawReturns(
+      [workspace(4, -20)],
+      [{ ...abandoned, createdAt: new Date(NOW.getTime() - 5 * 60 * 1000) }],
+    );
+    jest.mocked(inquirePayment).mockResolvedValue({
+      status: -1,
+      amountRials: 0,
+      paid: false,
+    } as never);
+
+    const report = await runSubscriptionJob(NOW);
+
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(report.closed).toBe(0);
+  });
+
+  it("refuses to settle paid money past the window, and says so", async () => {
+    // Money that left an account and bought nothing. Not extended weeks
+    // later, which is the surprise the window exists to prevent — and not
+    // silently skipped either, which is what the old date filter did.
+    rawReturns(
+      [workspace(4, -20)],
+      [{ ...abandoned, createdAt: new Date(NOW.getTime() - 30 * DAY) }],
+    );
+    jest.mocked(inquirePayment).mockResolvedValue({
+      status: 2,
+      amountRials: 19_900_000,
+      paid: true,
+    } as never);
+
+    const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const report = await runSubscriptionJob(NOW);
+
+    expect(settlePayment).not.toHaveBeenCalled();
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(report.settled).toBe(0);
+    expect(logged).toHaveBeenCalled();
+
+    logged.mockRestore();
+  });
+
+  it("looks at rows the old seven-day filter would have hidden", async () => {
+    // The filter is gone from the query on purpose: it kept the sweep from
+    // seeing the rows it most needed to see. Closing the unpaid ones is what
+    // bounds it now.
+    rawReturns([workspace(4, -20)], []);
+
+    await runSubscriptionJob(NOW);
+
+    const where = jest.mocked(prisma.payment.findMany).mock.calls[0][0]?.where;
+
+    expect(where).not.toHaveProperty("createdAt");
   });
 
   it("counts nothing for one already settled", async () => {
@@ -324,7 +423,7 @@ describe("settling payments the customer abandoned", () => {
   it("skips a row whose trackId is null", async () => {
     // The where clause excludes them, but the type does not know that, and a
     // null reaching inquirePayment would be a request for track id "null".
-    rawReturns([workspace(4, -20)], [{ trackId: null }]);
+    rawReturns([workspace(4, -20)], [{ ...abandoned, trackId: null }]);
 
     const report = await runSubscriptionJob(NOW);
 

@@ -23,7 +23,7 @@ const SMS_ENDPOINT = "https://api.sms.ir/v1/send/verify";
 export const SMS_TEMPLATES = {
   /** #DAYS# — sent at 7 days out and again at 1. */
   BEFORE_EXPIRY: "SMS_TEMPLATE_BEFORE_EXPIRY",
-  /** No parameters. The day the subscription ends. */
+  /** #DAYS# — days of grace left before writes stop. Sent on day 0. */
   ON_EXPIRY: "SMS_TEMPLATE_ON_EXPIRY",
   /** #DAYS# — days left before the data is deleted. */
   AFTER_EXPIRY: "SMS_TEMPLATE_AFTER_EXPIRY",

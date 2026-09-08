@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/solid";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import type { SettingsForm } from "../types/api";
+import { primaryButton } from "../utils/tableClasses";
 
 type UploadType = "logo" | "stamp" | "signature";
 
@@ -67,7 +68,10 @@ function ImageUploadBox({
           <PhotoIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-text-secondary mb-2" />
         )}
         <label className="cursor-pointer inline-block mt-2">
-          <span className="bg-primary-soft text-primary px-2 sm:px-3 py-1 rounded-field text-body-xs sm:text-body-sm hover:opacity-80 transition">
+          <span
+            className="bg-surface-alt border border-border text-text-primary px-3 py-1.5
+                       rounded-field text-body-xs font-bold hover:border-border-strong transition-colors"
+          >
             {uploading ? "در حال آپلود..." : "انتخاب تصویر"}
           </span>
           <input
@@ -232,8 +236,10 @@ export default function Settings() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64" dir="rtl">
-        <div className="text-text-secondary">در حال بارگذاری...</div>
+      <div dir="rtl" className="animate-pulse space-y-4">
+        <div className="h-9 w-40 rounded-field bg-surface-alt" />
+        <div className="h-10 w-full rounded-field bg-surface-alt" />
+        <div className="h-96 rounded-panel border border-border bg-surface" />
       </div>
     );
   }
@@ -257,12 +263,19 @@ export default function Settings() {
     : "ui";
 
   return (
-    <div dir="rtl" className="px-2 sm:px-4 mx-auto">
-      {!isSuperAdmin && (
-        <p className="text-body-sm text-text-secondary mb-4">
-          دسترسی محدود — فقط تنظیمات ظاهری
+    /* No padding of its own: <main> in the shell already provides it, and the
+       extra `px-2 sm:px-4` made this the one page inset from the others. */
+    <div dir="rtl">
+      <header className="mb-5">
+        <h1 className="text-headline-md font-bold text-text-primary">
+          تنظیمات
+        </h1>
+        <p className="text-body-sm text-text-secondary mt-0.5">
+          {isSuperAdmin
+            ? "ظاهر برنامه، اطلاعات کارگاه و پیش‌فرض‌های فاکتور"
+            : "دسترسی محدود — فقط تنظیمات ظاهری"}
         </p>
-      )}
+      </header>
 
       <div className="border-b border-border mb-4 sm:mb-6 overflow-x-auto">
         <nav className="flex gap-3 sm:gap-6 min-w-max">
@@ -272,9 +285,17 @@ export default function Settings() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors ${
+                /*
+                  The accent underlines the open tab. It was `border-primary
+                  text-primary`, and once the palette made primary the ink
+                  the underline became the same near-black as the label above
+                  it — a selected tab told apart from its neighbours only by
+                  how dark its text was. Same call as the sidebar's active
+                  item: one unambiguous "you are here" per surface.
+                */
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors cursor-pointer ${
                   currentTab === tab.id
-                    ? "border-primary text-primary"
+                    ? "border-accent text-text-primary font-bold"
                     : "border-transparent text-text-secondary hover:text-text-primary"
                 }`}
               >
@@ -290,14 +311,14 @@ export default function Settings() {
 
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {currentTab === "ui" && (
-          <div className="bg-surface shadow rounded-field p-4 sm:p-6">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
             <ThemeSwitcher />
           </div>
         )}
 
         {isSuperAdmin && currentTab === "company" && (
-          <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <BuildingOfficeIcon className="w-5 h-5 text-text-secondary" />
               اطلاعات شرکت
             </h2>
@@ -377,8 +398,8 @@ export default function Settings() {
         )}
 
         {isSuperAdmin && currentTab === "images" && (
-          <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <PhotoIcon className="w-5 h-5 text-text-secondary" />
               تصاویر
             </h2>
@@ -407,8 +428,8 @@ export default function Settings() {
         )}
 
         {isSuperAdmin && currentTab === "invoice" && (
-          <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <DocumentTextIcon className="w-5 h-5 text-text-secondary" />
               تنظیمات پیش‌فرض فاکتور
             </h2>
@@ -475,8 +496,8 @@ export default function Settings() {
         )}
 
         {isSuperAdmin && currentTab === "template" && (
-          <div className="bg-surface shadow rounded-field p-4 sm:p-6 overflow-x-auto">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5 overflow-x-auto">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <Cog6ToothIcon className="w-5 h-5 text-text-secondary" />
               قالب فاکتور فروش
             </h2>
@@ -666,9 +687,7 @@ export default function Settings() {
               type="submit"
               disabled={saving}
               aria-busy={saving}
-              className="px-5 py-2.5 rounded-field bg-primary text-primary-fg text-body-sm font-bold
-                         shadow-primary hover:bg-primary-hover transition-colors cursor-pointer
-                         disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className={`${primaryButton} flex-none disabled:opacity-60 disabled:cursor-not-allowed`}
             >
               {saving ? (
                 <span

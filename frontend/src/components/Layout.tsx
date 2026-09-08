@@ -219,18 +219,33 @@ function SidebarNav({
                       collapsed ? "justify-center" : ""
                     } ${active ? "" : "hover:bg-surface-alt"}`}
                   >
+                    {/*
+                      The active pill is the brand yellow.
+                      -------------------------------------------------------
+                      It was `bg-primary-soft`, and once the palette made
+                      that a warm off-white the indicator all but vanished
+                      against the sidebar's own white — the item was legible
+                      only by its dark icon square, which is a weak signal for
+                      the one thing a sidebar always has to say.
+
+                      The accent is otherwise spent once per screen, and this
+                      is that once: it is chrome rather than content, there is
+                      exactly one active item, and "where am I" is the most
+                      useful place in the app to put an unmissable colour.
+                      Ink on it measures 9.6:1.
+                    */}
                     {active && (
                       <motion.span
                         layoutId={`${layoutPrefix}-nav-active`}
                         transition={reduceMotion ? { duration: 0 } : spring}
-                        className="absolute inset-0 rounded-field bg-primary-soft"
+                        className="absolute inset-0 rounded-field bg-accent"
                       />
                     )}
 
                     <span
                       className={`relative z-10 shrink-0 w-9 h-9 rounded-field flex items-center justify-center transition-colors ${
                         active
-                          ? "bg-primary text-primary-fg"
+                          ? "bg-accent-fg/12 text-accent-fg"
                           : "bg-surface-alt text-text-secondary"
                       }`}
                     >
@@ -246,7 +261,7 @@ function SidebarNav({
                           transition={transition.fast}
                           className={`relative z-10 truncate text-body-sm ${
                             active
-                              ? "font-bold text-primary"
+                              ? "font-bold text-accent-fg"
                               : "text-text-primary"
                           }`}
                         >
@@ -557,16 +572,34 @@ export default function Layout() {
               <Bars3Icon className="w-6 h-6" />
             </button>
 
-            <div className="min-w-0 flex-1">
-              {activeSection && (
-                <p className="hidden sm:block text-body-xs text-text-muted truncate">
-                  {activeSection}
-                </p>
-              )}
-              <h1 className="text-title-sm font-bold text-text-primary truncate leading-tight">
-                {active?.name ?? "مدیریت تعمیرات"}
-              </h1>
-            </div>
+            {/*
+              A breadcrumb, not a heading.
+              ---------------------------------------------------------------
+              This was an <h1> carrying the nav item's name — which was right
+              while the pages had no titles of their own. They all have one
+              now, and each says exactly what this said, so every screen was
+              announcing itself twice and shipping two <h1>s.
+
+              The line stays because the header is sticky: once a long list is
+              scrolled, this is the only thing left on screen saying where you
+              are. Muted and at body size, so it reads as location rather than
+              competing with the page's own title.
+            */}
+            <nav aria-label="مسیر" className="min-w-0 flex-1">
+              <p className="text-body-sm text-text-secondary truncate">
+                {activeSection && (
+                  <span className="hidden sm:inline text-text-muted">
+                    {activeSection}
+                    <span className="mx-1.5 text-text-muted" aria-hidden="true">
+                      ›
+                    </span>
+                  </span>
+                )}
+                <span className="font-bold text-text-primary">
+                  {active?.name ?? "مدیریت تعمیرات"}
+                </span>
+              </p>
+            </nav>
 
             <button
               type="button"

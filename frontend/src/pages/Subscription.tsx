@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon, CreditCardIcon } from "@heroicons/react/24/solid";
+import StatusPill from "../components/StatusPill";
+import { toPersianDigits } from "../utils/formatters";
+import { primaryButton, searchField } from "../utils/tableClasses";
 import { getPaymentHistory, getQuote, startCheckout } from "../api";
 import PaymentReceipt from "../components/PaymentReceipt";
 import { useSubscription } from "../context/SubscriptionContext";
@@ -22,12 +25,50 @@ function jalali(iso: string): string {
   return new Date(iso).toLocaleDateString("fa-IR");
 }
 
-const PAYMENT_LABELS: Record<string, string> = {
-  pending: "در انتظار پرداخت",
-  paid: "پرداخت‌شده، در حال تأیید",
-  verified: "موفق",
-  failed: "ناموفق",
+/**
+ * A gateway payment's state.
+ *
+ * Badges rather than coloured text, like every other status in the app —
+ * these were bare `text-success-fg` / `text-danger-fg` spans, which read as
+ * emphasis rather than as a state. Severities, so they take the reserved
+ * tones: verified is good, failed is not, and the two in-between are neither
+ * yet.
+ */
+const PAYMENT_STATES: Record<
+  string,
+  { label: string; color: string; tone: string }
+> = {
+  pending: {
+    label: "در انتظار پرداخت",
+    color: "var(--warning)",
+    tone: "bg-warning-soft text-warning-fg",
+  },
+  paid: {
+    label: "پرداخت‌شده، در حال تأیید",
+    color: "var(--info)",
+    tone: "bg-info-soft text-info-fg",
+  },
+  verified: {
+    label: "موفق",
+    color: "var(--success)",
+    tone: "bg-success-soft text-success-fg",
+  },
+  failed: {
+    label: "ناموفق",
+    color: "var(--danger)",
+    tone: "bg-danger-soft text-danger-fg",
+  },
 };
+
+function paymentStateOf(status: string) {
+  return (
+    PAYMENT_STATES[status] ?? {
+      label: status,
+      color: "var(--text-muted)",
+      tone: "bg-surface-alt text-text-secondary",
+    }
+  );
+}
 
 export default function Subscription() {
   const { status } = useSubscription();
@@ -113,14 +154,25 @@ export default function Subscription() {
 
   if (!status) {
     return (
-      <div className="text-text-secondary text-body-sm">در حال بارگذاری...</div>
+      <div dir="rtl" className="animate-pulse space-y-4">
+        <div className="h-9 w-40 rounded-field bg-surface-alt" />
+        <div className="h-32 rounded-panel border border-border bg-surface" />
+        <div className="h-72 rounded-panel border border-border bg-surface" />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-surface rounded-3xl p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-text-primary mb-3">
+    <div dir="rtl" className="space-y-4">
+      <header>
+        <h1 className="text-headline-md font-bold text-text-primary">اشتراک</h1>
+        <p className="text-body-sm text-text-secondary mt-0.5">
+          وضعیت اعتبار کارگاه و تمدید آن
+        </p>
+      </header>
+
+      <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+        <h2 className="text-title-sm font-bold text-text-primary mb-3">
           وضعیت اشتراک
         </h2>
 
@@ -145,7 +197,7 @@ export default function Subscription() {
                 }
               >
                 {remaining > 0
-                  ? `${remaining} روز باقی مانده`
+                  ? `${toPersianDigits(remaining)} روز باقی مانده`
                   : "اشتراک شما به پایان رسیده است"}
               </p>
             )}
@@ -160,8 +212,8 @@ export default function Subscription() {
         )}
       </div>
 
-      <div className="bg-surface rounded-3xl p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-text-primary mb-1">
+      <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+        <h2 className="text-title-sm font-bold text-text-primary mb-1">
           تمدید اشتراک
         </h2>
         <p className="text-body-sm text-text-secondary mb-4">
@@ -178,13 +230,31 @@ export default function Subscription() {
                 key={plan.code}
                 type="button"
                 onClick={() => setSelected(plan.code)}
-                className={`text-right p-4 rounded-card border transition-colors ${
+                /*
+                  The chosen plan wears the accent.
+                  ---------------------------------------------------------
+                  It was `border-primary bg-primary-soft`, and the palette
+                  turned those into an ink hairline over warm off-white — a
+                  selection you had to look for. Picking one of three cards is
+                  precisely the kind of single, unambiguous state the brand
+                  colour exists to mark, and this page has exactly one.
+                */
+                className={`relative text-right p-4 rounded-card border-2 transition-colors cursor-pointer ${
                   active
-                    ? "border-primary bg-primary-soft"
-                    : "border-border hover:bg-surface-alt"
+                    ? "border-accent bg-accent-tint"
+                    : "border-border hover:border-border-strong hover:bg-surface-alt"
                 }`}
               >
-                <p className="font-medium text-text-primary">{plan.name}</p>
+                {active && (
+                  <span
+                    className="absolute top-3 left-3 w-5 h-5 rounded-full bg-accent
+                               text-accent-fg flex items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" />
+                  </span>
+                )}
+                <p className="font-bold text-text-primary">{plan.name}</p>
                 <p className="mt-2 text-lg font-bold text-text-primary">
                   {toToman(plan.amount_rials)}
                   <span className="text-body-sm font-normal"> تومان</span>
@@ -206,7 +276,7 @@ export default function Subscription() {
             onChange={(event) => setDiscountCode(event.target.value)}
             placeholder="کد تخفیف (اختیاری)"
             disabled={!selected}
-            className="flex-1 px-4 py-2 rounded-card border border-border-field bg-surface text-text-primary disabled:opacity-50"
+            className={`${searchField} !pr-3.5 flex-1 disabled:opacity-50`}
           />
           <button
             type="button"
@@ -215,9 +285,13 @@ export default function Subscription() {
               const plan = status.plans.find((p) => p.code === selected);
               if (plan) void handleCheckout(plan);
             }}
-            className="px-6 py-2 rounded-card bg-primary text-primary-fg font-medium disabled:opacity-50 hover:bg-primary-hover transition-colors"
+            className={`${primaryButton} flex-none disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {submitting ? "در حال انتقال..." : "پرداخت"}
+            <CreditCardIcon
+              className="w-[1.15rem] h-[1.15rem]"
+              aria-hidden="true"
+            />
+            {submitting ? "در حال انتقال…" : "پرداخت"}
           </button>
         </div>
 
@@ -264,8 +338,8 @@ export default function Subscription() {
       </div>
 
       {payments.length > 0 && (
-        <div className="bg-surface rounded-3xl p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-text-primary mb-4">
+        <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+          <h2 className="text-title-sm font-bold text-text-primary mb-4">
             تاریخچه‌ی پرداخت
           </h2>
 
@@ -288,16 +362,13 @@ export default function Subscription() {
                     <td className="py-2">
                       {toToman(payment.amount_rials)} تومان
                     </td>
-                    <td
-                      className={`py-2 ${
-                        payment.status === "verified"
-                          ? "text-success-fg"
-                          : payment.status === "failed"
-                            ? "text-danger-fg"
-                            : "text-text-secondary"
-                      }`}
-                    >
-                      {PAYMENT_LABELS[payment.status] ?? payment.status}
+                    <td className="py-2">
+                      <StatusPill
+                        label={paymentStateOf(payment.status).label}
+                        color={paymentStateOf(payment.status).color}
+                        tone={paymentStateOf(payment.status).tone}
+                        size="sm"
+                      />
                     </td>
                     <td className="py-2 text-left">
                       {payment.status === "verified" && (

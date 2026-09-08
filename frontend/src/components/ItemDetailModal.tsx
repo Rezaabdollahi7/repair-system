@@ -72,7 +72,7 @@ function QuickPurchaseModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
       <div className="bg-surface rounded-field p-6 w-full max-w-md" dir="rtl">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-text-primary">
@@ -104,7 +104,7 @@ function QuickPurchaseModal({
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="w-full border border-border rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 required
               />
             </div>
@@ -117,7 +117,7 @@ function QuickPurchaseModal({
                 min="0"
                 value={price}
                 onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
-                className="w-full border border-border rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 required
               />
             </div>
@@ -194,7 +194,7 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
       <div className="bg-surface rounded-field p-6 w-full max-w-md" dir="rtl">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-text-primary">فروش سریع</h3>
@@ -220,7 +220,13 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
             </div>
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
-                تعداد <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                تعداد{" "}
+                <span
+                  aria-hidden
+                  className="text-danger-fg text-[0.85em] leading-none align-super"
+                >
+                  *
+                </span>
               </label>
               <input
                 type="number"
@@ -232,7 +238,9 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                 required
               />
               {errors.quantity && (
-                <p className="text-body-xs text-danger-fg mt-1">{errors.quantity}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.quantity}
+                </p>
               )}
             </div>
             <div>
@@ -243,7 +251,7 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full border border-border rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 placeholder="مشتری متفرقه"
               />
             </div>
@@ -419,7 +427,7 @@ export default function ItemDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"

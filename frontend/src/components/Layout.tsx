@@ -305,8 +305,10 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
         className="flex items-center gap-2.5 p-1 pl-2.5 rounded-pill border border-border
                    hover:bg-surface-alt transition-colors cursor-pointer"
       >
-        <span className="w-8 h-8 rounded-full bg-primary-soft text-primary font-bold
-                         flex items-center justify-center text-body-sm shrink-0">
+        <span
+          className="w-8 h-8 rounded-full bg-primary-soft text-primary font-bold
+                         flex items-center justify-center text-body-sm shrink-0"
+        >
           {initial}
         </span>
         <span className="hidden sm:block text-right leading-tight">
@@ -495,7 +497,7 @@ export default function Layout() {
               exit={{ opacity: 0 }}
               transition={transition.fast}
               onClick={() => setDrawerOpen(false)}
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-scrim/50"
             />
             <motion.aside
               // x, not width: sliding a fixed panel moves one composited

@@ -42,7 +42,11 @@ const PAYMENT_STATUS_OPTIONS: {
   label: string;
   color: string;
 }[] = [
-  { value: "paid", label: "پرداخت شده", color: "bg-success-soft text-success-fg" },
+  {
+    value: "paid",
+    label: "پرداخت شده",
+    color: "bg-success-soft text-success-fg",
+  },
   {
     value: "partial",
     label: "پرداخت ناقص",
@@ -64,7 +68,9 @@ function SectionTitle({ icon: Icon, title }: SectionTitleProps) {
   return (
     <div className="flex items-center gap-2 mb-3 pb-2">
       <Icon className="w-5 h-5 text-text-secondary" />
-      <span className="text-body-sm font-semibold text-text-primary">{title}</span>
+      <span className="text-body-sm font-semibold text-text-primary">
+        {title}
+      </span>
     </div>
   );
 }
@@ -155,7 +161,7 @@ export default function SaleInvoiceFilterPanel({
         initial="hidden"
         animate="visible"
         onClick={onClose}
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-scrim/50"
       />
       <motion.div
         variants={modalPanel}
@@ -236,7 +242,7 @@ export default function SaleInvoiceFilterPanel({
                         placeholder="جستجو..."
                         value={paymentStatusSearch}
                         onChange={(e) => setPaymentStatusSearch(e.target.value)}
-                        className="w-full text-body-sm pr-3 pl-2 py-2 border border-border rounded-field bg-surface text-text-primary focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
+                        className="w-full text-body-sm pr-3 pl-2 py-2 border border-border-field rounded-field bg-surface text-text-primary focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
                         autoFocus
                       />
                     </div>
@@ -342,7 +348,7 @@ export default function SaleInvoiceFilterPanel({
                     min="0"
                     step="10000"
                     placeholder="حداقل مبلغ"
-                    className="w-full border border-border rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
+                    className="w-full border border-border-field rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
                   />
                 </div>
                 <div>
@@ -361,7 +367,7 @@ export default function SaleInvoiceFilterPanel({
                     min="0"
                     step="10000"
                     placeholder="حداکثر مبلغ"
-                    className="w-full border border-border rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
+                    className="w-full border border-border-field rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
                   />
                 </div>
               </div>

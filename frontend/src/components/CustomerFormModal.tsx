@@ -69,7 +69,7 @@ export default function CustomerFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50 p-4">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -97,7 +97,13 @@ export default function CustomerFormModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              نام <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+              نام{" "}
+              <span
+                aria-hidden
+                className="text-danger-fg text-[0.85em] leading-none align-super"
+              >
+                *
+              </span>
             </label>
             <div className="relative">
               <UserIcon className="absolute right-3 top-2.5 w-4 h-4 text-text-secondary" />
@@ -106,14 +112,20 @@ export default function CustomerFormModal({
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="نام کامل مشتری"
-                className="w-full pr-9 pl-3 py-2 border border-border rounded-field text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                className="w-full pr-9 pl-3 py-2 border border-border-field rounded-field text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
               />
             </div>
           </div>
 
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              شماره تماس <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+              شماره تماس{" "}
+              <span
+                aria-hidden
+                className="text-danger-fg text-[0.85em] leading-none align-super"
+              >
+                *
+              </span>
             </label>
             <div className="relative">
               <PhoneIcon className="absolute right-3 top-2.5 w-4 h-4 text-text-secondary" />
@@ -122,7 +134,7 @@ export default function CustomerFormModal({
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="09xxxxxxxxx"
-                className="w-full pr-9 pl-3 py-2 border border-border rounded-field text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                className="w-full pr-9 pl-3 py-2 border border-border-field rounded-field text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 dir="ltr"
               />
             </div>

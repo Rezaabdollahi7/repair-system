@@ -8,9 +8,12 @@ import type { Transition, Variants } from "framer-motion";
  * on the same clock; forty components each picking their own 0.25s and
  * "easeOut" is what makes an interface feel assembled rather than designed.
  *
- * Nothing here checks prefers-reduced-motion — that belongs at the component,
- * via useReducedMotion(), because the right fallback differs: a fade may stay
- * while a slide must not.
+ * Nothing here checks prefers-reduced-motion, and nothing needs to: App.tsx
+ * wraps the tree in <MotionConfig reducedMotion="user">, which strips the
+ * transform half of every variant below — the `y`, the `x`, the `scale` —
+ * and leaves the opacity. Components still reach for useReducedMotion()
+ * where the honest fallback is not "the same thing without the movement":
+ * a blob that breathes on a fourteen-second loop has to stop, not slow.
  */
 
 /** Seconds, matching framer-motion's unit. */
@@ -54,12 +57,6 @@ export const transition = {
 } satisfies Record<string, Transition>;
 
 /* ── Reusable variants ─────────────────────────────────────────────── */
-
-export const fadeIn: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: transition.base },
-  exit: { opacity: 0, transition: transition.fast },
-};
 
 /** The default entrance: a short rise with the fade, never a long slide. */
 export const fadeInUp: Variants = {
@@ -117,9 +114,10 @@ export const modalPanel: Variants = {
   exit: { opacity: 0, scale: 0.98, y: 4, transition: transition.fast },
 };
 
-/** Pressable feedback shared by buttons, so the whole app depresses equally. */
-export const pressable = {
-  whileHover: { y: -1 },
-  whileTap: { scale: 0.98, y: 0 },
-  transition: transition.fast,
-} as const;
+/*
+ * Two earlier entries are gone: `fadeIn`, which every call site preferred to
+ * write as a bare opacity pair, and `pressable`, which nothing adopted — the
+ * shared buttons in utils/tableClasses.ts do their hover with a CSS
+ * transition and never became motion components. A vocabulary is only useful
+ * while everything in it is spoken.
+ */

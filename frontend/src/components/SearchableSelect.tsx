@@ -51,7 +51,10 @@ export default function SearchableSelect({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
         setSearch("");
       }
@@ -106,7 +109,7 @@ export default function SearchableSelect({
                     ${
                       error
                         ? "border-danger focus:shadow-[0_0_0_3px_var(--danger-soft)]"
-                        : "border-border focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
+                        : "border-border-field focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
                     }
                     ${
                       disabled
@@ -149,7 +152,7 @@ export default function SearchableSelect({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full text-body-sm pr-9 pl-2.5 py-2 rounded-field bg-surface
-                             text-text-primary placeholder:text-text-muted border border-border
+                             text-text-primary placeholder:text-text-muted border border-border-field
                              focus:outline-none focus:border-primary
                              focus:shadow-[0_0_0_3px_var(--primary-soft)]
                              transition-[border-color,box-shadow] duration-150"

@@ -24,12 +24,7 @@ import {
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
-import type {
-  Customer,
-  CustomerDevice,
-  CustomerStats,
-  Id,
-} from "../types/api";
+import type { Customer, CustomerDevice, CustomerStats, Id } from "../types/api";
 import { modalPanel } from "../motion";
 
 /**
@@ -248,7 +243,7 @@ export default function CustomerDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"

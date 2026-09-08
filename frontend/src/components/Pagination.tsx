@@ -1,3 +1,4 @@
+import { toPersianDigits } from "../utils/formatters";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -54,8 +55,22 @@ export default function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 text-body-sm text-text-secondary">
+      {/*
+        dir="ltr" and the source order from→to.
+
+        This line used to be written {to}–{from}, on the assumption that the
+        bidi algorithm would swap the pair back inside an RTL paragraph. It
+        does not: two numbers joined by a dash are one numeric run and keep
+        their source order, so page one of forty-two announced itself as
+        "نمایش ۱۰–۱". The span makes the direction explicit rather than
+        relying on which neutral character happens to sit between them.
+      */}
       <span>
-        نمایش {to}–{from} از {total}
+        نمایش{" "}
+        <span dir="ltr" className="inline-block">
+          {toPersianDigits(from)}–{toPersianDigits(to)}
+        </span>{" "}
+        از {toPersianDigits(total)}
       </span>
 
       {/*
@@ -108,7 +123,7 @@ export default function Pagination({
                   : "border border-border text-text-primary hover:bg-surface-alt"
               }`}
             >
-              {entry}
+              {toPersianDigits(entry)}
             </button>
           ),
         )}
@@ -137,7 +152,7 @@ export default function Pagination({
         value={limit}
         onChange={(e) => onLimitChange(Number(e.target.value))}
         aria-label="تعداد در هر صفحه"
-        className="border border-border rounded-field px-2.5 py-2 bg-surface text-text-primary
+        className="border border-border-field rounded-field px-2.5 py-2 bg-surface text-text-primary
                    text-body-sm hover:border-border-strong focus:outline-none
                    focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]
                    transition-[border-color,box-shadow] cursor-pointer"

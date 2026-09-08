@@ -57,8 +57,7 @@ export const rowCard =
  * a hundred pixels of the screen before a single row of data — on a laptop
  * that is two table rows the user could have been reading.
  */
-export const toolbar =
-  "flex flex-col sm:flex-row sm:items-center gap-3 mb-4";
+export const toolbar = "flex flex-col sm:flex-row sm:items-center gap-3 mb-4";
 
 /** Grows to fill whatever the buttons leave. min-w-0 so it may shrink. */
 export const toolbarSearch = "relative flex-1 min-w-0";
@@ -71,7 +70,7 @@ export const searchIcon =
 
 export const searchField =
   "w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm " +
-  "border border-border rounded-field py-2.5 pr-11 pl-3.5 " +
+  "border border-border-field rounded-field py-2.5 pr-11 pl-3.5 " +
   "hover:border-border-strong focus:outline-none focus:border-primary " +
   "focus:shadow-[0_0_0_3px_var(--primary-soft)] " +
   "transition-[border-color,box-shadow] duration-150";
@@ -91,7 +90,7 @@ export const secondaryButton =
 
 /** Selects that sit in the toolbar beside the search field. */
 export const toolbarSelect =
-  "shrink-0 border border-border rounded-field px-3.5 py-2.5 text-body-sm bg-surface " +
+  "shrink-0 border border-border-field rounded-field px-3.5 py-2.5 text-body-sm bg-surface " +
   "text-text-primary hover:border-border-strong focus:outline-none focus:border-primary " +
   "focus:shadow-[0_0_0_3px_var(--primary-soft)] " +
   "transition-[border-color,box-shadow] cursor-pointer";

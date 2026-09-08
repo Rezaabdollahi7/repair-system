@@ -25,12 +25,7 @@ import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
 import { toPersianDigits } from "../utils/formatters";
-import {
-  backdrop,
-  modalPanel,
-  staggerContainer,
-  staggerItem,
-} from "../motion";
+import { backdrop, modalPanel, staggerContainer, staggerItem } from "../motion";
 import {
   badge,
   iconButton,
@@ -116,7 +111,10 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
       label: "غیرقابل تعمیر",
       color: "bg-danger-soft text-danger-fg",
     },
-    not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger-fg" },
+    not_repaired: {
+      label: "تعمیر نشد",
+      color: "bg-warning-soft text-danger-fg",
+    },
   };
 
   const current = map[status] || {
@@ -150,7 +148,7 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
               animate="visible"
               exit="exit"
               onClick={() => setShowModal(false)}
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-scrim/50"
             />
             <motion.div
               variants={modalPanel}
@@ -452,7 +450,10 @@ export default function DeviceList() {
             nor a state, and colouring it green spends a status tone on a
             control that has no status.
           */}
-          <button onClick={() => setFilterOpen(true)} className={secondaryButton}>
+          <button
+            onClick={() => setFilterOpen(true)}
+            className={secondaryButton}
+          >
             <FunnelIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
             فیلترها
             {activeFilterCount > 0 && (
@@ -461,7 +462,10 @@ export default function DeviceList() {
               </span>
             )}
           </button>
-          <button onClick={() => openDeviceEdit(null)} className={primaryButton}>
+          <button
+            onClick={() => openDeviceEdit(null)}
+            className={primaryButton}
+          >
             <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             ثبت دستگاه جدید
           </button>
@@ -559,7 +563,9 @@ export default function DeviceList() {
                         handleStatusChange(device.id, newStatus)
                       }
                     />
-                    {isAtLeast("admin") && <InvoiceStatusBadge device={device} />}
+                    {isAtLeast("admin") && (
+                      <InvoiceStatusBadge device={device} />
+                    )}
                     <AssigneeBadge assignees={device.assignees} />
                   </div>
 
@@ -634,8 +640,12 @@ export default function DeviceList() {
                       <td className={td}>
                         <AssigneeBadge assignees={device.assignees} />
                       </td>
-                      <td className={tdMuted}>{formatDate(device.entry_date)}</td>
-                      <td className={tdMuted}>{formatDate(device.exit_date)}</td>
+                      <td className={tdMuted}>
+                        {formatDate(device.entry_date)}
+                      </td>
+                      <td className={tdMuted}>
+                        {formatDate(device.exit_date)}
+                      </td>
 
                       {isAtLeast("admin") && (
                         <>

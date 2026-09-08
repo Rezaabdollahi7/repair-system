@@ -45,7 +45,7 @@ export default function PaymentReceipt({
   if (!isOpen || !payment) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50 p-4">
       <div
         className="bg-surface rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
         dir="rtl"
@@ -70,7 +70,7 @@ export default function PaymentReceipt({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div ref={printRef} className="bg-surface p-6">
+          <div ref={printRef} className="print-sheet bg-surface p-6">
             <div className="border-b-2 border-border pb-4 mb-6 text-center">
               <h1 className="text-2xl font-bold text-primary">دوفیکسو</h1>
               <p className="text-sm text-text-secondary mt-1">

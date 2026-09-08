@@ -107,7 +107,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div
         className="bg-surface border border-border rounded-card shadow-xl p-4 sm:p-6 w-full max-w-md"
         dir="rtl"
@@ -128,7 +128,9 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
                 className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.code ? "border-danger" : "border-border"}`}
               />
               {errors.code && (
-                <p className="text-body-xs text-danger-fg mt-1">{errors.code}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.code}
+                </p>
               )}
             </div>
             <div>
@@ -142,7 +144,9 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
                 className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.name ? "border-danger" : "border-border"}`}
               />
               {errors.name && (
-                <p className="text-body-xs text-danger-fg mt-1">{errors.name}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.name}
+                </p>
               )}
             </div>
             <div>
@@ -153,7 +157,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
                 name="unit"
                 value={formData.unit}
                 onChange={handleChange}
-                className="w-full border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               >
                 <option value="عدد">عدد</option>
                 <option value="متر">متر</option>
@@ -346,7 +350,7 @@ export default function PurchaseInvoiceFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -384,7 +388,7 @@ export default function PurchaseInvoiceFormModal({
                       name="supplier_name"
                       value={formData.supplier_name}
                       onChange={handleInputChange}
-                      className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="مثلاً: فروشگاه قطعات الکترونیک"
                     />
                   </div>
@@ -409,7 +413,7 @@ export default function PurchaseInvoiceFormModal({
                       value={formData.note}
                       onChange={handleInputChange}
                       rows={3}
-                      className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="توضیحات اضافی..."
                     />
                   </div>
@@ -507,7 +511,13 @@ export default function PurchaseInvoiceFormModal({
                         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3 items-center">
                           <div className="col-span-2 sm:col-span-5">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              کالا <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                              کالا{" "}
+                              <span
+                                aria-hidden
+                                className="text-danger-fg text-[0.85em] leading-none align-super"
+                              >
+                                *
+                              </span>
                             </label>
                             <SearchableSelect
                               options={itemOptions}
@@ -523,7 +533,13 @@ export default function PurchaseInvoiceFormModal({
                           </div>
                           <div className="col-span-1 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              تعداد <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                              تعداد{" "}
+                              <span
+                                aria-hidden
+                                className="text-danger-fg text-[0.85em] leading-none align-super"
+                              >
+                                *
+                              </span>
                             </label>
                             <input
                               type="number"
@@ -547,7 +563,12 @@ export default function PurchaseInvoiceFormModal({
                           <div className="col-span-2 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               قیمت واحد (ریال){" "}
-                              <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                              <span
+                                aria-hidden
+                                className="text-danger-fg text-[0.85em] leading-none align-super"
+                              >
+                                *
+                              </span>
                             </label>
                             <input
                               type="number"

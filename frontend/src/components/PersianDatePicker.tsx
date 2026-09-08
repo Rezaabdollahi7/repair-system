@@ -204,7 +204,7 @@ export default function PersianDatePicker({
           setOpen((p) => !p);
           setViewMode(VIEW_DAYS);
         }}
-        className="w-full flex justify-between items-center gap-2 rounded-field border border-border
+        className="w-full flex justify-between items-center gap-2 rounded-field border border-border-field
                    px-3.5 py-2.5 text-body-sm bg-surface text-right cursor-pointer
                    hover:border-border-strong focus:outline-none focus:border-primary
                    focus:shadow-[0_0_0_3px_var(--primary-soft)]
@@ -377,7 +377,13 @@ export default function PersianDatePicker({
                 >
                   <ChevronRightIcon className="w-4 h-4" />
                 </button>
-                <span className="text-body-sm font-bold text-text-primary">
+                {/* Same bidi trap as the pagination range: with a space on
+                    each side the dash is a neutral and takes the paragraph's
+                    direction, so ۱۳۹۰ – ۱۴۰۱ was drawn as ۱۴۰۱ – ۱۳۹۰. */}
+                <span
+                  dir="ltr"
+                  className="text-body-sm font-bold text-text-primary"
+                >
                   {toPersianDigits(yearRangeStart)} –{" "}
                   {toPersianDigits(yearRangeStart + YEAR_PAGE_SIZE - 1)}
                 </span>

@@ -21,8 +21,10 @@ import { transition } from "../motion";
  * something is wrong, this says which field.
  */
 
-interface Props
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "id"> {
+interface Props extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "id"
+> {
   label: string;
   hint?: string;
   error?: string;
@@ -93,7 +95,7 @@ export default function AuthField({
                       ${
                         error
                           ? "border-danger focus:shadow-[0_0_0_3px_var(--danger-soft)]"
-                          : "border-border hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
+                          : "border-border-field hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
                       }`}
           {...rest}
         />

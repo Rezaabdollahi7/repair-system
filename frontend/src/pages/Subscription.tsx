@@ -124,7 +124,9 @@ export default function Subscription() {
         </h2>
 
         {status.never_expires ? (
-          <p className="text-body-sm text-success-fg">اشتراک این کارگاه دائمی است.</p>
+          <p className="text-body-sm text-success-fg">
+            اشتراک این کارگاه دائمی است.
+          </p>
         ) : (
           <div className="space-y-1 text-body-sm">
             <p className="text-text-secondary">
@@ -203,7 +205,7 @@ export default function Subscription() {
             onChange={(event) => setDiscountCode(event.target.value)}
             placeholder="کد تخفیف (اختیاری)"
             disabled={!selected}
-            className="flex-1 px-4 py-2 rounded-card border border-border bg-surface text-text-primary disabled:opacity-50"
+            className="flex-1 px-4 py-2 rounded-card border border-border-field bg-surface text-text-primary disabled:opacity-50"
           />
           <button
             type="button"

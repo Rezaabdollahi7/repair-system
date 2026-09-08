@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { getDevice, deleteDevice, getDeviceImages } from "../api";
 import ImageSlider from "./ImageSlider";
@@ -22,7 +22,10 @@ import { modalPanel } from "../motion";
 
 /** "received", the schema default, is deliberately absent — as it was. */
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: "در انتظار بررسی", color: "bg-warning-soft text-warning-fg" },
+  pending: {
+    label: "در انتظار بررسی",
+    color: "bg-warning-soft text-warning-fg",
+  },
   diagnosing: { label: "در حال بررسی", color: "bg-primary-soft text-primary" },
   waiting_for_parts: {
     label: "در انتظار قطعه",
@@ -30,8 +33,14 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   },
   repairing: { label: "در حال تعمیر", color: "bg-primary-soft text-primary" },
   repaired: { label: "تعمیر شده", color: "bg-success-soft text-success-fg" },
-  delivered: { label: "تحویل داده شده", color: "bg-success-soft text-success-fg" },
-  unrepairable: { label: "غیرقابل تعمیر", color: "bg-danger-soft text-danger-fg" },
+  delivered: {
+    label: "تحویل داده شده",
+    color: "bg-success-soft text-success-fg",
+  },
+  unrepairable: {
+    label: "غیرقابل تعمیر",
+    color: "bg-danger-soft text-danger-fg",
+  },
   ready_for_pickup: {
     label: "آماده تحویل",
     color: "bg-primary-soft text-primary",
@@ -158,7 +167,7 @@ export default function DeviceDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -229,7 +238,9 @@ export default function DeviceDetailModal({
                     </p>
                   </div>
                   <div>
-                    <p className="text-body-xs text-text-secondary mb-1">وضعیت</p>
+                    <p className="text-body-xs text-text-secondary mb-1">
+                      وضعیت
+                    </p>
                     <span
                       className={`inline-block px-3 py-1.5 rounded-full text-body-xs sm:text-body-sm font-medium ${STATUS_MAP[device.status]?.color || "bg-surface-alt text-text-secondary"}`}
                     >
@@ -388,13 +399,15 @@ export default function DeviceDetailModal({
       />
 
       {/* Image Slider */}
-      {sliderIndex !== null && (
-        <ImageSlider
-          images={images}
-          initialIndex={sliderIndex}
-          onClose={() => setSliderIndex(null)}
-        />
-      )}
+      <AnimatePresence>
+        {sliderIndex !== null && (
+          <ImageSlider
+            images={images}
+            initialIndex={sliderIndex}
+            onClose={() => setSliderIndex(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

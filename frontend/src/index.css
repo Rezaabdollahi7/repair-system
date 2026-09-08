@@ -48,6 +48,28 @@
   --blue-neutral-500: #344055;
 
   /*
+   * Two derived steps for the boundary of a form control.
+   *
+   * The guideline's border tints land around 1.3:1 against their surface.
+   * That is right for a divider, which only has to separate two things the
+   * eye already reads as separate — but on an input it is the entire signal
+   * saying where the field begins, and WCAG asks 3:1 for that. These are the
+   * softest tones in the same hue family that clear it: 3.46:1 on white,
+   * 3.08:1 on the dark surface.
+   */
+  --field-border-light: #828a9c;
+  --field-border-dark: #586580;
+
+  /*
+   * The dimmest tone the dark theme can give --text-muted. The scale has no
+   * step between secondary-400 and secondary-500 — the first is already
+   * --text-secondary there, the second measures 3.63:1 — so the quietest
+   * text in the app had a choice between illegible and indistinguishable
+   * from the line above it. This sits between them at 4.73:1.
+   */
+  --muted-text-dark: #7b8394;
+
+  /*
    * Semantic, three steps each: a strong shade for text, a base for fills and
    * dots, a soft one for badge backgrounds. The base alone is not enough —
    * #22c55e as text on white is about 2.3:1, well under AA.
@@ -77,8 +99,20 @@
    کاربرِ تم تیره یک فریم سفید می‌بیند.
    =================================================================== */
 
+/*
+ * `.print-sheet` joins this selector rather than repeating it.
+ *
+ * The three invoice previews are ink on paper. They are written in the same
+ * semantic tokens as the rest of the app, which means that printing from the
+ * dark theme sent near-white text to the printer — and since browsers drop
+ * background colours by default but keep foreground ones, the sheet came out
+ * blank. Naming the class here re-declares the light values on that one
+ * element, and everything inside it inherits them; the surrounding modal
+ * chrome stays in whichever theme the user is actually using.
+ */
 :root,
-[data-theme="light"] {
+[data-theme="light"],
+.print-sheet {
   color-scheme: light;
 
   /* سطوح — از عقب به جلو: sunken پشت محتوا، raised جلوی آن */
@@ -90,12 +124,22 @@
 
   --border: var(--secondary-200);
   --border-strong: var(--secondary-300);
+  /* Only for inputs, selects and textareas — see the note in section ۱. */
+  --border-field: var(--field-border-light);
   /* مرزهای آبی‌مایل گایدلاین، برای جدول‌ها و جداکننده‌ها */
   --border-subtle: var(--blue-neutral-100);
 
   --text-primary: var(--secondary-900);
-  --text-secondary: var(--secondary-500);
-  --text-muted: var(--secondary-400);
+  /*
+   * Both of these went one step darker than the guideline's own suggestion.
+   * secondary-500 on the alt surface a table header sits on measures 4.47:1
+   * and secondary-400 on white measures 2.66:1 — the second is the tone
+   * every placeholder, hint and empty-state line in the app was written in.
+   * The step between the two survives (6.3:1 against 5.0:1), so the
+   * hierarchy still reads; it is just legible now.
+   */
+  --text-secondary: var(--blue-neutral-400);
+  --text-muted: var(--secondary-500);
   --text-inverse: #ffffff;
 
   --primary: var(--brand-500);
@@ -179,11 +223,12 @@
 
   --border: var(--secondary-800);
   --border-strong: var(--secondary-600);
+  --border-field: var(--field-border-dark);
   --border-subtle: #18202f;
 
   --text-primary: var(--secondary-100);
   --text-secondary: var(--secondary-400);
-  --text-muted: var(--secondary-500);
+  --text-muted: var(--muted-text-dark);
   --text-inverse: var(--secondary-900);
 
   /* دو پله روشن‌تر از تم لایت: #345bf7 روی زمینهٔ تیره کنتراستش به ۳:۱
@@ -243,12 +288,25 @@
 
   /* همان پنل، ولی به سمت سرمه‌ای عمیق. هنوز آبیِ برند است، ولی در کنار
      زمینهٔ تیره یک سطح است نه یک چراغ. */
-  --brand-panel: linear-gradient(
-    155deg,
-    #16307e 0%,
-    #102258 55%,
-    #0a152f 100%
-  );
+  --brand-panel: linear-gradient(155deg, #16307e 0%, #102258 55%, #0a152f 100%);
+}
+
+/* -------------------------------------------------------------------
+   دو توکنی که عمداً تم ندارند.
+   -------------------------------------------------------------------
+   پس‌زمینهٔ مودال‌ها، لایت‌باکس عکس و پنل برند در هر دو تم تیره‌اند:
+   آنجا محتوا خودِ عکس یا خودِ گرادیان برند است و چرومِ دورش باید کنار
+   برود. اگر این‌ها را per-theme تعریف کنیم، --text-inverse در تم تیره
+   نزدیک به سیاه است و متنِ روی این سطح‌ها نامرئی می‌شود — همان اتفاقی
+   که در ImageSlider و ImageUploader افتاده بود.
+
+   --scrim مات تعریف شده تا کلاس‌ها بتوانند شفافیت را خودشان بگذارند
+   (`bg-scrim/50` برای مودال، `/90` برای لایت‌باکس)، و --on-dark سفیدِ
+   خالص است تا `text-on-dark/70` هم کار کند.
+   ------------------------------------------------------------------- */
+:root {
+  --scrim: #090c14;
+  --on-dark: #ffffff;
 }
 
 /* ===================================================================
@@ -269,6 +327,7 @@
 
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-border-field: var(--border-field);
   --color-border-subtle: var(--border-subtle);
 
   --color-text-primary: var(--text-primary);
@@ -299,6 +358,9 @@
   --color-info: var(--info);
   --color-info-fg: var(--info-strong-fg);
   --color-info-soft: var(--info-soft);
+
+  --color-scrim: var(--scrim);
+  --color-on-dark: var(--on-dark);
 
   --color-danger-fill: var(--danger-fill);
   --color-warning-fill: var(--warning-fill);
@@ -412,6 +474,32 @@ body {
    می‌شود، و کامپوننتی که حلقهٔ خودش را دارد و `focus:outline-none`
    نوشته، هر دو را با هم می‌گرفت. */
 @layer base {
+  /*
+   * framer-motion is handled at the root by <MotionConfig reducedMotion="user">
+   * in App.tsx. This covers the other half — the CSS transitions and
+   * keyframes, which that switch never sees.
+   *
+   * `animate-spin` is deliberately left running, only slower. A spinner is
+   * not decoration: it is the only thing telling the user a request is still
+   * in flight, and freezing it turns "loading" into "broken". Everything
+   * else collapses to an instant change.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    .animate-spin {
+      animation-duration: 1.8s !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;

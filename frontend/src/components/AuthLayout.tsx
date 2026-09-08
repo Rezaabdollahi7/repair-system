@@ -132,7 +132,7 @@ export default function AuthLayout({
       {/* ── Brand panel ─────────────────────────────────────────────── */}
       <aside
         className="relative hidden lg:flex flex-col justify-center gap-16 overflow-hidden
-                   rounded-panel m-4 p-12 text-white"
+                   rounded-panel m-4 p-12 text-on-dark"
         style={{ backgroundImage: "var(--brand-panel)" }}
       >
         {/*
@@ -143,12 +143,12 @@ export default function AuthLayout({
         */}
         <div aria-hidden className="absolute inset-0 pointer-events-none">
           <motion.div
-            className="absolute -top-32 -right-20 w-[28rem] h-[28rem] rounded-full bg-white/12 blur-3xl"
+            className="absolute -top-32 -right-20 w-[28rem] h-[28rem] rounded-full bg-on-dark/12 blur-3xl"
             animate={reduceMotion ? undefined : { scale: [1, 1.12, 1] }}
             transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute -bottom-40 -left-24 w-[32rem] h-[32rem] rounded-full bg-black/25 blur-3xl"
+            className="absolute -bottom-40 -left-24 w-[32rem] h-[32rem] rounded-full bg-scrim/25 blur-3xl"
             animate={reduceMotion ? undefined : { scale: [1, 1.08, 1] }}
             transition={{
               duration: 18,
@@ -173,10 +173,10 @@ export default function AuthLayout({
           </motion.h2>
           <motion.p
             variants={staggerItem}
-            className="text-body-sm text-white/70 mt-4 max-w-md mx-auto"
+            className="text-body-sm text-on-dark/70 mt-4 max-w-md mx-auto"
           >
-            «دستگاه‌ها، مشتریان، انبار و فاکتورها — یک‌جا، قابل جست‌وجو، و
-            همیشه در دسترس»
+            «دستگاه‌ها، مشتریان، انبار و فاکتورها — یک‌جا، قابل جست‌وجو، و همیشه
+            در دسترس»
           </motion.p>
         </motion.div>
 
@@ -192,19 +192,21 @@ export default function AuthLayout({
               variants={staggerItem}
               className="flex gap-4 items-start"
             >
-              <span className="shrink-0 w-10 h-10 rounded-field bg-white/15 flex items-center justify-center">
+              <span className="shrink-0 w-10 h-10 rounded-field bg-on-dark/15 flex items-center justify-center">
                 <Icon className="w-5 h-5" />
               </span>
               <span>
                 <span className="block font-bold">{heading}</span>
-                <span className="block text-body-sm text-white/70">{body}</span>
+                <span className="block text-body-sm text-on-dark/70">
+                  {body}
+                </span>
               </span>
             </motion.li>
           ))}
         </motion.ul>
 
         <motion.p
-          className="absolute bottom-12 inset-x-12 text-body-sm text-white/60 text-center"
+          className="absolute bottom-12 inset-x-12 text-body-sm text-on-dark/60 text-center"
           initial="hidden"
           animate="visible"
           variants={fadeInUp}

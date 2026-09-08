@@ -98,7 +98,11 @@ const INVOICE_STATUS_OPTIONS = [
     label: "فاکتور ندارد",
     color: "bg-surface-alt text-text-secondary",
   },
-  { value: "paid", label: "پرداخت شده", color: "bg-success-soft text-success-fg" },
+  {
+    value: "paid",
+    label: "پرداخت شده",
+    color: "bg-success-soft text-success-fg",
+  },
   {
     value: "unpaid",
     label: "پرداخت نشده",
@@ -141,7 +145,7 @@ function SearchInput({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className="w-full text-body-sm pr-9 pl-2.5 py-2 border border-border rounded-field
+        className="w-full text-body-sm pr-9 pl-2.5 py-2 border border-border-field rounded-field
                    bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
         autoFocus
       />
@@ -420,7 +424,7 @@ export default function FilterPanel({
         initial="hidden"
         animate="visible"
         onClick={onClose}
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-scrim/50"
       />
       <motion.div
         variants={modalPanel}

@@ -155,7 +155,7 @@ function QuickCustomerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div
         className="bg-surface border border-border rounded-card shadow-xl p-4 sm:p-6 w-full max-w-md"
         dir="rtl"
@@ -167,7 +167,13 @@ function QuickCustomerModal({
           <div className="space-y-2 sm:space-y-3">
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
-                نام مشتری <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                نام مشتری{" "}
+                <span
+                  aria-hidden
+                  className="text-danger-fg text-[0.85em] leading-none align-super"
+                >
+                  *
+                </span>
               </label>
               <input
                 name="name"
@@ -177,7 +183,9 @@ function QuickCustomerModal({
                 placeholder="مثلاً: علی احمدی"
               />
               {errors.name && (
-                <p className="text-body-xs text-danger-fg mt-1">{errors.name}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.name}
+                </p>
               )}
             </div>
             <div>
@@ -188,7 +196,7 @@ function QuickCustomerModal({
                 name="phone"
                 value={formData.phone ?? ""}
                 onChange={handleChange}
-                className="w-full border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 placeholder="مثلاً: ۰۹۱۲۳۴۵۶۷۸۹"
               />
             </div>
@@ -580,7 +588,7 @@ export default function SaleInvoiceFormModal({
 
   if (loadingInvoice) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
         <div className="bg-surface border border-border rounded-card shadow-xl p-8">
           <div className="text-center py-4 text-text-primary" dir="rtl">
             در حال بارگذاری فاکتور...
@@ -591,7 +599,7 @@ export default function SaleInvoiceFormModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -666,7 +674,7 @@ export default function SaleInvoiceFormModal({
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleInputChange}
-                    className="w-full border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                    className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     placeholder="مشتری متفرقه"
                   />
                 </div>
@@ -681,7 +689,7 @@ export default function SaleInvoiceFormModal({
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleInputChange}
-                    className="w-full border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                    className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     placeholder="۰۹۱۲۳۴۵۶۷۸۹"
                   />
                 </div>
@@ -714,7 +722,7 @@ export default function SaleInvoiceFormModal({
                   value={formData.note}
                   onChange={handleInputChange}
                   rows={2}
-                  className="w-full border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="توضیحات اضافی..."
                 />
               </div>
@@ -827,7 +835,7 @@ export default function SaleInvoiceFormModal({
                                         )
                                       }
                                       placeholder="نام آیتم دلخواه"
-                                      className="w-full border border-border rounded-field px-2 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                                      className="w-full border border-border-field rounded-field px-2 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                     />
                                   </>
                                 )}
@@ -857,7 +865,7 @@ export default function SaleInvoiceFormModal({
                                   min="1"
                                   step="1"
                                   max={selectedItem?.currentStock}
-                                  className="w-full border border-border rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                                  className="w-full border border-border-field rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 />
                                 <p className="mt-0.5 text-[10px] text-text-secondary opacity-0">
                                   white space
@@ -883,7 +891,7 @@ export default function SaleInvoiceFormModal({
                                       e.target.value,
                                     )
                                   }
-                                  className="w-full border border-border rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                                  className="w-full border border-border-field rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 >
                                   {UNIT_OPTIONS.map((opt) => (
                                     <option key={opt.value} value={opt.value}>
@@ -913,7 +921,7 @@ export default function SaleInvoiceFormModal({
                                   }
                                   min="0"
                                   step="1000"
-                                  className="w-full border border-border rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                                  className="w-full border border-border-field rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 />
                                 <p className="mt-0.5 text-[10px] text-text-secondary opacity-0">
                                   white space

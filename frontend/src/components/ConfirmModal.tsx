@@ -78,7 +78,7 @@ export default function ConfirmModal({
             animate="visible"
             exit="exit"
             onClick={loading ? undefined : onClose}
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-scrim/50"
           />
 
           <motion.div

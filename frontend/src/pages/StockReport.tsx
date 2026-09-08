@@ -3,10 +3,7 @@ import { getStockReport, getCategories } from "../api";
 import toast from "react-hot-toast";
 import { useModal } from "../context/ModalContext";
 import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
-import {
-  th,
-  thead,
-} from "../utils/tableClasses";
+import { th, thead } from "../utils/tableClasses";
 import type {
   Category,
   QueryParams,
@@ -104,7 +101,7 @@ export default function StockReport() {
             <select
               value={filters.categoryId}
               onChange={(e) => handleFilterChange("categoryId", e.target.value)}
-              className="w-full sm:w-auto border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+              className="w-full sm:w-auto border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
             >
               <option value="">همه</option>
               {categories.map((cat) => (
@@ -141,25 +138,33 @@ export default function StockReport() {
       {report && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="bg-surface rounded-field shadow p-3 sm:p-4">
-            <p className="text-body-xs sm:text-body-sm text-text-secondary">کل کالاها</p>
+            <p className="text-body-xs sm:text-body-sm text-text-secondary">
+              کل کالاها
+            </p>
             <p className="text-lg sm:text-2xl font-bold text-text-primary">
               {toPersianDigits(report.summary.total_items)}
             </p>
           </div>
           <div className="bg-warning-soft rounded-field shadow p-3 sm:p-4 border border-warning-soft">
-            <p className="text-body-xs sm:text-body-sm text-warning-fg">کم‌موجود</p>
+            <p className="text-body-xs sm:text-body-sm text-warning-fg">
+              کم‌موجود
+            </p>
             <p className="text-lg sm:text-2xl font-bold text-warning-fg">
               {toPersianDigits(report.summary.low_stock_count)}
             </p>
           </div>
           <div className="bg-danger-soft rounded-field shadow p-3 sm:p-4 border border-danger-soft">
-            <p className="text-body-xs sm:text-body-sm text-danger-fg">اتمام موجودی</p>
+            <p className="text-body-xs sm:text-body-sm text-danger-fg">
+              اتمام موجودی
+            </p>
             <p className="text-lg sm:text-2xl font-bold text-danger-fg">
               {toPersianDigits(report.summary.critical_count)}
             </p>
           </div>
           <div className="bg-primary-soft rounded-field shadow p-3 sm:p-4 border border-primary-soft">
-            <p className="text-body-xs sm:text-body-sm text-primary">ارزش کل موجودی</p>
+            <p className="text-body-xs sm:text-body-sm text-primary">
+              ارزش کل موجودی
+            </p>
             <p className="text-base sm:text-xl font-bold text-primary break-words">
               {formatPersianCurrency(report.summary.total_inventory_value)} ریال
             </p>
@@ -176,27 +181,13 @@ export default function StockReport() {
           <table className="min-w-[720px] sm:min-w-full divide-y divide-border">
             <thead className={thead}>
               <tr>
-                <th className={th}>
-                  کد
-                </th>
-                <th className={th}>
-                  نام کالا
-                </th>
-                <th className={th}>
-                  دسته‌بندی
-                </th>
-                <th className={th}>
-                  موجودی
-                </th>
-                <th className={th}>
-                  حداقل
-                </th>
-                <th className={th}>
-                  وضعیت
-                </th>
-                <th className={th}>
-                  ارزش موجودی
-                </th>
+                <th className={th}>کد</th>
+                <th className={th}>نام کالا</th>
+                <th className={th}>دسته‌بندی</th>
+                <th className={th}>موجودی</th>
+                <th className={th}>حداقل</th>
+                <th className={th}>وضعیت</th>
+                <th className={th}>ارزش موجودی</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

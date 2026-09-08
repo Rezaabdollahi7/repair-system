@@ -248,7 +248,7 @@ export default function RepairInvoiceDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -689,8 +689,11 @@ export default function RepairInvoiceDetailModal({
 
       {/* Payment Modal */}
       {showPaymentModal && invoice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-surface border border-border rounded-card shadow-xl p-6 w-full max-w-md" dir="rtl">
+        <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60]">
+          <div
+            className="bg-surface border border-border rounded-card shadow-xl p-6 w-full max-w-md"
+            dir="rtl"
+          >
             <h3 className="text-lg font-bold text-text-primary mb-4">
               ثبت پرداخت
             </h3>
@@ -706,7 +709,7 @@ export default function RepairInvoiceDetailModal({
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     min="1"
                     max={invoice.total_amount - invoice.paid_amount}
-                    className="w-full border border-border rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                    className="w-full border border-border-field rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     required
                     autoFocus
                   />
@@ -718,7 +721,7 @@ export default function RepairInvoiceDetailModal({
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full border border-border rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                    className="w-full border border-border-field rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   >
                     <option value="cash">نقدی</option>
                     <option value="card">کارت بانکی</option>
@@ -733,7 +736,7 @@ export default function RepairInvoiceDetailModal({
                     value={paymentNote}
                     onChange={(e) => setPaymentNote(e.target.value)}
                     rows={2}
-                    className="w-full border border-border rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                    className="w-full border border-border-field rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   />
                 </div>
               </div>

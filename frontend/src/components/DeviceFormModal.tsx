@@ -139,7 +139,9 @@ function SectionTitle({ icon: Icon, title }: SectionTitleProps) {
   return (
     <div className="flex items-center gap-2 mb-3 pb-2 border-b border-primary-soft">
       <Icon className="size-5 text-primary" />
-      <span className="text-body-sm font-semibold text-text-primary">{title}</span>
+      <span className="text-body-sm font-semibold text-text-primary">
+        {title}
+      </span>
     </div>
   );
 }
@@ -460,7 +462,7 @@ export default function DeviceFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -508,7 +510,7 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowCustomerDropdown(false), 200)
                       }
-                      className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-text-primary"
                     />
                     {showCustomerDropdown && (
                       <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-56 overflow-y-auto">
@@ -578,7 +580,7 @@ export default function DeviceFormModal({
                       onChange={(e) =>
                         setNewCustomer((p) => ({ ...p, name: e.target.value }))
                       }
-                      className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <input
                       placeholder="شماره تلفن *"
@@ -586,7 +588,7 @@ export default function DeviceFormModal({
                       onChange={(e) =>
                         setNewCustomer((p) => ({ ...p, phone: e.target.value }))
                       }
-                      className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <div className="flex gap-2">
                       <button
@@ -625,7 +627,7 @@ export default function DeviceFormModal({
                     onBlur={() =>
                       setTimeout(() => setShowPersonnelDropdown(false), 150)
                     }
-                    className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                    className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   />
                   {showPersonnelDropdown && (
                     <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-48 overflow-y-auto">
@@ -684,7 +686,13 @@ export default function DeviceFormModal({
               {/* Device name */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
-                  نام دستگاه <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                  نام دستگاه{" "}
+                  <span
+                    aria-hidden
+                    className="text-danger-fg text-[0.85em] leading-none align-super"
+                  >
+                    *
+                  </span>
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -700,7 +708,7 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowDeviceNameDropdown(false), 200)
                       }
-                      className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     {showDeviceNameDropdown && deviceNameResults.length > 0 && (
                       <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-48 overflow-y-auto">
@@ -745,7 +753,7 @@ export default function DeviceFormModal({
                       onChange={(e) =>
                         setNewDeviceName({ name: e.target.value })
                       }
-                      className="w-full border border-border rounded-field px-3 py-2 text-body-sm mb-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm mb-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <div className="flex gap-2">
                       <button
@@ -786,7 +794,7 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowBrandDropdown(false), 200)
                       }
-                      className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     {showBrandDropdown && brandResults.length > 0 && (
                       <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-48 overflow-y-auto">
@@ -829,7 +837,7 @@ export default function DeviceFormModal({
                       placeholder="برند جدید"
                       value={newBrand.name}
                       onChange={(e) => setNewBrand({ name: e.target.value })}
-                      className="w-full border border-border rounded-field px-3 py-2 text-body-sm mb-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm mb-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <div className="flex gap-2">
                       <button
@@ -861,7 +869,7 @@ export default function DeviceFormModal({
                   value={form.model}
                   onChange={handleChange}
                   placeholder="مثال: Galaxy S21"
-                  className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 />
               </div>
 
@@ -874,7 +882,7 @@ export default function DeviceFormModal({
                   name="serial_number"
                   value={form.serial_number}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 />
               </div>
             </div>
@@ -886,7 +894,13 @@ export default function DeviceFormModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
-                  تاریخ ورود <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                  تاریخ ورود{" "}
+                  <span
+                    aria-hidden
+                    className="text-danger-fg text-[0.85em] leading-none align-super"
+                  >
+                    *
+                  </span>
                 </label>
                 <PersianDatePicker
                   value={form.entry_date}
@@ -921,7 +935,7 @@ export default function DeviceFormModal({
                   name="status"
                   value={form.status}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -939,7 +953,7 @@ export default function DeviceFormModal({
                   value={form.description}
                   onChange={handleChange}
                   rows={7}
-                  className="w-full border border-border rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   placeholder="توضیحات تعمیرکار ..."
                 />
               </div>

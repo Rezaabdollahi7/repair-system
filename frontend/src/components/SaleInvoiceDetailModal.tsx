@@ -166,7 +166,7 @@ export default function SaleInvoiceDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -447,7 +447,9 @@ export default function SaleInvoiceDetailModal({
                       </div>
 
                       <div className="flex justify-between py-2 text-body-sm border-b border-border">
-                        <span className="text-success-fg">دریافت شده (ریال):</span>
+                        <span className="text-success-fg">
+                          دریافت شده (ریال):
+                        </span>
                         <span className="font-medium text-success-fg">
                           {formatPersianCurrency(invoice.paid_amount)}
                         </span>
@@ -481,7 +483,7 @@ export default function SaleInvoiceDetailModal({
                             max={invoice.total_amount}
                             value={paymentAmount}
                             onChange={(e) => setPaymentAmount(e.target.value)}
-                            className="flex-1 border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary"
+                            className="flex-1 border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary"
                           />
                           <button
                             onClick={handlePaymentUpdate}

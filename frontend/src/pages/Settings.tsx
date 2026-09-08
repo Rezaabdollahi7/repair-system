@@ -100,7 +100,9 @@ function ToggleSwitch({
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
       <div>
-        <span className="text-body-sm font-medium text-text-primary">{label}</span>
+        <span className="text-body-sm font-medium text-text-primary">
+          {label}
+        </span>
         {description && (
           <p className="text-body-xs text-text-secondary">{description}</p>
         )}
@@ -310,7 +312,7 @@ export default function Settings() {
                   name="company_name"
                   value={settings.company_name || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="مثلاً: تعمیرگاه تخصصی الکترونیک"
                 />
               </div>
@@ -324,7 +326,7 @@ export default function Settings() {
                   name="company_phone"
                   value={settings.company_phone || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="مثلاً: 021-12345678, 09123456789"
                 />
               </div>
@@ -338,7 +340,7 @@ export default function Settings() {
                   value={settings.company_address || ""}
                   onChange={handleChange}
                   rows={2}
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="آدرس کامل تعمیرگاه..."
                 />
               </div>
@@ -352,7 +354,7 @@ export default function Settings() {
                   name="company_email"
                   value={settings.company_email || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="info@example.com"
                 />
               </div>
@@ -366,7 +368,7 @@ export default function Settings() {
                   name="company_website"
                   value={settings.company_website || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="www.example.com"
                 />
               </div>
@@ -421,7 +423,7 @@ export default function Settings() {
                   name="invoice_prefix"
                   value={settings.invoice_prefix || "INV-"}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
 
@@ -437,7 +439,7 @@ export default function Settings() {
                   min="0"
                   max="100"
                   step="0.5"
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
 
@@ -451,7 +453,7 @@ export default function Settings() {
                   value={settings.default_warranty_months || 3}
                   onChange={handleChange}
                   min="0"
-                  className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
             </div>
@@ -465,7 +467,7 @@ export default function Settings() {
                 value={settings.invoice_footer_text || ""}
                 onChange={handleChange}
                 rows={2}
-                className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 placeholder="مثلاً: با تشکر از اعتماد شما - تحویل گرفته شد"
               />
             </div>
@@ -488,7 +490,7 @@ export default function Settings() {
                   name="sale_invoice_paper_size"
                   value={settings.sale_invoice_paper_size || "A5"}
                   onChange={handleChange}
-                  className="w-full sm:w-64 border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary"
+                  className="w-full sm:w-64 border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary"
                 >
                   <option value="A4">A4 - حرفه‌ای (کامل)</option>
                   <option value="A5">A5 - نیمه‌حرفه‌ای (متوسط)</option>
@@ -626,7 +628,7 @@ export default function Settings() {
                       value={settings.sale_invoice_header_text || ""}
                       onChange={handleChange}
                       rows={2}
-                      className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="متن دلخواه برای بالای فاکتور..."
                     />
                   </div>
@@ -642,7 +644,7 @@ export default function Settings() {
                       }
                       onChange={handleChange}
                       rows={2}
-                      className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="متن دلخواه برای پایین فاکتور..."
                     />
                   </div>

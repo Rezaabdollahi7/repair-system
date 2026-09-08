@@ -128,7 +128,7 @@ export default function PersonnelFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50 p-4">
       <motion.div
         variants={modalPanel}
         initial="hidden"
@@ -156,7 +156,13 @@ export default function PersonnelFormModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              نام و نام خانوادگی <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+              نام و نام خانوادگی{" "}
+              <span
+                aria-hidden
+                className="text-danger-fg text-[0.85em] leading-none align-super"
+              >
+                *
+              </span>
             </label>
             <input
               type="text"
@@ -164,14 +170,20 @@ export default function PersonnelFormModal({
               value={form.full_name}
               onChange={handleChange}
               required
-              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+              className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               placeholder="مثال: علی محمدی"
             />
           </div>
 
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              شماره موبایل <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+              شماره موبایل{" "}
+              <span
+                aria-hidden
+                className="text-danger-fg text-[0.85em] leading-none align-super"
+              >
+                *
+              </span>
             </label>
             <input
               type="tel"
@@ -180,7 +192,7 @@ export default function PersonnelFormModal({
               onChange={handleChange}
               required
               dir="ltr"
-              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] font-mono"
+              className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] font-mono"
               placeholder="09123456789"
             />
             <p className="text-body-xs text-text-secondary mt-1">
@@ -196,7 +208,12 @@ export default function PersonnelFormModal({
                   (خالی = بدون تغییر)
                 </span>
               ) : (
-                <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+                <span
+                  aria-hidden
+                  className="text-danger-fg text-[0.85em] leading-none align-super"
+                >
+                  *
+                </span>
               )}
             </label>
             <input
@@ -205,7 +222,7 @@ export default function PersonnelFormModal({
               value={form.password}
               onChange={handleChange}
               required={!isEdit}
-              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+              className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               minLength={8}
               placeholder={
                 isEdit ? "برای تغییر رمز وارد کنید" : "حداقل ۸ کاراکتر"
@@ -223,20 +240,26 @@ export default function PersonnelFormModal({
               value={form.phone}
               onChange={handleChange}
               dir="ltr"
-              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+              className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               placeholder="اختیاری — مثلاً تلفن ثابت"
             />
           </div>
 
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              نقش <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
+              نقش{" "}
+              <span
+                aria-hidden
+                className="text-danger-fg text-[0.85em] leading-none align-super"
+              >
+                *
+              </span>
             </label>
             <select
               name="role_id"
               value={form.role_id}
               onChange={handleChange}
-              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+              className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
             >
               {allowedRoles.map((role) => (
                 <option key={role.id} value={role.id}>

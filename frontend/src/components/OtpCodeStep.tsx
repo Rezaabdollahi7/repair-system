@@ -143,7 +143,10 @@ export default function OtpCodeStep({
     event.preventDefault();
     // A code pasted whole starts at the first box wherever it was dropped;
     // a shorter fragment fills forward from the box that received it.
-    spread(pasted.length >= CODE_LENGTH ? 0 : index, pasted.slice(0, CODE_LENGTH));
+    spread(
+      pasted.length >= CODE_LENGTH ? 0 : index,
+      pasted.slice(0, CODE_LENGTH),
+    );
   };
 
   const handleKeyDown = (
@@ -250,7 +253,7 @@ export default function OtpCodeStep({
                           ${
                             digit
                               ? "border-success"
-                              : "border-border hover:border-border-strong"
+                              : "border-border-field hover:border-border-strong"
                           }
                           focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]`}
             />

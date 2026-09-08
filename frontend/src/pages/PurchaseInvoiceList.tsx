@@ -13,10 +13,23 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
+import {
+  badge,
+  iconButton,
+  tableCard,
+  tableScroll,
+  tbody,
+  td,
+  tdMuted,
+  th,
+  thead,
+  trClickable,
+} from "../utils/tableClasses";
 import type { PaymentStatus, PurchaseInvoice, QueryParams } from "../types/api";
 
 interface BadgeStyle {
@@ -29,17 +42,17 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
-      color: "bg-success-soft text-success",
+      color: "bg-success-soft text-success-fg",
       icon: <CheckCircleIcon className="w-4 h-4" />,
     },
     partial: {
       label: "پرداخت ناقص",
-      color: "bg-warning-soft text-warning",
+      color: "bg-warning-soft text-warning-fg",
       icon: <ExclamationCircleIcon className="w-4 h-4" />,
     },
     pending: {
       label: "در انتظار پرداخت",
-      color: "bg-warning-soft text-warning",
+      color: "bg-warning-soft text-warning-fg",
       icon: <ClockIcon className="w-4 h-4" />,
     },
   };
@@ -50,7 +63,7 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   };
   return (
     <span
-      className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit mx-auto ${s.color}`}
+      className={`${badge} gap-1 mx-auto ${s.color}`}
     >
       {s.icon}
       {s.label}
@@ -125,112 +138,120 @@ export default function PurchaseInvoiceList() {
 
   return (
     <div dir="rtl">
-      <div className="flex justify-end items-center mb-6">
+      <div className="flex justify-end items-center mb-4">
         <button
           onClick={() => openPurchaseInvoiceCreate()}
-          className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
+          className="w-full sm:w-auto px-4 py-2.5 rounded-field bg-primary text-primary-fg text-body-sm font-bold shadow-primary hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 cursor-pointer"
         >
-          <PlusIcon className="w-5 h-5" />
+          <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
           فاکتور جدید
         </button>
       </div>
 
       <div className="mb-4">
         <div className="relative">
-          <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
+          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="جستجو در نام فروشنده..."
-            className="w-full pr-10 pl-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+            className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm border border-border rounded-field py-2.5 pr-11 pl-3.5 hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
           />
         </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
+          <LoadingSpinner size="md" />
         </div>
       ) : invoices.length === 0 ? (
-        <div className="text-center py-20 text-text-secondary">
-          {searchInput ? "نتیجه‌ای یافت نشد" : "هیچ فاکتوری ثبت نشده"}
+        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
+          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
+            <ShoppingCartIcon className="w-7 h-7 text-text-muted" />
+          </span>
+          <p className="text-body-md font-bold text-text-primary">
+            {searchInput ? "نتیجه‌ای یافت نشد" : "هنوز فاکتور خریدی ثبت نشده"}
+          </p>
+          <p className="text-body-sm text-text-secondary mt-1">
+            {searchInput
+              ? "عبارت دیگری را امتحان کنید."
+              : "قطعاتی که می‌خرید را اینجا ثبت کنید تا موجودی انبار به‌روز بماند."}
+          </p>
         </div>
       ) : (
-        <div className="bg-surface shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1200px] lg:min-w-full divide-y divide-border">
-              <thead className="bg-primary-soft">
+        <div className={tableCard}>
+          <div className={tableScroll}>
+            <table className="min-w-[1040px] w-full">
+              <thead className={thead}>
                 <tr>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     شماره فاکتور
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     فروشنده
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     تاریخ
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     مبلغ کل
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     پرداخت شده
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     مانده
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
+                  <th className={th}>
                     وضعیت
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
+                  <th className={th}>
                     عملیات
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className={tbody}>
                 {invoices.map((invoice, index) => {
                   const remaining = invoice.total_amount - invoice.paid_amount;
                   return (
                     <tr
                       key={invoice.id}
                       onClick={() => openPurchaseInvoiceDetail(invoice.id)}
-                      className={`hover:bg-primary transition-colors cursor-pointer group ${
-                        index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
-                      }`}
+                      className={trClickable}
                     >
-                      <td className="px-4 py-3 text-sm font-mono font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
+                      <td className={`${td} tabular-nums`}>
                         {invoice.invoice_number}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse text-text-primary">
+                      <td className={td}>
                         {invoice.supplier_name || "—"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-text-secondary text-center border-l border-border group-hover:text-text-inverse">
+                      <td className={tdMuted}>
                         {formatDate(invoice.invoice_date)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-center border-l border-border group-hover:text-text-inverse text-text-primary">
+                      <td className={td}>
                         {formatPersianCurrency(invoice.total_amount)} {` `} ریال
                       </td>
-                      <td className="px-4 py-3 text-sm text-success text-center border-l border-border group-hover:text-text-inverse">
+                      <td className={`${td} text-success-fg`}>
                         {formatPersianCurrency(invoice.paid_amount)} {` `} ریال
                       </td>
-                      <td className="px-4 py-3 text-sm text-danger text-center border-l border-border group-hover:text-text-inverse">
+                      <td className={`${td} text-danger-fg`}>
                         {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-center border-l border-border">
+                      <td className="px-3 py-3 text-center">
                         <PaymentStatusBadge status={invoice.payment_status} />
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex gap-1 justify-center">
+                      <td className="px-3 py-3">
+                        <div className="flex gap-1.5 justify-center">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               openPurchaseInvoiceDetail(invoice.id);
                             }}
-                            className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
+                            className={`${iconButton} bg-primary-soft text-primary`}
                             title="مشاهده جزئیات"
                           >
-                            <EyeIcon className="w-5 h-5" />
+                            <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
                           </button>
 
                           {isAtLeast("admin") && (
@@ -239,9 +260,9 @@ export default function PurchaseInvoiceList() {
                                 e.stopPropagation();
                                 setDeleteTarget(invoice);
                               }}
-                              className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
+                              className={`${iconButton} bg-danger-soft text-danger-fg`}
                             >
-                              <TrashIcon className="w-5 h-5" />
+                              <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
                             </button>
                           )}
                         </div>

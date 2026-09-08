@@ -507,7 +507,7 @@ export default function PurchaseInvoiceFormModal({
                         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3 items-center">
                           <div className="col-span-2 sm:col-span-5">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              کالا <span className="text-danger">*</span>
+                              کالا <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
                             </label>
                             <SearchableSelect
                               options={itemOptions}
@@ -523,7 +523,7 @@ export default function PurchaseInvoiceFormModal({
                           </div>
                           <div className="col-span-1 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              تعداد <span className="text-danger">*</span>
+                              تعداد <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
                             </label>
                             <input
                               type="number"
@@ -547,7 +547,7 @@ export default function PurchaseInvoiceFormModal({
                           <div className="col-span-2 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               قیمت واحد (ریال){" "}
-                              <span className="text-danger">*</span>
+                              <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
                             </label>
                             <input
                               type="number"

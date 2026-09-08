@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { getPersonnelOne, createPersonnel, updatePersonnel } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { XMarkIcon, UserGroupIcon } from "@heroicons/react/24/solid";
 import type { Id, PersonnelCreateBody, RoleName } from "../types/api";
+import { modalPanel } from "../motion";
 
 /**
  * Role ids as the seed writes them. Hardcoded rather than read from the
@@ -127,13 +129,16 @@ export default function PersonnelFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-md"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-md"
         dir="rtl"
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary-soft rounded-lg">
+            <div className="p-2 bg-primary-soft rounded-field">
               <UserGroupIcon className="w-5 h-5 text-primary" />
             </div>
             <h2 className="text-lg font-bold text-text-primary">
@@ -142,7 +147,7 @@ export default function PersonnelFormModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -150,8 +155,8 @@ export default function PersonnelFormModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
-              نام و نام خانوادگی <span className="text-danger">*</span>
+            <label className="block text-body-sm font-medium text-text-primary mb-1">
+              نام و نام خانوادگی <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
             </label>
             <input
               type="text"
@@ -159,14 +164,14 @@ export default function PersonnelFormModal({
               value={form.full_name}
               onChange={handleChange}
               required
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               placeholder="مثال: علی محمدی"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
-              شماره موبایل <span className="text-danger">*</span>
+            <label className="block text-body-sm font-medium text-text-primary mb-1">
+              شماره موبایل <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
             </label>
             <input
               type="tel"
@@ -175,23 +180,23 @@ export default function PersonnelFormModal({
               onChange={handleChange}
               required
               dir="ltr"
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary font-mono"
+              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] font-mono"
               placeholder="09123456789"
             />
-            <p className="text-xs text-text-secondary mt-1">
+            <p className="text-body-xs text-text-secondary mt-1">
               این شماره، نام کاربری او برای ورود است
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
+            <label className="block text-body-sm font-medium text-text-primary mb-1">
               رمز عبور{" "}
               {isEdit ? (
                 <span className="text-text-secondary font-normal">
                   (خالی = بدون تغییر)
                 </span>
               ) : (
-                <span className="text-danger">*</span>
+                <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
               )}
             </label>
             <input
@@ -200,7 +205,7 @@ export default function PersonnelFormModal({
               value={form.password}
               onChange={handleChange}
               required={!isEdit}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               minLength={8}
               placeholder={
                 isEdit ? "برای تغییر رمز وارد کنید" : "حداقل ۸ کاراکتر"
@@ -209,7 +214,7 @@ export default function PersonnelFormModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
+            <label className="block text-body-sm font-medium text-text-primary mb-1">
               شماره تماس دیگر
             </label>
             <input
@@ -218,20 +223,20 @@ export default function PersonnelFormModal({
               value={form.phone}
               onChange={handleChange}
               dir="ltr"
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               placeholder="اختیاری — مثلاً تلفن ثابت"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
-              نقش <span className="text-danger">*</span>
+            <label className="block text-body-sm font-medium text-text-primary mb-1">
+              نقش <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
             </label>
             <select
               name="role_id"
               value={form.role_id}
               onChange={handleChange}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+              className="w-full border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
             >
               {allowedRoles.map((role) => (
                 <option key={role.id} value={role.id}>
@@ -245,7 +250,7 @@ export default function PersonnelFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-primary text-text-inverse py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm font-medium"
+              className="flex-1 bg-primary text-primary-fg py-2 rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm font-medium"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -256,13 +261,13 @@ export default function PersonnelFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-surface-alt text-text-primary py-2 rounded-lg hover:bg-surface-alt text-sm font-medium"
+              className="flex-1 bg-surface-alt text-text-primary py-2 rounded-field hover:bg-surface-alt text-body-sm font-medium"
             >
               انصراف
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

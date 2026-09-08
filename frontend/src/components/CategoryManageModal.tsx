@@ -1,5 +1,6 @@
 // src/components/CategoryManageModal.jsx
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   getCategories,
   createCategory,
@@ -18,6 +19,7 @@ import ConfirmModal from "./ConfirmModal";
 
 import axios from "axios";
 import type { Category } from "../types/api";
+import { modalPanel } from "../motion";
 
 interface CategoryManageModalProps {
   isOpen: boolean;
@@ -132,8 +134,11 @@ export default function CategoryManageModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-lg"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-lg"
         dir="rtl"
       >
         {/* Header */}
@@ -146,7 +151,7 @@ export default function CategoryManageModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -161,12 +166,12 @@ export default function CategoryManageModal({
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="نام دسته‌بندی جدید..."
-              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+              className="flex-1 border border-border rounded-field px-3 py-2 text-body-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
             />
             <button
               onClick={handleAdd}
               disabled={adding || !newName.trim()}
-              className="px-4 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-1 text-sm"
+              className="px-4 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 flex items-center gap-1 text-body-sm"
             >
               <PlusIcon className="w-4 h-4" />
               افزودن
@@ -187,7 +192,7 @@ export default function CategoryManageModal({
               {categories.map((cat) => (
                 <div
                   key={cat.id}
-                  className="flex items-center justify-between p-2 hover:bg-surface-alt rounded-lg"
+                  className="flex items-center justify-between p-2 hover:bg-surface-alt rounded-field"
                 >
                   {editTarget?.id === cat.id ? (
                     <div className="flex gap-2 flex-1">
@@ -196,13 +201,13 @@ export default function CategoryManageModal({
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="flex-1 border border-border rounded px-2 py-1 text-sm bg-surface text-text-primary"
+                        className="flex-1 border border-border rounded-field px-2 py-1 text-body-sm bg-surface text-text-primary"
                         autoFocus
                       />
                       <button
                         onClick={handleEdit}
                         disabled={editing}
-                        className="px-3 py-1 bg-success text-text-inverse rounded text-xs hover:opacity-80"
+                        className="px-3 py-1 bg-success-fill text-on-status rounded-field text-body-xs hover:opacity-80"
                       >
                         ذخیره
                       </button>
@@ -211,14 +216,14 @@ export default function CategoryManageModal({
                           setEditTarget(null);
                           setEditName("");
                         }}
-                        className="px-3 py-1 bg-surface-alt text-text-primary rounded text-xs hover:bg-surface-alt"
+                        className="px-3 py-1 bg-surface-alt text-text-primary rounded-field text-body-xs hover:bg-surface-alt"
                       >
                         انصراف
                       </button>
                     </div>
                   ) : (
                     <>
-                      <span className="text-sm text-text-primary">
+                      <span className="text-body-sm text-text-primary">
                         {cat.name}
                       </span>
                       <div className="flex gap-1">
@@ -227,14 +232,14 @@ export default function CategoryManageModal({
                             setEditTarget(cat);
                             setEditName(cat.name);
                           }}
-                          className="p-1.5 rounded text-success hover:opacity-80 transition"
+                          className="p-1.5 rounded-field text-success hover:opacity-80 transition"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteTarget(cat)}
-                          className="p-1.5 rounded text-danger hover:opacity-80 transition"
+                          className="p-1.5 rounded-field text-danger hover:opacity-80 transition"
                           title="حذف"
                         >
                           <TrashIcon className="w-4 h-4" />
@@ -248,15 +253,15 @@ export default function CategoryManageModal({
           )}
         </div>
 
-        <div className="flex justify-end p-4 border-t border-border bg-surface-alt rounded-b-xl">
+        <div className="flex justify-end p-4 border-t border-border bg-surface-alt rounded-b-card">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt"
+            className="px-4 py-2 border border-border rounded-field text-text-primary hover:bg-surface-alt"
           >
             بستن
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Delete Confirm */}
       <ConfirmModal

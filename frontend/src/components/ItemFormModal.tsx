@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import axios from "axios";
 import {
   getItem,
@@ -10,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import { XMarkIcon, CubeIcon } from "@heroicons/react/24/solid";
 import type { Category, Id, ItemCreateBody } from "../types/api";
+import { modalPanel } from "../motion";
 
 const unitOptions = [
   { value: "عدد", label: "عدد" },
@@ -193,18 +195,21 @@ export default function ItemFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-3xl my-8"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-3xl my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
             <CubeIcon className="w-5 h-5 text-text-secondary" />
             {isEditMode ? `ویرایش کالا #${itemId}` : "ثبت کالای جدید"}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -214,8 +219,8 @@ export default function ItemFormModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Code */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                کد کالا <span className="text-danger">*</span>
+              <label className="block text-body-sm font-medium text-text-primary mb-2">
+                کد کالا <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 type="text"
@@ -223,18 +228,18 @@ export default function ItemFormModal({
                 value={formData.code}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.code ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.code ? "border-danger" : "border-border"}`}
                 placeholder="مثلاً: CAP-1000-16"
               />
               {errors.code && (
-                <p className="mt-1 text-xs text-danger">{errors.code}</p>
+                <p className="mt-1 text-body-xs text-danger">{errors.code}</p>
               )}
             </div>
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                نام کالا <span className="text-danger">*</span>
+              <label className="block text-body-sm font-medium text-text-primary mb-2">
+                نام کالا <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 type="text"
@@ -242,17 +247,17 @@ export default function ItemFormModal({
                 value={formData.name}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.name ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.name ? "border-danger" : "border-border"}`}
                 placeholder="مثلاً: خازن ۱۰۰۰ میکروفاراد ۱۶ ولت"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-danger">{errors.name}</p>
+                <p className="mt-1 text-body-xs text-danger">{errors.name}</p>
               )}
             </div>
 
             {/* Category */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label className="block text-body-sm font-medium text-text-primary mb-2">
                 دسته‌بندی
               </label>
               <select
@@ -260,7 +265,7 @@ export default function ItemFormModal({
                 value={formData.categoryId}
                 onChange={handleChange}
                 disabled={loading}
-                className="w-full border border-border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary"
+                className="w-full border border-border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               >
                 <option value="">بدون دسته‌بندی</option>
                 {categories.map((cat) => (
@@ -273,15 +278,15 @@ export default function ItemFormModal({
 
             {/* Unit */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                واحد شمارش <span className="text-danger">*</span>
+              <label className="block text-body-sm font-medium text-text-primary mb-2">
+                واحد شمارش <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
               </label>
               <select
                 name="unit"
                 value={formData.unit}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.unit ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.unit ? "border-danger" : "border-border"}`}
               >
                 {unitOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -290,13 +295,13 @@ export default function ItemFormModal({
                 ))}
               </select>
               {errors.unit && (
-                <p className="mt-1 text-xs text-danger">{errors.unit}</p>
+                <p className="mt-1 text-body-xs text-danger">{errors.unit}</p>
               )}
             </div>
 
             {/* Minimum stock */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label className="block text-body-sm font-medium text-text-primary mb-2">
                 حداقل موجودی (هشدار)
               </label>
               <input
@@ -307,12 +312,12 @@ export default function ItemFormModal({
                 disabled={loading}
                 min="0"
                 step="1"
-                className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.minStock ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.minStock ? "border-danger" : "border-border"}`}
               />
               {errors.minStock && (
-                <p className="mt-1 text-xs text-danger">{errors.minStock}</p>
+                <p className="mt-1 text-body-xs text-danger">{errors.minStock}</p>
               )}
-              <p className="mt-1 text-xs text-text-secondary">
+              <p className="mt-1 text-body-xs text-text-secondary">
                 وقتی موجودی به این عدد برسد، هشدار کم‌موجودی نمایش داده می‌شود
               </p>
             </div>
@@ -320,7 +325,7 @@ export default function ItemFormModal({
             {/* Opening stock, only when creating */}
             {!isEditMode && (
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   موجودی اولیه
                 </label>
                 <input
@@ -331,14 +336,14 @@ export default function ItemFormModal({
                   disabled={loading}
                   min="0"
                   step="1"
-                  className={`w-full border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary ${errors.initialStock ? "border-danger" : "border-border"}`}
+                  className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.initialStock ? "border-danger" : "border-border"}`}
                 />
                 {errors.initialStock && (
-                  <p className="mt-1 text-xs text-danger">
+                  <p className="mt-1 text-body-xs text-danger">
                     {errors.initialStock}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-text-secondary">
+                <p className="mt-1 text-body-xs text-text-secondary">
                   اگر از قبل موجودی دارید، تعداد را وارد کنید
                 </p>
               </div>
@@ -346,14 +351,14 @@ export default function ItemFormModal({
 
             {/* Current stock, only when editing */}
             {isEditMode && (
-              <div className="bg-surface-alt p-4 rounded-lg border border-border">
-                <label className="block text-sm font-medium text-text-primary mb-2">
+              <div className="bg-surface-alt p-4 rounded-field border border-border">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   موجودی فعلی
                 </label>
                 <div className="text-2xl font-bold text-text-primary">
                   {formData.currentStock || 0} {formData.unit}
                 </div>
-                <p className="mt-1 text-xs text-text-secondary">
+                <p className="mt-1 text-body-xs text-text-secondary">
                   برای تغییر موجودی از بخش فاکتور خرید یا فروش استفاده کنید
                 </p>
               </div>
@@ -362,7 +367,7 @@ export default function ItemFormModal({
 
           {/* Description */}
           <div className="mt-6">
-            <label className="block text-sm font-medium text-text-primary mb-2">
+            <label className="block text-body-sm font-medium text-text-primary mb-2">
               توضیحات
             </label>
             <textarea
@@ -371,7 +376,7 @@ export default function ItemFormModal({
               onChange={handleChange}
               disabled={loading}
               rows={3}
-              className="w-full border border-border rounded-lg px-4 py-2 text-sm bg-surface text-text-primary"
+              className="w-full border border-border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               placeholder="توضیحات اضافی درباره کالا..."
             />
           </div>
@@ -381,14 +386,14 @@ export default function ItemFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt"
+              className="px-4 py-2 border border-border rounded-field text-text-primary hover:bg-surface-alt"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50"
+              className="px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -398,7 +403,7 @@ export default function ItemFormModal({
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

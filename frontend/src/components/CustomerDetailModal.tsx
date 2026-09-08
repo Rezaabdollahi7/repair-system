@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import axios from "axios";
 import {
   getCustomer,
@@ -22,28 +23,29 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
-import { formatPersianPhone } from "../utils/formatters";
+import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import type {
   Customer,
   CustomerDevice,
   CustomerStats,
   Id,
 } from "../types/api";
+import { modalPanel } from "../motion";
 
 /**
  * Neither map covers "received", the schema's default, so a device nobody
  * has touched yet falls through to its raw status. Left as it was.
  */
 const statusColor: Record<string, string> = {
-  pending: "bg-warning-soft text-warning",
+  pending: "bg-warning-soft text-warning-fg",
   diagnosing: "bg-primary-soft text-primary",
-  repairing: "bg-warning-soft text-warning",
-  repaired: "bg-success-soft text-success",
+  repairing: "bg-warning-soft text-warning-fg",
+  repaired: "bg-success-soft text-success-fg",
   delivered: "bg-primary-soft text-primary",
-  unrepairable: "bg-danger-soft text-danger",
-  not_repaired: "bg-danger-soft text-danger",
+  unrepairable: "bg-danger-soft text-danger-fg",
+  not_repaired: "bg-danger-soft text-danger-fg",
   ready_for_pickup: "bg-primary-soft text-primary",
-  waiting_for_parts: "bg-warning-soft text-warning",
+  waiting_for_parts: "bg-warning-soft text-warning-fg",
 };
 
 const statusLabel: Record<string, string> = {
@@ -72,12 +74,12 @@ interface StatCardProps {
 
 function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
   return (
-    <div className="bg-surface rounded-xl shadow-sm border border-border p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
+    <div className="bg-surface rounded-card shadow-sm border border-border p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
       <div className={`p-2 sm:p-3 rounded-full ${color} shrink-0`}>
         <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs sm:text-sm text-text-secondary truncate">
+        <p className="text-body-xs sm:text-body-sm text-text-secondary truncate">
           {label}
         </p>
         <p className="text-base sm:text-xl font-bold text-text-primary">
@@ -119,31 +121,31 @@ function DeviceTimeline({ devices, openDeviceDetail }: DeviceTimelineProps) {
             {/* Device card */}
             <button
               onClick={() => openDeviceDetail(device.id)}
-              className="flex-1 bg-surface rounded-xl shadow-sm border border-border p-3 sm:p-4 hover:border-primary-soft hover:shadow-md transition-all text-right group"
+              className="flex-1 bg-surface rounded-card shadow-sm border border-border p-3 sm:p-4 hover:border-primary-soft hover:shadow-md transition-all text-right group"
             >
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-text-primary text-sm sm:text-base truncate">
+                  <p className="font-medium text-text-primary text-body-sm sm:text-base truncate">
                     {device.device_name}
-                    <span className="text-text-secondary text-xs mr-1">
+                    <span className="text-text-secondary text-body-xs mr-1">
                       (#{device.id})
                     </span>
                   </p>
                   {device.brand && (
-                    <p className="text-xs sm:text-sm text-text-secondary mt-0.5 truncate">
+                    <p className="text-body-xs sm:text-body-sm text-text-secondary mt-0.5 truncate">
                       {device.brand}
                       {device.model && ` · ${device.model}`}
                     </p>
                   )}
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full whitespace-nowrap font-medium self-start sm:self-center ${statusColor[device.status] ?? "bg-surface-alt text-text-secondary"}`}
+                  className={`text-body-xs px-2 py-1 rounded-full whitespace-nowrap font-medium self-start sm:self-center ${statusColor[device.status] ?? "bg-surface-alt text-text-secondary"}`}
                 >
                   {statusLabel[device.status] ?? device.status}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-xs text-text-secondary">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-body-xs text-text-secondary">
                 <span className="flex items-center gap-1">
                   <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>ورود: {toJalali(device.entry_date)}</span>
@@ -157,7 +159,7 @@ function DeviceTimeline({ devices, openDeviceDetail }: DeviceTimelineProps) {
               </div>
 
               {device.description && (
-                <p className="mt-2 text-xs text-text-secondary line-clamp-2 break-words">
+                <p className="mt-2 text-body-xs text-text-secondary line-clamp-2 break-words">
                   {device.description}
                 </p>
               )}
@@ -247,14 +249,17 @@ export default function CustomerDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-3xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
+        <div className="sticky top-0 z-20 bg-surface rounded-t-card border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-primary-soft p-2 rounded-xl">
+            <div className="bg-primary-soft p-2 rounded-card">
               <UserIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -262,7 +267,7 @@ export default function CustomerDetailModal({
                 جزئیات مشتری
               </h2>
               {customer && (
-                <p className="text-xs text-text-secondary mt-0.5 hidden sm:block">
+                <p className="text-body-xs text-text-secondary mt-0.5 hidden sm:block">
                   عضویت: {toJalali(customer.created_at)}
                 </p>
               )}
@@ -270,7 +275,7 @@ export default function CustomerDetailModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
+            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -284,7 +289,7 @@ export default function CustomerDetailModal({
           ) : customer ? (
             <div className="space-y-4 sm:space-y-6">
               {/* Customer card */}
-              <div className="bg-gradient-to-r from-primary-soft to-surface rounded-2xl shadow-sm border border-primary-soft p-4 sm:p-6">
+              <div className="bg-gradient-to-r from-primary-soft to-surface rounded-card shadow-sm border border-primary-soft p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary-soft flex items-center justify-center shrink-0">
@@ -295,14 +300,14 @@ export default function CustomerDetailModal({
                         {customer.name}
                       </h2>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
-                        <div className="flex items-center gap-1 text-text-secondary text-xs sm:text-sm">
+                        <div className="flex items-center gap-1 text-text-secondary text-body-xs sm:text-body-sm">
                           <PhoneIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           <span className="break-words">
                             {formatPersianPhone(customer.phone)}
                           </span>
                         </div>
                         <div className="hidden sm:block text-border">|</div>
-                        <div className="flex items-center gap-1 text-text-secondary text-xs">
+                        <div className="flex items-center gap-1 text-text-secondary text-body-xs">
                           <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           <span>عضویت: {toJalali(customer.created_at)}</span>
                         </div>
@@ -314,7 +319,7 @@ export default function CustomerDetailModal({
                   <div className="flex gap-2 sm:gap-2 justify-end">
                     <button
                       onClick={handleEdit}
-                      className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-primary text-text-inverse text-xs sm:text-sm rounded-xl hover:bg-primary-hover transition-colors shadow-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-primary text-primary-fg text-body-xs sm:text-body-sm rounded-card hover:bg-primary-hover transition-colors shadow-sm"
                     >
                       <PencilIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span className="hidden sm:inline">ویرایش</span>
@@ -323,7 +328,7 @@ export default function CustomerDetailModal({
                     {isAtLeast("admin") && (
                       <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-danger-soft text-danger text-xs sm:text-sm rounded-xl hover:opacity-80 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-danger-soft text-danger-fg text-body-xs sm:text-body-sm rounded-card hover:opacity-80 transition-colors"
                       >
                         <TrashIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span className="hidden sm:inline">حذف</span>
@@ -340,37 +345,37 @@ export default function CustomerDetailModal({
                   <StatCard
                     icon={DevicePhoneMobileIcon}
                     label="کل دستگاه‌ها"
-                    value={stats.total_devices ?? 0}
+                    value={toPersianDigits(stats.total_devices ?? 0)}
                     color="bg-primary-soft text-primary"
                   />
                   <StatCard
                     icon={CheckCircleIcon}
                     label="تعمیر موفق"
-                    value={stats.successful_repairs ?? 0}
-                    color="bg-success-soft text-success"
+                    value={toPersianDigits(stats.successful_repairs ?? 0)}
+                    color="bg-success-soft text-success-fg"
                   />
                   <StatCard
                     icon={ClockIcon}
                     label="میانگین زمان تعمیر"
                     value={
                       stats.avg_repair_days
-                        ? `${Math.round(Number(stats.avg_repair_days))} روز`
+                        ? `${toPersianDigits(Math.round(Number(stats.avg_repair_days)))} روز`
                         : "—"
                     }
-                    color="bg-warning-soft text-warning"
+                    color="bg-warning-soft text-warning-fg"
                   />
                 </div>
               )}
 
               {/* Device history */}
-              <div className="bg-surface-alt rounded-xl p-4 sm:p-6">
+              <div className="bg-surface-alt rounded-card p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-4 sm:mb-6 pb-2 border-b border-border">
                   <DevicePhoneMobileIcon className="w-5 h-5 text-primary" />
                   <h2 className="text-base sm:text-lg font-semibold text-text-primary">
                     تاریخچه دستگاه‌ها
                   </h2>
                   {devices.length > 0 && (
-                    <span className="bg-primary-soft text-primary text-xs px-2 py-0.5 rounded-full mr-2">
+                    <span className="bg-primary-soft text-primary text-body-xs px-2 py-0.5 rounded-full mr-2">
                       {devices.length}
                     </span>
                   )}
@@ -383,7 +388,7 @@ export default function CustomerDetailModal({
             </div>
           ) : null}
         </div>
-      </div>
+      </motion.div>
 
       <ConfirmModal
         isOpen={showDeleteConfirm}

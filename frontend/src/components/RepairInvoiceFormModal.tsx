@@ -536,7 +536,7 @@ export default function RepairInvoiceFormModal({
                   <div className="space-y-3 sm:space-y-4">
                     <div>
                       <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        انتخاب دستگاه <span className="text-danger">*</span>
+                        انتخاب دستگاه <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
                       </label>
                       <SearchableSelect
                         options={deviceOptions}

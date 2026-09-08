@@ -167,7 +167,7 @@ function QuickCustomerModal({
           <div className="space-y-2 sm:space-y-3">
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
-                نام مشتری <span className="text-danger">*</span>
+                نام مشتری <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 name="name"

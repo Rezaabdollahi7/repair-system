@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
 import { useSubscription } from "../context/SubscriptionContext";
+import { transition } from "../motion";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -54,21 +56,39 @@ export default function SubscriptionBanner() {
     : `${remaining} روز تا پایان اشتراک شما باقی مانده است.`;
 
   return (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-4 ${
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={transition.base}
+      role={expired ? "alert" : "status"}
+      className={`flex items-center gap-3 px-4 py-3 rounded-card mb-4 border ${
         expired
-          ? "bg-danger-soft text-danger"
-          : "bg-warning-soft text-text-primary"
+          ? "bg-danger-soft border-danger/25 text-danger-fg"
+          : "bg-warning-soft border-warning/25 text-warning-fg"
       }`}
     >
-      <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
-      <span className="text-sm flex-1">{message}</span>
+      <span
+        className={`shrink-0 w-9 h-9 rounded-field flex items-center justify-center ${
+          expired ? "bg-danger/15" : "bg-warning/15"
+        }`}
+      >
+        <ExclamationTriangleIcon className="w-5 h-5" />
+      </span>
+
+      <span className="text-body-sm flex-1">{message}</span>
+
+      {/*
+        Inherits the banner's own text colour instead of filling with
+        --danger or --warning. White on #f59e0b is 2.1:1 — the one
+        combination in this file that could not be read at all.
+      */}
       <Link
         to="/subscription"
-        className="text-sm font-medium underline shrink-0"
+        className="shrink-0 text-body-sm font-bold px-3.5 py-2 rounded-field
+                   bg-surface/70 border border-current/20 hover:bg-surface transition-colors"
       >
         تمدید اشتراک
       </Link>
-    </div>
+    </motion.div>
   );
 }

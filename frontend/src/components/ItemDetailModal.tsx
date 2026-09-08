@@ -19,9 +19,10 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
 import type { Id, InventoryTransaction, Item } from "../types/api";
 import { modalPanel } from "../motion";
+import { stockStatusOf } from "../utils/stockStatus";
 
 /** The server answers with { error } on every failing path. */
 function errorText(error: unknown, fallback: string): string {
@@ -293,49 +294,56 @@ interface StockStatusCardProps {
   unit: string;
 }
 
+/*
+ * The label and the tone come from utils/stockStatus.ts — this was the fourth
+ * copy of the same three states, and the one that printed its numbers in
+ * Latin digits while every other figure in the app is Persian.
+ *
+ * The icon stays local: it is this card's own flourish, and the shared module
+ * describes what a state means rather than how one page draws it.
+ */
+const STOCK_ICONS: Record<string, React.ReactNode> = {
+  out: <ExclamationTriangleIcon className="w-8 h-8 text-danger-fg" />,
+  low: <ArrowTrendingDownIcon className="w-8 h-8 text-warning-fg" />,
+  ok: <ArrowTrendingUpIcon className="w-8 h-8 text-success-fg" />,
+};
+
 function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
-  const isCritical = current === 0;
-  const isLow = current > 0 && current <= min;
-  let bgColor = "bg-success-soft border-success-soft";
-  let textColor = "text-success-fg";
-  let icon = <ArrowTrendingUpIcon className="w-8 h-8 text-success-fg" />;
-  let statusText = "موجودی کافی";
-  if (isCritical) {
-    bgColor = "bg-danger-soft border-danger-soft";
-    textColor = "text-danger-fg";
-    icon = <ExclamationTriangleIcon className="w-8 h-8 text-danger-fg" />;
-    statusText = "اتمام موجودی";
-  } else if (isLow) {
-    bgColor = "bg-warning-soft border-warning-soft";
-    textColor = "text-warning-fg";
-    icon = <ArrowTrendingDownIcon className="w-8 h-8 text-warning-fg" />;
-    statusText = "کم‌موجود";
-  }
+  const status = stockStatusOf(current, min);
+  const needsAttention = status.key !== "ok";
+
   return (
-    <div className={`border rounded-field p-6 ${bgColor}`}>
+    <div className={`border rounded-panel p-6 ${status.tone}`}>
       <div className="flex items-start justify-between">
         <div>
-          <p className={`text-body-sm font-medium ${textColor} mb-1`}>
-            {statusText}
+          <p className="text-body-sm font-bold mb-1 flex items-center gap-2">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: status.color }}
+              aria-hidden="true"
+            />
+            {status.label}
           </p>
-          <p className="text-3xl font-bold text-text-primary">
-            {current}{" "}
+          <p className="text-3xl font-bold text-text-primary tabular-nums">
+            {toPersianDigits(current)}{" "}
             <span className="text-lg font-normal text-text-secondary">
               {unit}
             </span>
           </p>
-          <p className="text-body-sm text-text-secondary mt-2">
-            حداقل موجودی: {min} {unit}
+          <p className="text-body-sm text-text-secondary mt-2 tabular-nums">
+            حداقل موجودی: {toPersianDigits(min)} {unit}
           </p>
         </div>
-        <div className="p-3 bg-surface rounded-full shadow-sm">{icon}</div>
+        <div className="p-3 bg-surface rounded-full shadow-sm">
+          {STOCK_ICONS[status.key]}
+        </div>
       </div>
-      {(isCritical || isLow) && (
+      {needsAttention && (
         <div className="mt-4 p-3 bg-surface rounded-field border border-current">
-          <p className={`text-body-sm ${textColor}`}>
-            {isCritical
+          <p className="text-body-sm">
+            {status.key === "out"
               ? "موجودی این کالا به اتمام رسیده است."
-              : `موجودی این کالا به زیر حداقل (${min}) رسیده است.`}
+              : `موجودی این کالا به زیر حداقل (${toPersianDigits(min)}) رسیده است.`}
           </p>
         </div>
       )}

@@ -15,6 +15,7 @@ import type {
   ItemUpdateBody,
   QuickPurchaseBody,
   QuickSaleBody,
+  StockFilter,
 } from "../schemas/item";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
@@ -52,6 +53,35 @@ function toItemResponse(item: ItemWithCategory) {
 
 const DUPLICATE_CODE = { error: "این کد کالا قبلاً ثبت شده است" };
 
+/**
+ * The where fragment for one stock bucket.
+ *
+ * `low` and `ok` compare two columns of the same row, which is what Prisma's
+ * field references are for — `prisma.item.fields.minStock` becomes a column
+ * reference in the generated SQL rather than a bound value. That matters
+ * here: it keeps the filter in the database, so the count and the page still
+ * come from one indexed query.
+ *
+ * The alternative was what getLowStock below still does — load the whole
+ * catalogue and filter in JS — which the list cannot use, because it also has
+ * to paginate and report a total. The page filtered its own rows client-side
+ * before this existed, so a workshop asking for its low-stock items got only
+ * the low-stock rows that happened to be on page one, under a total that
+ * counted everything.
+ *
+ * The three buckets match stockStatus() in the report controller exactly,
+ * `out` first: an item with minStock 0 and nothing in stock is out, not ok.
+ */
+function stockWhere(stock: StockFilter): Prisma.ItemWhereInput {
+  if (stock === "out") return { currentStock: { lte: 0 } };
+  if (stock === "low") {
+    return {
+      currentStock: { gt: 0, lte: prisma.item.fields.minStock },
+    };
+  }
+  return { currentStock: { gt: prisma.item.fields.minStock } };
+}
+
 function paginate<T>(data: T[], total: number, page: number, limit: number) {
   return {
     data,
@@ -65,12 +95,15 @@ function paginate<T>(data: T[], total: number, page: number, limit: number) {
 // GET /api/items
 export const getAll = async (req: Request, res: Response) => {
   try {
-    const { categoryId, page, limit } = (req as ValidatedRequest).valid
+    const { categoryId, stock, page, limit } = (req as ValidatedRequest).valid
       .query as ItemListQuery;
 
     const where: Prisma.ItemWhereInput = { workspaceId: workspaceIdOf(req) };
     if (categoryId !== undefined) {
       where.categoryId = categoryId;
+    }
+    if (stock !== undefined) {
+      Object.assign(where, stockWhere(stock));
     }
 
     const [total, items] = await Promise.all([
@@ -115,8 +148,8 @@ export const getById = async (req: Request, res: Response) => {
 // GET /api/items/search
 export const search = async (req: Request, res: Response) => {
   try {
-    const { q, categoryId, page, limit } = (req as ValidatedRequest).valid
-      .query as ItemSearchQuery;
+    const { q, categoryId, stock, page, limit } = (req as ValidatedRequest)
+      .valid.query as ItemSearchQuery;
 
     const where: Prisma.ItemWhereInput = { workspaceId: workspaceIdOf(req) };
 
@@ -130,6 +163,9 @@ export const search = async (req: Request, res: Response) => {
 
     if (categoryId !== undefined) {
       where.categoryId = categoryId;
+    }
+    if (stock !== undefined) {
+      Object.assign(where, stockWhere(stock));
     }
 
     const [total, items] = await Promise.all([

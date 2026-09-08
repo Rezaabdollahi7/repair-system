@@ -6,24 +6,31 @@ import { useModal } from "../context/ModalContext";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import CategoryManageModal from "../components/CategoryManageModal";
+import { motion } from "framer-motion";
 
 import {
   FolderPlusIcon,
   PlusIcon,
-  EyeIcon,
-  PencilSquareIcon,
-  TrashIcon,
   MagnifyingGlassIcon,
   CubeIcon,
 } from "@heroicons/react/24/solid";
-import LoadingSpinner from "../components/LoadingSpinner";
+/* Outline for the row's own controls — a solid heroicon at 18px is a disc. */
+import {
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import StockStatusBadge from "../components/StockStatusBadge";
 import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
+import { staggerContainer, staggerItem } from "../motion";
+import { STOCK_STATUSES, stockStatusOf } from "../utils/stockStatus";
+import type { StockStatusKey } from "../utils/stockStatus";
 import {
-  badge,
   iconButton,
   primaryButton,
+  rowCard,
   searchField,
   searchIcon,
   secondaryButton,
@@ -42,25 +49,33 @@ import {
 } from "../utils/tableClasses";
 import type { Category, Item, QueryParams } from "../types/api";
 
-function StockBadge({ current, min }: { current: number; min: number }) {
-  if (current === 0) {
-    return (
-      <span className={`${badge} bg-danger-soft text-danger-fg`}>
-        اتمام موجودی
-      </span>
-    );
-  }
-  if (current <= min) {
-    return (
-      <span className={`${badge} bg-warning-soft text-warning-fg`}>
-        کم‌موجود ({toPersianDigits(current)})
-      </span>
-    );
-  }
+/** Mirrors the table and the phone cards so the page does not jump. */
+function ItemListSkeleton() {
   return (
-    <span className={`${badge} bg-success-soft text-success-fg`}>
-      موجود ({toPersianDigits(current)})
-    </span>
+    <div className="animate-pulse">
+      <div className="hidden lg:block bg-surface border border-border rounded-panel p-5">
+        <div className="h-4 w-full rounded-field bg-surface-alt mb-5" />
+        {Array.from({ length: 8 }, (_, row) => (
+          <div key={row} className="flex gap-3 mb-4">
+            {[2, 5, 3, 2, 3, 3].map((span, cell) => (
+              <div
+                key={cell}
+                className="h-4 rounded-field bg-surface-alt"
+                style={{ flexGrow: span, flexBasis: 0 }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="lg:hidden space-y-3">
+        {[0, 1, 2, 3].map((card) => (
+          <div
+            key={card}
+            className="h-28 rounded-panel border border-border bg-surface"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -70,7 +85,7 @@ export default function ItemList() {
   const [searchInput, setSearchInput] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
-  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [stockFilter, setStockFilter] = useState<StockStatusKey | "">("");
 
   const { isAtLeast } = useAuth();
   const { openItemEdit, openItemDetail, refreshList } = useModal();
@@ -91,7 +106,7 @@ export default function ItemList() {
     async (
       searchTerm: string,
       categoryId: string,
-      lowStock: boolean,
+      stock: StockStatusKey | "",
       currentPage: number,
       currentLimit: number,
     ) => {
@@ -99,6 +114,14 @@ export default function ItemList() {
       try {
         const params: QueryParams = { page: currentPage, limit: currentLimit };
         if (categoryId) params.categoryId = categoryId;
+        /*
+         * Sent to the server rather than applied to the rows that come back.
+         * This page used to filter its own page after fetching it, so asking
+         * for low-stock items showed only the low-stock rows that happened to
+         * land on page one, under a total that counted the whole catalogue.
+         * The items endpoint takes a `stock` bucket now.
+         */
+        if (stock) params.stock = stock;
 
         const res = searchTerm
           ? await searchItems({ ...params, q: searchTerm })
@@ -106,14 +129,7 @@ export default function ItemList() {
 
         setTotal(res.data.total);
         setTotalPages(res.data.totalPages);
-
-        // Applied after the page has been fetched, so it only ever sees the
-        // rows already on screen. getLowStockItems does this server-side.
-        setItems(
-          lowStock
-            ? res.data.data.filter((item) => item.currentStock <= item.minStock)
-            : res.data.data,
-        );
+        setItems(res.data.data);
       } catch {
         toast.error("خطا در دریافت لیست کالاها");
         setItems([]);
@@ -134,18 +150,11 @@ export default function ItemList() {
     void fetchItems(
       debouncedSearch,
       selectedCategory,
-      showLowStockOnly,
+      stockFilter,
       page,
       limit,
     );
-  }, [
-    debouncedSearch,
-    selectedCategory,
-    showLowStockOnly,
-    page,
-    limit,
-    fetchItems,
-  ]);
+  }, [debouncedSearch, selectedCategory, stockFilter, page, limit, fetchItems]);
 
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -154,14 +163,14 @@ export default function ItemList() {
       return;
     }
     setPage(1);
-  }, [debouncedSearch, selectedCategory, showLowStockOnly]);
+  }, [debouncedSearch, selectedCategory, stockFilter]);
 
   useEffect(() => {
     refreshList(() => {
       void fetchItems(
         debouncedSearch,
         selectedCategory,
-        showLowStockOnly,
+        stockFilter,
         page,
         limit,
       );
@@ -171,19 +180,140 @@ export default function ItemList() {
     fetchItems,
     debouncedSearch,
     selectedCategory,
-    showLowStockOnly,
+    stockFilter,
     page,
     limit,
   ]);
 
+  const filtering =
+    debouncedSearch !== "" || selectedCategory !== "" || stockFilter !== "";
+
   const handleClearFilters = () => {
     setSearchInput("");
     setSelectedCategory("");
-    setShowLowStockOnly(false);
+    setStockFilter("");
+    setPage(1);
   };
+
+  /** Row actions, shared by the table row and the phone card. */
+  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
+
+  const rowActions = (item: Item) => (
+    <div className="flex gap-1 justify-end items-center">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          openItemDetail(item.id);
+        }}
+        className={actionButton}
+        title="مشاهده جزئیات"
+      >
+        <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          openItemEdit(item.id);
+        }}
+        className={actionButton}
+        title="ویرایش"
+      >
+        <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
+      </button>
+      {isAtLeast("admin") && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteTarget(item);
+          }}
+          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          title="حذف"
+        >
+          <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div dir="rtl">
+      <header className="mb-5">
+        <h1 className="text-headline-md font-bold text-text-primary">
+          کالاها و انبار
+        </h1>
+        <p className="text-body-sm text-text-secondary mt-0.5">
+          {loading
+            ? "در حال بارگذاری…"
+            : filtering
+              ? `${toPersianDigits(total)} نتیجه از این فیلتر`
+              : `${toPersianDigits(total)} کالا در انبار`}
+        </p>
+
+        {/*
+          The three stock buckets, worst first.
+          -----------------------------------------------------------------
+          They replace a «فقط کالاهای کم‌موجود» checkbox that meant low *and*
+          empty at once. Split, because those are two different jobs — an
+          empty item cannot be sold today, a low one needs ordering this week
+          — and because that is how the badge on each row already reads.
+
+          Single-select: the buckets are mutually exclusive, so a shop asking
+          for two of them at once is really asking «what needs restocking»,
+          which is what the stock report answers.
+        */}
+        <div
+          className="flex gap-2 mt-4 overflow-x-auto pb-1
+                     sm:flex-wrap sm:overflow-x-visible sm:pb-0"
+          role="group"
+          aria-label="فیلتر وضعیت موجودی"
+        >
+          <button
+            onClick={() => setStockFilter("")}
+            aria-pressed={stockFilter === ""}
+            className={`shrink-0 px-3 py-1.5 rounded-pill text-body-xs font-bold border
+                        transition-colors cursor-pointer ${
+                          stockFilter === ""
+                            ? "bg-primary text-primary-fg border-primary"
+                            : "bg-surface text-text-secondary border-border hover:border-border-strong"
+                        }`}
+          >
+            همه
+          </button>
+          {STOCK_STATUSES.map((status) => {
+            const active = stockFilter === status.key;
+            return (
+              <button
+                key={status.key}
+                onClick={() => setStockFilter(active ? "" : status.key)}
+                aria-pressed={active}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill
+                            text-body-xs font-bold border transition-colors cursor-pointer
+                            ${
+                              active
+                                ? "text-text-primary"
+                                : "bg-surface text-text-secondary border-border hover:border-border-strong"
+                            }`}
+                style={
+                  active
+                    ? {
+                        backgroundColor: `color-mix(in oklab, ${status.color} 16%, var(--surface))`,
+                        borderColor: `color-mix(in oklab, ${status.color} 55%, var(--surface))`,
+                      }
+                    : undefined
+                }
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: status.color }}
+                  aria-hidden="true"
+                />
+                {status.label}
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
       <div className={toolbar}>
         <div className={toolbarSearch}>
           <MagnifyingGlassIcon className={searchIcon} />
@@ -197,8 +327,25 @@ export default function ItemList() {
           />
         </div>
 
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          aria-label="دسته‌بندی"
+          className={toolbarSelect}
+        >
+          <option value="">همه دسته‌بندی‌ها</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
+
         <div className={toolbarActions}>
-          <button onClick={() => setShowCategoryModal(true)} className={secondaryButton}>
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className={secondaryButton}
+          >
             <FolderPlusIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
             دسته‌بندی‌ها
           </button>
@@ -209,150 +356,194 @@ export default function ItemList() {
         </div>
       </div>
 
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-3 items-center">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            aria-label="دسته‌بندی"
-            className={toolbarSelect}
-          >
-            <option value="">همه دسته‌بندی‌ها</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="flex items-center gap-2 cursor-pointer text-body-sm text-text-primary">
-            <input
-              type="checkbox"
-              checked={showLowStockOnly}
-              onChange={(e) => setShowLowStockOnly(e.target.checked)}
-              className="w-4 h-4 accent-[var(--primary)] cursor-pointer"
-            />
-            فقط کالاهای کم‌موجود
-          </label>
-
-          {(searchInput || selectedCategory || showLowStockOnly) && (
+      {loading ? (
+        <ItemListSkeleton />
+      ) : items.length === 0 ? (
+        <div className="bg-surface border border-border rounded-panel flex flex-col items-center justify-center text-center py-16 px-4">
+          <span className="w-14 h-14 rounded-panel bg-surface-alt flex items-center justify-center mb-4">
+            <CubeIcon className="w-7 h-7 text-text-muted" aria-hidden="true" />
+          </span>
+          <p className="text-body-md font-bold text-text-primary">
+            {filtering ? "نتیجه‌ای یافت نشد" : "هنوز کالایی ثبت نشده"}
+          </p>
+          <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
+            {filtering
+              ? "این ترکیب فیلترها چیزی برنگرداند. یکی از آن‌ها را بردارید."
+              : "قطعاتی که در انبار دارید را اینجا اضافه کنید."}
+          </p>
+          {filtering ? (
             <button
               onClick={handleClearFilters}
-              className="text-body-sm text-text-secondary hover:text-primary transition-colors cursor-pointer"
+              className={`${secondaryButton} mt-5 flex-none`}
             >
-              پاک کردن فیلترها
+              پاک‌کردن جستجو و فیلترها
+            </button>
+          ) : (
+            <button
+              onClick={() => openItemEdit(null)}
+              className={`${primaryButton} mt-5 flex-none`}
+            >
+              <PlusIcon
+                className="w-[1.15rem] h-[1.15rem]"
+                aria-hidden="true"
+              />
+              کالای جدید
             </button>
           )}
         </div>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
-          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
-            <CubeIcon className="w-7 h-7 text-text-muted" />
-          </span>
-          <p className="text-body-md font-bold text-text-primary">
-            {searchInput || selectedCategory || showLowStockOnly
-              ? "نتیجه‌ای یافت نشد"
-              : "هنوز کالایی ثبت نشده"}
-          </p>
-          <p className="text-body-sm text-text-secondary mt-1">
-            {searchInput || selectedCategory || showLowStockOnly
-              ? "فیلترها را بردارید یا عبارت دیگری را امتحان کنید."
-              : "قطعاتی که در انبار دارید را اینجا اضافه کنید."}
-          </p>
-        </div>
       ) : (
-        <div className={tableCard}>
-          <div className={tableScroll}>
-            <table className="min-w-[940px] w-full">
-              <thead className={thead}>
-                <tr>
-                  <th className={th}>کد کالا</th>
-                  <th className={th}>نام کالا</th>
-                  <th className={th}>دسته‌بندی</th>
-                  <th className={th}>واحد</th>
-                  <th className={th}>وضعیت موجودی</th>
-                  <th className={th}>حداقل موجودی</th>
-                  <th className={th}>قیمت میانگین (ریال)</th>
-                  <th className={th}>عملیات</th>
-                </tr>
-              </thead>
-              <tbody className={tbody}>
-                {items.map((item) => (
-                  <tr
-                    key={item.id}
+        <>
+          {/*
+            Below lg the table becomes one card per item. Eight columns need
+            940px, which this page used to ask a phone to scroll sideways
+            through — it was the only list left without a card layout.
+          */}
+          <motion.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="lg:hidden space-y-3"
+          >
+            {items.map((item) => {
+              const status = stockStatusOf(
+                item.currentStock || 0,
+                item.minStock || 0,
+              );
+              return (
+                <motion.li key={item.id} variants={staggerItem}>
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => openItemDetail(item.id)}
-                    className={trClickable}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openItemDetail(item.id);
+                      }
+                    }}
+                    className={`${rowCard} cursor-pointer hover:border-border-strong
+                                relative overflow-hidden ps-5`}
                   >
-                    <td className={`${td} tabular-nums`} dir="ltr">
-                      {item.code || "—"}
-                    </td>
-                    <td className={`${td} font-bold text-primary`}>
-                      {item.name}
-                    </td>
-                    <td className={tdMuted}>{item.categoryName || "—"}</td>
-                    <td className={tdMuted}>{item.unit}</td>
-                    <td className="px-3 py-3 text-center">
-                      <StockBadge
-                        current={item.currentStock || 0}
-                        min={item.minStock || 0}
-                      />
-                    </td>
-                    <td className={`${tdMuted} tabular-nums`}>
-                      {toPersianDigits(item.minStock || 0)}
-                    </td>
-                    <td className={`${tdMuted} tabular-nums`}>
-                      {item.avgPurchasePrice
-                        ? formatPersianCurrency(item.avgPurchasePrice)
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex gap-1.5 justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openItemDetail(item.id);
-                          }}
-                          className={`${iconButton} bg-primary-soft text-primary`}
-                          title="مشاهده جزئیات"
-                        >
-                          <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openItemEdit(item.id);
-                          }}
-                          className={`${iconButton} bg-surface-alt text-text-secondary`}
-                          title="ویرایش"
-                        >
-                          <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
-                        </button>
-                        {isAtLeast("admin") && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget(item);
-                            }}
-                            className={`${iconButton} bg-danger-soft text-danger-fg`}
-                            title="حذف"
-                          >
-                            <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
-                          </button>
-                        )}
+                    {/* The stock state as a rule down the leading edge, so a
+                        stack of cards can be skimmed for what has run out. */}
+                    <span
+                      className="absolute inset-y-0 start-0 w-1.5"
+                      style={{ backgroundColor: status.color }}
+                      aria-hidden="true"
+                    />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-body-sm font-bold text-text-primary truncate">
+                          {item.name}
+                        </p>
+                        <p className="text-body-xs text-text-muted">
+                          {item.categoryName || "بدون دسته‌بندی"}
+                        </p>
                       </div>
-                    </td>
+                      <span
+                        className="text-body-xs text-text-muted shrink-0 tabular-nums"
+                        dir="ltr"
+                      >
+                        {item.code || "—"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <StockStatusBadge
+                        status={status}
+                        quantity={item.currentStock || 0}
+                        unit={item.unit}
+                      />
+                      <span className="text-body-xs text-text-muted">
+                        حداقل {toPersianDigits(item.minStock || 0)} {item.unit}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-border-subtle">
+                      <span className="text-body-xs text-text-muted tabular-nums">
+                        {item.avgPurchasePrice
+                          ? `میانگین خرید ${formatPersianCurrency(item.avgPurchasePrice)} ریال`
+                          : "قیمت خریدی ثبت نشده"}
+                      </span>
+                      {rowActions(item)}
+                    </div>
+                  </div>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+
+          <div className={`hidden lg:block ${tableCard}`}>
+            <div className={tableScroll}>
+              <table className="min-w-[940px] w-full">
+                <thead className={thead}>
+                  <tr>
+                    <th className={th}>کد کالا</th>
+                    <th className={th}>نام کالا</th>
+                    <th className={th}>دسته‌بندی</th>
+                    <th className={th}>موجودی</th>
+                    <th className={th}>حداقل</th>
+                    <th className={th}>قیمت میانگین (ریال)</th>
+                    <th className={th}>عملیات</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className={tbody}>
+                  {items.map((item) => {
+                    const status = stockStatusOf(
+                      item.currentStock || 0,
+                      item.minStock || 0,
+                    );
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => openItemDetail(item.id)}
+                        className={trClickable}
+                      >
+                        {/* The stock state as a rule down the row's leading
+                            edge, the same signal the badge carries in words. */}
+                        <td
+                          className={`${td} tabular-nums`}
+                          dir="ltr"
+                          style={{
+                            boxShadow: `inset -3px 0 0 0 ${status.color}`,
+                          }}
+                        >
+                          {item.code || "—"}
+                        </td>
+                        <td className={`${td} font-bold text-primary`}>
+                          {item.name}
+                        </td>
+                        <td className={tdMuted}>{item.categoryName || "—"}</td>
+                        {/*
+                          The count and its state in one cell. They used to be
+                          two columns apart — «کم‌موجود» in one and the number
+                          in another — and the whole question on this page is
+                          "how many, and is that enough".
+                        */}
+                        <td className="px-3 py-3 text-center">
+                          <StockStatusBadge
+                            status={status}
+                            quantity={item.currentStock || 0}
+                            unit={item.unit}
+                          />
+                        </td>
+                        <td className={`${tdMuted} tabular-nums`}>
+                          {toPersianDigits(item.minStock || 0)} {item.unit}
+                        </td>
+                        <td className={`${tdMuted} tabular-nums`}>
+                          {item.avgPurchasePrice
+                            ? formatPersianCurrency(item.avgPurchasePrice)
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-3">{rowActions(item)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {!loading && items.length > 0 && (
@@ -384,7 +575,7 @@ export default function ItemList() {
             fetchItems(
               debouncedSearch,
               selectedCategory,
-              showLowStockOnly,
+              stockFilter,
               page,
               limit,
             );
@@ -408,7 +599,7 @@ export default function ItemList() {
             fetchItems(
               debouncedSearch,
               selectedCategory,
-              showLowStockOnly,
+              stockFilter,
               page,
               limit,
             )

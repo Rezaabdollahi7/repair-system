@@ -25,6 +25,14 @@ jest.mock("../lib/prisma", () => {
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        /*
+         * Prisma's field references, which the stock filter uses to compare
+         * currentStock against minStock inside the query. The real client
+         * puts an opaque marker here that the query engine turns into a
+         * column reference; a sentinel is enough for the assertions, and
+         * without it the filter reads a property of undefined.
+         */
+        fields: { minStock: "REF(minStock)" },
       },
 
       inventoryTransaction: { count: jest.fn(), findMany: jest.fn() },
@@ -152,6 +160,78 @@ describe("itemController.getAll", () => {
       categoryId: 3,
     });
   });
+
+  /*
+   * The three stock buckets are asserted on the where clause rather than on
+   * the rows, because that is the whole point of the change: the filter has
+   * to reach the database. The page used to narrow its own rows after
+   * fetching them, so a shop asking for low-stock items got only the ones
+   * that happened to land on page one, under a total that counted every item
+   * it had.
+   */
+  it("asks the database for items that have run out", async () => {
+    db.item.count.mockResolvedValue(0);
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, stock: "out" } }),
+      mockResponse(),
+    );
+
+    expect(db.item.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      currentStock: { lte: 0 },
+    });
+  });
+
+  it("compares stock against each item's own minimum for the low bucket", async () => {
+    db.item.count.mockResolvedValue(0);
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, stock: "low" } }),
+      mockResponse(),
+    );
+
+    // `gt: 0` as well as the column comparison: an item with nothing left
+    // belongs in the "out" bucket, not this one — the same order
+    // stockStatus() uses.
+    expect(db.item.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      currentStock: { gt: 0, lte: "REF(minStock)" },
+    });
+  });
+
+  it("takes everything above its minimum as in stock", async () => {
+    db.item.count.mockResolvedValue(0);
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, stock: "ok" } }),
+      mockResponse(),
+    );
+
+    expect(db.item.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      currentStock: { gt: "REF(minStock)" },
+    });
+  });
+
+  it("counts the same rows it returns when a stock filter is on", async () => {
+    db.item.count.mockResolvedValue(0);
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, stock: "low" } }),
+      mockResponse(),
+    );
+
+    // The total drives the pager. It has to be counted over the filtered set,
+    // or the page shows three rows and offers thirty pages of them.
+    expect(db.item.count.mock.calls[0][0].where).toEqual(
+      db.item.findMany.mock.calls[0][0].where,
+    );
+  });
 });
 
 describe("itemController.search", () => {
@@ -168,6 +248,23 @@ describe("itemController.search", () => {
       { code: { contains: "خازن", mode: "insensitive" } },
       { name: { contains: "خازن", mode: "insensitive" } },
     ]);
+  });
+
+  it("combines a search term with a stock filter", async () => {
+    db.item.count.mockResolvedValue(0);
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.search(
+      mockRequest({ query: { ...listQuery, q: "خازن", stock: "out" } }),
+      mockResponse(),
+    );
+
+    // Searching and filtering at once is the ordinary case — a shop looks for
+    // a part and wants to know whether it has any — so the two have to end up
+    // in the same where clause rather than one replacing the other.
+    const where = db.item.findMany.mock.calls[0][0].where;
+    expect(where.OR).toHaveLength(2);
+    expect(where.currentStock).toEqual({ lte: 0 });
   });
 });
 

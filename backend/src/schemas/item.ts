@@ -8,8 +8,21 @@ const optionalText = z
   .optional()
   .transform((value) => value || null);
 
+/**
+ * Stock state, as a filter.
+ *
+ * The same three buckets `stockStatus()` in the report controller reports —
+ * `out` for nothing left, `low` for at or below the item's own minimum, `ok`
+ * for above it — so a list filtered by one of these agrees with the badge the
+ * row is wearing.
+ */
+export const stockFilterSchema = z.enum(["ok", "low", "out"]);
+
+export type StockFilter = z.infer<typeof stockFilterSchema>;
+
 export const itemListQuerySchema = paginationQuerySchema.extend({
   categoryId: z.coerce.number().int().positive().optional(),
+  stock: stockFilterSchema.optional(),
 });
 
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;
@@ -17,6 +30,7 @@ export type ItemListQuery = z.infer<typeof itemListQuerySchema>;
 export const itemSearchQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().optional(),
   categoryId: z.coerce.number().int().positive().optional(),
+  stock: stockFilterSchema.optional(),
 });
 
 export type ItemSearchQuery = z.infer<typeof itemSearchQuerySchema>;

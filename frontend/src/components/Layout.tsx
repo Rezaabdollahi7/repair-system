@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import HomeIcon from "./icons/HomeIcon";
 import SubscriptionBanner from "./SubscriptionBanner";
 import {
@@ -20,32 +22,372 @@ import {
   ArrowDownTrayIcon,
   CreditCardIcon,
   GiftIcon,
+  ArrowRightStartOnRectangleIcon,
+  SunIcon,
+  MoonIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/solid";
+import { fadeInUp, spring, transition } from "../motion";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
-/** A divider carries nothing but its own kind. */
-interface MenuDivider {
-  divider: true;
-}
-
 interface MenuLink {
-  divider?: false;
   name: string;
   path: string;
   icon: IconComponent;
   adminOnly: boolean;
 }
 
-type MenuEntry = MenuDivider | MenuLink;
+/**
+ * A titled group of links.
+ *
+ * The sidebar used to separate these with bare rules. The groups were
+ * already there — the rules sat exactly on these boundaries — so this only
+ * gives them the names they were implying.
+ */
+interface MenuSection {
+  title: string;
+  items: MenuLink[];
+}
+
+const MENU: MenuSection[] = [
+  {
+    title: "منوی اصلی",
+    items: [
+      { name: "داشبورد", path: "/dashboard", icon: HomeIcon, adminOnly: true },
+      {
+        name: "دستگاه‌ها",
+        path: "/devices",
+        icon: WrenchScrewdriverIcon,
+        adminOnly: false,
+      },
+      {
+        name: "مشتریان",
+        path: "/customers",
+        icon: UsersIcon,
+        adminOnly: false,
+      },
+      {
+        name: "پرسنل",
+        path: "/personnel",
+        icon: UserGroupIcon,
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    title: "انبار و فاکتورها",
+    items: [
+      {
+        name: "انبار و کالاها",
+        path: "/items",
+        icon: CubeIcon,
+        adminOnly: true,
+      },
+      {
+        name: "فاکتورهای خرید",
+        path: "/purchase-invoices",
+        icon: ShoppingCartIcon,
+        adminOnly: true,
+      },
+      {
+        name: "فاکتورهای فروش",
+        path: "/sale-invoices",
+        icon: CurrencyDollarIcon,
+        adminOnly: true,
+      },
+      {
+        name: "فاکتورهای تعمیر",
+        path: "/repair-invoices",
+        icon: WrenchScrewdriverIcon,
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    title: "گزارش‌ها و حساب",
+    items: [
+      {
+        name: "گزارش موجودی",
+        path: "/reports/stock",
+        icon: ChartBarIcon,
+        adminOnly: true,
+      },
+      {
+        name: "گزارش سود و زیان",
+        path: "/reports/profit",
+        icon: ChartPieIcon,
+        adminOnly: true,
+      },
+      {
+        name: "خروجی اطلاعات",
+        path: "/exports",
+        icon: ArrowDownTrayIcon,
+        adminOnly: true,
+      },
+      {
+        name: "اشتراک",
+        path: "/subscription",
+        icon: CreditCardIcon,
+        adminOnly: true,
+      },
+      {
+        name: "دعوت از دوستان",
+        path: "/referral",
+        icon: GiftIcon,
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    title: "سیستم",
+    items: [
+      {
+        name: "تنظیمات",
+        path: "/settings",
+        icon: Cog6ToothIcon,
+        adminOnly: false,
+      },
+    ],
+  },
+];
+
+const COLLAPSE_KEY = "dofixo-sidebar-collapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/* ── Navigation ─────────────────────────────────────────────────────── */
+
+interface NavProps {
+  sections: MenuSection[];
+  /** Longest matching path, so /reports/stock does not also light up /reports. */
+  activePath: string | null;
+  collapsed: boolean;
+  onNavigate?: () => void;
+  /**
+   * The desktop sidebar stays mounted behind `hidden lg:flex` while the
+   * mobile drawer is open, so both would claim the same layoutId and the
+   * indicator would fly between two sidebars. One prefix each keeps them
+   * animating independently.
+   */
+  layoutPrefix: string;
+}
+
+function SidebarNav({
+  sections,
+  activePath,
+  collapsed,
+  onNavigate,
+  layoutPrefix,
+}: NavProps) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2">
+      {sections.map((section) => (
+        <div key={section.title} className="mb-5 last:mb-2">
+          {/* The heading keeps its height when collapsed so the groups stay
+              the same distance apart in both widths. */}
+          <p
+            className={`text-body-xs font-bold text-text-muted mb-2 h-4 transition-opacity duration-150 ${
+              collapsed ? "opacity-0 px-0" : "opacity-100 px-2"
+            }`}
+            aria-hidden={collapsed}
+          >
+            {section.title}
+          </p>
+
+          <ul className="space-y-1">
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const active = activePath === item.path;
+
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    title={collapsed ? item.name : undefined}
+                    className={`relative flex items-center gap-3 rounded-field p-1.5 transition-colors ${
+                      collapsed ? "justify-center" : ""
+                    } ${active ? "" : "hover:bg-surface-alt"}`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId={`${layoutPrefix}-nav-active`}
+                        transition={reduceMotion ? { duration: 0 } : spring}
+                        className="absolute inset-0 rounded-field bg-primary-soft"
+                      />
+                    )}
+
+                    <span
+                      className={`relative z-10 shrink-0 w-9 h-9 rounded-field flex items-center justify-center transition-colors ${
+                        active
+                          ? "bg-primary text-primary-fg"
+                          : "bg-surface-alt text-text-secondary"
+                      }`}
+                    >
+                      <Icon className="w-[1.15rem] h-[1.15rem]" />
+                    </span>
+
+                    <AnimatePresence initial={false}>
+                      {!collapsed && (
+                        <motion.span
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={transition.fast}
+                          className={`relative z-10 truncate text-body-sm ${
+                            active
+                              ? "font-bold text-primary"
+                              : "text-text-primary"
+                          }`}
+                        >
+                          {item.name}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+/* ── User menu ──────────────────────────────────────────────────────── */
+
+function UserMenu({ onLogout }: { onLogout: () => void }) {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+
+  // Closes on an outside click and on Escape. Without the first, the menu
+  // stays open behind whatever the user clicked next.
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const initial =
+    user?.full_name?.charAt(0) || user?.username?.charAt(0) || "؟";
+
+  return (
+    <div ref={container} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-2.5 p-1 pl-2.5 rounded-pill border border-border
+                   hover:bg-surface-alt transition-colors cursor-pointer"
+      >
+        <span className="w-8 h-8 rounded-full bg-primary-soft text-primary font-bold
+                         flex items-center justify-center text-body-sm shrink-0">
+          {initial}
+        </span>
+        <span className="hidden sm:block text-right leading-tight">
+          <span className="block text-body-sm font-bold text-text-primary max-w-32 truncate">
+            {user?.full_name || user?.username}
+          </span>
+          <span className="block text-body-xs text-text-secondary">
+            {user?.role_label}
+          </span>
+        </span>
+        <ChevronDownIcon
+          className={`w-4 h-4 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={transition.fast}
+            className="absolute left-0 mt-2 w-56 origin-top-left z-50 rounded-card
+                       bg-surface border border-border shadow-lg p-1.5"
+          >
+            <div className="px-2.5 py-2 border-b border-border mb-1.5">
+              <p className="text-body-sm font-bold text-text-primary truncate">
+                {user?.full_name || user?.username}
+              </p>
+              <p className="text-body-xs text-text-secondary" dir="ltr">
+                {user?.username}
+              </p>
+            </div>
+
+            <Link
+              to="/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-field text-body-sm
+                         text-text-primary hover:bg-surface-alt transition-colors"
+            >
+              <Cog6ToothIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
+              تنظیمات
+            </Link>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onLogout}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-field text-body-sm
+                         text-danger hover:bg-danger-soft transition-colors cursor-pointer"
+            >
+              <ArrowRightStartOnRectangleIcon className="w-[1.15rem] h-[1.15rem]" />
+              خروج
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────── */
 
 export default function Layout() {
   const location = useLocation();
-  const { isAtLeast, user, logoutUser } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { isAtLeast, logoutUser } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const reduceMotion = useReducedMotion();
 
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch {
+      // Not remembering the width is not worth crashing the shell over.
+    }
+  }, [collapsed]);
 
   // No navigate() afterwards: logoutUser already routes to /login once the
   // server has been told, and navigating here raced it.
@@ -53,317 +395,230 @@ export default function Layout() {
     void logoutUser();
   };
 
-  const menuItems: MenuEntry[] = [
-    { name: "داشبورد", path: "/dashboard", icon: HomeIcon, adminOnly: true },
-    {
-      name: "دستگاه‌ها",
-      path: "/devices",
-      icon: WrenchScrewdriverIcon,
-      adminOnly: false,
-    },
-    { name: "مشتریان", path: "/customers", icon: UsersIcon, adminOnly: false },
-    { name: "پرسنل", path: "/personnel", icon: UserGroupIcon, adminOnly: true },
-    { divider: true },
-    { name: "انبار و کالاها", path: "/items", icon: CubeIcon, adminOnly: true },
-    {
-      name: "فاکتورهای خرید",
-      path: "/purchase-invoices",
-      icon: ShoppingCartIcon,
-      adminOnly: true,
-    },
-    {
-      name: "فاکتورهای فروش",
-      path: "/sale-invoices",
-      icon: CurrencyDollarIcon,
-      adminOnly: true,
-    },
-    {
-      name: "فاکتورهای تعمیر",
-      path: "/repair-invoices",
-      icon: WrenchScrewdriverIcon,
-      adminOnly: true,
-    },
-    { divider: true },
-    {
-      name: "گزارش موجودی",
-      path: "/reports/stock",
-      icon: ChartBarIcon,
-      adminOnly: true,
-    },
-    {
-      name: "گزارش سود و زیان",
-      path: "/reports/profit",
-      icon: ChartPieIcon,
-      adminOnly: true,
-    },
-    {
-      name: "خروجی اطلاعات",
-      path: "/exports",
-      icon: ArrowDownTrayIcon,
-      adminOnly: true,
-    },
-    {
-      name: "اشتراک",
-      path: "/subscription",
-      icon: CreditCardIcon,
-      adminOnly: true,
-    },
-    {
-      name: "دعوت از دوستان",
-      path: "/referral",
-      icon: GiftIcon,
-      adminOnly: true,
-    },
-    { divider: true },
-    {
-      name: "تنظیمات",
-      path: "/settings",
-      icon: Cog6ToothIcon,
-      adminOnly: false,
-    },
-  ];
+  const sections = useMemo(
+    () =>
+      MENU.map((section) => ({
+        ...section,
+        items: section.items.filter(
+          (item) => !item.adminOnly || isAtLeast("admin"),
+        ),
+      }))
+        // A section whose every link was admin-only would otherwise leave a
+        // heading with nothing under it.
+        .filter((section) => section.items.length > 0),
+    [isAtLeast],
+  );
 
-  const filteredMenuItems = menuItems.filter((item) => {
-    if (item.divider) return true;
-    if (item.adminOnly) return isAtLeast("admin");
-    return true;
-  });
+  /**
+   * Longest prefix wins. `/reports/stock` starts with `/reports`, and a
+   * plain `startsWith` over the list would light whichever came first.
+   */
+  const active = useMemo(() => {
+    let match: MenuLink | null = null;
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (
+          location.pathname.startsWith(item.path) &&
+          (!match || item.path.length > match.path.length)
+        ) {
+          match = item;
+        }
+      }
+    }
+    return match;
+  }, [sections, location.pathname]);
 
-  // Drops a divider that ended up leading, trailing, or beside another one
-  // after the role filter removed what sat between them.
-  const cleanMenuItems = filteredMenuItems.filter((item, index, arr) => {
-    if (!item.divider) return true;
-    if (index === 0) return false;
-    if (index === arr.length - 1) return false;
-    if (arr[index - 1]?.divider) return false;
-    if (arr[index + 1]?.divider) return false;
-    return true;
-  });
+  const activeSection =
+    sections.find((section) => section.items.some((i) => i === active))
+      ?.title ?? null;
+
+  const isDark = resolvedTheme === "dark";
+
+  const brand = (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <img
+        src="/logo.webp"
+        alt=""
+        className="w-9 h-9 shrink-0 rounded-field bg-primary-soft p-1"
+      />
+      <span className="font-bold text-text-primary truncate">
+        مدیریت تعمیرات
+      </span>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-bg" dir="rtl">
-      {/* Desktop Sidebar */}
+    <div className="min-h-screen bg-bg">
+      {/* ── Desktop sidebar ───────────────────────────────────────────── */}
       <aside
-        className={`bg-surface h-[97%] my-auto rounded-3xl shadow-lg transition-all duration-300 flex-col fixed inset-y-0 right-3 z-30 hidden lg:flex ${sidebarOpen ? "w-64" : "w-20"}`}
+        className={`hidden lg:flex flex-col fixed inset-y-0 right-0 z-30 bg-surface
+                    border-l border-border transition-[width] duration-300 ease-[var(--ease-smooth)]
+                    ${collapsed ? "w-[4.75rem]" : "w-64"}`}
       >
-        <div className="h-16 flex items-center justify-between px-4 border-b border-border shrink-0">
-          {sidebarOpen && (
-            <h1 className="text-lg font-bold text-text-primary truncate">
-              سیستم مدیریت تعمیرات
-            </h1>
-          )}
+        <div
+          className={`h-16 shrink-0 flex items-center gap-2 px-3 border-b border-border ${
+            collapsed ? "justify-center" : "justify-between"
+          }`}
+        >
+          {!collapsed && brand}
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-surface-alt transition-colors"
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+            title={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+            className="p-2 rounded-field text-text-secondary hover:text-text-primary
+                       hover:bg-surface-alt transition-colors cursor-pointer shrink-0"
           >
-            {sidebarOpen ? (
-              <ChevronRightIcon className="w-5 h-5 text-text-primary" />
+            {collapsed ? (
+              <ChevronLeftIcon className="w-5 h-5" />
             ) : (
-              <ChevronLeftIcon className="w-5 h-5 text-text-primary" />
+              <ChevronRightIcon className="w-5 h-5" />
             )}
           </button>
         </div>
-        <nav className="flex-1 pt-2 overflow-y-auto">
-          <ul className="px-2">
-            {cleanMenuItems.map((item, index) => {
-              if (item.divider)
-                return (
-                  <li
-                    key={`divider-${index}`}
-                    className="my-2 border-t border-border"
-                  />
-                );
-              const Icon = item.icon;
-              const active = isActive(item.path);
-              return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-3xl transition-colors ${
-                      active
-                        ? "bg-primary-soft text-text-primary"
-                        : "text-text-primary hover:bg-surface-alt"
-                    } ${!sidebarOpen && "justify-center"}`}
-                    title={!sidebarOpen ? item.name : ""}
-                  >
-                    <Icon
-                      className={`w-5 h-5 shrink-0 ${active ? "text-primary" : "text-text-secondary"}`}
-                    />
-                    {sidebarOpen && <span>{item.name}</span>}
-                    {active && sidebarOpen && (
-                      <span className="mr-auto size-2 rounded-full bg-primary" />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-        <div className="border-t border-border shrink-0">
-          <div className="p-2 border-b border-border shrink-0">
-            <div
-              className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary-soft flex items-center justify-center shrink-0">
-                <span className="text-primary font-medium text-sm">
-                  {user?.full_name?.charAt(0) ||
-                    user?.username?.charAt(0) ||
-                    "U"}
-                </span>
-              </div>
-              {sidebarOpen && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">
-                    {user?.full_name || user?.username}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="p-4 pt-0">
-            <button
-              onClick={handleLogout}
-              className={`w-full flex pt-2 gap-3 px-3 text-danger hover:bg-danger-soft rounded-lg transition-colors ${!sidebarOpen && "justify-center"}`}
-              title={!sidebarOpen ? "خروج" : ""}
-            >
-              <svg
-                className="w-5 h-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              {sidebarOpen && <span className="text-sm font-medium">خروج</span>}
-            </button>
-          </div>
-        </div>
+
+        <SidebarNav
+          sections={sections}
+          activePath={active?.path ?? null}
+          collapsed={collapsed}
+          layoutPrefix="desktop"
+        />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
-      {mobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMobileSidebarOpen(false)}
-          />
-          <aside className="absolute inset-y-0 right-0 w-64 bg-surface shadow-xl flex flex-col z-50">
-            <div className="h-16 flex items-center justify-between px-4 border-b border-border shrink-0">
-              <h1 className="text-lg font-bold text-text-primary truncate">
-                سیستم مدیریت تعمیرات
-              </h1>
-              <button
-                onClick={() => setMobileSidebarOpen(false)}
-                className="p-2 rounded-lg hover:bg-surface-alt transition-colors"
-              >
-                <XMarkIcon className="w-5 h-5 text-text-primary" />
-              </button>
-            </div>
-            <nav className="flex-1 py-4 overflow-y-auto">
-              <ul className="space-y-1 px-2">
-                {cleanMenuItems.map((item, index) => {
-                  if (item.divider)
-                    return (
-                      <li
-                        key={`divider-${index}`}
-                        className="my-3 border-t border-border"
-                      />
-                    );
-                  const Icon = item.icon;
-                  const active = isActive(item.path);
-                  return (
-                    <li key={item.path}>
-                      <Link
-                        to={item.path}
-                        onClick={() => setMobileSidebarOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                          active
-                            ? "bg-primary-soft text-primary"
-                            : "text-text-primary hover:bg-surface-alt"
-                        }`}
-                      >
-                        <Icon
-                          className={`w-5 h-5 shrink-0 ${active ? "text-primary" : "text-text-secondary"}`}
-                        />
-                        <span className="font-medium">{item.name}</span>
-                        {active && (
-                          <span className="mr-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-            <div className="border-t border-border shrink-0">
-              <div className="p-4 border-b border-border shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary-soft flex items-center justify-center shrink-0">
-                    <span className="text-primary font-medium text-sm">
-                      {user?.full_name?.charAt(0) ||
-                        user?.username?.charAt(0) ||
-                        "U"}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">
-                      {user?.full_name || user?.username}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 pt-0">
+      {/* ── Mobile drawer ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {drawerOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={transition.fast}
+              onClick={() => setDrawerOpen(false)}
+              className="absolute inset-0 bg-black/50"
+            />
+            <motion.aside
+              // x, not width: sliding a fixed panel moves one composited
+              // layer, where animating width relays out its whole contents
+              // on every frame.
+              initial={reduceMotion ? { opacity: 0 } : { x: "100%" }}
+              animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { x: "100%" }}
+              transition={reduceMotion ? { duration: 0 } : spring}
+              className="absolute inset-y-0 right-0 w-72 bg-surface shadow-xl flex flex-col"
+            >
+              <div className="h-16 shrink-0 flex items-center justify-between gap-2 px-3 border-b border-border">
+                {brand}
                 <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 mt-2 text-danger hover:bg-danger-soft rounded-lg transition-colors"
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  aria-label="بستن منو"
+                  className="p-2 rounded-field text-text-secondary hover:bg-surface-alt
+                             transition-colors cursor-pointer shrink-0"
                 >
-                  <svg
-                    className="w-5 h-5 shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  <span className="text-sm font-medium">خروج</span>
+                  <XMarkIcon className="w-5 h-5" />
                 </button>
               </div>
-            </div>
-          </aside>
-        </div>
-      )}
 
-      {/* Main Content */}
+              <SidebarNav
+                sections={sections}
+                activePath={active?.path ?? null}
+                collapsed={false}
+                onNavigate={() => setDrawerOpen(false)}
+                layoutPrefix="mobile"
+              />
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Content ───────────────────────────────────────────────────── */}
       <div
-        className={`transition-all duration-300 ${sidebarOpen ? "lg:mr-64" : "lg:mr-20"}`}
+        className={`transition-[padding] duration-300 ease-[var(--ease-smooth)] ${
+          collapsed ? "lg:pr-[4.75rem]" : "lg:pr-64"
+        }`}
       >
-        <header className="bg-surface shadow-sm lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
+        {/*
+          The desktop header is new. Every page used to open its own <h1>,
+          which meant the title moved a little from page to page and there
+          was nowhere to put anything that belongs to the shell.
+        */}
+        <header className="sticky top-0 z-20 h-16 bg-surface/85 backdrop-blur border-b border-border">
+          <div className="h-full flex items-center gap-3 px-3 sm:px-5">
             <button
-              onClick={() => setMobileSidebarOpen(true)}
-              className="p-2 rounded-lg hover:bg-surface-alt"
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="باز کردن منو"
+              className="lg:hidden p-2 rounded-field text-text-secondary hover:bg-surface-alt
+                         transition-colors cursor-pointer shrink-0"
             >
-              <Bars3Icon className="w-6 h-6 text-text-secondary" />
+              <Bars3Icon className="w-6 h-6" />
             </button>
-            <h1 className="text-lg font-bold text-text-primary">
-              سیستم مدیریت تعمیرات
-            </h1>
-            <div className="w-6" />
+
+            <div className="min-w-0 flex-1">
+              {activeSection && (
+                <p className="hidden sm:block text-body-xs text-text-muted truncate">
+                  {activeSection}
+                </p>
+              )}
+              <h1 className="text-title-sm font-bold text-text-primary truncate leading-tight">
+                {active?.name ?? "مدیریت تعمیرات"}
+              </h1>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={isDark ? "روشن کردن پوسته" : "تیره کردن پوسته"}
+              title={isDark ? "پوستهٔ روشن" : "پوستهٔ تیره"}
+              className="p-2.5 rounded-field text-text-secondary hover:text-text-primary
+                         hover:bg-surface-alt transition-colors cursor-pointer shrink-0"
+            >
+              <motion.span
+                key={resolvedTheme}
+                initial={reduceMotion ? false : { rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                transition={transition.base}
+                className="block"
+              >
+                {isDark ? (
+                  <SunIcon className="w-5 h-5" />
+                ) : (
+                  <MoonIcon className="w-5 h-5" />
+                )}
+              </motion.span>
+            </button>
+
+            <UserMenu onLogout={handleLogout} />
           </div>
         </header>
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-auto">
+
+        {/*
+          overflow-x-auto, so a table wider than the phone scrolls inside the
+          page area instead of widening the document. Without it the whole
+          document overflows, and in RTL that shifts the fixed drawer off the
+          screen edge by however much the table overhangs.
+
+          On <main> rather than an ancestor: giving the header's parent an
+          overflow would make it the scroll container and the sticky header
+          would stop sticking.
+        */}
+        <main className="p-3 sm:p-4 lg:p-6 overflow-x-auto">
           <SubscriptionBanner />
-          <Outlet />
+          {/*
+            Keyed on the path so each route plays the entrance once. No
+            AnimatePresence: `mode="wait"` would hold the old page on screen
+            for the length of its exit before the new one starts, which on a
+            data-heavy list reads as the app hesitating.
+          */}
+          <motion.div
+            key={location.pathname}
+            variants={fadeInUp}
+            initial="hidden"
+            animate="visible"
+          >
+            <Outlet />
+          </motion.div>
         </main>
       </div>
     </div>

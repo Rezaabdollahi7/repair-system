@@ -1,10 +1,21 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  BuildingStorefrontIcon,
+  DevicePhoneMobileIcon,
+  LockClosedIcon,
+  TicketIcon,
+} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { register, sendOtp } from "../api";
 import { errorText } from "../utils/errors";
 import OtpCodeStep from "../components/OtpCodeStep";
+import AuthLayout from "../components/AuthLayout";
+import AuthField from "../components/AuthField";
+import AuthSubmit from "../components/AuthSubmit";
+import { slideFromEnd } from "../motion";
 
 interface RegisterForm {
   workspace_name: string;
@@ -17,6 +28,7 @@ export default function Register() {
   const { loginUser } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const reduceMotion = useReducedMotion();
 
   const [form, setForm] = useState<RegisterForm>({
     workspace_name: "",
@@ -104,142 +116,153 @@ export default function Register() {
     }
   };
 
-  // Shared by the three inputs, which differ only in their validation
-  // attributes and placeholder.
+  // Shared by the text inputs, which differ only in their validation
+  // attributes, icon and placeholder.
   const field = (key: keyof RegisterForm) => ({
     value: form[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm({ ...form, [key]: e.target.value }),
-    className:
-      "w-full border border-border rounded-lg px-3 py-2 focus:outline-none " +
-      "focus:ring-2 focus:ring-primary bg-surface text-text-primary",
   });
 
+  const onCodeStep = sentAt !== null;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg">
-      <div className="bg-surface rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center text-text-primary mb-2">
-          ساخت کارگاه جدید
-        </h1>
-        <p className="text-sm text-center text-text-secondary mb-6">
-          یک ماه رایگان، بدون محدودیت
-        </p>
-
-        {sentAt === null ? (
-          <form onSubmit={requestCode} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                نام کارگاه
-              </label>
-              <input
-                type="text"
-                required
-                minLength={2}
-                maxLength={100}
-                placeholder="تعمیرگاه رضا"
-                {...field("workspace_name")}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                شماره موبایل
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="09123456789"
-                dir="ltr"
-                {...field("username")}
-              />
-              <p className="text-xs text-text-secondary mt-1">
-                کد تأیید به این شماره فرستاده می‌شود و با همین شماره وارد
-                می‌شوید
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                رمز عبور
-              </label>
-              <input
-                type="password"
-                required
-                // Matches the server's rule rather than guessing at a stricter
-                // one: a form that rejects what the API would accept is its own
-                // kind of bug.
-                minLength={8}
-                dir="ltr"
-                {...field("password")}
-              />
-              <p className="text-xs text-text-secondary mt-1">
-                حداقل ۸ کاراکتر
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                کد دعوت{" "}
-                <span className="text-text-secondary font-normal">
-                  (اختیاری)
-                </span>
-              </label>
-              <input
-                type="text"
-                maxLength={32}
-                placeholder="ABC234"
-                dir="ltr"
-                {...field("referral_code")}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    // Upper-cased here as well as on the server: the codes are
-                    // printed in capitals and someone typing lowercase should
-                    // see it match what they were given.
-                    referral_code: event.target.value.toUpperCase(),
-                  })
-                }
-              />
-              <p className="text-xs text-text-secondary mt-1">
-                اگر کسی شما را دعوت کرده، ۱۰٪ تخفیف روی اولین خرید می‌گیرید
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary-hover text-text-inverse
-                         font-semibold py-2 rounded-lg transition disabled:opacity-50"
-            >
-              {loading ? "در حال ارسال کد..." : "ادامه"}
-            </button>
-          </form>
-        ) : (
-          <OtpCodeStep
-            phone={form.username}
-            code={code}
-            onCodeChange={setCode}
-            onSubmit={submitRegistration}
-            onResend={resendCode}
-            // The form is still in state, so going back shows it filled in
-            // rather than empty — the number is usually what needs fixing.
-            onBack={() => {
-              setSentAt(null);
-              setCode("");
-            }}
-            loading={loading}
-            sentAt={sentAt}
-            submitLabel="ساخت کارگاه"
-          />
-        )}
-
-        <p className="text-sm text-center text-text-secondary mt-6">
+    <AuthLayout
+      title={onCodeStep ? "تأیید شماره" : "ساخت کارگاه جدید"}
+      subtitle={
+        onCodeStep
+          ? "آخرین قدم — شماره‌تان را تأیید کنید"
+          : "یک ماه رایگان، بدون محدودیت امکانات"
+      }
+      footer={
+        <>
           قبلاً ثبت‌نام کرده‌اید؟{" "}
-          <Link to="/login" className="text-primary hover:underline">
+          <Link to="/login" className="text-primary font-medium hover:underline">
             ورود
           </Link>
-        </p>
+        </>
+      }
+    >
+      {/* Two segments rather than a "step 1 of 2" caption: the filled half
+          says how far along the user is without being read. */}
+      <div className="flex gap-1.5 mb-6" aria-hidden>
+        <span className="h-1 flex-1 rounded-pill bg-primary" />
+        <span className="h-1 flex-1 rounded-pill bg-surface-alt overflow-hidden">
+          {/* scaleX from the right edge, because the page reads right to left */}
+          <motion.span
+            className="block h-full rounded-pill bg-primary origin-right"
+            initial={false}
+            animate={{ scaleX: onCodeStep ? 1 : 0 }}
+            transition={reduceMotion ? { duration: 0 } : undefined}
+          />
+        </span>
       </div>
-    </div>
+
+      {/*
+        mode="wait" so the outgoing step finishes leaving before the next
+        arrives — the two have different heights, and crossfading them makes
+        the card jump.
+      */}
+      <AnimatePresence mode="wait" initial={false}>
+        {!onCodeStep ? (
+          <motion.form
+            key="details"
+            onSubmit={requestCode}
+            className="space-y-4"
+            variants={slideFromEnd}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <AuthField
+              label="نام کارگاه"
+              required
+              minLength={2}
+              maxLength={100}
+              icon={BuildingStorefrontIcon}
+              placeholder="تعمیرگاه رضا"
+              {...field("workspace_name")}
+            />
+
+            <AuthField
+              label="شماره موبایل"
+              type="tel"
+              required
+              autoComplete="tel"
+              icon={DevicePhoneMobileIcon}
+              placeholder="09123456789"
+              dir="ltr"
+              hint="کد تأیید به این شماره فرستاده می‌شود و با همین شماره وارد می‌شوید"
+              {...field("username")}
+            />
+
+            <AuthField
+              label="رمز عبور"
+              type="password"
+              required
+              autoComplete="new-password"
+              icon={LockClosedIcon}
+              // Matches the server's rule rather than guessing at a stricter
+              // one: a form that rejects what the API would accept is its own
+              // kind of bug.
+              minLength={8}
+              dir="ltr"
+              placeholder="••••••••"
+              hint="حداقل ۸ کاراکتر"
+              {...field("password")}
+            />
+
+            <AuthField
+              label="کد دعوت"
+              optional
+              maxLength={32}
+              icon={TicketIcon}
+              placeholder="ABC234"
+              dir="ltr"
+              hint="اگر کسی شما را دعوت کرده، ۱۰٪ تخفیف روی اولین خرید می‌گیرید"
+              value={form.referral_code}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  // Upper-cased here as well as on the server: the codes are
+                  // printed in capitals and someone typing lowercase should
+                  // see it match what they were given.
+                  referral_code: event.target.value.toUpperCase(),
+                })
+              }
+            />
+
+            <AuthSubmit loading={loading} className="!mt-6">
+              {loading ? "در حال ارسال کد" : "ادامه"}
+            </AuthSubmit>
+          </motion.form>
+        ) : (
+          <motion.div
+            key="code"
+            variants={slideFromEnd}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <OtpCodeStep
+              phone={form.username}
+              code={code}
+              onCodeChange={setCode}
+              onSubmit={submitRegistration}
+              onResend={resendCode}
+              // The form is still in state, so going back shows it filled in
+              // rather than empty — the number is usually what needs fixing.
+              onBack={() => {
+                setSentAt(null);
+                setCode("");
+              }}
+              loading={loading}
+              sentAt={sentAt}
+              submitLabel="ساخت کارگاه"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AuthLayout>
   );
 }

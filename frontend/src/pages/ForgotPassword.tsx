@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  DevicePhoneMobileIcon,
+  LockClosedIcon,
+  InformationCircleIcon,
+} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { resetPassword, sendOtp } from "../api";
 import { errorText } from "../utils/errors";
 import OtpCodeStep from "../components/OtpCodeStep";
+import AuthLayout from "../components/AuthLayout";
+import AuthField from "../components/AuthField";
+import AuthSubmit from "../components/AuthSubmit";
+import { slideFromEnd } from "../motion";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -61,72 +71,75 @@ export default function ForgotPassword() {
     }
   };
 
-  const inputClass =
-    "w-full border border-border rounded-lg px-3 py-2 focus:outline-none " +
-    "focus:ring-2 focus:ring-primary bg-surface text-text-primary";
+  const onCodeStep = sentAt !== null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg">
-      <div className="bg-surface rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center text-text-primary mb-2">
-          فراموشی رمز عبور
-        </h1>
-        <p className="text-sm text-center text-text-secondary mb-6">
-          با شماره‌ی موبایلتان رمز تازه بسازید
-        </p>
+    <AuthLayout
+      title={onCodeStep ? "تأیید شماره" : "فراموشی رمز عبور"}
+      subtitle={
+        onCodeStep
+          ? "کد را وارد کنید تا رمز تازه ثبت شود"
+          : "با شماره‌ی موبایلتان رمز تازه بسازید"
+      }
+      footer={
+        <Link to="/login" className="text-primary font-medium hover:underline">
+          بازگشت به ورود
+        </Link>
+      }
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        {!onCodeStep ? (
+          <motion.form
+            key="details"
+            onSubmit={requestCode}
+            className="space-y-4"
+            variants={slideFromEnd}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <AuthField
+              label="شماره موبایل"
+              type="tel"
+              required
+              autoComplete="tel"
+              icon={DevicePhoneMobileIcon}
+              placeholder="09123456789"
+              dir="ltr"
+              hint="همان شماره‌ای که با آن وارد می‌شوید"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
 
-        {sentAt === null ? (
-          <form onSubmit={requestCode} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                شماره موبایل
-              </label>
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="09123456789"
-                dir="ltr"
-                className={inputClass}
-              />
-              <p className="text-xs text-text-secondary mt-1">
-                همان شماره‌ای که با آن وارد می‌شوید
-              </p>
-            </div>
+            {/* Chosen before the code, like sign-up: the code is spent in the
+                same request that sets it, so there is nothing held on the
+                server in between. */}
+            <AuthField
+              label="رمز عبور تازه"
+              type="password"
+              required
+              autoComplete="new-password"
+              icon={LockClosedIcon}
+              minLength={8}
+              dir="ltr"
+              placeholder="••••••••"
+              hint="حداقل ۸ کاراکتر"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                رمز عبور تازه
-              </label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                dir="ltr"
-                className={inputClass}
-              />
-              {/* Chosen before the code, like sign-up: the code is spent in
-                  the same request that sets it, so there is nothing held on
-                  the server in between. */}
-              <p className="text-xs text-text-secondary mt-1">
-                حداقل ۸ کاراکتر
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary-hover text-text-inverse
-                         font-semibold py-2 rounded-lg transition disabled:opacity-50"
-            >
-              {loading ? "در حال ارسال کد..." : "ادامه"}
-            </button>
-          </form>
+            <AuthSubmit loading={loading} className="!mt-6">
+              {loading ? "در حال ارسال کد" : "ادامه"}
+            </AuthSubmit>
+          </motion.form>
         ) : (
-          <>
+          <motion.div
+            key="code"
+            variants={slideFromEnd}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
             <OtpCodeStep
               phone={phone}
               code={code}
@@ -141,19 +154,14 @@ export default function ForgotPassword() {
               sentAt={sentAt}
               submitLabel="تغییر رمز عبور"
             />
-            <p className="text-xs text-center text-text-secondary mt-4">
-              با تغییر رمز، از همه‌ی دستگاه‌هایی که وارد بوده‌اید خارج
-              می‌شوید
-            </p>
-          </>
-        )}
 
-        <p className="text-sm text-center text-text-secondary mt-6">
-          <Link to="/login" className="text-primary hover:underline">
-            بازگشت به ورود
-          </Link>
-        </p>
-      </div>
-    </div>
+            <p className="flex gap-2 text-body-xs text-text-secondary mt-5 p-3 rounded-field bg-warning-soft/60 leading-relaxed">
+              <InformationCircleIcon className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+              با تغییر رمز، از همه‌ی دستگاه‌هایی که وارد بوده‌اید خارج می‌شوید
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AuthLayout>
   );
 }

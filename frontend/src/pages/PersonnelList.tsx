@@ -14,8 +14,21 @@ import {
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
+  MagnifyingGlassIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
+import {
+  badge,
+  iconButton,
+  tableCard,
+  tableScroll,
+  tbody,
+  tdMuted,
+  th,
+  thead,
+  tr,
+} from "../utils/tableClasses";
 import type { Personnel, QueryParams } from "../types/api";
 
 export default function PersonnelList() {
@@ -113,139 +126,148 @@ export default function PersonnelList() {
   return (
     <div dir="rtl">
       {canManage && (
-        <div className="flex justify-end items-center mb-6">
+        <div className="flex justify-end items-center mb-4">
           <button
             onClick={() => openPersonnelEdit(null)}
-            className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-field bg-primary text-primary-fg
+                       text-body-sm font-bold shadow-primary hover:bg-primary-hover
+                       transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
-            <PlusIcon className="w-5 h-5" />
+            <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             افزودن پرسنل
           </button>
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 relative">
+        <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
         <input
-          type="text"
+          type="search"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="جستجو در نام، نام کاربری، تلفن..."
-          className="w-full border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+          placeholder="جستجو در نام، نام کاربری، تلفن…"
+          aria-label="جستجوی پرسنل"
+          className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm
+                     border border-border rounded-field py-2.5 pr-11 pl-3.5
+                     hover:border-border-strong focus:outline-none focus:border-primary
+                     focus:shadow-[0_0_0_3px_var(--primary-soft)]
+                     transition-[border-color,box-shadow] duration-150"
         />
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
+          <LoadingSpinner size="md" />
         </div>
       ) : personnel.length === 0 ? (
-        <div className="text-center py-20 text-text-secondary">
-          {searchInput ? "نتیجه‌ای یافت نشد" : "پرسنلی ثبت نشده است"}
+        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
+          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
+            <UserGroupIcon className="w-7 h-7 text-text-muted" />
+          </span>
+          <p className="text-body-md font-bold text-text-primary">
+            {searchInput ? "نتیجه‌ای یافت نشد" : "هنوز پرسنلی ثبت نشده"}
+          </p>
+          <p className="text-body-sm text-text-secondary mt-1">
+            {searchInput
+              ? "عبارت دیگری را امتحان کنید."
+              : "همکارانتان را اضافه کنید تا بتوانند دستگاه‌ها را پیگیری کنند."}
+          </p>
         </div>
       ) : (
-        <div className="bg-surface rounded-xl shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-[700px] lg:min-w-full divide-y divide-border">
-              <thead className="bg-primary-soft">
+        <div className={tableCard}>
+          <div className={tableScroll}>
+            <table className="min-w-[680px] w-full">
+              <thead className={thead}>
                 <tr>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    نام
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    نام کاربری
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    نقش
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تلفن
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    وضعیت
-                  </th>
-                  {canManage && (
-                    <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                      عملیات
-                    </th>
-                  )}
+                  <th className={th}>نام</th>
+                  <th className={th}>نام کاربری</th>
+                  <th className={th}>نقش</th>
+                  <th className={th}>تلفن</th>
+                  <th className={th}>وضعیت</th>
+                  {canManage && <th className={th}>عملیات</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {personnel.map((person, index) => (
-                  <tr
-                    key={person.id}
-                    className={`hover:bg-primary group transition-colors ${index % 2 === 0 ? "bg-surface" : "bg-surface-alt"}`}
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap text-center border-l border-border">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-sm">
-                          {person.full_name?.charAt(0)}
+              <tbody className={tbody}>
+                {personnel.map((person) => {
+                  // An admin may not edit a super admin or another admin.
+                  const outranks =
+                    user?.role === "admin" &&
+                    (person.role_name === "super_admin" ||
+                      person.role_name === "admin");
+
+                  return (
+                    <tr key={person.id} className={tr}>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2.5">
+                          <span className="w-8 h-8 shrink-0 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-body-xs">
+                            {person.full_name?.charAt(0)}
+                          </span>
+                          <span className="text-body-sm font-bold text-text-primary">
+                            {person.full_name}
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-text-primary group-hover:text-text-inverse">
-                          {person.full_name}
+                      </td>
+                      <td
+                        className={`${tdMuted} whitespace-nowrap tabular-nums`}
+                        dir="ltr"
+                      >
+                        {person.username}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={`${badge} ${
+                            person.role_name === "technician"
+                              ? "bg-surface-alt text-text-secondary"
+                              : "bg-primary-soft text-primary"
+                          }`}
+                        >
+                          {person.role_label}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-l border-border font-mono group-hover:text-text-inverse text-text-primary">
-                      {person.username}
-                    </td>
-                    <td className="py-3 whitespace-nowrap flex items-center justify-center border-l border-border">
-                      <span
-                        className={`mt-2.5 px-2 py-1 text-xs font-medium rounded-full items-center justify-center ${
-                          person.role_name === "super_admin"
-                            ? "bg-primary-soft text-primary"
-                            : person.role_name === "admin"
-                              ? "bg-primary-soft text-primary"
-                              : "bg-surface-alt text-text-primary"
-                        }`}
+                      </td>
+                      <td
+                        className={`${tdMuted} whitespace-nowrap tabular-nums`}
+                        dir="ltr"
                       >
-                        {person.role_label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary border-l border-border group-hover:text-text-inverse text-center">
-                      {formatPersianPhone(person.phone)}
-                    </td>
-                    <td className="px-4 py-4.5 whitespace-nowrap border-l border-border flex items-center justify-center">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
-                          person.is_active
-                            ? "bg-success-soft text-success"
-                            : "bg-danger-soft text-danger"
-                        }`}
-                      >
-                        {person.is_active ? (
-                          <CheckCircleIcon className="w-3.5 h-3.5" />
-                        ) : (
-                          <XCircleIcon className="w-3.5 h-3.5" />
-                        )}
-                        {person.is_active ? "فعال" : "غیرفعال"}
-                      </span>
-                    </td>
-                    {canManage && (
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        <div className="flex gap-1 justify-center">
-                          {!(
-                            user?.role === "admin" &&
-                            (person.role_name === "super_admin" ||
-                              person.role_name === "admin")
-                          ) && (
-                            <button
-                              onClick={() => openPersonnelEdit(person.id)}
-                              className="p-2 rounded-lg bg-success-soft text-success hover:opacity-80 transition-colors"
-                              title="ویرایش"
-                            >
-                              <PencilSquareIcon className="size-5.5" />
-                            </button>
+                        {formatPersianPhone(person.phone)}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        {/* Icon as well as colour: "active" and "inactive"
+                            must not be a hue difference alone. */}
+                        <span
+                          className={`${badge} gap-1 ${
+                            person.is_active
+                              ? "bg-success-soft text-success-fg"
+                              : "bg-danger-soft text-danger-fg"
+                          }`}
+                        >
+                          {person.is_active ? (
+                            <CheckCircleIcon className="w-3.5 h-3.5" />
+                          ) : (
+                            <XCircleIcon className="w-3.5 h-3.5" />
                           )}
-                          {person.id !== user?.id &&
-                            !(
-                              user?.role === "admin" &&
-                              (person.role_name === "super_admin" ||
-                                person.role_name === "admin")
-                            ) && (
+                          {person.is_active ? "فعال" : "غیرفعال"}
+                        </span>
+                      </td>
+                      {canManage && (
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex gap-1.5 justify-center">
+                            {!outranks && (
+                              <button
+                                onClick={() => openPersonnelEdit(person.id)}
+                                className={`${iconButton} bg-surface-alt text-text-secondary`}
+                                title="ویرایش"
+                              >
+                                <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
+                              </button>
+                            )}
+                            {person.id !== user?.id && !outranks && (
                               <button
                                 onClick={() => setToggleTarget(person)}
-                                className={`p-2 rounded-lg transition-colors ${person.is_active ? "bg-warning-soft text-warning hover:opacity-80" : "bg-success-soft text-success hover:opacity-80"}`}
+                                className={`${iconButton} ${
+                                  person.is_active
+                                    ? "bg-warning-soft text-warning-fg"
+                                    : "bg-success-soft text-success-fg"
+                                }`}
                                 title={
                                   person.is_active
                                     ? "غیرفعال‌سازی"
@@ -253,26 +275,27 @@ export default function PersonnelList() {
                                 }
                               >
                                 {person.is_active ? (
-                                  <XCircleIcon className="size-5.5" />
+                                  <XCircleIcon className="w-[1.15rem] h-[1.15rem]" />
                                 ) : (
-                                  <CheckCircleIcon className="size-5.5" />
+                                  <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
                                 )}
                               </button>
                             )}
-                          {canDelete && person.id !== user?.id && (
-                            <button
-                              onClick={() => setDeleteTarget(person)}
-                              className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
-                              title="حذف"
-                            >
-                              <TrashIcon className="size-5.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                            {canDelete && person.id !== user?.id && (
+                              <button
+                                onClick={() => setDeleteTarget(person)}
+                                className={`${iconButton} bg-danger-soft text-danger-fg`}
+                                title="حذف"
+                              >
+                                <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

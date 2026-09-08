@@ -5,6 +5,7 @@ import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
+import { AnimatePresence, motion } from "framer-motion";
 import {
   PlusIcon,
   TrashIcon,
@@ -12,14 +13,37 @@ import {
   ArrowsRightLeftIcon,
   XCircleIcon,
   CheckCircleIcon,
+  CheckIcon,
   DocumentCheckIcon,
   FunnelIcon,
+  MagnifyingGlassIcon,
+  WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "../components/ConfirmModal";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
+import { toPersianDigits } from "../utils/formatters";
+import {
+  backdrop,
+  modalPanel,
+  staggerContainer,
+  staggerItem,
+} from "../motion";
+import {
+  badge,
+  iconButton,
+  rowCard,
+  tableCard,
+  tableScroll,
+  tbody,
+  td,
+  tdMuted,
+  th,
+  thead,
+  trClickable,
+} from "../utils/tableClasses";
 import type { DeviceFilters } from "../components/FilterPanel";
 import type { Device, DeviceAssignee, QueryParams } from "../types/api";
 
@@ -33,21 +57,15 @@ function InvoiceStatusBadge({ device }: { device: Device }) {
     }
     if (device.invoice_count > 0) {
       return device.invoice_status === "paid"
-        ? { label: "پرداخت شده", color: "bg-success-soft text-success" }
-        : { label: "پرداخت نشده", color: "bg-danger-soft text-danger" };
+        ? { label: "پرداخت شده", color: "bg-success-soft text-success-fg" }
+        : { label: "پرداخت نشده", color: "bg-danger-soft text-danger-fg" };
     }
-    return { label: "فاکتور ندارد", color: "bg-warning-soft text-warning" };
+    return { label: "فاکتور ندارد", color: "bg-warning-soft text-warning-fg" };
   };
 
   const status = getInvoiceStatus();
 
-  return (
-    <span
-      className={`px-2 py-1 mt-3 rounded-full text-xs font-medium  ${status.color}`}
-    >
-      {status.label}
-    </span>
-  );
+  return <span className={`${badge} ${status.color}`}>{status.label}</span>;
 }
 
 interface StatusBadgeProps {
@@ -61,7 +79,7 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
   const map: Record<string, { label: string; color: string }> = {
     pending: {
       label: "در انتظار بررسی",
-      color: "bg-warning-soft text-warning",
+      color: "bg-warning-soft text-warning-fg",
     },
     diagnosing: {
       label: "در حال بررسی",
@@ -69,7 +87,7 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
     },
     waiting_for_parts: {
       label: "در انتظار قطعه",
-      color: "bg-warning-soft text-warning",
+      color: "bg-warning-soft text-warning-fg",
     },
     repairing: {
       label: "در حال تعمیر",
@@ -81,7 +99,7 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
     },
     delivered: {
       label: "تحویل داده شده",
-      color: "bg-success-soft text-success",
+      color: "bg-success-soft text-success-fg",
     },
     ready_for_pickup: {
       label: "آماده تحویل",
@@ -89,9 +107,9 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
     },
     unrepairable: {
       label: "غیرقابل تعمیر",
-      color: "bg-danger-soft text-danger",
+      color: "bg-danger-soft text-danger-fg",
     },
-    not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
+    not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger-fg" },
   };
 
   const current = map[status] || {
@@ -101,86 +119,81 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
 
   return (
     <>
-      <div className="flex items-center  gap-3">
-        <span
-          className={`px-2 py-1 mr-5 rounded-full text-xs font-medium ${current.color}`}
-        >
-          {current.label}
-        </span>
+      <div className="flex items-center justify-center gap-2">
+        <span className={`${badge} ${current.color}`}>{current.label}</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
             setShowModal(true);
           }}
-          className="p-0.5 rounded-full text-text-secondary hover:text-primary group-hover:text-text-inverse hover:opacity-80 transition-colors"
+          className="p-1 rounded-field text-text-muted hover:text-primary hover:bg-surface-alt transition-colors cursor-pointer"
           title="تغییر وضعیت"
         >
-          <ArrowsRightLeftIcon className="size-5" />
+          <ArrowsRightLeftIcon className="w-4 h-4" />
         </button>
       </div>
 
       {/* Status picker */}
-      {showModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="bg-surface rounded-xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
-            dir="rtl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-border">
-              <h3 className="text-sm font-bold text-text-primary">
-                تغییر وضعیت
-              </h3>
-            </div>
-            <div className="p-2">
-              {Object.entries(map).map(([key, val]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    onStatusChange(key);
-                    setShowModal(false);
-                  }}
-                  className={`w-full text-right px-4 py-3 rounded-lg text-sm font-medium transition-colors mb-1 ${
-                    key === status
-                      ? `${val.color} ring-2 ring-inset`
-                      : "text-text-primary hover:bg-surface-alt"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{val.label}</span>
+      <AnimatePresence>
+        {showModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              variants={backdrop}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-black/50"
+            />
+            <motion.div
+              variants={modalPanel}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="relative bg-surface border border-border rounded-card shadow-xl w-full max-w-xs overflow-hidden"
+              dir="rtl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-border">
+                <h3 className="text-body-sm font-bold text-text-primary">
+                  تغییر وضعیت
+                </h3>
+              </div>
+              <div className="p-2 max-h-[60vh] overflow-y-auto">
+                {Object.entries(map).map(([key, val]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      onStatusChange(key);
+                      setShowModal(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 text-right px-3 py-2.5
+                                rounded-field text-body-sm transition-colors mb-1 cursor-pointer ${
+                                  key === status
+                                    ? "bg-primary-soft"
+                                    : "hover:bg-surface-alt"
+                                }`}
+                  >
+                    <span className={`${badge} ${val.color}`}>{val.label}</span>
                     {key === status && (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <CheckIcon className="w-4 h-4 shrink-0 text-primary" />
                     )}
-                  </div>
+                  </button>
+                ))}
+              </div>
+              <div className="p-2 border-t border-border">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="w-full px-4 py-2.5 text-body-sm text-text-secondary
+                             hover:bg-surface-alt rounded-field transition-colors cursor-pointer"
+                >
+                  انصراف
                 </button>
-              ))}
-            </div>
-            <div className="p-2 border-t border-border">
-              <button
-                onClick={() => setShowModal(false)}
-                className="w-full px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-alt rounded-lg transition-colors"
-              >
-                انصراف
-              </button>
-            </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -192,11 +205,11 @@ function formatDate(dateStr: string | null | undefined): string {
 
 function AssigneeBadge({ assignees }: { assignees: DeviceAssignee[] }) {
   if (!assignees || assignees.length === 0) {
-    return <span className="text-text-secondary text-xs">—</span>;
+    return <span className="text-text-muted text-body-xs">—</span>;
   }
   if (assignees.length === 1) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary">
+      <span className={`${badge} bg-primary-soft text-primary`}>
         {assignees[0].name}
       </span>
     );
@@ -204,9 +217,9 @@ function AssigneeBadge({ assignees }: { assignees: DeviceAssignee[] }) {
   return (
     <span
       title={assignees.map((a) => a.name).join("، ")}
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary cursor-help"
+      className={`${badge} bg-primary-soft text-primary cursor-help`}
     >
-      مشترک ({assignees.length} نفر)
+      مشترک ({toPersianDigits(assignees.length)} نفر)
     </span>
   );
 }
@@ -335,40 +348,135 @@ export default function DeviceList() {
   };
 
   // ─── Render ───────────────────────────────────────────────────
+
+  /** Row actions, shared by the table row and the phone card. */
+  const rowActions = (device: Device) => (
+    <div className="flex gap-2 justify-end items-center">
+      {device.invoice_count > 0 ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (device.sale_invoice_id)
+              openSaleInvoiceDetail(device.sale_invoice_id);
+          }}
+          className={`${iconButton} ${
+            device.invoice_status === "paid"
+              ? "bg-success-soft text-success-fg"
+              : "bg-danger-soft text-danger-fg"
+          }`}
+          title={
+            device.invoice_status === "paid"
+              ? "فاکتور پرداخت شده"
+              : "فاکتور پرداخت نشده"
+          }
+        >
+          <DocumentCheckIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      ) : !device.needs_invoice ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggleNeedsInvoice(device.id, true);
+          }}
+          className={`${iconButton} bg-primary-soft text-primary`}
+          title="اگر نیاز به فاکتور دارد — کلیک کنید"
+        >
+          <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openSaleInvoiceCreate(device.id);
+            }}
+            className={`${iconButton} bg-warning-soft text-warning-fg`}
+            title="ایجاد فاکتور فروش"
+          >
+            <DocumentCurrencyDollarIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleNeedsInvoice(device.id, false);
+            }}
+            className={`${iconButton} bg-primary-soft text-primary`}
+            title="فاکتور لازم نیست"
+          >
+            <XCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+        </>
+      )}
+
+      <span className="w-px h-6 bg-border mx-0.5" />
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setDeleteTarget(device);
+        }}
+        className={`${iconButton} bg-danger-soft text-danger-fg`}
+        title="حذف"
+      >
+        <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+      </button>
+    </div>
+  );
+
   return (
     <div dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-4">
         <div className="flex gap-2 w-full sm:w-auto">
+          {/*
+            A neutral button, not a green one. --success is reserved for
+            "this went well"; opening a filter panel is neither a success
+            nor a state, and colouring it green spends a status tone on a
+            control that has no status.
+          */}
           <button
             onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none bg-success text-text-inverse px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm hover:opacity-80"
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field border border-border
+                       bg-surface text-text-primary text-body-sm font-bold
+                       hover:bg-surface-alt hover:border-border-strong transition-colors
+                       flex items-center justify-center gap-2 cursor-pointer"
           >
-            <FunnelIcon className="w-5 h-5" />
-            <span>فیلترها</span>
+            <FunnelIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
+            فیلترها
             {activeFilterCount > 0 && (
-              <span className="bg-surface text-success text-xs font-bold rounded-full  py-1 px-2.5 flex items-center">
-                {activeFilterCount}
+              <span className="min-w-5 h-5 px-1.5 rounded-pill bg-primary text-primary-fg text-body-xs flex items-center justify-center">
+                {toPersianDigits(activeFilterCount)}
               </span>
             )}
           </button>
           <button
             onClick={() => openDeviceEdit(null)}
-            className="flex-1 sm:flex-none bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field bg-primary text-primary-fg
+                       text-body-sm font-bold shadow-primary hover:bg-primary-hover
+                       transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
-            <PlusIcon className="w-5 h-5" />
+            <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             ثبت دستگاه جدید
           </button>
         </div>
       </div>
-      {/* Search + Filter */}
+
+      {/* Search */}
       <div className="mb-4">
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس..."
-          className="w-full border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
-        />
+        <div className="relative">
+          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس…"
+            aria-label="جستجوی دستگاه"
+            className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm
+                       border border-border rounded-field py-2.5 pr-11 pl-3.5
+                       hover:border-border-strong focus:outline-none focus:border-primary
+                       focus:shadow-[0_0_0_3px_var(--primary-soft)]
+                       transition-[border-color,box-shadow] duration-150"
+          />
+        </div>
         <FilterPanel
           isOpen={filterOpen}
           onClose={() => setFilterOpen(false)}
@@ -383,212 +491,179 @@ export default function DeviceList() {
           }}
         />
       </div>
-      {/* Table */}
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
+          <LoadingSpinner size="md" />
         </div>
       ) : devices.length === 0 ? (
-        <div className="text-center py-20 text-text-secondary">
-          {searchInput
-            ? `نتیجه‌ای برای "${searchInput}" یافت نشد`
-            : "هیچ دستگاهی ثبت نشده"}
+        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
+          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
+            <WrenchScrewdriverIcon className="w-7 h-7 text-text-muted" />
+          </span>
+          <p className="text-body-md font-bold text-text-primary">
+            {searchInput ? "نتیجه‌ای یافت نشد" : "هنوز دستگاهی ثبت نشده"}
+          </p>
+          <p className="text-body-sm text-text-secondary mt-1">
+            {searchInput
+              ? `چیزی با «${searchInput}» پیدا نشد. عبارت دیگری را امتحان کنید.`
+              : "اولین دستگاهی که برای تعمیر پذیرش می‌کنید را اینجا ثبت کنید."}
+          </p>
         </div>
       ) : (
-        <div className="bg-surface shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1400px] lg:min-w-full divide-y divide-border">
-              <thead className="bg-primary-soft">
-                <tr>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    شماره پذیرش
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    مشتری
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    شماره تماس
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    نوع دستگاه
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    برند
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    وضعیت دستگاه
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تعمیرکار
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تاریخ ثبت
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تاریخ خروج
-                  </th>
-
-                  {isAtLeast("admin") && (
-                    <>
-                      <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                        وضعیت پرداخت
-                      </th>
-                      <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
-                        عملیات
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {devices.map((device, index) => (
-                  <tr
-                    key={device.id}
-                    onClick={() => openDeviceEdit(device.id)}
-                    className={`hover:bg-primary hover:text-text-inverse transition-colors hover:cursor-pointer group ${
-                      index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
-                    }`}
-                  >
-                    <td className="px-4 py-3 text-sm text-center border-l border-border font-mono text-text-primary group-hover:text-text-inverse">
-                      {device.id}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border">
+        <>
+          {/*
+            Below lg the table becomes one card per device. Eleven columns
+            need 1400px, which on a phone is a page the user has to drag
+            sideways to read a single row.
+          */}
+          <motion.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="lg:hidden space-y-3"
+          >
+            {devices.map((device) => (
+              <motion.li key={device.id} variants={staggerItem}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDeviceEdit(device.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openDeviceEdit(device.id);
+                    }
+                  }}
+                  className={`${rowCard} cursor-pointer hover:border-primary-border`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-body-sm font-bold text-text-primary truncate">
+                        {device.device_name}
+                        {device.brand ? ` — ${device.brand}` : ""}
+                      </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (device.customer_id)
                             openCustomerDetail(device.customer_id);
                         }}
-                        className="text-primary group-hover:text-text-inverse hover:underline font-medium"
+                        className="text-body-sm text-primary hover:underline"
                       >
                         {device.customer_name ?? "مشتری"}
                       </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
-                      {device.customer_phone}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-primary group-hover:text-text-inverse">
-                      {device.device_name}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-primary group-hover:text-text-inverse">
-                      {device.brand ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 border-l border-border">
-                      <StatusBadge
-                        status={device.status}
-                        onStatusChange={(newStatus) =>
-                          handleStatusChange(device.id, newStatus)
-                        }
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse">
-                      <AssigneeBadge assignees={device.assignees} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
-                      {formatDate(device.entry_date)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
-                      {formatDate(device.exit_date)}
-                    </td>
+                      <p className="text-body-xs text-text-secondary" dir="ltr">
+                        {device.customer_phone}
+                      </p>
+                    </div>
+                    <span className="text-body-xs text-text-muted shrink-0">
+                      #{toPersianDigits(device.id)}
+                    </span>
+                  </div>
 
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <StatusBadge
+                      status={device.status}
+                      onStatusChange={(newStatus) =>
+                        handleStatusChange(device.id, newStatus)
+                      }
+                    />
+                    {isAtLeast("admin") && <InvoiceStatusBadge device={device} />}
+                    <AssigneeBadge assignees={device.assignees} />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-border">
+                    <span className="text-body-xs text-text-secondary">
+                      ثبت: {formatDate(device.entry_date)}
+                    </span>
+                    {isAtLeast("admin") && rowActions(device)}
+                  </div>
+                </div>
+              </motion.li>
+            ))}
+          </motion.ul>
+
+          <div className={`hidden lg:block ${tableCard}`}>
+            <div className={tableScroll}>
+              <table className="min-w-[1040px] w-full">
+                <thead className={thead}>
+                  <tr>
+                    <th className={th}>شماره پذیرش</th>
+                    <th className={th}>مشتری</th>
+                    <th className={th}>شماره تماس</th>
+                    <th className={th}>نوع دستگاه</th>
+                    <th className={th}>برند</th>
+                    <th className={th}>وضعیت دستگاه</th>
+                    <th className={th}>تعمیرکار</th>
+                    <th className={th}>تاریخ ثبت</th>
+                    <th className={th}>تاریخ خروج</th>
                     {isAtLeast("admin") && (
                       <>
-                        <td className="px-4 py-3 flex  justify-center border-l border-border">
-                          <InvoiceStatusBadge device={device} />
-                        </td>
-
-                        <td className="px-4 py-3 text-sm text-center">
-                          <div className="flex gap-2 justify-end items-center">
-                            {isAtLeast("admin") && (
-                              <>
-                                {device.invoice_count > 0 ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (device.sale_invoice_id)
-                                        openSaleInvoiceDetail(
-                                          device.sale_invoice_id,
-                                        );
-                                    }}
-                                    className={`p-2 rounded-lg transition-colors ${
-                                      device.invoice_status === "paid"
-                                        ? "bg-success-soft text-success hover:opacity-80"
-                                        : "bg-danger-soft text-danger hover:opacity-80"
-                                    }`}
-                                    title={
-                                      device.invoice_status === "paid"
-                                        ? "فاکتور پرداخت شده"
-                                        : "فاکتور پرداخت نشده"
-                                    }
-                                  >
-                                    <DocumentCheckIcon className="w-5 h-5" />
-                                  </button>
-                                ) : !device.needs_invoice ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleNeedsInvoice(device.id, true);
-                                    }}
-                                    className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
-                                    title=" اگر نیاز به فاکتور دارد - کلیک کنید"
-                                  >
-                                    <CheckCircleIcon className="w-5 h-5" />
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openSaleInvoiceCreate(device.id);
-                                      }}
-                                      className="p-2 rounded-lg bg-warning-soft text-warning hover:opacity-80 transition-colors"
-                                      title="ایجاد فاکتور فروش"
-                                    >
-                                      <DocumentCurrencyDollarIcon className="w-5 h-5" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleNeedsInvoice(
-                                          device.id,
-                                          false,
-                                        );
-                                      }}
-                                      className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
-                                      title="فاکتور لازم نیست"
-                                    >
-                                      <XCircleIcon className="w-5 h-5" />
-                                    </button>
-                                  </>
-                                )}
-
-                                <div className="w-px h-8 bg-border mx-1" />
-                              </>
-                            )}
-
-                            {isAtLeast("admin") && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget(device);
-                                }}
-                                className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
-                                title="حذف"
-                              >
-                                <TrashIcon className="w-5 h-5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                        <th className={th}>وضعیت پرداخت</th>
+                        <th className={th}>عملیات</th>
                       </>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className={tbody}>
+                  {devices.map((device) => (
+                    <tr
+                      key={device.id}
+                      onClick={() => openDeviceEdit(device.id)}
+                      className={trClickable}
+                    >
+                      <td className={`${td} tabular-nums`}>
+                        {toPersianDigits(device.id)}
+                      </td>
+                      <td className={td}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (device.customer_id)
+                              openCustomerDetail(device.customer_id);
+                          }}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          {device.customer_name ?? "مشتری"}
+                        </button>
+                      </td>
+                      <td className={`${tdMuted} tabular-nums`} dir="ltr">
+                        {device.customer_phone}
+                      </td>
+                      <td className={td}>{device.device_name}</td>
+                      <td className={td}>{device.brand ?? "—"}</td>
+                      <td className="px-3 py-3">
+                        <StatusBadge
+                          status={device.status}
+                          onStatusChange={(newStatus) =>
+                            handleStatusChange(device.id, newStatus)
+                          }
+                        />
+                      </td>
+                      <td className={td}>
+                        <AssigneeBadge assignees={device.assignees} />
+                      </td>
+                      <td className={tdMuted}>{formatDate(device.entry_date)}</td>
+                      <td className={tdMuted}>{formatDate(device.exit_date)}</td>
+
+                      {isAtLeast("admin") && (
+                        <>
+                          <td className="px-3 py-3 text-center">
+                            <InvoiceStatusBadge device={device} />
+                          </td>
+                          <td className="px-3 py-3">{rowActions(device)}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
+
       {/* Pagination */}
       <div className="mt-4">
         <Pagination

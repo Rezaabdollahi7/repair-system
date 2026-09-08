@@ -9,7 +9,11 @@ jest.mock("../lib/prisma", () => ({
     purchaseInvoice: { findMany: jest.fn(), aggregate: jest.fn() },
     saleInvoice: { findMany: jest.fn(), aggregate: jest.fn() },
     saleInvoiceItem: { groupBy: jest.fn() },
-    repairInvoice: { count: jest.fn(), aggregate: jest.fn() },
+    repairInvoice: {
+      count: jest.fn(),
+      aggregate: jest.fn(),
+      findMany: jest.fn(),
+    },
     inventoryTransaction: { findMany: jest.fn() },
     device: { count: jest.fn(), groupBy: jest.fn() },
   },
@@ -338,6 +342,10 @@ describe("reportController.getDashboardStats", () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([]);
     db.device.count.mockResolvedValue(0);
     db.device.groupBy.mockResolvedValue([]);
+    // The two reads behind the trend series. Rows rather than aggregates,
+    // because a daily bucket cannot be grouped in SQL through Prisma.
+    db.repairInvoice.findMany.mockResolvedValue([]);
+    db.saleInvoice.findMany.mockResolvedValue([]);
   }
 
   it("reports zeros rather than nulls on an empty database", async () => {
@@ -357,15 +365,17 @@ describe("reportController.getDashboardStats", () => {
 
     await controller.getDashboardStats(mockRequest(), mockResponse());
 
-    // Seventeen parallel queries; a workspace filter missing from any one of
+    // Twenty parallel queries; a workspace filter missing from any one of
     // them would leak another shop's figures into this dashboard.
     const everyWhere = [
       ...db.repairInvoice.count.mock.calls,
       ...db.repairInvoice.aggregate.mock.calls,
+      ...db.repairInvoice.findMany.mock.calls,
       ...db.item.count.mock.calls,
       ...db.item.findMany.mock.calls,
       ...db.purchaseInvoice.aggregate.mock.calls,
       ...db.saleInvoice.aggregate.mock.calls,
+      ...db.saleInvoice.findMany.mock.calls,
       ...db.inventoryTransaction.findMany.mock.calls,
       ...db.saleInvoiceItem.groupBy.mock.calls,
       ...db.device.count.mock.calls,
@@ -446,6 +456,77 @@ describe("reportController.getDashboardStats", () => {
       sold_quantity: 12,
       revenue: 90000,
     });
+  });
+
+  it("returns one trend bucket per day, zero-filled and oldest first", async () => {
+    stubDashboard();
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    const series = res.json.mock.calls[0][0].revenue_series;
+
+    // Fourteen days with no invoices at all still arrive as fourteen zeros:
+    // a missing day would leave the chart's x axis unevenly spaced and let a
+    // line be drawn straight over a day the workshop was closed.
+    expect(series).toHaveLength(14);
+    expect(
+      series.every((point: { repair: number }) => point.repair === 0),
+    ).toBe(true);
+    expect(series[0].date < series[13].date).toBe(true);
+  });
+
+  it("buckets each trend invoice into its own UTC day", async () => {
+    stubDashboard();
+
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    db.repairInvoice.findMany.mockResolvedValue([
+      { invoiceDate: today, totalAmount: decimal(40000) },
+      { invoiceDate: today, totalAmount: decimal(60000) },
+    ]);
+    db.saleInvoice.findMany.mockResolvedValue([
+      { invoiceDate: today, totalAmount: decimal(25000) },
+    ]);
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    const series = res.json.mock.calls[0][0].revenue_series;
+    const bucket = series.find(
+      (point: { date: string }) => point.date === todayKey,
+    );
+
+    // Two invoices on the same day sum into one bucket rather than producing
+    // two points.
+    expect(bucket).toEqual({ date: todayKey, repair: 100000, sale: 25000 });
+  });
+
+  it("splits the month's billing into collected and outstanding", async () => {
+    stubDashboard();
+    db.repairInvoice.aggregate.mockResolvedValue({
+      _sum: { totalAmount: decimal(900000), paidAmount: decimal(350000) },
+    });
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    const invoices = res.json.mock.calls[0][0].repair_invoices;
+    expect(invoices.month_paid).toBe(350000);
+    expect(invoices.month_unpaid).toBe(550000);
+  });
+
+  it("floors the outstanding month total at zero when a customer overpays", async () => {
+    stubDashboard();
+    db.repairInvoice.aggregate.mockResolvedValue({
+      _sum: { totalAmount: decimal(100000), paidAmount: decimal(120000) },
+    });
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    // A negative remainder would draw a ring segment on the wrong side.
+    expect(res.json.mock.calls[0][0].repair_invoices.month_unpaid).toBe(0);
   });
 
   it("flattens the device status grouping", async () => {

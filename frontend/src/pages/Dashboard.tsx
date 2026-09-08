@@ -17,8 +17,20 @@ import {
   ArrowLeftIcon,
 } from "@heroicons/react/24/solid";
 import { getDashboardStats } from "../api";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import { useAuth } from "../context/AuthContext";
+import {
+  formatPersianCompact,
+  formatPersianCurrency,
+  toPersianDigits,
+} from "../utils/formatters";
+import { jalaliDayAndMonth } from "../utils/jalali";
 import { staggerContainer, staggerItem, transition } from "../motion";
+import { ChartCard, ChartTable } from "../components/charts/chartKit";
+import { SERIES } from "../components/charts/series";
+import DonutChart from "../components/charts/DonutChart";
+import BarList from "../components/charts/BarList";
+import Gauge from "../components/charts/Gauge";
+import TrendChart from "../components/charts/TrendChart";
 import type {
   DashboardStats,
   DashboardTopItem,
@@ -38,11 +50,19 @@ const DEVICE_STATUS_LABELS: Record<string, string> = {
   not_repaired: "تعمیر نشد",
 };
 
-/** The four tints a tile's icon can take. Fills only — never tile text. */
-type Tone = "primary" | "success" | "warning" | "danger";
+/**
+ * A tile's tint.
+ *
+ * `accent` is the brand yellow and is spent once per screen — on the figure
+ * the shop opens the page to see. A second yellow tile halves the emphasis of
+ * the first, and a row of four makes the colour mean nothing at all.
+ */
+type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
-const TONE_CLASS: Record<Tone, string> = {
-  primary: "bg-primary-soft text-primary",
+const TONE_ICON: Record<Tone, string> = {
+  neutral: "bg-surface-alt text-text-secondary",
+  // On the yellow fill, so both are stated against the accent, not the page.
+  accent: "bg-accent-fg/10 text-accent-fg",
   success: "bg-success-soft text-success-fg",
   warning: "bg-warning-soft text-warning-fg",
   danger: "bg-danger-soft text-danger-fg",
@@ -77,6 +97,80 @@ function CountUp({ value }: { value: number }) {
   return <>{toPersianDigits(reduceMotion ? value : shown)}</>;
 }
 
+/**
+ * The three figures in the page header, set at display size.
+ *
+ * Not charts and not tiles: each is one number with no comparison to make, so
+ * the form is the number itself, large, with its label under it.
+ */
+function HeroFigure({
+  value,
+  label,
+  icon: Icon,
+}: {
+  value: number;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="text-center sm:text-right">
+      <p className="text-display-sm font-bold text-text-primary leading-none tabular-nums">
+        <CountUp value={value} />
+      </p>
+      <p className="text-body-xs text-text-secondary mt-1.5 flex items-center gap-1 justify-center sm:justify-start">
+        <Icon className="w-3.5 h-3.5 text-text-muted" aria-hidden="true" />
+        {label}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A share of a whole, as a pill.
+ *
+ * Three of these sit in the header. They are the only place a ratio appears
+ * without its two amounts, so each carries the percentage as a direct label
+ * inside the fill — a bar the reader has to measure against its neighbours to
+ * value is decoration.
+ */
+function MeterPill({
+  label,
+  ratio,
+  detail,
+  color,
+}: {
+  label: string;
+  ratio: number;
+  detail: string;
+  color: string;
+}) {
+  const reduceMotion = useReducedMotion();
+  const clamped = Math.min(Math.max(ratio, 0), 1);
+
+  return (
+    <div className="min-w-0">
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <span className="text-body-xs text-text-secondary truncate">
+          {label}
+        </span>
+        <span className="text-body-xs font-bold text-text-primary tabular-nums shrink-0">
+          ٪{toPersianDigits(Math.round(clamped * 100))}
+        </span>
+      </div>
+      <div className="h-2 rounded-pill bg-chart-track overflow-hidden">
+        <motion.div
+          className="h-full rounded-pill origin-right"
+          style={{ backgroundColor: color }}
+          initial={reduceMotion ? false : { scaleX: 0 }}
+          animate={{ scaleX: Math.max(clamped, 0.01) }}
+          transition={reduceMotion ? { duration: 0 } : transition.slow}
+        />
+      </div>
+      <p className="text-body-xs text-text-muted mt-1 truncate">{detail}</p>
+    </div>
+  );
+}
+
 interface StatCardProps {
   label: string;
   value: React.ReactNode;
@@ -93,23 +187,46 @@ interface StatCardProps {
  * font's proportional figures set better, and nothing here is a column that
  * needs its digits to line up vertically.
  */
-function StatCard({ label, value, icon: Icon, tone = "primary", hint, to }: StatCardProps) {
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone = "neutral",
+  hint,
+  to,
+}: StatCardProps) {
+  const accent = tone === "accent";
+
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-body-sm text-text-secondary">{label}</p>
-          <p className="text-title-lg font-bold text-text-primary mt-1 break-words">
+          <p
+            className={`text-body-sm ${accent ? "text-accent-fg/70" : "text-text-secondary"}`}
+          >
+            {label}
+          </p>
+          <p
+            className={`text-title-lg font-bold mt-1 break-words ${
+              accent ? "text-accent-fg" : "text-text-primary"
+            }`}
+          >
             {value}
           </p>
         </div>
         <span
-          className={`shrink-0 w-10 h-10 rounded-field flex items-center justify-center ${TONE_CLASS[tone]}`}
+          className={`shrink-0 w-10 h-10 rounded-field flex items-center justify-center ${TONE_ICON[tone]}`}
         >
-          <Icon className="w-5 h-5" />
+          <Icon className="w-5 h-5" aria-hidden="true" />
         </span>
       </div>
-      {hint && <p className="text-body-xs text-text-secondary mt-2">{hint}</p>}
+      {hint && (
+        <p
+          className={`text-body-xs mt-2 ${accent ? "text-accent-fg/70" : "text-text-secondary"}`}
+        >
+          {hint}
+        </p>
+      )}
     </>
   );
 
@@ -117,8 +234,11 @@ function StatCard({ label, value, icon: Icon, tone = "primary", hint, to }: Stat
   // inside one only grows to its own content, so a tile carrying a hint
   // stands taller than the ones beside it.
   const className =
-    "bg-surface border border-border rounded-card shadow-sm p-5 block h-full transition-colors" +
-    (to ? " hover:border-primary-border" : "");
+    `rounded-panel p-5 block h-full border transition-colors ${
+      accent
+        ? "bg-accent border-accent-border shadow-accent"
+        : "bg-surface border-border shadow-sm"
+    }` + (to ? " hover:border-border-strong" : "");
 
   return (
     <motion.div variants={staggerItem} className="h-full">
@@ -145,10 +265,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-8">
+    <section className="mb-6">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h2 className="text-title-sm font-bold text-text-primary flex items-center gap-2">
-          <Icon className="w-5 h-5 text-text-secondary" />
+          <Icon className="w-5 h-5 text-text-muted" aria-hidden="true" />
           {title}
         </h2>
         {action && (
@@ -157,52 +277,18 @@ function Section({
             className="text-body-sm text-primary hover:underline flex items-center gap-1 shrink-0"
           >
             {action.label}
-            <ArrowLeftIcon className="w-4 h-4" />
+            <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
           </Link>
         )}
       </div>
-      <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
         {children}
       </motion.div>
     </section>
-  );
-}
-
-function Panel({
-  title,
-  icon: Icon,
-  action,
-  empty,
-  children,
-}: {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  action: { label: string; to: string };
-  empty: string;
-  children: React.ReactNode[];
-}) {
-  return (
-    <div className="bg-surface border border-border rounded-card shadow-sm p-5">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-title-sm font-bold text-text-primary flex items-center gap-2">
-          <Icon className="w-5 h-5 text-text-secondary" />
-          {title}
-        </h2>
-        <Link
-          to={action.to}
-          className="text-body-sm text-primary hover:underline shrink-0"
-        >
-          {action.label}
-        </Link>
-      </div>
-      {children.length === 0 ? (
-        <p className="text-center text-body-sm text-text-secondary py-8">
-          {empty}
-        </p>
-      ) : (
-        <div>{children}</div>
-      )}
-    </div>
   );
 }
 
@@ -211,16 +297,17 @@ function RecentTransactionItem({ tx }: { tx: DashboardTransaction }) {
   const label = isPurchase ? "خرید" : tx.type === "sale" ? "فروش" : "تنظیم";
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-border last:border-0">
+    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-border-subtle">
       <div className="flex items-center gap-3 min-w-0">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${isPurchase ? "bg-success" : "bg-danger"}`}
+          aria-hidden="true"
         />
         <div className="min-w-0">
           <p className="text-body-sm font-medium text-text-primary truncate">
             [{tx.item_code}] {tx.item_name}
           </p>
-          <p className="text-body-xs text-text-secondary">
+          <p className="text-body-xs text-text-muted">
             {new Date(tx.created_at).toLocaleDateString("fa-IR")}
           </p>
         </div>
@@ -232,132 +319,33 @@ function RecentTransactionItem({ tx }: { tx: DashboardTransaction }) {
           {isPurchase ? "+" : "−"}
           {toPersianDigits(Math.abs(tx.quantity))} عدد
         </p>
-        <p className="text-body-xs text-text-secondary">{label}</p>
+        <p className="text-body-xs text-text-muted">{label}</p>
       </div>
     </div>
   );
 }
 
-function TopItemItem({
-  item,
-  index,
-}: {
-  item: DashboardTopItem;
-  index: number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-border last:border-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="shrink-0 w-6 h-6 rounded-field bg-surface-alt text-text-secondary text-body-xs font-bold flex items-center justify-center">
-          {toPersianDigits(index + 1)}
-        </span>
-        <div className="min-w-0">
-          <p className="text-body-sm font-medium text-text-primary truncate">
-            {item.name}
-          </p>
-          <p className="text-body-xs text-text-secondary">{item.code}</p>
-        </div>
-      </div>
-      <div className="text-left shrink-0">
-        <p className="text-body-sm font-bold text-text-primary">
-          {formatPersianCurrency(item.revenue)} ریال
-        </p>
-        <p className="text-body-xs text-text-secondary">
-          {toPersianDigits(item.sold_quantity)} عدد فروش
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Device counts by status, as a bar per status rather than the row of pills
- * this used to be — pills gave every status the same visual weight, which is
- * the one thing a distribution is supposed to show.
- *
- * Every bar is the same hue. Length carries the magnitude; shading the bars
- * by rank would encode the ordering twice and mean nothing when two statuses
- * tie. Colouring them by status instead would spend the reserved good/warning
- * /danger palette on nine workflow states that are not severities.
- */
-function StatusDistribution({
-  rows,
-}: {
-  rows: { status: string; count: number }[];
-}) {
-  const reduceMotion = useReducedMotion();
-  const sorted = [...rows].sort((a, b) => b.count - a.count);
-  const max = Math.max(...sorted.map((r) => r.count), 1);
-  const total = sorted.reduce((sum, r) => sum + r.count, 0);
-
-  return (
-    <div className="bg-surface border border-border rounded-card shadow-sm p-5">
-      <div className="flex items-baseline justify-between gap-3 mb-4">
-        <h2 className="text-title-sm font-bold text-text-primary">
-          توزیع وضعیت دستگاه‌ها
-        </h2>
-        <span className="text-body-xs text-text-secondary shrink-0">
-          {toPersianDigits(total)} دستگاه
-        </span>
-      </div>
-
-      <ul className="space-y-2.5">
-        {sorted.map((row) => {
-          const label = DEVICE_STATUS_LABELS[row.status] || row.status;
-          const share = (row.count / max) * 100;
-
-          return (
-            <li
-              key={row.status}
-              className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3"
-              title={`${label}: ${toPersianDigits(row.count)}`}
-            >
-              <span className="text-body-sm text-text-secondary truncate">
-                {label}
-              </span>
-              {/* Track is a lighter step of the bar's own hue, so an empty
-                  bar still reads as part of the same scale. */}
-              <span className="h-2 rounded-pill bg-primary-soft overflow-hidden">
-                <motion.span
-                  className="block h-full rounded-pill bg-primary origin-right"
-                  initial={reduceMotion ? false : { scaleX: 0 }}
-                  animate={{ scaleX: share / 100 }}
-                  transition={
-                    reduceMotion ? { duration: 0 } : { ...transition.slow, delay: 0.1 }
-                  }
-                />
-              </span>
-              <span className="text-body-sm font-bold text-text-primary text-left tabular-nums">
-                {toPersianDigits(row.count)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-/** Mirrors the tile grid so the page does not jump when the data lands. */
+/** Mirrors the real layout so the page does not jump when the data lands. */
 function DashboardSkeleton() {
   return (
     <div className="animate-pulse">
-      {[0, 1].map((section) => (
-        <section key={section} className="mb-8">
-          <div className="h-5 w-40 rounded-field bg-surface-alt mb-3" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[0, 1, 2, 3].map((tile) => (
-              <div
-                key={tile}
-                className="h-[6.5rem] rounded-card border border-border bg-surface"
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      <div className="h-9 w-64 rounded-field bg-surface-alt mb-3" />
+      <div className="h-4 w-40 rounded-field bg-surface-alt mb-8" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <div className="lg:col-span-2 h-80 rounded-panel border border-border bg-surface" />
+        <div className="h-80 rounded-panel border border-border bg-surface" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        {[0, 1, 2, 3].map((tile) => (
+          <div
+            key={tile}
+            className="h-[7rem] rounded-panel border border-border bg-surface"
+          />
+        ))}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="h-64 rounded-card border border-border bg-surface" />
-        <div className="h-64 rounded-card border border-border bg-surface" />
+        <div className="h-72 rounded-panel border border-border bg-surface" />
+        <div className="h-72 rounded-panel border border-border bg-surface" />
       </div>
     </div>
   );
@@ -367,7 +355,13 @@ function DashboardSkeleton() {
 
 const TILE_GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4";
 
+/** Today's date as a Jalali `۲۳ شهریور`, from the same UTC key the API uses. */
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -381,15 +375,114 @@ export default function Dashboard() {
   if (loading) return <DashboardSkeleton />;
   if (!stats) return null;
 
-  const monthNetPositive = stats.month.net >= 0;
   const todayNetPositive = stats.today.net >= 0;
+  const monthNetPositive = stats.month.net >= 0;
+
+  const billed =
+    stats.repair_invoices.month_paid + stats.repair_invoices.month_unpaid;
+  const collectedRatio =
+    billed > 0 ? stats.repair_invoices.month_paid / billed : 0;
+
+  const statusSlices = stats.devices.by_status.map((row) => ({
+    label: DEVICE_STATUS_LABELS[row.status] || row.status,
+    value: row.count,
+  }));
+
+  const topItemRows = stats.top_items.map((item: DashboardTopItem) => ({
+    label: item.name ?? "—",
+    meta: item.code ?? undefined,
+    value: item.revenue,
+    display: `${formatPersianCompact(item.revenue)} ریال`,
+  }));
 
   return (
     <div dir="rtl">
+      {/*
+        The header sits on the page rather than in a card, with a soft wash of
+        the brand yellow behind it. The wash is the one purely decorative
+        thing on the screen and is kept to the header for that reason — under
+        a chart it would tint the marks and quietly break their contrast.
+      */}
+      <header className="relative mb-6 overflow-hidden rounded-panel">
+        <div
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(110% 150% at 90% -30%, var(--accent) 0%, var(--accent-soft) 34%, transparent 68%)",
+            opacity: 0.5,
+          }}
+          aria-hidden="true"
+        />
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-2">
+          <div className="min-w-0">
+            <h1 className="text-headline-md sm:text-display-sm font-bold text-text-primary">
+              خوش آمدید، {user?.full_name ?? "مدیر"}
+            </h1>
+            <p className="text-body-sm text-text-secondary mt-1">
+              امروز {jalaliDayAndMonth(todayKey())} — خلاصهٔ وضعیت تعمیرگاه
+            </p>
+          </div>
+          <div className="flex items-end gap-6 sm:gap-9 shrink-0">
+            <HeroFigure
+              value={stats.devices?.total || 0}
+              label="کل دستگاه‌ها"
+              icon={WrenchScrewdriverIcon}
+            />
+            <HeroFigure
+              value={stats.devices?.repairing || 0}
+              label="در حال تعمیر"
+              icon={CogIcon}
+            />
+            <HeroFigure
+              value={stats.items.total}
+              label="کل کالاها"
+              icon={CubeIcon}
+            />
+          </div>
+        </div>
+
+        {/*
+          Three ratios that exist in the data, rather than four bars invented
+          to fill the row. Each takes a series slot in order, so the same
+          colour means the same thing here as it does in the charts below.
+        */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 mt-6 pt-5 border-t border-border">
+          <MeterPill
+            label="در حال تعمیر"
+            ratio={
+              stats.devices.total > 0
+                ? stats.devices.repairing / stats.devices.total
+                : 0
+            }
+            detail={`${toPersianDigits(stats.devices.repairing)} از ${toPersianDigits(stats.devices.total)} دستگاه`}
+            color={SERIES[0]}
+          />
+          <MeterPill
+            label="وصول این ماه"
+            ratio={collectedRatio}
+            detail={`${formatPersianCompact(stats.repair_invoices.month_paid)} از ${formatPersianCompact(billed)} ریال`}
+            color={SERIES[2]}
+          />
+          <MeterPill
+            label="کالاهای کم‌موجود"
+            ratio={
+              stats.items.total > 0
+                ? stats.items.low_stock / stats.items.total
+                : 0
+            }
+            detail={`${toPersianDigits(stats.items.low_stock)} از ${toPersianDigits(stats.items.total)} کالا`}
+            color={SERIES[3]}
+          />
+        </div>
+      </header>
+
       {stats.items.low_stock > 0 && (
-        <div className="flex items-center gap-3 bg-warning-soft border border-warning/25 rounded-card p-4 mb-6">
+        <div className="flex items-center gap-3 bg-warning-soft border border-warning/25 rounded-panel p-4 mb-4">
           <span className="shrink-0 w-9 h-9 rounded-field bg-warning/15 flex items-center justify-center">
-            <ExclamationTriangleIcon className="w-5 h-5 text-warning-fg" />
+            <ExclamationTriangleIcon
+              className="w-5 h-5 text-warning-fg"
+              aria-hidden="true"
+            />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-body-sm font-bold text-warning-fg">
@@ -411,34 +504,60 @@ export default function Dashboard() {
         </div>
       )}
 
-      <Section
-        title="دستگاه‌ها"
-        icon={WrenchScrewdriverIcon}
-        action={{ label: "همهٔ دستگاه‌ها", to: "/devices" }}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <StatCard
-            label="کل دستگاه‌ها"
-            value={<CountUp value={stats.devices?.total || 0} />}
-            icon={WrenchScrewdriverIcon}
-          />
-          <StatCard
-            label="پذیرش امروز"
-            value={<CountUp value={stats.devices?.today || 0} />}
-            icon={CalendarIcon}
-          />
-          <StatCard
-            label="در حال تعمیر"
-            value={<CountUp value={stats.devices?.repairing || 0} />}
-            icon={CogIcon}
-            tone="warning"
-          />
-        </div>
+      {/* Trend beside the collection ring: the first says how the month has
+          been going, the second how much of it has actually been paid for. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <ChartCard
+          title="روند درآمد روزانه"
+          subtitle="۱۴ روز گذشته — محور زمان از راست به چپ"
+          className="lg:col-span-2"
+        >
+          <TrendChart series={stats.revenue_series} />
+        </ChartCard>
 
-        {stats.devices.by_status.length > 0 && (
-          <StatusDistribution rows={stats.devices.by_status} />
-        )}
-      </Section>
+        <ChartCard
+          tone="ink"
+          title="وصول مطالبات"
+          subtitle="فاکتورهای تعمیر این ماه"
+        >
+          <Gauge
+            ratio={collectedRatio}
+            caption="از مبلغ صورت‌حساب‌شده وصول شده"
+          />
+          <dl className="mt-5 space-y-2.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-body-xs text-text-secondary">وصول‌شده</dt>
+              <dd className="text-body-sm font-bold text-accent tabular-nums">
+                {formatPersianCurrency(stats.repair_invoices.month_paid)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-body-xs text-text-secondary">باقی‌مانده</dt>
+              <dd className="text-body-sm font-bold text-text-primary tabular-nums">
+                {formatPersianCurrency(stats.repair_invoices.month_unpaid)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 pt-2.5 border-t border-on-dark/10">
+              <dt className="text-body-xs text-text-secondary">
+                در انتظار پرداخت
+              </dt>
+              <dd className="text-body-sm font-bold text-text-primary tabular-nums">
+                {toPersianDigits(stats.repair_invoices.pending_payment_count)}{" "}
+                فاکتور
+              </dd>
+            </div>
+          </dl>
+          <Link
+            to="/repair-invoices"
+            className="mt-4 w-full flex items-center justify-center gap-1.5 text-body-sm font-bold
+                       px-4 py-2.5 rounded-field bg-accent text-accent-fg
+                       hover:bg-accent-hover transition-colors"
+          >
+            فاکتورهای تعمیر
+            <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
+          </Link>
+        </ChartCard>
+      </div>
 
       <Section
         title="فاکتورهای تعمیر"
@@ -446,10 +565,12 @@ export default function Dashboard() {
         action={{ label: "همهٔ فاکتورها", to: "/repair-invoices" }}
       >
         <div className={TILE_GRID}>
+          {/* The one accent tile on the screen. */}
           <StatCard
-            label="فاکتورهای امروز"
-            value={<CountUp value={stats.repair_invoices?.today_count || 0} />}
-            icon={DocumentTextIcon}
+            label="درآمد این ماه"
+            value={`${formatPersianCurrency(stats.repair_invoices?.month_revenue || 0)} ریال`}
+            icon={CalendarIcon}
+            tone="accent"
           />
           <StatCard
             label="درآمد امروز"
@@ -458,10 +579,9 @@ export default function Dashboard() {
             tone="success"
           />
           <StatCard
-            label="درآمد این ماه"
-            value={`${formatPersianCurrency(stats.repair_invoices?.month_revenue || 0)} ریال`}
-            icon={CalendarIcon}
-            tone="success"
+            label="فاکتورهای امروز"
+            value={<CountUp value={stats.repair_invoices?.today_count || 0} />}
+            icon={DocumentTextIcon}
           />
           <StatCard
             label="در انتظار پرداخت"
@@ -481,8 +601,55 @@ export default function Dashboard() {
         </div>
       </Section>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <ChartCard
+          title="توزیع وضعیت دستگاه‌ها"
+          subtitle={`${toPersianDigits(stats.devices.total)} دستگاه در کارگاه`}
+        >
+          <DonutChart
+            slices={statusSlices}
+            centreLabel="کل دستگاه‌ها"
+            emptyMessage="هنوز دستگاهی ثبت نشده"
+          />
+          <ChartTable
+            caption="نمایش اعداد به‌صورت جدول"
+            columns={["وضعیت", "تعداد"]}
+            rows={statusSlices.map((slice) => [
+              slice.label,
+              toPersianDigits(slice.value),
+            ])}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="پرفروش‌ترین کالاها"
+          subtitle="بر اساس مبلغ فروش"
+          aside={
+            <Link
+              to="/reports/profit"
+              className="text-body-sm text-primary hover:underline"
+            >
+              گزارش کامل
+            </Link>
+          }
+        >
+          <BarList rows={topItemRows} emptyMessage="هنوز فروشی ثبت نشده" />
+          {stats.top_items.length > 0 && (
+            <ChartTable
+              caption="نمایش اعداد به‌صورت جدول"
+              columns={["کالا", "مبلغ فروش (ریال)", "تعداد فروش"]}
+              rows={stats.top_items.map((item) => [
+                item.name ?? "—",
+                formatPersianCurrency(item.revenue),
+                toPersianDigits(item.sold_quantity),
+              ])}
+            />
+          )}
+        </ChartCard>
+      </div>
+
       <Section
-        title="فروش و خرید امروز"
+        title="فروش و خرید"
         icon={CurrencyDollarIcon}
         action={{ label: "گزارش سود و زیان", to: "/reports/profit" }}
       >
@@ -506,61 +673,39 @@ export default function Dashboard() {
             tone={todayNetPositive ? "success" : "danger"}
           />
           <StatCard
-            label="کل کالاها"
-            value={<CountUp value={stats.items.total} />}
-            hint={`${toPersianDigits(stats.items.low_stock)} کالا کم‌موجود`}
-            icon={CubeIcon}
-            to="/items"
-          />
-        </div>
-      </Section>
-
-      <Section title="این ماه" icon={CalendarIcon}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard
-            label="فروش این ماه"
-            value={`${formatPersianCurrency(stats.month.sale)} ریال`}
-            icon={ArrowTrendingUpIcon}
-            tone="success"
-          />
-          <StatCard
-            label="خرید این ماه"
-            value={`${formatPersianCurrency(stats.month.purchase)} ریال`}
-            icon={ArrowTrendingDownIcon}
-            tone="warning"
-          />
-          <StatCard
             label="سود این ماه"
             value={`${formatPersianCurrency(stats.month.net)} ریال`}
+            hint={`فروش ${formatPersianCompact(stats.month.sale)} — خرید ${formatPersianCompact(stats.month.purchase)}`}
             icon={CurrencyDollarIcon}
             tone={monthNetPositive ? "success" : "danger"}
           />
         </div>
       </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel
-          title="آخرین تراکنش‌ها"
-          icon={ClockIcon}
-          action={{ label: "مشاهده همه", to: "/reports/transactions" }}
-          empty="هنوز تراکنشی ثبت نشده"
-        >
-          {stats.recent_transactions.map((tx) => (
-            <RecentTransactionItem key={tx.id} tx={tx} />
-          ))}
-        </Panel>
-
-        <Panel
-          title="پرفروش‌ترین کالاها"
-          icon={ArrowTrendingUpIcon}
-          action={{ label: "گزارش کامل", to: "/reports/profit" }}
-          empty="هنوز فروشی ثبت نشده"
-        >
-          {stats.top_items.map((item, index) => (
-            <TopItemItem key={item.id} item={item} index={index} />
-          ))}
-        </Panel>
-      </div>
+      <ChartCard
+        title="آخرین تراکنش‌های انبار"
+        subtitle="ده مورد اخیر"
+        aside={
+          <Link
+            to="/reports/transactions"
+            className="text-body-sm text-primary hover:underline"
+          >
+            مشاهده همه
+          </Link>
+        }
+      >
+        {stats.recent_transactions.length === 0 ? (
+          <p className="text-center text-body-sm text-text-muted py-8">
+            هنوز تراکنشی ثبت نشده
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
+            {stats.recent_transactions.map((tx) => (
+              <RecentTransactionItem key={tx.id} tx={tx} />
+            ))}
+          </div>
+        )}
+      </ChartCard>
     </div>
   );
 }

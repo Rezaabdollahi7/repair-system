@@ -866,6 +866,21 @@ export interface DashboardTopItem {
 }
 
 /**
+ * One day of the dashboard's trend chart. `date` is a `YYYY-MM-DD` UTC day
+ * key — the same boundary as the "today" window, so a Tehran day rolls over
+ * at 03:30 local time here too.
+ *
+ * The series arrives oldest first with no gaps: a day with no invoices is a
+ * zero rather than a missing entry, so the chart's x axis stays evenly
+ * spaced and a closed day reads as closed instead of being drawn over.
+ */
+export interface DashboardRevenuePoint {
+  date: string;
+  repair: number;
+  sale: number;
+}
+
+/**
  * GET /reports/dashboard.
  *
  * Note "today" and "month" boundaries are UTC, so a Tehran day rolls over at
@@ -900,7 +915,16 @@ export interface DashboardStats {
     month_revenue: number;
     pending_payment_count: number;
     issued_unpaid_amount: number;
+    /**
+     * This month's billed amount split by what has been collected.
+     * `month_revenue` is the billed total; these two are how much of it came
+     * in and how much has not. `month_unpaid` is floored at zero, so an
+     * overpayment does not send it negative.
+     */
+    month_paid: number;
+    month_unpaid: number;
   };
+  revenue_series: DashboardRevenuePoint[];
 }
 
 /**

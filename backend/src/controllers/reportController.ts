@@ -2,7 +2,13 @@ import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
-import { dateFilter, monthRange, todayRange } from "../utils/dateRange";
+import {
+  dateFilter,
+  lastDaysRange,
+  monthRange,
+  todayRange,
+  utcDayKey,
+} from "../utils/dateRange";
 import { errorMessage } from "../utils/errors";
 import type { DateRangeQuery, StockReportQuery } from "../schemas/report";
 import { workspaceIdOf } from "../utils/workspace";
@@ -267,6 +273,13 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const today = todayRange();
     const month = monthRange();
+    /*
+     * The trend chart's window. Fourteen days rather than thirty: a workshop
+     * closes one day a week, and at thirty points those closures crowd into a
+     * comb the eye reads as noise instead of a weekly rhythm.
+     */
+    const TREND_DAYS = 14;
+    const trend = lastDaysRange(TREND_DAYS);
     const workspaceId = workspaceIdOf(req);
 
     const issuedOrPaid: Prisma.RepairInvoiceWhereInput = {
@@ -299,6 +312,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       todayDevices,
       repairingDevices,
       devicesByStatus,
+      trendRepairInvoices,
+      trendSaleInvoices,
+      monthRepairPayments,
     ] = await Promise.all([
       prisma.repairInvoice.count({
         where: { workspaceId, invoiceDate: today },
@@ -364,6 +380,27 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         _count: { status: true },
         orderBy: { _count: { status: "desc" } },
       }),
+      /*
+       * The two trend reads pull rows and bucket them in JS rather than
+       * grouping in SQL. groupBy cannot group by a date's day — only by the
+       * whole timestamp — so the alternative is $queryRaw with a date_trunc,
+       * which would bypass the Prisma client extension that scopes every
+       * query by workspace. Two weeks of one workshop's invoices is tens of
+       * rows, and [workspaceId, invoiceDate] is already indexed, so the
+       * safer form costs nothing here.
+       */
+      prisma.repairInvoice.findMany({
+        where: { invoiceDate: trend, ...issuedOrPaid },
+        select: { invoiceDate: true, totalAmount: true },
+      }),
+      prisma.saleInvoice.findMany({
+        where: { workspaceId, invoiceDate: trend },
+        select: { invoiceDate: true, totalAmount: true },
+      }),
+      prisma.repairInvoice.aggregate({
+        where: { invoiceDate: month, ...issuedOrPaid },
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
     ]);
 
     // Needs a second round trip: the ids only exist once the grouping above
@@ -389,6 +426,31 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // optional, so the property access can produce it.
     const amount = (value: { toNumber(): number } | null | undefined) =>
       value?.toNumber() ?? 0;
+
+    /*
+     * One bucket per day in the window, zero-filled before anything is added.
+     * A day with no invoices has to reach the chart as a zero rather than be
+     * missing: a line drawn over absent days joins Sunday to Tuesday and
+     * hides the closure, and the x axis stops being evenly spaced.
+     */
+    const trendBuckets = new Map<string, { repair: number; sale: number }>();
+    for (let i = 0; i < TREND_DAYS; i += 1) {
+      const day = new Date(trend.gte);
+      day.setUTCDate(day.getUTCDate() + i);
+      trendBuckets.set(utcDayKey(day), { repair: 0, sale: 0 });
+    }
+
+    for (const invoice of trendRepairInvoices) {
+      const bucket = trendBuckets.get(utcDayKey(invoice.invoiceDate));
+      if (bucket) bucket.repair += invoice.totalAmount.toNumber();
+    }
+    for (const invoice of trendSaleInvoices) {
+      const bucket = trendBuckets.get(utcDayKey(invoice.invoiceDate));
+      if (bucket) bucket.sale += invoice.totalAmount.toNumber();
+    }
+
+    const monthRepairTotal = amount(monthRepairPayments._sum?.totalAmount);
+    const monthRepairPaid = amount(monthRepairPayments._sum?.paidAmount);
 
     const todayPurchaseTotal = amount(todayPurchase._sum.totalAmount);
     const todaySaleTotal = amount(todaySale._sum.totalAmount);
@@ -447,7 +509,27 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         issued_unpaid_amount:
           amount(unpaidTotals._sum?.totalAmount) -
           amount(unpaidTotals._sum?.paidAmount),
+        /*
+         * This month's billed amount split by what has actually come in.
+         * month_revenue answers "how much did we bill"; these two answer
+         * "how much of it did we collect", which is the number a workshop
+         * chases. Floored at zero because an overpayment — a customer
+         * rounding up — would otherwise send the remainder negative and put
+         * a segment on the wrong side of the ring.
+         */
+        month_paid: monthRepairPaid,
+        month_unpaid: Math.max(monthRepairTotal - monthRepairPaid, 0),
       },
+      /*
+       * Daily totals for the trend chart, oldest first, one entry per day
+       * with no gaps. Dates are UTC day keys, the same boundary every other
+       * window in this response uses.
+       */
+      revenue_series: [...trendBuckets.entries()].map(([date, totals]) => ({
+        date,
+        repair: totals.repair,
+        sale: totals.sale,
+      })),
     });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });

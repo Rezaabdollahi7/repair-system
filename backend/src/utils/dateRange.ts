@@ -49,3 +49,30 @@ export function dateFilter(
     ...(to ? { lte: endOfDay(to) } : {}),
   };
 }
+
+/**
+ * The window covering the last `days` calendar days, today included, aligned
+ * to the same UTC day boundary every other range here uses.
+ *
+ * `days: 14` therefore starts thirteen days back and ends where todayRange()
+ * ends. Callers that bucket rows by day need the start to be a day boundary
+ * rather than "now minus 14×24h", or the first and last buckets each hold a
+ * partial day and the chart opens on a dip that is not in the data.
+ */
+export function lastDaysRange(days: number): { gte: Date; lt: Date } {
+  const today = todayRange();
+  const start = new Date(today.gte);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  return { gte: start, lt: today.lt };
+}
+
+/**
+ * The UTC day a timestamp falls in, as `YYYY-MM-DD`.
+ *
+ * Deliberately not toISOString().slice(0, 10) at the call site: this is the
+ * key a daily bucket is stored under, and it has to agree with the boundary
+ * lastDaysRange() draws. Both read the date in UTC, so they cannot drift.
+ */
+export function utcDayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}

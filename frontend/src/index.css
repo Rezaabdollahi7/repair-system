@@ -12,83 +12,150 @@
 
 :root {
   /*
-   * Orbit primary. Ten steps as given; --brand-50 is the one derived value —
-   * the guideline has no tint light enough for a soft background, and every
-   * "selected row" and "active nav item" in the app needs one.
-   */
-  --brand-50: #ebf0fe;
-  --brand-100: #96aafb;
-  --brand-200: #7e96fa;
-  --brand-300: #6583f9;
-  --brand-400: #4d6ff8;
-  --brand-500: #345bf7;
-  --brand-600: #204bf6;
-  --brand-700: #0d3bf5;
-  --brand-800: #0935e5;
-  --brand-900: #0830d1;
-  --brand-950: #072cbe;
-
-  /* Orbit secondary — the blue-grey that carries text and surfaces */
-  --secondary-50: #f9fafb;
-  --secondary-100: #f2f3f5;
-  --secondary-200: #e4e6ea;
-  --secondary-300: #d0d4da;
-  --secondary-400: #989fae;
-  --secondary-500: #697081;
-  --secondary-600: #353e51;
-  --secondary-700: #353c4a;
-  --secondary-800: #1d2737;
-  --secondary-900: #101627;
-
-  /* Orbit blue-neutral — borders and dividers with a hint of the brand hue */
-  --blue-neutral-100: #e5eaf4;
-  --blue-neutral-200: #b2bcd0;
-  --blue-neutral-300: #6f7b92;
-  --blue-neutral-400: #536079;
-  --blue-neutral-500: #344055;
-
-  /*
-   * Two derived steps for the boundary of a form control.
+   * The five tones the identity is built from. Everything below is either one
+   * of these or a step derived from one, and the derivations say why they had
+   * to exist.
    *
-   * The guideline's border tints land around 1.3:1 against their surface.
-   * That is right for a divider, which only has to separate two things the
-   * eye already reads as separate — but on an input it is the entire signal
-   * saying where the field begins, and WCAG asks 3:1 for that. These are the
-   * softest tones in the same hue family that clear it: 3.46:1 on white,
-   * 3.08:1 on the dark surface.
+   *   --brand    #FFD85F  the yellow
+   *   --ink      #303030  near-black; text, and the dark surfaces
+   *   --paper    #FFFFFF  cards
+   *   --cream    #F9F6EE  the page behind them
+   *   --grey     #898989  the neutral
    */
-  --field-border-light: #828a9c;
-  --field-border-dark: #586580;
+  --brand: #ffd85f;
+  --ink: #303030;
+  --paper: #ffffff;
+  --cream: #f9f6ee;
+  --grey: #898989;
 
   /*
-   * The dimmest tone the dark theme can give --text-muted. The scale has no
-   * step between secondary-400 and secondary-500 — the first is already
-   * --text-secondary there, the second measures 3.63:1 — so the quietest
-   * text in the app had a choice between illegible and indistinguishable
-   * from the line above it. This sits between them at 4.73:1.
+   * Brand steps. The yellow given is a fill, not a scale: it is bright enough
+   * that a tint of it disappears against cream and a shade of it turns olive
+   * before it turns dark. So only four steps, each with a job.
+   *
+   * --brand-tint is the softest wash that still reads as yellow on cream
+   * (a "selected row", a bar's empty track); --brand-soft is one step up for
+   * the same job on white; --brand-deep is the hover of a yellow fill.
    */
-  --muted-text-dark: #7b8394;
+  --brand-tint: #fdf6dd;
+  --brand-soft: #fbeaa8;
+  --brand-strong: var(--brand);
+  --brand-deep: #f2c53c;
+
+  /*
+   * The yellow cannot be a text colour. #FFD85F on white is 1.35:1 — it is
+   * invisible, not merely low-contrast — so anywhere the brand has to be
+   * *written* rather than *filled*, this gold stands in: 5.07:1 on white,
+   * 4.7:1 on cream. It is the same hue family, darkened until it is legible.
+   */
+  --brand-text: #8a6a00;
+
+  /*
+   * Ink steps. The interface's interactive colour is the ink, not the yellow —
+   * a dark pill for the active nav item, a dark button, dark links — with the
+   * yellow reserved for highlight and for data. That is how the reference
+   * design actually works, and it is also the only arrangement in which the
+   * app's existing `text-primary` / `bg-primary` classes stay legible: white
+   * on ink is 13.2:1, ink on white is the same, and a yellow `--primary`
+   * would have made unreadable text of every link on every page.
+   */
+  --ink-900: #1c1c1c;
+  --ink-800: #262626;
+  --ink-700: var(--ink);
+  --ink-600: #3d3d3d;
+  --ink-500: #4a4a4a;
+
+  /*
+   * Neutral steps, and the one place this palette has to depart from the five
+   * tones it was given.
+   *
+   * #898989 measures 3.50:1 on white and 3.24:1 on cream. That is enough for
+   * a border, an icon or a 24px number, and short of the 4.5:1 body text
+   * needs — and #898989 is exactly the tone every hint, placeholder and
+   * empty-state line in this app is written in. So the grey keeps its job as
+   * the decorative neutral, and two darker steps carry the text: 7.0:1 and
+   * 5.1:1 on white, 6.5:1 and 4.7:1 on cream. The hierarchy between them
+   * survives; it is just readable now.
+   */
+  --grey-text: #575757;
+  --grey-text-soft: #6e6e6e;
+  --grey-line: var(--grey);
+
+  /* Warm neutrals, mixed toward the cream rather than pure greys — a cool
+     #f5f5f5 next to #F9F6EE reads as a stain rather than a second surface. */
+  --sand-50: var(--cream);
+  --sand-100: #f4f0e6;
+  --sand-200: #ece7da;
+  --sand-300: #ded8c9;
+  --sand-400: #c9c2b1;
 
   /*
    * Semantic, three steps each: a strong shade for text, a base for fills and
    * dots, a soft one for badge backgrounds. The base alone is not enough —
    * #22c55e as text on white is about 2.3:1, well under AA.
+   *
+   * These stay in their own hues. The warning tone in particular is *not*
+   * the brand yellow: a low-stock banner and a highlighted KPI have to be
+   * distinguishable, and painting both #FFD85F would have made the alert
+   * read as decoration.
    */
   --success-strong: #15803d;
   --success-base: #22c55e;
-  --success-tint: #dcfce7;
+  --success-tint: #e8f7ed;
 
   --error-strong: #b91c1c;
   --error-base: #ef4444;
-  --error-tint: #fef2f2;
+  --error-tint: #fdf0ee;
 
-  --warning-strong: #b45309;
-  --warning-base: #f59e0b;
-  --warning-tint: #fffbeb;
+  --warning-strong: #a35c00;
+  --warning-base: #e08700;
+  --warning-tint: #fdf1e2;
 
   --info-strong: #0e7490;
   --info-base: #06b6d4;
-  --info-tint: #ecfeff;
+  --info-tint: #e9f6fa;
+
+  /*
+   * Two derived steps for the boundary of a form control.
+   *
+   * A divider only has to separate two things the eye already reads as
+   * separate, but on an input the border is the entire signal saying where
+   * the field begins, and WCAG asks 3:1 for that. --grey itself clears it on
+   * white (3.50:1); on the dark surface it does not, so the dark theme gets
+   * its own step at 3.1:1.
+   */
+  --field-border-light: var(--grey);
+  --field-border-dark: #6b6b6b;
+
+  /*
+   * ── Chart series ──────────────────────────────────────────────────────
+   *
+   * Eight hues in a fixed order, assigned to series in sequence and never
+   * cycled. Slot 1 is the brand's gold — the yellow itself sits at OKLCH
+   * L 0.89, far above the 0.43–0.77 band a mark has to stay inside to be
+   * seen against white, so the series version of it is darkened until it
+   * clears 3:1 (#C08000, 3.06:1). The yellow keeps the jobs where it is a
+   * large fill with ink on top.
+   *
+   * The set is validated, not chosen by eye: lightness band, chroma floor,
+   * adjacent-pair separation under protanopia and deuteranopia, the
+   * normal-vision floor, and contrast against the surface. Light passes all
+   * five (worst adjacent ΔE 8.5 protan, 17.9 normal-vision, all ≥ 3:1).
+   * Re-run the check before changing any of them.
+   */
+  --series-1: #c08000;
+  --series-2: #2e7bd6;
+  --series-3: #17a67c;
+  --series-4: #ee6c4d;
+  --series-5: #7c5cd6;
+  --series-6: #dc4f8c;
+  --series-7: #4e9a2f;
+  --series-8: #1e9cb8;
+
+  /* The ground a bar or ring segment is missing from. Two steps: one for a
+     chart sitting on white, one for a chart on a dark card. */
+  --chart-track: var(--sand-200);
+  --chart-grid: var(--sand-200);
 }
 
 /* ===================================================================
@@ -115,42 +182,51 @@
 .print-sheet {
   color-scheme: light;
 
-  /* سطوح — از عقب به جلو: sunken پشت محتوا، raised جلوی آن */
-  --bg: var(--secondary-50);
-  --surface: #ffffff;
-  --surface-alt: var(--secondary-100);
-  --surface-sunken: var(--secondary-200);
-  --surface-raised: #ffffff;
+  /* سطوح — کارت سفید روی زمینهٔ کِرِم؛ برعکس تم قبلی که سفید روی خاکستری بود */
+  --bg: var(--cream);
+  --surface: var(--paper);
+  --surface-alt: var(--sand-100);
+  --surface-sunken: var(--sand-200);
+  --surface-raised: var(--paper);
 
-  --border: var(--secondary-200);
-  --border-strong: var(--secondary-300);
+  --border: var(--sand-200);
+  --border-strong: var(--sand-300);
   /* Only for inputs, selects and textareas — see the note in section ۱. */
   --border-field: var(--field-border-light);
-  /* مرزهای آبی‌مایل گایدلاین، برای جدول‌ها و جداکننده‌ها */
-  --border-subtle: var(--blue-neutral-100);
+  --border-subtle: var(--sand-100);
 
-  --text-primary: var(--secondary-900);
+  --text-primary: var(--ink);
+  --text-secondary: var(--grey-text);
+  --text-muted: var(--grey-text-soft);
+  --text-inverse: var(--paper);
+
   /*
-   * Both of these went one step darker than the guideline's own suggestion.
-   * secondary-500 on the alt surface a table header sits on measures 4.47:1
-   * and secondary-400 on white measures 2.66:1 — the second is the tone
-   * every placeholder, hint and empty-state line in the app was written in.
-   * The step between the two survives (6.3:1 against 5.0:1), so the
-   * hierarchy still reads; it is just legible now.
+   * The ink, not the yellow — see the note on the ink steps above. Every
+   * `bg-primary` in the app becomes a dark button with white text, and every
+   * `text-primary` a dark link, which is what the reference design does and
+   * what keeps the other pages legible while only the dashboard is redrawn.
    */
-  --text-secondary: var(--blue-neutral-400);
-  --text-muted: var(--secondary-500);
-  --text-inverse: #ffffff;
+  --primary: var(--ink-700);
+  --primary-hover: var(--ink-900);
+  --primary-active: #111111;
+  --primary-soft: var(--sand-100);
+  --primary-soft-hover: var(--sand-200);
+  --primary-border: var(--sand-300);
+  --primary-fg: var(--paper);
 
-  --primary: var(--brand-500);
-  --primary-hover: var(--brand-600);
-  --primary-active: var(--brand-700);
-  --primary-soft: var(--brand-50);
-  --primary-soft-hover: #dce4fd;
-  --primary-border: var(--brand-100);
-  /* Text and icons sitting ON a --primary fill. Separate from
-     --text-inverse, which follows the page rather than the button. */
-  --primary-fg: #ffffff;
+  /*
+   * The yellow, as its own token. `--primary` is pressable; `--accent` is
+   * highlight and data: a KPI's fill, a selected row, the brand series in a
+   * chart. --accent-fg is what goes on top of it, and it is the ink — white
+   * on #FFD85F is 1.35:1, ink on it is 9.58:1.
+   */
+  --accent: var(--brand);
+  --accent-hover: var(--brand-deep);
+  --accent-soft: var(--brand-soft);
+  --accent-tint: var(--brand-tint);
+  --accent-border: var(--brand-soft);
+  --accent-fg: var(--ink);
+  --accent-text: var(--brand-text);
 
   --success: var(--success-base);
   --success-strong-fg: var(--success-strong);
@@ -166,109 +242,126 @@
   --info-strong-fg: var(--info-strong);
   --info-soft: var(--info-tint);
 
-  /*
-   * Solid status buttons — «حذف», «غیرفعال کن». The base tones are fills
-   * for dots and bars, and white on #f59e0b is 2.1:1, so a button painted
-   * with one cannot be read. These are the strong steps, which carry white
-   * at 6:1 or better; --on-status is what goes on top of any of them.
-   */
   --danger-fill: var(--error-strong);
   --warning-fill: var(--warning-strong);
   --success-fill: var(--success-strong);
-  --on-status: #ffffff;
+  --on-status: var(--paper);
 
-  /* سایه‌ها دو لایه‌اند: یک لبهٔ تیزِ نزدیک و یک پخشِ دور. تک‌لایه‌بودن
-     همان چیزی است که کارت‌های فعلی را «تخت» نشان می‌دهد. */
-  --shadow-color: 16 22 39;
+  /* سایه‌ها دو لایه‌اند: یک لبهٔ تیزِ نزدیک و یک پخشِ دور. رنگ‌شان از
+     خاکستریِ سرد به قهوه‌ایِ گرم عوض شده تا روی کِرِم خاکی به نظر نرسد. */
+  --shadow-color: 62 52 32;
   --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.05);
   --shadow-sm:
     0 1px 2px rgb(var(--shadow-color) / 0.04),
     0 2px 6px rgb(var(--shadow-color) / 0.06);
   --shadow-md:
     0 2px 4px rgb(var(--shadow-color) / 0.04),
-    0 6px 16px rgb(var(--shadow-color) / 0.08);
+    0 6px 16px rgb(var(--shadow-color) / 0.07);
   --shadow-lg:
     0 4px 8px rgb(var(--shadow-color) / 0.04),
-    0 14px 32px rgb(var(--shadow-color) / 0.1);
+    0 14px 32px rgb(var(--shadow-color) / 0.09);
   --shadow-xl:
     0 8px 16px rgb(var(--shadow-color) / 0.05),
-    0 28px 56px rgb(var(--shadow-color) / 0.12);
+    0 28px 56px rgb(var(--shadow-color) / 0.11);
 
-  /* هالهٔ رنگی زیر دکمهٔ اصلی. در گایدلاین دکمه تخت است، پس ملایم نگه
-     داشته شده — حضورش حس «قابل فشردن» می‌دهد بدون اینکه شناور به نظر برسد. */
-  --shadow-primary: 0 2px 8px rgb(52 91 247 / 0.24);
+  --shadow-primary: 0 2px 8px rgb(48 48 48 / 0.2);
+  /* The yellow's own halo, for the accent buttons and the KPI card. */
+  --shadow-accent: 0 4px 14px rgb(255 216 95 / 0.45);
 
-  /* پنل برند صفحات ورود. عمداً از --primary جدا است: --primary در تم تیره
-     روشن می‌شود تا متن رویش خوانا بماند، و یک پنل تمام‌قد با آن رنگ، صفحهٔ
-     تیره را به یک سطح آبی روشن تبدیل می‌کرد. */
+  /* پنل برند صفحات ورود: از یاسیِ گرم به زردِ برند. */
   --brand-panel: linear-gradient(
     155deg,
-    var(--brand-500) 0%,
-    var(--brand-700) 55%,
-    var(--brand-900) 100%
+    var(--brand) 0%,
+    var(--brand-deep) 45%,
+    #e0a800 100%
   );
+
+  /* نمودارها روی سطح سفید می‌نشینند. */
+  --chart-surface: var(--surface);
+
+  /*
+   * The one dark panel per screen — the reference design's black card.
+   *
+   * A semantic token rather than --ink used directly, because in the dark
+   * theme a #303030 card sits on a #303030 surface and disappears. There it
+   * becomes the darkest step instead, so the panel still reads as a distinct
+   * layer. The text on it is near-white in both themes, which is why the
+   * card sets its own text tokens rather than inheriting them.
+   */
+  --panel-ink: var(--ink);
+  --panel-ink-border: var(--ink);
+  --panel-ink-track: #4a4a48;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* نه سیاه مطلق: لایه‌ها باید از هم قابل تشخیص باشند، و مشکیِ خالص
-     روی نمایشگر OLED لبه‌ها را حذف می‌کند. پایه، همان سکندریِ گایدلاین
-     است یک پله تیره‌تر، تا --surface روی آن دیده شود. */
-  --bg: #080d18;
-  --surface: var(--secondary-900);
-  --surface-alt: var(--secondary-800);
-  --surface-sunken: #060a12;
-  --surface-raised: var(--secondary-800);
+  /*
+   * The dark theme is the given ink, spread into a scale rather than used at
+   * one value: #303030 is the *surface*, with the page behind it darker and
+   * the raised layer lighter, so the three still separate. Pure black is
+   * avoided for the same reason as before — on OLED it deletes the edges.
+   */
+  --bg: #1a1a19;
+  --surface: var(--ink-700);
+  --surface-alt: var(--ink-600);
+  --surface-sunken: #141413;
+  --surface-raised: var(--ink-600);
 
-  --border: var(--secondary-800);
-  --border-strong: var(--secondary-600);
+  --border: #434343;
+  --border-strong: #565656;
   --border-field: var(--field-border-dark);
-  --border-subtle: #18202f;
+  --border-subtle: #3a3a3a;
 
-  --text-primary: var(--secondary-100);
-  --text-secondary: var(--secondary-400);
-  --text-muted: var(--muted-text-dark);
-  --text-inverse: var(--secondary-900);
+  --text-primary: #f5f2ea;
+  --text-secondary: #bdb9b0;
+  --text-muted: #9c9890;
+  --text-inverse: var(--ink);
 
-  /* دو پله روشن‌تر از تم لایت: #345bf7 روی زمینهٔ تیره کنتراستش به ۳:۱
-     می‌افتد، که برای متن زیر حد AA است. */
-  --primary: var(--brand-300);
-  --primary-hover: var(--brand-200);
-  --primary-active: var(--brand-100);
-  --primary-soft: #16213f;
-  --primary-soft-hover: #1d2b52;
-  --primary-border: #2a3a6b;
-  /* Dark, not white: white on #6583f9 is about 3.4:1, under AA for
-     button-sized text. Against this near-black it is roughly 5.5:1. */
-  --primary-fg: #060d1c;
+  /*
+   * Inverted from the light theme: on a dark page an ink button *is* the
+   * page, so the pressable surface becomes the near-white and the label
+   * goes dark. Contrast is the same 13:1, just the other way round.
+   */
+  --primary: #f5f2ea;
+  --primary-hover: var(--paper);
+  --primary-active: #e6e2d8;
+  --primary-soft: #3a3a38;
+  --primary-soft-hover: #464644;
+  --primary-border: #565654;
+  --primary-fg: var(--ink);
+
+  /* The yellow needs no adjusting here — 11:1 on this surface, and it is the
+     one colour that should look identical in both themes. */
+  --accent: var(--brand);
+  --accent-hover: #ffe28a;
+  --accent-soft: #4a3f1c;
+  --accent-tint: #3a3324;
+  --accent-border: #6b5a24;
+  --accent-fg: var(--ink);
+  --accent-text: #ffd85f;
 
   /* پایه‌ها روشن‌تر و tintها به تیره برمی‌گردند — یک بج با پس‌زمینهٔ
-     #dcfce7 روی صفحهٔ تیره مثل برچسب فسفری می‌زند. */
+     روشن روی صفحهٔ تیره مثل برچسب فسفری می‌زند. */
   --success: #4ade80;
   --success-strong-fg: #86efac;
-  --success-soft: #0b2b1b;
+  --success-soft: #16301f;
   --warning: #fbbf24;
   --warning-strong-fg: #fcd34d;
-  --warning-soft: #2e1f05;
+  --warning-soft: #33270c;
   --danger: #f87171;
   --danger-hover: #fca5a5;
   --danger-strong-fg: #fca5a5;
-  --danger-soft: #341112;
+  --danger-soft: #351b1a;
   --info: #22d3ee;
   --info-strong-fg: #67e8f9;
-  --info-soft: #082f36;
+  --info-soft: #123339;
 
-  /* Inverted here: on a dark page the strong steps are too close to the
-     background to read as a button, so the fill is the light tone and the
-     label goes dark — the same trade --primary-fg makes. */
   --danger-fill: #f87171;
   --warning-fill: #fbbf24;
   --success-fill: #4ade80;
-  --on-status: #060d1c;
+  --on-status: var(--ink);
 
-  /* سایه روی زمینهٔ تیره تقریباً دیده نمی‌شود، پس تیره‌تر و عمیق‌تر
-     می‌شود و بار جداسازی لایه‌ها بیشتر روی --border می‌افتد. */
   --shadow-color: 0 0 0;
   --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.3);
   --shadow-sm:
@@ -284,11 +377,41 @@
     0 8px 16px rgb(var(--shadow-color) / 0.35),
     0 28px 56px rgb(var(--shadow-color) / 0.55);
 
-  --shadow-primary: 0 2px 8px rgb(101 131 249 / 0.2);
+  --shadow-primary: 0 2px 8px rgb(0 0 0 / 0.4);
+  --shadow-accent: 0 4px 14px rgb(255 216 95 / 0.18);
 
-  /* همان پنل، ولی به سمت سرمه‌ای عمیق. هنوز آبیِ برند است، ولی در کنار
-     زمینهٔ تیره یک سطح است نه یک چراغ. */
-  --brand-panel: linear-gradient(155deg, #16307e 0%, #102258 55%, #0a152f 100%);
+  --brand-panel: linear-gradient(155deg, #4a3f1c 0%, #33301f 55%, #1f1e18 100%);
+
+  /*
+   * The dark theme's own series steps, selected rather than flipped: the band
+   * a mark has to sit in on a dark surface is OKLCH L 0.48–0.67, much
+   * narrower than the light one, and every light-theme step is above it.
+   * Validated against #303030 — all eight inside the band, worst adjacent
+   * ΔE 8.8 deutan, 17.9 normal-vision, all ≥ 3:1.
+   *
+   * Slot 1 is the muddiest compromise in the palette and knowingly so: gold
+   * is intrinsically light, and forcing it under L 0.67 costs it most of its
+   * cheer. The brand yellow keeps every job where it is a fill rather than a
+   * thin mark, and there it stays #FFD85F in both themes.
+   */
+  --series-1: #b98a1b;
+  --series-2: #4a8fe0;
+  --series-3: #16a278;
+  --series-4: #db5f3c;
+  --series-5: #8e6ee8;
+  --series-6: #d0568b;
+  --series-7: #5fab3a;
+  --series-8: #2694ad;
+
+  --chart-track: #454543;
+  --chart-grid: #414140;
+  --chart-surface: var(--surface);
+
+  /* Darker than --surface here, not lighter: the panel has to separate from
+     the cards around it, and on this theme those are already the ink. */
+  --panel-ink: #141413;
+  --panel-ink-border: #2e2e2c;
+  --panel-ink-track: #3a3a38;
 }
 
 /* -------------------------------------------------------------------
@@ -343,6 +466,16 @@
   --color-primary-border: var(--primary-border);
   --color-primary-fg: var(--primary-fg);
 
+  /* The yellow. `bg-accent text-accent-fg` is the highlight pair;
+     `text-accent-text` is the only legible way to *write* in the brand. */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-border: var(--accent-border);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+
   /* هر وضعیت دو رنگ متن دارد: پایه برای پرکردن و نقطه، و -fg برای متن
      روی زمینهٔ روشن. بج‌ها ترکیب `bg-*-soft text-*-fg` را می‌گیرند. */
   --color-success: var(--success);
@@ -367,6 +500,27 @@
   --color-success-fill: var(--success-fill);
   --color-on-status: var(--on-status);
 
+  /* نمودارها. هر سری یک شکاف ثابت است و به‌ترتیب داده می‌شود؛ سری نهم
+     رنگ تازه نمی‌گیرد، در «سایر» جمع می‌شود. */
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-series-7: var(--series-7);
+  --color-series-8: var(--series-8);
+  /* The raw ink, for the few places that want it regardless of theme —
+     a tooltip, a dark panel's own border. */
+  --color-ink: var(--ink);
+  --color-panel-ink: var(--panel-ink);
+  --color-panel-ink-border: var(--panel-ink-border);
+  --color-panel-ink-track: var(--panel-ink-track);
+
+  --color-chart-track: var(--chart-track);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-surface: var(--chart-surface);
+
   /* بازتعریف مقیاس سایهٔ Tailwind، تا `shadow-md` در تم تیره هم درست
      دربیاید و صفحات مجبور نباشند برای هر تم کلاس جدا بنویسند. */
   --shadow-xs: var(--shadow-xs);
@@ -375,6 +529,7 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-primary: var(--shadow-primary);
+  --shadow-accent: var(--shadow-accent);
 
   /* شعاع گوشه‌ها، مطابق مرجع: کارت‌ها ۱۲px، فیلدها و دکمه‌ها ۸px */
   --radius-card: 0.75rem;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { getPaymentHistory, getQuote, startCheckout } from "../api";
@@ -316,11 +317,15 @@ export default function Subscription() {
           </div>
         </div>
       )}
-      <PaymentReceipt
-        payment={receipt}
-        isOpen={receipt !== null}
-        onClose={() => setReceipt(null)}
-      />
+      <AnimatePresence>
+        {receipt !== null && (
+          <PaymentReceipt
+            payment={receipt}
+            isOpen
+            onClose={() => setReceipt(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

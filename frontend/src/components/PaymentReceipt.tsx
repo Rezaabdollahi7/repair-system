@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { XMarkIcon, PrinterIcon } from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
+import PrintPreviewModal from "./PrintPreviewModal";
 import type { SubscriptionPayment } from "../types/api";
 
 interface PaymentReceiptProps {
@@ -45,116 +45,111 @@ export default function PaymentReceipt({
   if (!isOpen || !payment) return null;
 
   return (
-    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50 p-4">
+    <PrintPreviewModal
+      title="رسید پرداخت"
+      onPrint={handlePrint}
+      onClose={onClose}
+      maxWidth="32rem"
+      showPdfButton={false}
+    >
       <div
-        className="bg-surface rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
-        dir="rtl"
+        ref={printRef}
+        className="print-sheet bg-surface mx-auto max-w-[148mm] p-8 shadow-sm rounded-card"
       >
-        <div className="flex items-center justify-between p-4 border-b border-border no-print">
-          <h3 className="text-lg font-bold text-text-primary">رسید پرداخت</h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-3 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover flex items-center gap-1 text-sm"
-            >
-              <PrinterIcon className="w-4 h-4" />
-              چاپ / PDF
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
-            >
-              <XMarkIcon className="w-5 h-5" />
-            </button>
-          </div>
+        <div className="avoid-break border-b-2 border-border-strong pb-4 mb-6 text-center">
+          <h1 className="text-xl font-bold text-primary">دوفیکسو</h1>
+          <p className="mt-1 text-xs text-text-secondary">
+            سامانه مدیریت تعمیرگاه
+          </p>
+          <p className="text-xs text-text-secondary">dofixo.ir</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div ref={printRef} className="print-sheet bg-surface p-6">
-            <div className="border-b-2 border-border pb-4 mb-6 text-center">
-              <h1 className="text-2xl font-bold text-primary">دوفیکسو</h1>
-              <p className="text-sm text-text-secondary mt-1">
-                سامانه مدیریت تعمیرگاه
-              </p>
-              <p className="text-sm text-text-secondary">dofixo.ir</p>
-            </div>
+        <h2 className="text-xs font-bold text-text-secondary mb-2">
+          رسید پرداخت اشتراک
+        </h2>
 
-            <h2 className="font-medium text-text-primary mb-3">
-              رسید پرداخت اشتراک
-            </h2>
+        <table className="w-full text-sm">
+          <tbody>
+            <Row label="شماره سفارش" value={payment.order_id} ltr />
+            <Row label="تاریخ پرداخت" value={formatDate(payment.paid_at)} />
+            <Row label="پلن" value={payment.plan_name} />
+            {payment.ref_number && (
+              <Row label="شماره پیگیری" value={payment.ref_number} ltr />
+            )}
+            {payment.card_number && (
+              <Row label="شماره کارت" value={payment.card_number} ltr />
+            )}
+            {payment.created_by_name && (
+              <Row label="پرداخت‌کننده" value={payment.created_by_name} />
+            )}
+          </tbody>
+        </table>
 
-            <table className="w-full text-sm">
-              <tbody>
-                <Row label="شماره سفارش" value={payment.order_id} mono />
-                <Row label="تاریخ پرداخت" value={formatDate(payment.paid_at)} />
-                <Row label="پلن" value={payment.plan_name} />
-                {payment.ref_number && (
-                  <Row label="شماره پیگیری" value={payment.ref_number} mono />
-                )}
-                {payment.card_number && (
-                  <Row label="شماره کارت" value={payment.card_number} mono />
-                )}
-                {payment.created_by_name && (
-                  <Row label="پرداخت‌کننده" value={payment.created_by_name} />
-                )}
-              </tbody>
-            </table>
-
-            <table className="w-full text-sm mt-6 border-t border-border pt-3">
-              <tbody>
+        {/* The money, in its own block so the amount paid is not one more
+            line in a list of metadata. */}
+        <div className="avoid-break mt-6 rounded-card bg-surface-alt px-4 py-3">
+          <table className="w-full text-sm">
+            <tbody>
+              <Row
+                label="قیمت پلن"
+                value={`${toToman(payment.base_price_rials)} تومان`}
+              />
+              {payment.discount_rials > 0 && (
                 <Row
-                  label="قیمت پلن"
-                  value={`${toToman(payment.base_price_rials)} تومان`}
+                  label="تخفیف"
+                  value={`− ${toToman(payment.discount_rials)} تومان`}
                 />
-                {payment.discount_rials > 0 && (
-                  <Row
-                    label="تخفیف"
-                    value={`− ${toToman(payment.discount_rials)} تومان`}
-                  />
-                )}
-              </tbody>
-            </table>
+              )}
+            </tbody>
+          </table>
 
-            <div className="flex justify-between items-center mt-3 pt-3 border-t-2 border-border">
-              <span className="font-bold text-text-primary">
-                مبلغ پرداخت‌شده
-              </span>
-              <span className="font-bold text-primary text-lg">
-                {toToman(payment.amount_rials)} تومان
-              </span>
-            </div>
-
-            <p className="mt-8 text-xs text-text-secondary text-center">
-              پرداخت از طریق درگاه امن زیبال انجام شده است.
-            </p>
-            {/* Said plainly rather than left to be discovered by someone who
-                needs one for their accounts. */}
-            <p className="mt-1 text-xs text-text-secondary text-center">
-              این رسید فاکتور رسمی مالیاتی نیست.
-            </p>
+          <div className="flex justify-between items-center mt-2 pt-2.5 border-t border-border">
+            <span className="font-bold text-text-primary">مبلغ پرداخت‌شده</span>
+            <span className="text-base font-bold text-primary">
+              {toToman(payment.amount_rials)} تومان
+            </span>
           </div>
         </div>
+
+        <p className="mt-8 text-xs text-text-secondary text-center">
+          پرداخت از طریق درگاه امن زیبال انجام شده است.
+        </p>
+        {/* Said plainly rather than left to be discovered by someone who
+            needs one for their accounts. */}
+        <p className="mt-1 text-xs text-text-secondary text-center">
+          این رسید فاکتور رسمی مالیاتی نیست.
+        </p>
       </div>
-    </div>
+    </PrintPreviewModal>
   );
 }
 
+/**
+ * `ltr` replaces what used to be `mono`. Peyda has no monospace face, so the
+ * class only ever picked whatever the browser had; what an order id or a
+ * card number actually needs is a direction, because a Latin reference
+ * inside an RTL sheet gets reordered around its separators.
+ */
 function Row({
   label,
   value,
-  mono,
+  ltr,
 }: {
   label: string;
   value: string;
-  mono?: boolean;
+  ltr?: boolean;
 }) {
   return (
     <tr>
       <td className="py-1.5 text-text-secondary">{label}</td>
-      <td
-        className={`py-1.5 text-left text-text-primary ${mono ? "font-mono" : ""}`}
-      >
-        {value}
+      <td className="py-1.5 text-left text-text-primary font-medium">
+        {ltr ? (
+          <span dir="ltr" className="inline-block tracking-wide">
+            {value}
+          </span>
+        ) : (
+          value
+        )}
       </td>
     </tr>
   );

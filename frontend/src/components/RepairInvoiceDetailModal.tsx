@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import axios from "axios";
 import {
   getRepairInvoice,
@@ -789,13 +789,15 @@ export default function RepairInvoiceDetailModal({
       />
 
       {/* Print Preview */}
-      {showPreview && (
-        <InvoicePreview
-          invoice={invoice}
-          isOpen={showPreview}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
+      <AnimatePresence>
+        {showPreview && (
+          <InvoicePreview
+            invoice={invoice}
+            isOpen
+            onClose={() => setShowPreview(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

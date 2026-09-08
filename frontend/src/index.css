@@ -473,6 +473,54 @@ body {
    نباشد بر utilityهای Tailwind (که در @layer utilities هستند) مقدم
    می‌شود، و کامپوننتی که حلقهٔ خودش را دارد و `focus:outline-none`
    نوشته، هر دو را با هم می‌گرفت. */
+/* ===================================================================
+   ۴. چاپ
+   -------------------------------------------------------------------
+   react-to-print محتوای `.print-sheet` را داخل یک iframe کپی می‌کند و
+   همین شیوه‌نامه هم با آن می‌رود، پس قواعد زیر همان‌جا اعمال می‌شوند.
+   بخش ۲ رنگ‌های روشن را به آن داده؛ این بخش کاغذ را می‌دهد.
+   =================================================================== */
+
+@page {
+  size: A4;
+  /* حاشیهٔ ۱۲ میلی‌متری: کمتر از این را خیلی از چاپگرها نمی‌توانند چاپ
+     کنند و متن لبه را می‌بُرند. فاکتور فروش این را با pageStyle خودش
+     بازنویسی می‌کند، چون A5 و رول حرارتی ۸۰ میلی‌متری هم دارد. */
+  margin: 12mm;
+}
+
+@media print {
+  .print-sheet {
+    /* بدون این، مرورگر زمینهٔ ردیف سرستون و پنل جمع کل را حذف می‌کند و
+       جدول بدون هیچ تفکیکی چاپ می‌شود. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 0 !important;
+  }
+
+  /* سرستون روی هر صفحه تکرار شود. یک فاکتور با سی قلم به صفحهٔ دوم
+     می‌رود و بدون این، آن صفحه ستون‌های بی‌عنوان دارد. */
+  .print-sheet thead {
+    display: table-header-group;
+  }
+
+  .print-sheet tfoot {
+    display: table-footer-group;
+  }
+
+  /* هیچ ردیفی نصفه نشود، و هیچ بلوکی از عنوانش جدا نیفتد. */
+  .print-sheet tr,
+  .print-sheet .avoid-break {
+    break-inside: avoid;
+  }
+
+  .print-sheet h1,
+  .print-sheet h2,
+  .print-sheet h3 {
+    break-after: avoid;
+  }
+}
+
 @layer base {
   /*
    * framer-motion is handled at the root by <MotionConfig reducedMotion="user">

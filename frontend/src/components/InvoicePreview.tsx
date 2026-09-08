@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { getSettings } from "../api";
-import {
-  XMarkIcon,
-  PrinterIcon,
-  ArrowDownTrayIcon,
-} from "@heroicons/react/24/solid";
 import { useReactToPrint } from "react-to-print";
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import PrintPreviewModal from "./PrintPreviewModal";
 import type { AppSettings, RepairInvoiceDetail } from "../types/api";
 
 interface InvoicePreviewProps {
@@ -15,20 +11,73 @@ interface InvoicePreviewProps {
   onClose: () => void;
 }
 
+/** A label above its value, which is how every field on this sheet reads. */
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-1.5">
+      <span className="text-text-secondary shrink-0">{label}:</span>
+      <span className="text-text-primary font-medium">{value || "—"}</span>
+    </div>
+  );
+}
+
+/*
+ * One row of the totals panel.
+ *
+ * The four of them used to be table rows spanning five columns of the items
+ * table, which meant the amounts were only aligned with the "جمع" column by
+ * coincidence and the labels sat under "قیمت واحد".
+ */
+function Total({
+  label,
+  value,
+  tone = "normal",
+}: {
+  label: string;
+  value: string;
+  tone?: "normal" | "danger" | "grand";
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-6 py-1.5 ${
+        tone === "grand"
+          ? "border-t border-border mt-1.5 pt-2.5 text-base font-bold"
+          : "text-sm"
+      }`}
+    >
+      <span
+        className={
+          tone === "grand" ? "text-text-primary" : "text-text-secondary"
+        }
+      >
+        {label}
+      </span>
+      <span
+        className={
+          tone === "danger"
+            ? "text-danger-fg"
+            : tone === "grand"
+              ? "text-primary"
+              : "text-text-primary"
+        }
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export default function InvoicePreview({
   invoice,
   isOpen,
   onClose,
 }: InvoicePreviewProps) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [, setLoading] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      getSettings()
-        .then((res) => setSettings(res.data))
-        .finally(() => setLoading(false));
+      getSettings().then((res) => setSettings(res.data));
     }
   }, [isOpen]);
 
@@ -40,322 +89,244 @@ export default function InvoicePreview({
     documentTitle: invoice?.invoice_number || "فاکتور",
   });
 
-  // The browser's print dialog offers Save as PDF, so this is the same action
-  // under a name people look for.
-  const handleDownloadPDF = () => {
-    handlePrint();
-  };
-
   if (!isOpen || !invoice) return null;
 
+  const th =
+    "px-3 py-2.5 text-xs font-bold text-text-secondary border-b border-border-strong";
+  const td = "px-3 py-2.5 text-sm text-text-primary border-b border-border";
+
   return (
-    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50 p-4">
+    <PrintPreviewModal
+      title="پیش‌نمایش فاکتور تعمیر"
+      onPrint={handlePrint}
+      onClose={onClose}
+    >
       <div
-        className="bg-surface rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
-        dir="rtl"
+        ref={printRef}
+        className="print-sheet bg-surface mx-auto max-w-[210mm] p-8 shadow-sm rounded-card"
       >
-        {/* Header - no-print */}
-        <div className="flex items-center justify-between p-4 border-b border-border no-print">
-          <h3 className="text-lg font-bold text-text-primary">
-            پیش‌نمایش فاکتور
-          </h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-3 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover flex items-center gap-1 text-sm"
+        {/* ── Letterhead ─────────────────────────────────────────────── */}
+        <div className="avoid-break flex items-start justify-between gap-6 pb-5 border-b-2 border-border-strong">
+          <div className="flex items-start gap-4">
+            {settings?.company_logo && (
+              <img
+                src={settings.company_logo}
+                alt=""
+                className="h-16 w-auto object-contain"
+              />
+            )}
+            <div>
+              <h2 className="text-xl font-bold text-text-primary">
+                {settings?.company_name || "تعمیرگاه"}
+              </h2>
+              <div className="mt-1 space-y-0.5 text-xs text-text-secondary">
+                {settings?.company_address && <p>{settings.company_address}</p>}
+                {settings?.company_phone && (
+                  <p>تلفن: {toPersianDigits(settings.company_phone)}</p>
+                )}
+                {settings?.company_email && <p>{settings.company_email}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/*
+            The invoice number is the one thing someone looking for this
+            sheet in a drawer reads first, so it gets a tinted block of its
+            own rather than being a line of body text beside the address.
+          */}
+          <div className="text-left shrink-0">
+            <h1 className="text-lg font-bold text-primary">فاکتور تعمیر</h1>
+            <p
+              dir="ltr"
+              className="mt-1.5 inline-block rounded-field bg-primary-soft px-2.5 py-1
+                         text-base font-bold tracking-wide text-primary"
             >
-              <PrinterIcon className="w-4 h-4" />
-              چاپ
-            </button>
-            <button
-              onClick={handleDownloadPDF}
-              className="px-3 py-2 bg-success-fill text-on-status rounded-field hover:opacity-90 transition-opacity flex items-center gap-1 text-sm"
-            >
-              <ArrowDownTrayIcon className="w-4 h-4" />
-              PDF
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
-            >
-              <XMarkIcon className="w-5 h-5" />
-            </button>
+              {invoice.invoice_number}
+            </p>
+            <p className="mt-1.5 text-xs text-text-secondary">
+              تاریخ: {formatDate(invoice.invoice_date)}
+            </p>
           </div>
         </div>
 
-        {/* Invoice Content - Printable */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div ref={printRef} className="print-sheet bg-surface p-6">
-            {/* Company Header */}
-            <div className="border-b-2 border-border pb-4 mb-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  {settings?.company_logo && (
-                    <img
-                      src={settings.company_logo}
-                      alt="Logo"
-                      className="h-16 w-auto object-contain"
-                    />
-                  )}
-                  <div>
-                    <h2 className="text-xl font-bold text-text-primary">
-                      {settings?.company_name || "تعمیرگاه"}
-                    </h2>
-                    {settings?.company_address && (
-                      <p className="text-sm text-text-secondary mt-1">
-                        {settings.company_address}
-                      </p>
-                    )}
-                    {settings?.company_phone && (
-                      <p className="text-sm text-text-secondary">
-                        تلفن: {settings.company_phone}
-                      </p>
-                    )}
-                    {settings?.company_email && (
-                      <p className="text-sm text-text-secondary">
-                        ایمیل: {settings.company_email}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="text-left">
-                  <h1 className="text-2xl font-bold text-primary mb-2">
-                    فاکتور تعمیر
-                  </h1>
-                  <p className="text-lg font-mono font-medium text-text-primary">
-                    {invoice.invoice_number}
-                  </p>
-                  <p className="text-sm text-text-secondary mt-1">
-                    تاریخ: {formatDate(invoice.invoice_date)}
-                  </p>
-                </div>
-              </div>
+        {/* ── Customer & device ──────────────────────────────────────── */}
+        <div className="avoid-break grid grid-cols-2 gap-5 mt-6">
+          <section>
+            <h3 className="text-xs font-bold text-text-secondary pb-1.5 mb-2 border-b border-border">
+              اطلاعات مشتری
+            </h3>
+            <div className="space-y-1 text-sm">
+              <Field label="نام" value={invoice.customer_name || ""} />
+              <Field
+                label="شماره تماس"
+                value={toPersianDigits(invoice.customer_phone) || ""}
+              />
             </div>
+          </section>
 
-            {/* Customer & Device Info */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="border border-border rounded-lg p-4">
-                <h3 className="font-medium text-text-primary mb-3 pb-2 border-b border-border">
-                  اطلاعات مشتری
-                </h3>
-                <div className="space-y-1">
-                  <p>
-                    <span className="text-text-secondary">نام:</span>{" "}
-                    <span className="font-medium text-text-primary">
-                      {invoice.customer_name || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-text-secondary">شماره تماس:</span>{" "}
-                    <span className="text-text-primary">
-                      {invoice.customer_phone || "—"}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <div className="border border-border rounded-lg p-4">
-                <h3 className="font-medium text-text-primary mb-3 pb-2 border-b border-border">
-                  اطلاعات دستگاه
-                </h3>
-                <div className="space-y-1">
-                  <p>
-                    <span className="text-text-secondary">شماره پذیرش:</span>{" "}
-                    <span className="font-mono text-text-primary">
-                      {invoice.device_id}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-text-secondary">دستگاه:</span>{" "}
-                    <span className="font-medium text-text-primary">
-                      {invoice.device_name}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-text-secondary">برند:</span>{" "}
-                    <span className="text-text-primary">
-                      {invoice.brand || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-text-secondary">مدل:</span>{" "}
-                    <span className="text-text-primary">
-                      {invoice.model || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-text-secondary">سریال:</span>{" "}
-                    <span className="text-text-primary">
-                      {invoice.serial_number || "—"}
-                    </span>
-                  </p>
-                </div>
-              </div>
+          <section>
+            <h3 className="text-xs font-bold text-text-secondary pb-1.5 mb-2 border-b border-border">
+              اطلاعات دستگاه
+            </h3>
+            <div className="space-y-1 text-sm">
+              <Field
+                label="شماره پذیرش"
+                value={toPersianDigits(invoice.device_id)}
+              />
+              <Field label="دستگاه" value={invoice.device_name} />
+              <Field label="برند" value={invoice.brand || ""} />
+              <Field label="مدل" value={invoice.model || ""} />
+              <Field label="سریال" value={invoice.serial_number || ""} />
             </div>
+          </section>
+        </div>
 
-            {/* Items Table */}
-            <div className="mb-6">
-              <h3 className="font-medium text-text-primary mb-3">
-                اقلام فاکتور
-              </h3>
-              <table className="w-full border-collapse border border-border">
-                <thead className="bg-surface-alt">
-                  <tr>
-                    <th className="border border-border px-3 py-2 text-sm text-right text-text-primary">
-                      #
-                    </th>
-                    <th className="border border-border px-3 py-2 text-sm text-right text-text-primary">
-                      شرح
-                    </th>
-                    <th className="border border-border px-3 py-2 text-sm text-center text-text-primary">
-                      تعداد
-                    </th>
-                    <th className="border border-border px-3 py-2 text-sm text-center text-text-primary">
-                      واحد
-                    </th>
-                    <th className="border border-border px-3 py-2 text-sm text-left text-text-primary">
-                      قیمت واحد
-                    </th>
-                    <th className="border border-border px-3 py-2 text-sm text-left text-text-primary">
-                      جمع
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoice.items?.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="border border-border px-3 py-2 text-sm text-center text-text-primary">
-                        {index + 1}
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-text-primary">
-                        {item.name}
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-center text-text-primary">
-                        {item.quantity}
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-center text-text-primary">
-                        {item.unit}
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-left text-text-primary">
-                        {formatPersianCurrency(item.unit_price)}
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-left font-medium text-text-primary">
-                        {formatPersianCurrency(item.total_price)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-surface-alt">
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="border border-border px-3 py-2 text-sm text-left text-text-primary"
-                    >
-                      جمع کل:
-                    </td>
-                    <td className="border border-border px-3 py-2 text-sm text-left font-medium text-text-primary">
-                      {formatPersianCurrency(invoice.subtotal)}
-                    </td>
-                  </tr>
-                  {invoice.discount_amount > 0 && (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="border border-border px-3 py-2 text-sm text-left text-text-primary"
-                      >
-                        تخفیف:
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-left text-danger-fg">
-                        ({formatPersianCurrency(invoice.discount_amount)})
-                      </td>
-                    </tr>
-                  )}
-                  {invoice.tax_amount > 0 && (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="border border-border px-3 py-2 text-sm text-left text-text-primary"
-                      >
-                        مالیات (%{invoice.tax_rate}):
-                      </td>
-                      <td className="border border-border px-3 py-2 text-sm text-left text-text-primary">
-                        {formatPersianCurrency(invoice.tax_amount)}
-                      </td>
-                    </tr>
-                  )}
-                  <tr className="font-bold">
-                    <td
-                      colSpan={5}
-                      className="border border-border px-3 py-2 text-sm text-left text-text-primary"
-                    >
-                      مبلغ قابل پرداخت:
-                    </td>
-                    <td className="border border-border px-3 py-2 text-sm text-left text-primary">
-                      {formatPersianCurrency(invoice.total_amount)} ریال
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+        {/* ── Items ──────────────────────────────────────────────────── */}
+        <div className="mt-6">
+          <h3 className="text-xs font-bold text-text-secondary mb-2">
+            اقلام فاکتور
+          </h3>
+          {/*
+            Horizontal rules only. The full cell grid this had was a lot of
+            ink for lines nobody reads, and it made a four-line invoice look
+            like a spreadsheet.
+          */}
+          <table className="w-full border-collapse">
+            <thead className="bg-surface-alt">
+              <tr>
+                <th className={`${th} text-right w-10`}>#</th>
+                <th className={`${th} text-right`}>شرح</th>
+                <th className={`${th} text-center w-16`}>تعداد</th>
+                <th className={`${th} text-center w-20`}>واحد</th>
+                <th className={`${th} text-left w-32`}>قیمت واحد</th>
+                <th className={`${th} text-left w-32`}>جمع</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.items?.map((item, index) => (
+                <tr key={item.id}>
+                  <td className={`${td} text-center text-text-secondary`}>
+                    {toPersianDigits(index + 1)}
+                  </td>
+                  <td className={td}>{item.name}</td>
+                  <td className={`${td} text-center`}>
+                    {toPersianDigits(item.quantity)}
+                  </td>
+                  <td className={`${td} text-center text-text-secondary`}>
+                    {item.unit}
+                  </td>
+                  <td className={`${td} text-left`}>
+                    {formatPersianCurrency(item.unit_price)}
+                  </td>
+                  <td className={`${td} text-left font-medium`}>
+                    {formatPersianCurrency(item.total_price)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-            {/* Warranty & Notes */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div>
-                <h3 className="font-medium text-text-primary mb-2">گارانتی</h3>
-                <p className="text-sm text-text-primary">
-                  {invoice.warranty_months > 0
-                    ? `${invoice.warranty_months} ماه (تا تاریخ ${formatDate(invoice.warranty_until)})`
-                    : "بدون گارانتی"}
-                </p>
-                {invoice.technician_name && (
-                  <p className="text-sm text-text-secondary mt-1">
-                    تعمیرکار: {invoice.technician_name}
-                  </p>
-                )}
-              </div>
-              <div>
-                <h3 className="font-medium text-text-primary mb-2">توضیحات</h3>
-                <p className="text-sm text-text-primary">
-                  {invoice.notes || "—"}
-                </p>
-              </div>
-            </div>
+        {/* ── Totals ─────────────────────────────────────────────────── */}
+        <div className="avoid-break flex justify-start mt-5">
+          <div className="w-full max-w-xs rounded-card bg-surface-alt px-4 py-3">
+            <Total
+              label="جمع کل"
+              value={formatPersianCurrency(invoice.subtotal)}
+            />
+            {invoice.discount_amount > 0 && (
+              <Total
+                label="تخفیف"
+                tone="danger"
+                value={`− ${formatPersianCurrency(invoice.discount_amount)}`}
+              />
+            )}
+            {invoice.tax_amount > 0 && (
+              <Total
+                label={`مالیات (${toPersianDigits(invoice.tax_rate)}٪)`}
+                value={formatPersianCurrency(invoice.tax_amount)}
+              />
+            )}
+            <Total
+              label="مبلغ قابل پرداخت"
+              tone="grand"
+              value={`${formatPersianCurrency(invoice.total_amount)} ریال`}
+            />
+          </div>
+        </div>
 
-            {/* Footer with Stamp & Signature */}
-            <div className="border-t-2 border-border pt-6 mt-6">
-              <div className="flex items-end justify-between">
-                <div className="text-center space-y-2">
-                  {settings?.signature_image && (
-                    <img
-                      src={settings.signature_image}
-                      alt="Signature"
-                      className="h-16 w-auto object-contain mx-auto"
-                    />
-                  )}
-                  <p className="text-sm text-text-secondary">امضا</p>
-                </div>
-                <div className="text-center space-y-2">
-                  {settings?.stamp_image && (
-                    <img
-                      src={settings.stamp_image}
-                      alt="Stamp"
-                      className="h-20 w-auto object-contain mx-auto"
-                    />
-                  )}
-                  <p className="text-sm text-text-secondary">مهر شرکت</p>
-                </div>
-              </div>
+        {/* ── Warranty & notes ───────────────────────────────────────── */}
+        <div className="avoid-break grid grid-cols-2 gap-5 mt-6">
+          <section>
+            <h3 className="text-xs font-bold text-text-secondary pb-1.5 mb-2 border-b border-border">
+              گارانتی
+            </h3>
+            <p className="text-sm text-text-primary">
+              {invoice.warranty_months > 0
+                ? `${toPersianDigits(invoice.warranty_months)} ماه — تا ${formatDate(invoice.warranty_until)}`
+                : "بدون گارانتی"}
+            </p>
+            {invoice.technician_name && (
+              <p className="mt-1 text-xs text-text-secondary">
+                تعمیرکار: {invoice.technician_name}
+              </p>
+            )}
+          </section>
+          <section>
+            <h3 className="text-xs font-bold text-text-secondary pb-1.5 mb-2 border-b border-border">
+              توضیحات
+            </h3>
+            <p className="text-sm text-text-primary whitespace-pre-line">
+              {invoice.notes || "—"}
+            </p>
+          </section>
+        </div>
 
-              {settings?.invoice_footer_text && (
-                <div className="mt-6 text-center">
-                  <p className="text-sm text-text-secondary italic">
-                    {settings.invoice_footer_text}
-                  </p>
-                </div>
+        {/* ── Signature & stamp ──────────────────────────────────────── */}
+        <div className="avoid-break border-t-2 border-border-strong mt-8 pt-6">
+          <div className="flex items-end justify-between gap-8">
+            {/*
+              A ruled line under each block whether or not an image was
+              uploaded — most shops sign by hand on the printed sheet, and
+              an empty caption gave them nothing to sign on.
+            */}
+            <div className="w-44 text-center">
+              {settings?.signature_image ? (
+                <img
+                  src={settings.signature_image}
+                  alt=""
+                  className="h-16 w-auto object-contain mx-auto"
+                />
+              ) : (
+                <div className="h-16" />
               )}
+              <p className="border-t border-border pt-1.5 text-xs text-text-secondary">
+                امضا
+              </p>
+            </div>
+            <div className="w-44 text-center">
+              {settings?.stamp_image ? (
+                <img
+                  src={settings.stamp_image}
+                  alt=""
+                  className="h-16 w-auto object-contain mx-auto"
+                />
+              ) : (
+                <div className="h-16" />
+              )}
+              <p className="border-t border-border pt-1.5 text-xs text-text-secondary">
+                مهر شرکت
+              </p>
             </div>
           </div>
+
+          {settings?.invoice_footer_text && (
+            <p className="mt-6 text-center text-xs text-text-secondary">
+              {settings.invoice_footer_text}
+            </p>
+          )}
         </div>
       </div>
-    </div>
+    </PrintPreviewModal>
   );
 }

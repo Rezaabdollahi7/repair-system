@@ -1,6 +1,6 @@
 // src/components/SaleInvoiceDetailModal.jsx
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   getSaleInvoice,
   deleteSaleInvoice,
@@ -503,13 +503,15 @@ export default function SaleInvoiceDetailModal({
         </div>
       </motion.div>
 
-      {showPreview && (
-        <SaleInvoicePreview
-          invoice={invoice}
-          isOpen={showPreview}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
+      <AnimatePresence>
+        {showPreview && (
+          <SaleInvoicePreview
+            invoice={invoice}
+            isOpen
+            onClose={() => setShowPreview(false)}
+          />
+        )}
+      </AnimatePresence>
       <ConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}

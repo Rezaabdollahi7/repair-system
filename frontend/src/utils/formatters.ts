@@ -40,7 +40,15 @@ export function formatPersianCurrency(
   const num = Math.round(Number(amount));
   if (isNaN(num)) return "—";
 
-  return toPersianDigits(num.toLocaleString("en-US"));
+  /*
+   * The sign is written out rather than left to toLocaleString, so a negative
+   * amount reads the same here as it does from formatPersianCompact beside
+   * it: a real minus (U+2212) in front of the digits, not the hyphen that
+   * bidi reorders around a Persian number. Losses show up in the profit
+   * report and in the dashboard's net figure, so this is not hypothetical.
+   */
+  const sign = num < 0 ? "−" : "";
+  return sign + toPersianDigits(Math.abs(num).toLocaleString("en-US"));
 }
 
 /**
@@ -100,4 +108,18 @@ export function formatPersianDate(date: string | null | undefined): string {
   const parsed = new Date(date);
   if (isNaN(parsed.getTime())) return "—";
   return parsed.toLocaleDateString("fa-IR");
+}
+
+/**
+ * A percentage with Persian digits and the Persian percent sign — `٪۱۲٫۵`.
+ *
+ * The profit report was printing `12.5%`: Latin digits, a Latin decimal
+ * point, and the sign on the wrong side of the number for the direction the
+ * page reads in. One decimal, because the second is noise on a margin.
+ */
+export function formatPersianPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) return "—";
+  const sign = value < 0 ? "−" : "";
+  const text = Math.abs(value).toFixed(1).replace(/\.0$/, "");
+  return `${sign}٪${toPersianDigits(text).replace(".", "٫")}`;
 }

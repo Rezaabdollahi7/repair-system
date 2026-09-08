@@ -5,23 +5,36 @@ import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
 import ConfirmModal from "../components/ConfirmModal";
 import Pagination from "../components/Pagination";
-import { formatPersianPhone } from "../utils/formatters";
+import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
+import { motion } from "framer-motion";
 import {
   PlusIcon,
+  MagnifyingGlassIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/solid";
+/* Outline for the row's own controls — a solid heroicon at 18px is a disc. */
+import {
   PencilSquareIcon,
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
-  MagnifyingGlassIcon,
-  UserGroupIcon,
+} from "@heroicons/react/24/outline";
+/* Solid for the two badges, where the glyph is a 14px mark not a control. */
+import {
+  CheckCircleIcon as CheckCircleSolid,
+  XCircleIcon as XCircleSolid,
 } from "@heroicons/react/24/solid";
-import LoadingSpinner from "../components/LoadingSpinner";
+import StatusPill from "../components/StatusPill";
+import { roleStyleOf } from "../utils/roleStatus";
+import { staggerContainer, staggerItem } from "../motion";
 import {
   badge,
   iconButton,
+  rowCard,
   primaryButton,
+  secondaryButton,
   searchField,
   searchIcon,
   tableCard,
@@ -129,8 +142,145 @@ export default function PersonnelList() {
     }
   };
 
+  /**
+   * An admin may not act on a super admin or another admin.
+   *
+   * Hoisted out of the table body so the phone cards apply the same rule
+   * rather than re-deriving it — two copies of a permission check is one too
+   * many.
+   */
+  const outranks = (person: Personnel) =>
+    user?.role === "admin" &&
+    (person.role_name === "super_admin" || person.role_name === "admin");
+
+  const roleBadge = (person: Personnel) => {
+    const { color, tone } = roleStyleOf(person.role_name);
+    return (
+      <StatusPill
+        label={person.role_label}
+        color={color}
+        tone={tone}
+        size="sm"
+      />
+    );
+  };
+
+  /* Icon as well as colour: "active" and "inactive" must not be a hue
+     difference alone. */
+  const activeBadge = (person: Personnel) => (
+    <span
+      className={`${badge} gap-1 ${
+        person.is_active
+          ? "bg-success-soft text-success-fg"
+          : "bg-danger-soft text-danger-fg"
+      }`}
+    >
+      {person.is_active ? (
+        <CheckCircleSolid className="w-3.5 h-3.5" />
+      ) : (
+        <XCircleSolid className="w-3.5 h-3.5" />
+      )}
+      {person.is_active ? "فعال" : "غیرفعال"}
+    </span>
+  );
+
+  const avatar = (person: Personnel) => (
+    <span
+      className="w-8 h-8 shrink-0 rounded-full bg-surface-sunken flex items-center
+                 justify-center text-text-secondary font-bold text-body-xs"
+      aria-hidden="true"
+    >
+      {person.full_name?.charAt(0)}
+    </span>
+  );
+
+  /*
+   * Row actions, shared by the table row and the phone card.
+   *
+   * Neutral until hovered. The activate/deactivate button used to be tinted
+   * amber or green by the state it would *leave*, which read as the state the
+   * person is in — and that is already the «وضعیت» column's job, two cells
+   * over, saying the opposite thing.
+   */
+  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
+
+  const rowActions = (person: Personnel) => (
+    <div className="flex gap-1 justify-end items-center">
+      {!outranks(person) && (
+        <button
+          onClick={() => openPersonnelEdit(person.id)}
+          className={actionButton}
+          title="ویرایش"
+        >
+          <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      )}
+      {person.id !== user?.id && !outranks(person) && (
+        <button
+          onClick={() => setToggleTarget(person)}
+          className={actionButton}
+          title={person.is_active ? "غیرفعال‌سازی" : "فعال‌سازی"}
+        >
+          {person.is_active ? (
+            <XCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+          ) : (
+            <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+          )}
+        </button>
+      )}
+      {canDelete && person.id !== user?.id && (
+        <button
+          onClick={() => setDeleteTarget(person)}
+          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          title="حذف"
+        >
+          <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      )}
+    </div>
+  );
+
+  /** Mirrors the table and the phone cards so the page does not jump. */
+  const skeleton = (
+    <div className="animate-pulse">
+      <div className="hidden lg:block bg-surface border border-border rounded-panel p-5">
+        <div className="h-4 w-full rounded-field bg-surface-alt mb-5" />
+        {Array.from({ length: 6 }, (_, row) => (
+          <div key={row} className="flex gap-3 mb-4">
+            {[4, 3, 2, 3, 2, 2].map((span, cell) => (
+              <div
+                key={cell}
+                className="h-4 rounded-field bg-surface-alt"
+                style={{ flexGrow: span, flexBasis: 0 }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="lg:hidden space-y-3">
+        {[0, 1, 2, 3].map((card) => (
+          <div
+            key={card}
+            className="h-28 rounded-panel border border-border bg-surface"
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div dir="rtl">
+      <header className="mb-5">
+        <h1 className="text-headline-md font-bold text-text-primary">پرسنل</h1>
+        <p className="text-body-sm text-text-secondary mt-0.5">
+          {loading
+            ? "در حال بارگذاری…"
+            : debouncedSearch
+              ? `${toPersianDigits(total)} نتیجه از این جستجو`
+              : `${toPersianDigits(total)} کاربر در این کارگاه`}
+        </p>
+      </header>
+
       <div className={toolbar}>
         <div className={toolbarSearch}>
           <MagnifyingGlassIcon className={searchIcon} />
@@ -146,7 +296,10 @@ export default function PersonnelList() {
 
         {canManage && (
           <div className={toolbarActions}>
-            <button onClick={() => openPersonnelEdit(null)} className={primaryButton}>
+            <button
+              onClick={() => openPersonnelEdit(null)}
+              className={primaryButton}
+            >
               <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
               افزودن پرسنل
             </button>
@@ -155,165 +308,172 @@ export default function PersonnelList() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" />
-        </div>
+        skeleton
       ) : personnel.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
-          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
-            <UserGroupIcon className="w-7 h-7 text-text-muted" />
+        <div className="bg-surface border border-border rounded-panel flex flex-col items-center justify-center text-center py-16 px-4">
+          <span className="w-14 h-14 rounded-panel bg-surface-alt flex items-center justify-center mb-4">
+            <UserGroupIcon
+              className="w-7 h-7 text-text-muted"
+              aria-hidden="true"
+            />
           </span>
           <p className="text-body-md font-bold text-text-primary">
             {searchInput ? "نتیجه‌ای یافت نشد" : "هنوز پرسنلی ثبت نشده"}
           </p>
-          <p className="text-body-sm text-text-secondary mt-1">
+          <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
             {searchInput
               ? "عبارت دیگری را امتحان کنید."
               : "همکارانتان را اضافه کنید تا بتوانند دستگاه‌ها را پیگیری کنند."}
           </p>
+          {searchInput ? (
+            <button
+              onClick={() => setSearchInput("")}
+              className={`${secondaryButton} mt-5 flex-none`}
+            >
+              پاک‌کردن جستجو
+            </button>
+          ) : (
+            canManage && (
+              <button
+                onClick={() => openPersonnelEdit(null)}
+                className={`${primaryButton} mt-5 flex-none`}
+              >
+                <PlusIcon
+                  className="w-[1.15rem] h-[1.15rem]"
+                  aria-hidden="true"
+                />
+                افزودن پرسنل
+              </button>
+            )
+          )}
         </div>
       ) : (
-        <div className={tableCard}>
-          <div className={tableScroll}>
-            <table className="min-w-[680px] w-full">
-              <thead className={thead}>
-                <tr>
-                  <th className={th}>نام</th>
-                  <th className={th}>نام کاربری</th>
-                  <th className={th}>نقش</th>
-                  <th className={th}>تلفن</th>
-                  <th className={th}>وضعیت</th>
-                  {canManage && <th className={th}>عملیات</th>}
-                </tr>
-              </thead>
-              <tbody className={tbody}>
-                {personnel.map((person) => {
-                  // An admin may not edit a super admin or another admin.
-                  const outranks =
-                    user?.role === "admin" &&
-                    (person.role_name === "super_admin" ||
-                      person.role_name === "admin");
-
-                  return (
-                    <tr key={person.id} className={tr}>
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2.5">
-                          <span className="w-8 h-8 shrink-0 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-body-xs">
-                            {person.full_name?.charAt(0)}
-                          </span>
-                          <span className="text-body-sm font-bold text-text-primary">
-                            {person.full_name}
-                          </span>
-                        </div>
-                      </td>
-                      <td
-                        className={`${tdMuted} whitespace-nowrap tabular-nums`}
+        <>
+          {/*
+            Below lg the table becomes one card per person. Six columns needed
+            680px, and this page had no card layout at all — a phone had to be
+            dragged sideways to see who was active.
+          */}
+          <motion.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="lg:hidden space-y-3"
+          >
+            {personnel.map((person) => (
+              <motion.li key={person.id} variants={staggerItem}>
+                <div className={rowCard}>
+                  <div className="flex items-start gap-3">
+                    {avatar(person)}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-body-sm font-bold text-text-primary truncate">
+                        {person.full_name}
+                      </p>
+                      <p
+                        className="text-body-xs text-text-muted tabular-nums"
                         dir="ltr"
                       >
-                        {person.username}
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <span
-                          className={`${badge} ${
-                            person.role_name === "technician"
-                              ? "bg-surface-alt text-text-secondary"
-                              : "bg-primary-soft text-primary"
-                          }`}
-                        >
-                          {person.role_label}
-                        </span>
-                      </td>
-                      <td
-                        className={`${tdMuted} whitespace-nowrap tabular-nums`}
+                        {toPersianDigits(person.username)}
+                      </p>
+                    </div>
+                    {activeBadge(person)}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    {roleBadge(person)}
+                    {person.phone && (
+                      <span
+                        className="text-body-xs text-text-muted tabular-nums"
                         dir="ltr"
                       >
                         {formatPersianPhone(person.phone)}
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        {/* Icon as well as colour: "active" and "inactive"
-                            must not be a hue difference alone. */}
-                        <span
-                          className={`${badge} gap-1 ${
-                            person.is_active
-                              ? "bg-success-soft text-success-fg"
-                              : "bg-danger-soft text-danger-fg"
-                          }`}
-                        >
-                          {person.is_active ? (
-                            <CheckCircleIcon className="w-3.5 h-3.5" />
-                          ) : (
-                            <XCircleIcon className="w-3.5 h-3.5" />
-                          )}
-                          {person.is_active ? "فعال" : "غیرفعال"}
-                        </span>
-                      </td>
-                      {canManage && (
+                      </span>
+                    )}
+                  </div>
+
+                  {canManage && (
+                    <div className="flex justify-end mt-3 pt-3 border-t border-border-subtle">
+                      {rowActions(person)}
+                    </div>
+                  )}
+                </div>
+              </motion.li>
+            ))}
+          </motion.ul>
+
+          <div className={`hidden lg:block ${tableCard}`}>
+            <div className={tableScroll}>
+              <table className="min-w-[680px] w-full">
+                <thead className={thead}>
+                  <tr>
+                    <th className={th}>نام</th>
+                    <th className={th}>نام کاربری</th>
+                    <th className={th}>نقش</th>
+                    <th className={th}>تلفن</th>
+                    <th className={th}>وضعیت</th>
+                    {canManage && <th className={th}>عملیات</th>}
+                  </tr>
+                </thead>
+                <tbody className={tbody}>
+                  {personnel.map((person) => {
+                    return (
+                      <tr key={person.id} className={tr}>
                         <td className="px-3 py-3 whitespace-nowrap">
-                          <div className="flex gap-1.5 justify-center">
-                            {!outranks && (
-                              <button
-                                onClick={() => openPersonnelEdit(person.id)}
-                                className={`${iconButton} bg-surface-alt text-text-secondary`}
-                                title="ویرایش"
-                              >
-                                <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
-                              </button>
-                            )}
-                            {person.id !== user?.id && !outranks && (
-                              <button
-                                onClick={() => setToggleTarget(person)}
-                                className={`${iconButton} ${
-                                  person.is_active
-                                    ? "bg-warning-soft text-warning-fg"
-                                    : "bg-success-soft text-success-fg"
-                                }`}
-                                title={
-                                  person.is_active
-                                    ? "غیرفعال‌سازی"
-                                    : "فعال‌سازی"
-                                }
-                              >
-                                {person.is_active ? (
-                                  <XCircleIcon className="w-[1.15rem] h-[1.15rem]" />
-                                ) : (
-                                  <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
-                                )}
-                              </button>
-                            )}
-                            {canDelete && person.id !== user?.id && (
-                              <button
-                                onClick={() => setDeleteTarget(person)}
-                                className={`${iconButton} bg-danger-soft text-danger-fg`}
-                                title="حذف"
-                              >
-                                <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
-                              </button>
-                            )}
+                          <div className="flex items-center justify-center gap-2.5">
+                            {avatar(person)}
+                            <span className="text-body-sm font-bold text-text-primary">
+                              {person.full_name}
+                            </span>
                           </div>
                         </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td
+                          className={`${tdMuted} whitespace-nowrap tabular-nums`}
+                          dir="ltr"
+                        >
+                          {toPersianDigits(person.username)}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          {roleBadge(person)}
+                        </td>
+                        <td
+                          className={`${tdMuted} whitespace-nowrap tabular-nums`}
+                          dir="ltr"
+                        >
+                          {formatPersianPhone(person.phone)}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          {activeBadge(person)}
+                        </td>
+                        {canManage && (
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {rowActions(person)}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
-      <div className="mt-4">
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(newLimit) => {
-            setLimit(newLimit);
-            setPage(1);
-          }}
-        />
-      </div>
+      {!loading && personnel.length > 0 && (
+        <div className="mt-4">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={!!toggleTarget}

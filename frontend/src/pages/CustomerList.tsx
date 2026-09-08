@@ -9,20 +9,22 @@ import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
 import { motion } from "framer-motion";
 import {
-  TrashIcon,
-  EyeIcon,
-  PencilSquareIcon,
   PlusIcon,
   MagnifyingGlassIcon,
   UsersIcon,
 } from "@heroicons/react/24/solid";
-import LoadingSpinner from "../components/LoadingSpinner";
+/* Outline for the row's own controls — a solid heroicon at 18px is a disc. */
+import {
+  TrashIcon,
+  EyeIcon,
+  PencilSquareIcon,
+} from "@heroicons/react/24/outline";
 import { toPersianDigits } from "../utils/formatters";
 import { staggerContainer, staggerItem } from "../motion";
 import {
-  badge,
   iconButton,
   primaryButton,
+  secondaryButton,
   rowCard,
   searchField,
   searchIcon,
@@ -98,15 +100,21 @@ export default function CustomerList() {
       void fetchCustomers(debouncedSearch, page, limit);
     });
   }, [refreshList, fetchCustomers, debouncedSearch, page, limit]);
-  /** Row actions, shared by the table row and the phone card. */
+  /*
+   * Row actions, shared by the table row and the phone card. Neutral until
+   * hovered: a tinted square each put three colours in the last column of a
+   * four-column table, which was most of the colour on the page.
+   */
+  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
+
   const rowActions = (c: CustomerListRow) => (
-    <div className="flex gap-1.5 justify-end">
+    <div className="flex gap-1 justify-end items-center">
       <button
         onClick={(e) => {
           e.stopPropagation();
           openCustomerDetail(c.id);
         }}
-        className={`${iconButton} bg-primary-soft text-primary`}
+        className={actionButton}
         title="مشاهده جزئیات"
       >
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -116,7 +124,7 @@ export default function CustomerList() {
           e.stopPropagation();
           openCustomerEdit(c.id);
         }}
-        className={`${iconButton} bg-surface-alt text-text-secondary`}
+        className={actionButton}
         title="ویرایش"
       >
         <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -127,7 +135,7 @@ export default function CustomerList() {
             e.stopPropagation();
             setDeleteTarget(c);
           }}
-          className={`${iconButton} bg-danger-soft text-danger-fg`}
+          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -136,8 +144,71 @@ export default function CustomerList() {
     </div>
   );
 
+  /**
+   * How many devices this customer has brought in.
+   *
+   * A count, not a state, so it stays neutral — and it is the only thing on
+   * the row besides the name and the number, which is why it earns a chip at
+   * all rather than a bare figure in a column.
+   */
+  const deviceChip = (count: number) =>
+    // No chip for a customer who has not brought anything in: a pill is
+    // emphasis, and «۰ دستگاه» does not need any.
+    count === 0 ? (
+      <span className="text-body-xs text-text-muted">بدون دستگاه</span>
+    ) : (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill
+                   bg-surface-alt text-text-primary text-body-xs font-bold
+                   whitespace-nowrap tabular-nums"
+      >
+        {toPersianDigits(count)} دستگاه
+      </span>
+    );
+
+  /** Mirrors the table and the phone cards so the page does not jump. */
+  const skeleton = (
+    <div className="animate-pulse">
+      <div className="hidden sm:block bg-surface border border-border rounded-panel p-5">
+        <div className="h-4 w-full rounded-field bg-surface-alt mb-5" />
+        {Array.from({ length: 8 }, (_, row) => (
+          <div key={row} className="flex gap-3 mb-4">
+            {[5, 4, 2, 2].map((span, cell) => (
+              <div
+                key={cell}
+                className="h-4 rounded-field bg-surface-alt"
+                style={{ flexGrow: span, flexBasis: 0 }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="sm:hidden space-y-3">
+        {[0, 1, 2, 3].map((card) => (
+          <div
+            key={card}
+            className="h-28 rounded-panel border border-border bg-surface"
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div dir="rtl">
+      <header className="mb-5">
+        <h1 className="text-headline-md font-bold text-text-primary">
+          مشتریان
+        </h1>
+        <p className="text-body-sm text-text-secondary mt-0.5">
+          {loading
+            ? "در حال بارگذاری…"
+            : debouncedSearch
+              ? `${toPersianDigits(total)} نتیجه از این جستجو`
+              : `${toPersianDigits(total)} مشتری ثبت شده`}
+        </p>
+      </header>
+
       <div className={toolbar}>
         <div className={toolbarSearch}>
           <MagnifyingGlassIcon className={searchIcon} />
@@ -152,7 +223,10 @@ export default function CustomerList() {
         </div>
 
         <div className={toolbarActions}>
-          <button onClick={() => openCustomerEdit(null)} className={primaryButton}>
+          <button
+            onClick={() => openCustomerEdit(null)}
+            className={primaryButton}
+          >
             <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             افزودن مشتری
           </button>
@@ -160,22 +234,39 @@ export default function CustomerList() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" />
-        </div>
+        skeleton
       ) : customers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
-          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
-            <UsersIcon className="w-7 h-7 text-text-muted" />
+        <div className="bg-surface border border-border rounded-panel flex flex-col items-center justify-center text-center py-16 px-4">
+          <span className="w-14 h-14 rounded-panel bg-surface-alt flex items-center justify-center mb-4">
+            <UsersIcon className="w-7 h-7 text-text-muted" aria-hidden="true" />
           </span>
           <p className="text-body-md font-bold text-text-primary">
             {searchInput ? "نتیجه‌ای یافت نشد" : "هنوز مشتری‌ای ثبت نشده"}
           </p>
-          <p className="text-body-sm text-text-secondary mt-1">
+          <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
             {searchInput
               ? `چیزی با «${searchInput}» پیدا نشد. عبارت دیگری را امتحان کنید.`
               : "با ثبت اولین دستگاه، مشتری‌اش هم اینجا ساخته می‌شود."}
           </p>
+          {searchInput ? (
+            <button
+              onClick={() => setSearchInput("")}
+              className={`${secondaryButton} mt-5 flex-none`}
+            >
+              پاک‌کردن جستجو
+            </button>
+          ) : (
+            <button
+              onClick={() => openCustomerEdit(null)}
+              className={`${primaryButton} mt-5 flex-none`}
+            >
+              <PlusIcon
+                className="w-[1.15rem] h-[1.15rem]"
+                aria-hidden="true"
+              />
+              افزودن مشتری
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -197,22 +288,25 @@ export default function CustomerList() {
                       openCustomerDetail(c.id);
                     }
                   }}
-                  className={`${rowCard} cursor-pointer hover:border-primary-border`}
+                  className={`${rowCard} cursor-pointer hover:border-border-strong`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-body-sm font-bold text-primary truncate">
                         {c.name}
                       </p>
-                      <p className="text-body-xs text-text-secondary" dir="ltr">
+                      <p
+                        className="text-body-xs text-text-muted tabular-nums"
+                        dir="ltr"
+                      >
                         {formatPersianPhone(c.phone)}
                       </p>
                     </div>
-                    <span className={`${badge} bg-primary-soft text-primary shrink-0`}>
-                      {toPersianDigits(c.device_count ?? 0)} دستگاه
+                    <span className="shrink-0">
+                      {deviceChip(c.device_count ?? 0)}
                     </span>
                   </div>
-                  <div className="flex justify-end mt-3 pt-3 border-t border-border">
+                  <div className="flex justify-end mt-3 pt-3 border-t border-border-subtle">
                     {rowActions(c)}
                   </div>
                 </div>
@@ -238,14 +332,14 @@ export default function CustomerList() {
                       onClick={() => openCustomerDetail(c.id)}
                       className={trClickable}
                     >
-                      <td className={`${td} font-bold text-primary`}>{c.name}</td>
+                      <td className={`${td} font-bold text-primary`}>
+                        {c.name}
+                      </td>
                       <td className={`${tdMuted} tabular-nums`} dir="ltr">
                         {formatPersianPhone(c.phone)}
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className={`${badge} bg-primary-soft text-primary`}>
-                          {toPersianDigits(c.device_count ?? 0)} دستگاه
-                        </span>
+                        {deviceChip(c.device_count ?? 0)}
                       </td>
                       <td className="px-3 py-3">{rowActions(c)}</td>
                     </tr>
@@ -257,19 +351,21 @@ export default function CustomerList() {
         </>
       )}
 
-      <div className="mt-4">
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-          onLimitChange={(newLimit) => {
-            setLimit(newLimit);
-            setPage(1);
-          }}
-        />
-      </div>
+      {!loading && customers.length > 0 && (
+        <div className="mt-4">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={!!deleteTarget}

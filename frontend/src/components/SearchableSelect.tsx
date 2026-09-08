@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   MagnifyingGlassIcon,
-  ChevronUpIcon,
   ChevronDownIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
+import { transition } from "../motion";
 
 /**
  * Option values are widened to string | number because callers pass both:
@@ -54,8 +56,19 @@ export default function SearchableSelect({
         setSearch("");
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        setSearch("");
+      }
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   useEffect(() => {
@@ -85,80 +98,120 @@ export default function SearchableSelect({
         type="button"
         onClick={handleToggle}
         disabled={disabled}
-        className={`w-full border rounded-lg px-3 py-2 text-sm bg-surface text-right flex justify-between items-center ${
-          error ? "border-danger" : "border-border"
-        } ${disabled ? "bg-surface-alt cursor-not-allowed" : "hover:border-primary"}`}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        className={`w-full flex justify-between items-center gap-2 rounded-field border
+                    px-3.5 py-2.5 text-body-sm text-right bg-surface
+                    transition-[border-color,box-shadow] duration-150 focus:outline-none
+                    ${
+                      error
+                        ? "border-danger focus:shadow-[0_0_0_3px_var(--danger-soft)]"
+                        : "border-border focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
+                    }
+                    ${
+                      disabled
+                        ? "bg-surface-alt text-text-muted cursor-not-allowed"
+                        : "hover:border-border-strong cursor-pointer"
+                    }`}
       >
         <span
-          className={
-            selectedOption ? "text-text-primary" : "text-text-secondary"
-          }
+          className={`truncate ${
+            selectedOption ? "text-text-primary" : "text-text-muted"
+          }`}
         >
           {selectedOption?.label || placeholder}
           {required && <span className="text-danger mr-1">*</span>}
         </span>
-        {isOpen ? (
-          <ChevronUpIcon className="w-4 h-4 text-text-secondary shrink-0" />
-        ) : (
-          <ChevronDownIcon className="w-4 h-4 text-text-secondary shrink-0" />
-        )}
+        <ChevronDownIcon
+          className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-150 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-surface border border-border rounded-lg shadow-lg">
-          <div className="p-2 border-b border-border">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-              <input
-                type="text"
-                placeholder="جستجو..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-sm pr-8 pl-2 py-1.5 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary bg-surface text-text-primary"
-                autoFocus
-              />
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            role="listbox"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={transition.fast}
+            className="absolute z-50 mt-1.5 w-full bg-surface border border-border
+                       rounded-card shadow-lg overflow-hidden"
+          >
+            <div className="p-2 border-b border-border">
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <input
+                  type="text"
+                  placeholder="جستجو…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full text-body-sm pr-9 pl-2.5 py-2 rounded-field bg-surface
+                             text-text-primary placeholder:text-text-muted border border-border
+                             focus:outline-none focus:border-primary
+                             focus:shadow-[0_0_0_3px_var(--primary-soft)]
+                             transition-[border-color,box-shadow] duration-150"
+                  autoFocus
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="max-h-60 overflow-y-auto">
-            {loading ? (
-              <div className="px-3 py-4 text-center text-sm text-text-secondary">
-                در حال بارگذاری...
-              </div>
-            ) : filteredOptions.length === 0 ? (
-              <div className="px-3 py-4 text-center text-sm text-text-secondary">
-                نتیجه‌ای یافت نشد
-              </div>
-            ) : (
-              filteredOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setIsOpen(false);
-                    setSearch("");
-                  }}
-                  className={`w-full text-right px-3 py-2 text-sm hover:bg-surface-alt transition-colors border-b border-b-border ${
-                    value === opt.value
-                      ? "bg-primary-soft text-primary font-medium"
-                      : "text-text-primary"
-                  }`}
-                >
-                  {opt.label}
-                  {opt.subLabel && (
-                    <span className="text-xs text-text-secondary block mt-1">
-                      {opt.subLabel}
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+            <div className="max-h-60 overflow-y-auto p-1">
+              {loading ? (
+                <div className="px-3 py-6 text-center text-body-sm text-text-secondary">
+                  در حال بارگذاری…
+                </div>
+              ) : filteredOptions.length === 0 ? (
+                <div className="px-3 py-6 text-center text-body-sm text-text-secondary">
+                  نتیجه‌ای یافت نشد
+                </div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const selected = value === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        onChange(opt.value);
+                        setIsOpen(false);
+                        setSearch("");
+                      }}
+                      // No divider between rows: the hover tint already
+                      // separates them, and a line under every option in a
+                      // sixty-row list reads as a table.
+                      className={`w-full flex items-start justify-between gap-2 text-right
+                                  px-3 py-2 rounded-field text-body-sm transition-colors cursor-pointer ${
+                                    selected
+                                      ? "bg-primary-soft text-primary font-bold"
+                                      : "text-text-primary hover:bg-surface-alt"
+                                  }`}
+                    >
+                      <span className="min-w-0">
+                        {opt.label}
+                        {opt.subLabel && (
+                          <span className="block text-body-xs font-normal text-text-secondary mt-0.5">
+                            {opt.subLabel}
+                          </span>
+                        )}
+                      </span>
+                      {selected && (
+                        <CheckIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+      {error && <p className="mt-1.5 text-body-xs text-danger">{error}</p>}
     </div>
   );
 }

@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronRightIcon, ChevronLeftIcon } from "@heroicons/react/24/outline";
+import { motion } from "framer-motion";
+import {
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  CalendarDaysIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { toJalaali, toGregorian, jalaaliMonthLength } from "jalaali-js";
+import { transition } from "../motion";
+import { toPersianDigits } from "../utils/formatters";
 
 /**
  * A Jalali date that may be absent: every field is null when the input was
@@ -191,41 +199,39 @@ export default function PersianDatePicker({
           setOpen((p) => !p);
           setViewMode(VIEW_DAYS);
         }}
-        className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface text-right flex justify-between items-center hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+        className="w-full flex justify-between items-center gap-2 rounded-field border border-border
+                   px-3.5 py-2.5 text-body-sm bg-surface text-right cursor-pointer
+                   hover:border-border-strong focus:outline-none focus:border-primary
+                   focus:shadow-[0_0_0_3px_var(--primary-soft)]
+                   transition-[border-color,box-shadow] duration-150"
       >
         <span
-          className={displayValue ? "text-text-primary" : "text-text-secondary"}
+          className={`truncate ${displayValue ? "text-text-primary" : "text-text-muted"}`}
         >
           {displayValue || placeholder}
         </span>
         {value ? (
           <span
+            role="button"
+            tabIndex={-1}
+            aria-label="پاک کردن تاریخ"
             onClick={clearValue}
-            className="text-text-secondary hover:text-danger cursor-pointer text-lg leading-none"
+            className="shrink-0 p-0.5 rounded-md text-text-muted hover:text-danger transition-colors cursor-pointer"
           >
-            ×
+            <XMarkIcon className="w-4 h-4" />
           </span>
         ) : (
-          <svg
-            className="w-4 h-4 text-text-secondary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
+          <CalendarDaysIcon className="w-4 h-4 shrink-0 text-text-muted" />
         )}
       </button>
 
       {/* Calendar popover */}
       {open && (
-        <div
-          className="absolute z-50 mt-1 bg-surface border border-border rounded-xl shadow-lg p-3 w-72"
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={transition.fast}
+          className="absolute z-50 mt-1.5 bg-surface border border-border rounded-card shadow-lg p-3 w-72"
           dir="rtl"
         >
           {/* Day view */}
@@ -234,16 +240,16 @@ export default function PersianDatePicker({
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={nextMonth}
-                  className="p-1 hover:bg-surface-alt rounded-lg"
+                  className="p-1.5 rounded-field text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  <ChevronRightIcon className="w-4 h-4 text-text-secondary" />
+                  <ChevronRightIcon className="w-4 h-4" />
                 </button>
 
                 {/* Clicking month or year switches view */}
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setViewMode(VIEW_MONTHS)}
-                    className="text-sm font-semibold text-text-primary hover:text-primary hover:bg-primary-soft px-2 py-0.5 rounded-lg transition-colors"
+                    className="text-body-sm font-bold text-text-primary hover:text-primary hover:bg-primary-soft px-2 py-1 rounded-field transition-colors cursor-pointer"
                   >
                     {MONTH_NAMES[viewMonth - 1]}
                   </button>
@@ -252,17 +258,17 @@ export default function PersianDatePicker({
                       setYearRangeStart(viewYear - (viewYear % YEAR_PAGE_SIZE));
                       setViewMode(VIEW_YEARS);
                     }}
-                    className="text-sm font-semibold text-text-primary hover:text-primary hover:bg-primary-soft px-2 py-0.5 rounded-lg transition-colors"
+                    className="text-body-sm font-bold text-text-primary hover:text-primary hover:bg-primary-soft px-2 py-1 rounded-field transition-colors cursor-pointer"
                   >
-                    {viewYear}
+                    {toPersianDigits(viewYear)}
                   </button>
                 </div>
 
                 <button
                   onClick={prevMonth}
-                  className="p-1 hover:bg-surface-alt rounded-lg"
+                  className="p-1.5 rounded-field text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  <ChevronLeftIcon className="w-4 h-4 text-text-secondary" />
+                  <ChevronLeftIcon className="w-4 h-4" />
                 </button>
               </div>
 
@@ -271,7 +277,7 @@ export default function PersianDatePicker({
                 {DAY_NAMES.map((d) => (
                   <div
                     key={d}
-                    className="text-center text-xs text-text-secondary py-1"
+                    className="text-center text-body-xs font-bold text-text-muted py-1"
                   >
                     {d}
                   </div>
@@ -288,14 +294,13 @@ export default function PersianDatePicker({
                     <button
                       key={jd}
                       onClick={() => selectDay(jd)}
-                      className={`
-                      text-center text-sm py-1 rounded-lg transition-colors
-                      ${isSelected(jd) ? "bg-primary text-text-inverse font-bold" : ""}
-                      ${isToday(jd) && !isSelected(jd) ? "border border-primary text-primary" : ""}
-                      ${!isSelected(jd) ? "hover:bg-primary-soft text-text-primary" : ""}
-                    `}
+                      className={`text-center text-body-sm py-1.5 rounded-field
+                        transition-colors cursor-pointer
+                        ${isSelected(jd) ? "bg-primary text-primary-fg font-bold" : ""}
+                        ${isToday(jd) && !isSelected(jd) ? "ring-1 ring-inset ring-primary text-primary font-bold" : ""}
+                        ${!isSelected(jd) ? "hover:bg-surface-alt text-text-primary" : ""}`}
                     >
-                      {jd}
+                      {toPersianDigits(jd)}
                     </button>
                   ),
                 )}
@@ -312,24 +317,24 @@ export default function PersianDatePicker({
                     setYearRangeStart(viewYear - (viewYear % YEAR_PAGE_SIZE));
                     setViewMode(VIEW_YEARS);
                   }}
-                  className="p-1 hover:bg-surface-alt rounded-lg"
+                  className="p-1.5 rounded-field text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  <ChevronRightIcon className="w-4 h-4 text-text-secondary" />
+                  <ChevronRightIcon className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => {
                     setYearRangeStart(viewYear - (viewYear % YEAR_PAGE_SIZE));
                     setViewMode(VIEW_YEARS);
                   }}
-                  className="text-sm font-semibold text-text-primary hover:text-primary hover:bg-primary-soft px-2 py-0.5 rounded-lg transition-colors"
+                  className="text-body-sm font-bold text-text-primary hover:text-primary hover:bg-primary-soft px-2 py-1 rounded-field transition-colors cursor-pointer"
                 >
-                  {viewYear}
+                  {toPersianDigits(viewYear)}
                 </button>
                 <button
                   onClick={() => setViewMode(VIEW_DAYS)}
-                  className="p-1 hover:bg-surface-alt rounded-lg"
+                  className="p-1.5 rounded-field text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  <ChevronLeftIcon className="w-4 h-4 text-text-secondary" />
+                  <ChevronLeftIcon className="w-4 h-4" />
                 </button>
               </div>
 
@@ -344,12 +349,10 @@ export default function PersianDatePicker({
                     <button
                       key={name}
                       onClick={() => selectMonth(i)}
-                      className={`
-                        text-sm py-2 rounded-lg transition-colors
-                        ${isCurrentMonth ? "bg-primary text-text-inverse font-bold" : ""}
-                        ${isTodayMonth && !isCurrentMonth ? "border border-primary text-primary" : ""}
-                        ${!isCurrentMonth ? "hover:bg-primary-soft text-text-primary" : ""}
-                      `}
+                      className={`text-body-sm py-2 rounded-field transition-colors cursor-pointer
+                        ${isCurrentMonth ? "bg-primary text-primary-fg font-bold" : ""}
+                        ${isTodayMonth && !isCurrentMonth ? "ring-1 ring-inset ring-primary text-primary font-bold" : ""}
+                        ${!isCurrentMonth ? "hover:bg-surface-alt text-text-primary" : ""}`}
                     >
                       {name}
                     </button>
@@ -365,18 +368,19 @@ export default function PersianDatePicker({
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => setYearRangeStart((s) => s + YEAR_PAGE_SIZE)}
-                  className="p-1 hover:bg-surface-alt rounded-lg"
+                  className="p-1.5 rounded-field text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  <ChevronRightIcon className="w-4 h-4 text-text-secondary" />
+                  <ChevronRightIcon className="w-4 h-4" />
                 </button>
-                <span className="text-sm font-semibold text-text-primary">
-                  {yearRangeStart} – {yearRangeStart + YEAR_PAGE_SIZE - 1}
+                <span className="text-body-sm font-bold text-text-primary">
+                  {toPersianDigits(yearRangeStart)} –{" "}
+                  {toPersianDigits(yearRangeStart + YEAR_PAGE_SIZE - 1)}
                 </span>
                 <button
                   onClick={() => setYearRangeStart((s) => s - YEAR_PAGE_SIZE)}
-                  className="p-1 hover:bg-surface-alt rounded-lg"
+                  className="p-1.5 rounded-field text-text-secondary hover:bg-surface-alt hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  <ChevronLeftIcon className="w-4 h-4 text-text-secondary" />
+                  <ChevronLeftIcon className="w-4 h-4" />
                 </button>
               </div>
 
@@ -388,21 +392,19 @@ export default function PersianDatePicker({
                     <button
                       key={y}
                       onClick={() => selectYear(y)}
-                      className={`
-                        text-sm py-2 rounded-lg transition-colors
-                        ${isSelectedYear ? "bg-primary text-text-inverse font-bold" : ""}
-                        ${isTodayYear && !isSelectedYear ? "border border-primary text-primary" : ""}
-                        ${!isSelectedYear ? "hover:bg-primary-soft text-text-primary" : ""}
-                      `}
+                      className={`text-body-sm py-2 rounded-field transition-colors cursor-pointer
+                        ${isSelectedYear ? "bg-primary text-primary-fg font-bold" : ""}
+                        ${isTodayYear && !isSelectedYear ? "ring-1 ring-inset ring-primary text-primary font-bold" : ""}
+                        ${!isSelectedYear ? "hover:bg-surface-alt text-text-primary" : ""}`}
                     >
-                      {y}
+                      {toPersianDigits(y)}
                     </button>
                   );
                 })}
               </div>
             </>
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );

@@ -13,7 +13,16 @@
       name="keywords"
       content="تعمیرات, مدیریت تعمیرگاه, فاکتور تعمیر, انبار قطعات, مدیریت مشتریان, نرم افزار تعمیرات"
     />
-    <meta name="theme-color" content="#2563eb" />
+    <meta
+      name="theme-color"
+      content="#f7f9fc"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#080d17"
+      media="(prefers-color-scheme: dark)"
+    />
     <meta property="og:title" content="سیستم مدیریت تعمیرات  " />
     <meta
       property="og:description"
@@ -21,9 +30,40 @@
     />
     <meta property="og:type" content="website" />
     <title>سیستم مدیریت تعمیرات</title>
+
+    <!--
+      Runs before the first paint, which React cannot: ThemeProvider only
+      applies the theme in an effect, so a user on dark would see one white
+      frame on every load. Kept inline and dependency-free for the same
+      reason — an external file would be a round trip before that paint.
+
+      The key and the accepted values must match src/context/ThemeContext.tsx.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("dofixo-theme");
+          var preference =
+            stored === "light" || stored === "dark" || stored === "system"
+              ? stored
+              : "system";
+          var resolved =
+            preference === "system"
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+              : preference;
+          document.documentElement.setAttribute("data-theme", resolved);
+        } catch (err) {
+          // Private mode can throw on localStorage. Light is the default the
+          // stylesheet already assumes, so there is nothing to repair.
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -3,207 +3,334 @@
 @import "tailwindcss";
 
 /* ===================================================================
-   تعریف تم‌ها (۵ تم مستقل: لایت / دارک / آبی / زرد / نارنجی)
-   هر تم مجموعه کاملی از توکن‌های رنگی معنایی رو تعریف می‌کنه.
-   تم فعال با ست‌کردن [data-theme="..."] روی <html> تغییر می‌کنه.
+   ۱. پالت خام
+   -------------------------------------------------------------------
+   تنها جایی که رنگ واقعی (hex) نوشته می‌شود. تم‌ها در بخش ۲ فقط به
+   این‌ها ارجاع می‌دهند، پس عوض‌کردن هویت بصری برنامه یعنی ویرایش همین
+   بلوک — نه گشتن در چهل کامپوننت.
    =================================================================== */
 
-/* ───── لایت (پیش‌فرض) ───── */
+:root {
+  /*
+   * Orbit primary. Ten steps as given; --brand-50 is the one derived value —
+   * the guideline has no tint light enough for a soft background, and every
+   * "selected row" and "active nav item" in the app needs one.
+   */
+  --brand-50: #ebf0fe;
+  --brand-100: #96aafb;
+  --brand-200: #7e96fa;
+  --brand-300: #6583f9;
+  --brand-400: #4d6ff8;
+  --brand-500: #345bf7;
+  --brand-600: #204bf6;
+  --brand-700: #0d3bf5;
+  --brand-800: #0935e5;
+  --brand-900: #0830d1;
+  --brand-950: #072cbe;
+
+  /* Orbit secondary — the blue-grey that carries text and surfaces */
+  --secondary-50: #f9fafb;
+  --secondary-100: #f2f3f5;
+  --secondary-200: #e4e6ea;
+  --secondary-300: #d0d4da;
+  --secondary-400: #989fae;
+  --secondary-500: #697081;
+  --secondary-600: #353e51;
+  --secondary-700: #353c4a;
+  --secondary-800: #1d2737;
+  --secondary-900: #101627;
+
+  /* Orbit blue-neutral — borders and dividers with a hint of the brand hue */
+  --blue-neutral-100: #e5eaf4;
+  --blue-neutral-200: #b2bcd0;
+  --blue-neutral-300: #6f7b92;
+  --blue-neutral-400: #536079;
+  --blue-neutral-500: #344055;
+
+  /*
+   * Semantic, three steps each: a strong shade for text, a base for fills and
+   * dots, a soft one for badge backgrounds. The base alone is not enough —
+   * #22c55e as text on white is about 2.3:1, well under AA.
+   */
+  --success-strong: #15803d;
+  --success-base: #22c55e;
+  --success-tint: #dcfce7;
+
+  --error-strong: #b91c1c;
+  --error-base: #ef4444;
+  --error-tint: #fef2f2;
+
+  --warning-strong: #b45309;
+  --warning-base: #f59e0b;
+  --warning-tint: #fffbeb;
+
+  --info-strong: #0e7490;
+  --info-base: #06b6d4;
+  --info-tint: #ecfeff;
+}
+
+/* ===================================================================
+   ۲. توکن‌های معنایی — دو تم و بس
+   -------------------------------------------------------------------
+   تم فعال با [data-theme="light|dark"] روی <html> تعیین می‌شود؛ مقدارش
+   را اسکریپت درون index.html پیش از اولین رنگ‌آمیزی می‌نویسد، وگرنه
+   کاربرِ تم تیره یک فریم سفید می‌بیند.
+   =================================================================== */
+
 :root,
 [data-theme="light"] {
-  --color-bg: #f8fafc;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f1f5f9;
-  --color-border: #e2e8f0;
+  color-scheme: light;
 
-  --color-text-primary: #1e293b;
-  --color-text-secondary: #64748b;
-  --color-text-inverse: #ffffff;
+  /* سطوح — از عقب به جلو: sunken پشت محتوا، raised جلوی آن */
+  --bg: var(--secondary-50);
+  --surface: #ffffff;
+  --surface-alt: var(--secondary-100);
+  --surface-sunken: var(--secondary-200);
+  --surface-raised: #ffffff;
 
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-soft: #dbeafe;
+  --border: var(--secondary-200);
+  --border-strong: var(--secondary-300);
+  /* مرزهای آبی‌مایل گایدلاین، برای جدول‌ها و جداکننده‌ها */
+  --border-subtle: var(--blue-neutral-100);
 
-  --color-success: #16a34a;
-  --color-success-soft: #dcfce7;
-  --color-warning: #ca8a04;
-  --color-warning-soft: #fef9c3;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-danger-soft: #fee2e2;
+  --text-primary: var(--secondary-900);
+  --text-secondary: var(--secondary-500);
+  --text-muted: var(--secondary-400);
+  --text-inverse: #ffffff;
 
-  --color-accent: #eab308;
+  --primary: var(--brand-500);
+  --primary-hover: var(--brand-600);
+  --primary-active: var(--brand-700);
+  --primary-soft: var(--brand-50);
+  --primary-soft-hover: #dce4fd;
+  --primary-border: var(--brand-100);
+  /* Text and icons sitting ON a --primary fill. Separate from
+     --text-inverse, which follows the page rather than the button. */
+  --primary-fg: #ffffff;
+
+  --success: var(--success-base);
+  --success-strong-fg: var(--success-strong);
+  --success-soft: var(--success-tint);
+  --warning: var(--warning-base);
+  --warning-strong-fg: var(--warning-strong);
+  --warning-soft: var(--warning-tint);
+  --danger: var(--error-base);
+  --danger-hover: var(--error-strong);
+  --danger-strong-fg: var(--error-strong);
+  --danger-soft: var(--error-tint);
+  --info: var(--info-base);
+  --info-strong-fg: var(--info-strong);
+  --info-soft: var(--info-tint);
+
+  /* سایه‌ها دو لایه‌اند: یک لبهٔ تیزِ نزدیک و یک پخشِ دور. تک‌لایه‌بودن
+     همان چیزی است که کارت‌های فعلی را «تخت» نشان می‌دهد. */
+  --shadow-color: 16 22 39;
+  --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.05);
+  --shadow-sm:
+    0 1px 2px rgb(var(--shadow-color) / 0.04),
+    0 2px 6px rgb(var(--shadow-color) / 0.06);
+  --shadow-md:
+    0 2px 4px rgb(var(--shadow-color) / 0.04),
+    0 6px 16px rgb(var(--shadow-color) / 0.08);
+  --shadow-lg:
+    0 4px 8px rgb(var(--shadow-color) / 0.04),
+    0 14px 32px rgb(var(--shadow-color) / 0.1);
+  --shadow-xl:
+    0 8px 16px rgb(var(--shadow-color) / 0.05),
+    0 28px 56px rgb(var(--shadow-color) / 0.12);
+
+  /* هالهٔ رنگی زیر دکمهٔ اصلی. در گایدلاین دکمه تخت است، پس ملایم نگه
+     داشته شده — حضورش حس «قابل فشردن» می‌دهد بدون اینکه شناور به نظر برسد. */
+  --shadow-primary: 0 2px 8px rgb(52 91 247 / 0.24);
+
+  /* پنل برند صفحات ورود. عمداً از --primary جدا است: --primary در تم تیره
+     روشن می‌شود تا متن رویش خوانا بماند، و یک پنل تمام‌قد با آن رنگ، صفحهٔ
+     تیره را به یک سطح آبی روشن تبدیل می‌کرد. */
+  --brand-panel: linear-gradient(
+    155deg,
+    var(--brand-500) 0%,
+    var(--brand-700) 55%,
+    var(--brand-900) 100%
+  );
 }
 
-/* ───── دارک ───── */
 [data-theme="dark"] {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-alt: #273449;
-  --color-border: #334155;
+  color-scheme: dark;
 
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-inverse: #0f172a;
+  /* نه سیاه مطلق: لایه‌ها باید از هم قابل تشخیص باشند، و مشکیِ خالص
+     روی نمایشگر OLED لبه‌ها را حذف می‌کند. پایه، همان سکندریِ گایدلاین
+     است یک پله تیره‌تر، تا --surface روی آن دیده شود. */
+  --bg: #080d18;
+  --surface: var(--secondary-900);
+  --surface-alt: var(--secondary-800);
+  --surface-sunken: #060a12;
+  --surface-raised: var(--secondary-800);
 
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
-  --color-primary-soft: #1e3a5f;
+  --border: var(--secondary-800);
+  --border-strong: var(--secondary-600);
+  --border-subtle: #18202f;
 
-  --color-success: #22c55e;
-  --color-success-soft: #14532d;
-  --color-warning: #eab308;
-  --color-warning-soft: #422006;
-  --color-danger: #ef4444;
-  --color-danger-hover: #f87171;
-  --color-danger-soft: #450a0a;
+  --text-primary: var(--secondary-100);
+  --text-secondary: var(--secondary-400);
+  --text-muted: var(--secondary-500);
+  --text-inverse: var(--secondary-900);
 
-  --color-accent: #fbbf24;
-}
+  /* دو پله روشن‌تر از تم لایت: #345bf7 روی زمینهٔ تیره کنتراستش به ۳:۱
+     می‌افتد، که برای متن زیر حد AA است. */
+  --primary: var(--brand-300);
+  --primary-hover: var(--brand-200);
+  --primary-active: var(--brand-100);
+  --primary-soft: #16213f;
+  --primary-soft-hover: #1d2b52;
+  --primary-border: #2a3a6b;
+  /* Dark, not white: white on #6583f9 is about 3.4:1, under AA for
+     button-sized text. Against this near-black it is roughly 5.5:1. */
+  --primary-fg: #060d1c;
 
-/* ───── آبی ───── */
-[data-theme="blue"] {
-  --color-bg: #eff6ff;
-  --color-surface: #ffffff;
-  --color-surface-alt: #dbeafe;
-  --color-border: #bfdbfe;
+  /* پایه‌ها روشن‌تر و tintها به تیره برمی‌گردند — یک بج با پس‌زمینهٔ
+     #dcfce7 روی صفحهٔ تیره مثل برچسب فسفری می‌زند. */
+  --success: #4ade80;
+  --success-strong-fg: #86efac;
+  --success-soft: #0b2b1b;
+  --warning: #fbbf24;
+  --warning-strong-fg: #fcd34d;
+  --warning-soft: #2e1f05;
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
+  --danger-strong-fg: #fca5a5;
+  --danger-soft: #341112;
+  --info: #22d3ee;
+  --info-strong-fg: #67e8f9;
+  --info-soft: #082f36;
 
-  --color-text-primary: #1e3a8a;
-  --color-text-secondary: #3b82f6;
-  --color-text-inverse: #ffffff;
+  /* سایه روی زمینهٔ تیره تقریباً دیده نمی‌شود، پس تیره‌تر و عمیق‌تر
+     می‌شود و بار جداسازی لایه‌ها بیشتر روی --border می‌افتد. */
+  --shadow-color: 0 0 0;
+  --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.3);
+  --shadow-sm:
+    0 1px 2px rgb(var(--shadow-color) / 0.3),
+    0 2px 6px rgb(var(--shadow-color) / 0.35);
+  --shadow-md:
+    0 2px 4px rgb(var(--shadow-color) / 0.3),
+    0 6px 16px rgb(var(--shadow-color) / 0.45);
+  --shadow-lg:
+    0 4px 8px rgb(var(--shadow-color) / 0.3),
+    0 14px 32px rgb(var(--shadow-color) / 0.5);
+  --shadow-xl:
+    0 8px 16px rgb(var(--shadow-color) / 0.35),
+    0 28px 56px rgb(var(--shadow-color) / 0.55);
 
-  --color-primary: #1d4ed8;
-  --color-primary-hover: #1e40af;
-  --color-primary-soft: #bfdbfe;
+  --shadow-primary: 0 2px 8px rgb(101 131 249 / 0.2);
 
-  --color-success: #16a34a;
-  --color-success-soft: #dcfce7;
-  --color-warning: #ca8a04;
-  --color-warning-soft: #fef9c3;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-danger-soft: #fee2e2;
-
-  --color-accent: #60a5fa;
-}
-
-/* ───── زرد ───── */
-[data-theme="yellow"] {
-  --color-bg: #fefce8;
-  --color-surface: #ffffff;
-  --color-surface-alt: #fef9c3;
-  --color-border: #fde047; /* زردتر و واضح‌تر از قبل */
-
-  --color-text-primary: #292524; /* خنثی تیره - دیگه قهوه‌ای نیست */
-  --color-text-secondary: #78716c; /* خاکستری گرم خنثی */
-  --color-text-inverse: #1c1917; /* توضیح پایین ⬇ */
-
-  --color-primary: #eab308; /* زرد واقعی و پررنگ (yellow-500) */
-  --color-primary-hover: #ca8a04;
-  --color-primary-soft: #fef08a;
-
-  --color-success: #16a34a;
-  --color-success-soft: #dcfce7;
-  --color-warning: #d97706;
-  --color-warning-soft: #fed7aa;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-danger-soft: #fee2e2;
-
-  --color-accent: #facc15;
-}
-
-/* ───── نارنجی ───── */
-[data-theme="orange"] {
-  --color-bg: #fff7ed;
-  --color-surface: #ffffff;
-  --color-surface-alt: #ffedd5;
-  --color-border: #fed7aa;
-
-  --color-text-primary: #ee5d37;
-  --color-text-secondary: #ea580c;
-  --color-text-inverse: #ffffff;
-
-  --color-primary: #ea580c;
-  --color-primary-hover: #c2410c;
-  --color-primary-soft: #fed7aa;
-
-  --color-success: #16a34a;
-  --color-success-soft: #dcfce7;
-  --color-warning: #ca8a04;
-  --color-warning-soft: #fef9c3;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-danger-soft: #fee2e2;
-
-  --color-accent: #fb923c;
-}
-
-/* ───── بنفش (Purple) ───── */
-[data-theme="purple"] {
-  --color-bg: #110e2d;
-  --color-surface: #1b1640;
-  --color-surface-alt: #241d52;
-  --color-border: #332c66;
-
-  --color-text-primary: #f2f0fb;
-  --color-text-secondary: #a79fd8;
-  --color-text-inverse: #ffffff;
-
-  --color-primary: #7c5cfc;
-  --color-primary-hover: #6845e0;
-  --color-primary-soft: #2c2460;
-
-  --color-success: #22c55e;
-  --color-success-soft: #14532d;
-  --color-warning: #eab308;
-  --color-warning-soft: #422006;
-  --color-danger: #ef4444;
-  --color-danger-hover: #f87171;
-  --color-danger-soft: #450a0a;
-
-  --color-accent: #c4b5fd;
+  /* همان پنل، ولی به سمت سرمه‌ای عمیق. هنوز آبیِ برند است، ولی در کنار
+     زمینهٔ تیره یک سطح است نه یک چراغ. */
+  --brand-panel: linear-gradient(
+    155deg,
+    #16307e 0%,
+    #102258 55%,
+    #0a152f 100%
+  );
 }
 
 /* ===================================================================
-   معرفی توکن‌ها به Tailwind v4
-   بعد از این، کلاس‌هایی مثل bg-surface / text-text-secondary /
-   border-border / bg-primary / hover:bg-primary-hover و... در
-   دسترس هستن، دقیقاً مثل bg-blue-600 قبلی ولی به‌صورت معنایی.
+   ۳. معرفی توکن‌ها به Tailwind
+   -------------------------------------------------------------------
+   `inline` یعنی Tailwind مقدار را مستقیم داخل کلاس می‌گذارد
+   (`var(--surface)`) به‌جای ساختن یک متغیر دوم روی :root. بدون آن،
+   ارجاع هم‌نامِ `--color-bg: var(--color-bg)` حلقه می‌سازد و مقدار
+   نامعتبر می‌شود — دقیقاً همان تله‌ای که نسخهٔ قبلی این فایل داشت.
    =================================================================== */
 
-@theme {
-  --color-bg: var(--color-bg);
-  --color-surface: var(--color-surface);
-  --color-surface-alt: var(--color-surface-alt);
-  --color-border: var(--color-border);
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
 
-  --color-text-primary: var(--color-text-primary);
-  --color-text-secondary: var(--color-text-secondary);
-  --color-text-inverse: var(--color-text-inverse);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
 
-  --color-primary: var(--color-primary);
-  --color-primary-hover: var(--color-primary-hover);
-  --color-primary-soft: var(--color-primary-soft);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
 
-  --color-success: var(--color-success);
-  --color-success-soft: var(--color-success-soft);
-  --color-warning: var(--color-warning);
-  --color-warning-soft: var(--color-warning-soft);
-  --color-danger: var(--color-danger);
-  --color-danger-hover: var(--color-danger-hover);
-  --color-danger-soft: var(--color-danger-soft);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-hover: var(--primary-soft-hover);
+  --color-primary-border: var(--primary-border);
+  --color-primary-fg: var(--primary-fg);
 
-  --color-accent: var(--color-accent);
+  /* هر وضعیت دو رنگ متن دارد: پایه برای پرکردن و نقطه، و -fg برای متن
+     روی زمینهٔ روشن. بج‌ها ترکیب `bg-*-soft text-*-fg` را می‌گیرند. */
+  --color-success: var(--success);
+  --color-success-fg: var(--success-strong-fg);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-strong-fg);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-fg: var(--danger-strong-fg);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-fg: var(--info-strong-fg);
+  --color-info-soft: var(--info-soft);
+
+  /* بازتعریف مقیاس سایهٔ Tailwind، تا `shadow-md` در تم تیره هم درست
+     دربیاید و صفحات مجبور نباشند برای هر تم کلاس جدا بنویسند. */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-primary: var(--shadow-primary);
+
+  /* شعاع گوشه‌ها، مطابق مرجع: کارت‌ها ۱۲px، فیلدها و دکمه‌ها ۸px */
+  --radius-card: 0.75rem;
+  --radius-field: 0.5rem;
+  --radius-panel: 1.5rem;
+  --radius-pill: 999px;
+
+  --ease-smooth: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+   * مقیاس تایپوگرافی گایدلاین. زیرمجموعه‌ای از آن آورده شده — پله‌های
+   * ۴۰px به بالا در یک پنل مدیریتی جایی ندارند و توکنِ بی‌مصرف می‌ماندند.
+   *
+   * وزن‌ها یک تفاوت دارند: گایدلاین برای Title از SemiBold (۶۰۰) استفاده
+   * می‌کند و Peyda فقط ۴۰۰/۵۰۰/۷۰۰ دارد، پس Title با ۷۰۰ نوشته می‌شود.
+   * جایگزینش سنتز وزن توسط مرورگر بود، که در فارسی حروف را چاق و بدشکل
+   * می‌کند.
+   */
+  --text-display-sm: 2rem; /* 32 */
+  --text-display-sm--line-height: 1.35;
+  --text-headline-md: 1.75rem; /* 28 */
+  --text-headline-md--line-height: 1.45;
+  --text-title-lg: 1.5rem; /* 24 */
+  --text-title-lg--line-height: 1.5;
+  --text-title-md: 1.25rem; /* 20 */
+  --text-title-md--line-height: 1.55;
+  --text-title-sm: 1.125rem; /* 18 */
+  --text-title-sm--line-height: 1.6;
+  --text-body-lg: 1.125rem; /* 18 */
+  --text-body-lg--line-height: 1.75;
+  --text-body-md: 1rem; /* 16 */
+  --text-body-md--line-height: 1.75;
+  --text-body-sm: 0.875rem; /* 14 */
+  --text-body-sm--line-height: 1.7;
+  --text-body-xs: 0.75rem; /* 12 */
+  --text-body-xs--line-height: 1.65;
 }
 
 /* ===================================================================
-   استایل‌های پایه پروژه
+   ۴. فونت
    =================================================================== */
-
-* {
-  font-family: "Peyda", sans-serif;
-}
 
 @font-face {
   font-family: "Peyda";
@@ -229,16 +356,89 @@
   font-display: swap;
 }
 
+/* ===================================================================
+   ۵. پایه
+   =================================================================== */
+
+* {
+  font-family: "Peyda", sans-serif;
+}
+
 html {
   overflow-y: scroll;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   direction: rtl;
   font-family: "Peyda", sans-serif;
-  background-color: var(--color-bg);
-  color: var(--color-text-primary);
+  background-color: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* خط‌های فارسی به فضای عمودی بیشتری از لاتین نیاز دارند */
+  line-height: 1.7;
+}
+
+/* حلقهٔ فوکوس یک‌دست برای همهٔ عناصر تعاملی. `:focus-visible` یعنی فقط
+   وقتی دیده می‌شود که کاربر با کیبورد حرکت کند، نه بعد از هر کلیک ماوس. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-field);
+}
+
+::selection {
+  background-color: var(--primary-soft-hover);
+  color: var(--text-primary);
+}
+
+/* اسکرول‌بار باریک و هم‌رنگ تم — پیش‌فرض روشنِ مرورگر در تم تیره
+   مثل یک نوار سفید کنار صفحه می‌زند. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: var(--radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+  background-clip: content-box;
+}
+
+/* تعویض تم نباید پرشی باشد — ولی transition روی * هر رندر را کند
+   می‌کند، پس فقط همان چند خاصیتی که تم عوض می‌کند. */
+body,
+[data-theme] {
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
+    background-color 200ms var(--ease-smooth),
+    color 200ms var(--ease-smooth);
+}
+
+/* احترام به تنظیم سیستم: کاربری که حرکت را خاموش کرده، حرکت نبیند.
+   framer-motion هم همین را از useReducedMotion می‌خواند. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

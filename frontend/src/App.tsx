@@ -38,7 +38,28 @@ function App() {
               it has to know who is signed in. */}
           <SubscriptionProvider>
             <ModalProvider>
-              <Toaster position="top-center" />
+              {/* Themed here rather than per-call: react-hot-toast paints a
+                  white card by default, which in the dark theme arrives as a
+                  bright rectangle over a dark page. Reading the same tokens
+                  as everything else keeps it part of the interface. */}
+              <Toaster
+                position="top-center"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: "var(--surface)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-field)",
+                    boxShadow: "var(--shadow-lg)",
+                    fontFamily: "Peyda, sans-serif",
+                    fontSize: "0.875rem",
+                    maxWidth: "26rem",
+                  },
+                  success: { iconTheme: { primary: "var(--success)", secondary: "var(--surface)" } },
+                  error: { iconTheme: { primary: "var(--danger)", secondary: "var(--surface)" } },
+                }}
+              />
               <Routes>
                 <Route path="/login" element={<Login />} />
                 {/* Linked from dofixo.ir, so the marketing site can point

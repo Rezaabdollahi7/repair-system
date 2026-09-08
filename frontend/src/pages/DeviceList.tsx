@@ -34,7 +34,11 @@ import {
 import {
   badge,
   iconButton,
+  primaryButton,
   rowCard,
+  searchField,
+  searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -42,6 +46,9 @@ import {
   tdMuted,
   th,
   thead,
+  toolbar,
+  toolbarActions,
+  toolbarSearch,
   trClickable,
 } from "../utils/tableClasses";
 import type { DeviceFilters } from "../components/FilterPanel";
@@ -425,21 +432,27 @@ export default function DeviceList() {
 
   return (
     <div dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-4">
-        <div className="flex gap-2 w-full sm:w-auto">
+      <div className={toolbar}>
+        <div className={toolbarSearch}>
+          <MagnifyingGlassIcon className={searchIcon} />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس…"
+            aria-label="جستجوی دستگاه"
+            className={searchField}
+          />
+        </div>
+
+        <div className={toolbarActions}>
           {/*
             A neutral button, not a green one. --success is reserved for
             "this went well"; opening a filter panel is neither a success
             nor a state, and colouring it green spends a status tone on a
             control that has no status.
           */}
-          <button
-            onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field border border-border
-                       bg-surface text-text-primary text-body-sm font-bold
-                       hover:bg-surface-alt hover:border-border-strong transition-colors
-                       flex items-center justify-center gap-2 cursor-pointer"
-          >
+          <button onClick={() => setFilterOpen(true)} className={secondaryButton}>
             <FunnelIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
             فیلترها
             {activeFilterCount > 0 && (
@@ -448,35 +461,12 @@ export default function DeviceList() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => openDeviceEdit(null)}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field bg-primary text-primary-fg
-                       text-body-sm font-bold shadow-primary hover:bg-primary-hover
-                       transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
+          <button onClick={() => openDeviceEdit(null)} className={primaryButton}>
             <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             ثبت دستگاه جدید
           </button>
         </div>
-      </div>
 
-      {/* Search */}
-      <div className="mb-4">
-        <div className="relative">
-          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس…"
-            aria-label="جستجوی دستگاه"
-            className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm
-                       border border-border rounded-field py-2.5 pr-11 pl-3.5
-                       hover:border-border-strong focus:outline-none focus:border-primary
-                       focus:shadow-[0_0_0_3px_var(--primary-soft)]
-                       transition-[border-color,box-shadow] duration-150"
-          />
-        </div>
         <FilterPanel
           isOpen={filterOpen}
           onClose={() => setFilterOpen(false)}

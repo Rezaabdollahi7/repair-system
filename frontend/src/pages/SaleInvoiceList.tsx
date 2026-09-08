@@ -24,6 +24,10 @@ import { useDebounce } from "../utils/helpers";
 import {
   badge,
   iconButton,
+  primaryButton,
+  searchField,
+  searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -31,6 +35,9 @@ import {
   tdMuted,
   th,
   thead,
+  toolbar,
+  toolbarActions,
+  toolbarSearch,
   trClickable,
 } from "../utils/tableClasses";
 import type { SaleInvoiceFilters } from "../components/SaleInvoiceFilterPanel";
@@ -174,15 +181,21 @@ export default function SaleInvoiceList() {
 
   return (
     <div dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-4">
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field border border-border
-                       bg-surface text-text-primary text-body-sm font-bold
-                       hover:bg-surface-alt hover:border-border-strong transition-colors
-                       flex items-center justify-center gap-2 cursor-pointer"
-          >
+      <div className={toolbar}>
+        <div className={toolbarSearch}>
+          <MagnifyingGlassIcon className={searchIcon} />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="جستجو در شماره فاکتور، نام مشتری یا تلفن…"
+            aria-label="جستجوی فاکتور فروش"
+            className={searchField}
+          />
+        </div>
+
+        <div className={toolbarActions}>
+          <button onClick={() => setFilterOpen(true)} className={secondaryButton}>
             <FunnelIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
             فیلترها
             {activeFilterCount > 0 && (
@@ -191,33 +204,10 @@ export default function SaleInvoiceList() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => openSaleInvoiceCreate()}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field bg-primary text-primary-fg
-                       text-body-sm font-bold shadow-primary hover:bg-primary-hover
-                       transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
+          <button onClick={() => openSaleInvoiceCreate()} className={primaryButton}>
             <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             فاکتور جدید
           </button>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="mb-4">
-        <div className="relative">
-          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="جستجو در شماره فاکتور، نام مشتری یا تلفن..."
-            className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm
-                       border border-border rounded-field py-2.5 pr-11 pl-3.5
-                       hover:border-border-strong focus:outline-none focus:border-primary
-                       focus:shadow-[0_0_0_3px_var(--primary-soft)]
-                       transition-[border-color,box-shadow] duration-150"
-          />
         </div>
       </div>
 

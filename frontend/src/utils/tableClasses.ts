@@ -1,5 +1,5 @@
 /**
- * The class strings the four list tables share.
+ * The class strings the list pages share — their toolbar and their table.
  *
  * Not a Table component — the pages differ too much in their columns and
  * row actions for one to be worth the indirection. But four hand-typed
@@ -46,3 +46,52 @@ export const iconButton =
 /** The card shown in place of the table below `lg`. */
 export const rowCard =
   "bg-surface border border-border rounded-card shadow-sm p-4 transition-colors";
+
+/* ── Toolbar ────────────────────────────────────────────────────────── */
+
+/**
+ * The row above every list: search on the reading-start edge, actions at
+ * the far one.
+ *
+ * The search field and the buttons used to be two stacked rows, which cost
+ * a hundred pixels of the screen before a single row of data — on a laptop
+ * that is two table rows the user could have been reading.
+ */
+export const toolbar =
+  "flex flex-col sm:flex-row sm:items-center gap-3 mb-4";
+
+/** Grows to fill whatever the buttons leave. min-w-0 so it may shrink. */
+export const toolbarSearch = "relative flex-1 min-w-0";
+
+/** Keeps its natural width; full width only when stacked on a phone. */
+export const toolbarActions = "flex gap-2 shrink-0";
+
+export const searchIcon =
+  "pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted";
+
+export const searchField =
+  "w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm " +
+  "border border-border rounded-field py-2.5 pr-11 pl-3.5 " +
+  "hover:border-border-strong focus:outline-none focus:border-primary " +
+  "focus:shadow-[0_0_0_3px_var(--primary-soft)] " +
+  "transition-[border-color,box-shadow] duration-150";
+
+/** The page's main action — "ثبت دستگاه جدید", "فاکتور جدید". */
+export const primaryButton =
+  "flex-1 sm:flex-none px-4 py-2.5 rounded-field bg-primary text-primary-fg " +
+  "text-body-sm font-bold shadow-primary hover:bg-primary-hover transition-colors " +
+  "flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap";
+
+/** Everything beside it — filters, categories. */
+export const secondaryButton =
+  "flex-1 sm:flex-none px-4 py-2.5 rounded-field border border-border bg-surface " +
+  "text-text-primary text-body-sm font-bold hover:bg-surface-alt " +
+  "hover:border-border-strong transition-colors flex items-center justify-center " +
+  "gap-2 cursor-pointer whitespace-nowrap";
+
+/** Selects that sit in the toolbar beside the search field. */
+export const toolbarSelect =
+  "shrink-0 border border-border rounded-field px-3.5 py-2.5 text-body-sm bg-surface " +
+  "text-text-primary hover:border-border-strong focus:outline-none focus:border-primary " +
+  "focus:shadow-[0_0_0_3px_var(--primary-soft)] " +
+  "transition-[border-color,box-shadow] cursor-pointer";

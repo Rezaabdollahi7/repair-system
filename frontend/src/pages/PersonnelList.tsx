@@ -21,12 +21,18 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import {
   badge,
   iconButton,
+  primaryButton,
+  searchField,
+  searchIcon,
   tableCard,
   tableScroll,
   tbody,
   tdMuted,
   th,
   thead,
+  toolbar,
+  toolbarActions,
+  toolbarSearch,
   tr,
 } from "../utils/tableClasses";
 import type { Personnel, QueryParams } from "../types/api";
@@ -125,34 +131,27 @@ export default function PersonnelList() {
 
   return (
     <div dir="rtl">
-      {canManage && (
-        <div className="flex justify-end items-center mb-4">
-          <button
-            onClick={() => openPersonnelEdit(null)}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-field bg-primary text-primary-fg
-                       text-body-sm font-bold shadow-primary hover:bg-primary-hover
-                       transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
-            افزودن پرسنل
-          </button>
+      <div className={toolbar}>
+        <div className={toolbarSearch}>
+          <MagnifyingGlassIcon className={searchIcon} />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="جستجو در نام، نام کاربری، تلفن…"
+            aria-label="جستجوی پرسنل"
+            className={searchField}
+          />
         </div>
-      )}
 
-      <div className="mb-4 relative">
-        <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
-        <input
-          type="search"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="جستجو در نام، نام کاربری، تلفن…"
-          aria-label="جستجوی پرسنل"
-          className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm
-                     border border-border rounded-field py-2.5 pr-11 pl-3.5
-                     hover:border-border-strong focus:outline-none focus:border-primary
-                     focus:shadow-[0_0_0_3px_var(--primary-soft)]
-                     transition-[border-color,box-shadow] duration-150"
-        />
+        {canManage && (
+          <div className={toolbarActions}>
+            <button onClick={() => openPersonnelEdit(null)} className={primaryButton}>
+              <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
+              افزودن پرسنل
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (

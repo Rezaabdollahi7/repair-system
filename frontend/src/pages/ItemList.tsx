@@ -23,6 +23,10 @@ import { errorText } from "../utils/errors";
 import {
   badge,
   iconButton,
+  primaryButton,
+  searchField,
+  searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -30,6 +34,10 @@ import {
   tdMuted,
   th,
   thead,
+  toolbar,
+  toolbarActions,
+  toolbarSearch,
+  toolbarSelect,
   trClickable,
 } from "../utils/tableClasses";
 import type { Category, Item, QueryParams } from "../types/api";
@@ -176,56 +184,38 @@ export default function ItemList() {
 
   return (
     <div dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-4">
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setShowCategoryModal(true)}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field border border-border
-                       bg-surface text-text-primary text-body-sm font-bold
-                       hover:bg-surface-alt hover:border-border-strong transition-colors
-                       flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <FolderPlusIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
-            دسته‌بندی‌ها
-          </button>
-          <button
-            onClick={() => openItemEdit(null)}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-field bg-primary text-primary-fg
-                       text-body-sm font-bold shadow-primary hover:bg-primary-hover
-                       transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
-            کالای جدید
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4 space-y-3">
-        <div className="relative">
-          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-3.5 w-[1.15rem] h-[1.15rem] text-text-muted" />
+      <div className={toolbar}>
+        <div className={toolbarSearch}>
+          <MagnifyingGlassIcon className={searchIcon} />
           <input
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="جستجو در کد، نام یا توضیحات…"
             aria-label="جستجوی کالا"
-            className="w-full bg-surface text-text-primary placeholder:text-text-muted text-body-sm
-                       border border-border rounded-field py-2.5 pr-11 pl-3.5
-                       hover:border-border-strong focus:outline-none focus:border-primary
-                       focus:shadow-[0_0_0_3px_var(--primary-soft)]
-                       transition-[border-color,box-shadow] duration-150"
+            className={searchField}
           />
         </div>
 
+        <div className={toolbarActions}>
+          <button onClick={() => setShowCategoryModal(true)} className={secondaryButton}>
+            <FolderPlusIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
+            دسته‌بندی‌ها
+          </button>
+          <button onClick={() => openItemEdit(null)} className={primaryButton}>
+            <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
+            کالای جدید
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4">
         <div className="flex flex-wrap gap-3 items-center">
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             aria-label="دسته‌بندی"
-            className="border border-border rounded-field px-3 py-2.5 text-body-sm bg-surface
-                       text-text-primary hover:border-border-strong focus:outline-none
-                       focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]
-                       transition-[border-color,box-shadow] cursor-pointer"
+            className={toolbarSelect}
           >
             <option value="">همه دسته‌بندی‌ها</option>
             {categories.map((cat) => (

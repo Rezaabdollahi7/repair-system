@@ -12,7 +12,6 @@ import {
   EyeIcon,
   PencilSquareIcon,
   PlusIcon,
-  UserIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import type { CustomerListRow, QueryParams } from "../types/api";
@@ -77,11 +76,7 @@ export default function CustomerList() {
   }, [refreshList, fetchCustomers, debouncedSearch, page, limit]);
   return (
     <div dir="rtl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <UserIcon className="w-6 h-6 inline-block text-text-secondary" />
-          مشتریان
-        </h1>
+      <div className="flex justify-end items-center mb-6">
         <button
           onClick={() => openCustomerEdit(null)}
           className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { getStockReport, getCategories } from "../api";
 import toast from "react-hot-toast";
-import { ChartBarIcon } from "@heroicons/react/24/solid";
 import { useModal } from "../context/ModalContext";
 import { formatPersianCurrency } from "../utils/formatters";
 import type {
@@ -92,13 +91,6 @@ export default function StockReport() {
 
   return (
     <div dir="rtl" className="px-2 sm:px-0 mx-auto">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-text-primary flex gap-2 items-center">
-          <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
-          گزارش موجودی انبار
-        </h1>
-      </div>
-
       <div className="bg-surface shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-end">
           <div className="w-full sm:w-auto">

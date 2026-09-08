@@ -15,7 +15,6 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
-  CurrencyDollarIcon,
   FunnelIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -162,12 +161,7 @@ export default function SaleInvoiceList() {
 
   return (
     <div dir="rtl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <CurrencyDollarIcon className="w-6 h-6 text-text-secondary" />
-          فاکتورهای فروش
-        </h1>
+      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-6">
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => setFilterOpen(true)}

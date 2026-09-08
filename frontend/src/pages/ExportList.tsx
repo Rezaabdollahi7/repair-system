@@ -146,13 +146,6 @@ export default function ExportList() {
 
   return (
     <div dir="rtl" className="px-2 sm:px-0">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-text-primary flex items-center gap-2">
-          <ArrowDownTrayIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
-          خروجی اطلاعات
-        </h1>
-      </div>
-
       {/* What this page is, and what it is not */}
       <div className="bg-primary-soft border border-primary-soft rounded-lg p-4 mb-4 sm:mb-6">
         <p className="text-sm text-primary leading-7">

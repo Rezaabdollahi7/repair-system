@@ -256,15 +256,11 @@ export default function Settings() {
 
   return (
     <div dir="rtl" className="px-2 sm:px-4 mx-auto">
-      <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-4 sm:mb-6 flex gap-2 items-center">
-        <Cog6ToothIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
-        تنظیمات
-        {!isSuperAdmin && (
-          <span className="text-sm font-normal text-text-secondary mr-2">
-            (دسترسی محدود - فقط تنظیمات ظاهری)
-          </span>
-        )}
-      </h1>
+      {!isSuperAdmin && (
+        <p className="text-body-sm text-text-secondary mb-4">
+          دسترسی محدود — فقط تنظیمات ظاهری
+        </p>
+      )}
 
       <div className="border-b border-border mb-4 sm:mb-6 overflow-x-auto">
         <nav className="flex gap-3 sm:gap-6 min-w-max">

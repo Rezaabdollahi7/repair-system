@@ -14,7 +14,6 @@ import {
   PencilSquareIcon,
   TrashIcon,
   MagnifyingGlassIcon,
-  CubeIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPersianCurrency } from "../utils/formatters";
@@ -164,12 +163,7 @@ export default function ItemList() {
 
   return (
     <div dir="rtl">
-      {/* Header - responsive */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-text-primary flex items-center gap-2">
-          <CubeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
-          مدیریت کالاها
-        </h1>
+      <div className="flex flex-col sm:flex-row sm:justify-end items-start sm:items-center gap-3 mb-6">
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowCategoryModal(true)}

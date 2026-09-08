@@ -17,7 +17,6 @@ import {
   ExclamationCircleIcon,
   DocumentTextIcon,
   XCircleIcon,
-  WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useDebounce } from "../utils/helpers";
@@ -177,11 +176,7 @@ export default function RepairInvoiceList() {
 
   return (
     <div dir="rtl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <WrenchScrewdriverIcon className="w-6 h-6 text-text-secondary" />
-          فاکتورهای تعمیر
-        </h1>
+      <div className="flex justify-end items-center mb-6">
         <button
           onClick={() => openRepairInvoiceCreate()}
           className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"

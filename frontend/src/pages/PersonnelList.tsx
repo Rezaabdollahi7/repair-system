@@ -12,7 +12,6 @@ import {
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
-  UserGroupIcon,
   CheckCircleIcon,
   XCircleIcon,
 } from "@heroicons/react/24/solid";
@@ -113,12 +112,8 @@ export default function PersonnelList() {
 
   return (
     <div dir="rtl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <UserGroupIcon className="w-6 h-6 text-text-secondary" />
-          مدیریت پرسنل
-        </h1>
-        {canManage && (
+      {canManage && (
+        <div className="flex justify-end items-center mb-6">
           <button
             onClick={() => openPersonnelEdit(null)}
             className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center gap-2"
@@ -126,8 +121,8 @@ export default function PersonnelList() {
             <PlusIcon className="w-5 h-5" />
             افزودن پرسنل
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="mb-4">
         <input

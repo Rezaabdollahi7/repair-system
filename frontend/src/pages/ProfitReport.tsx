@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getProfitReport } from "../api";
 import toast from "react-hot-toast";
-import { ArrowTrendingUpIcon, ChartPieIcon } from "@heroicons/react/24/solid";
+import { ArrowTrendingUpIcon } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
 import { useModal } from "../context/ModalContext";
 import { formatPersianCurrency } from "../utils/formatters";
@@ -40,13 +40,6 @@ export default function ProfitReport() {
 
   return (
     <div dir="rtl" className="px-2 sm:px-0 mx-auto">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-text-primary flex gap-2 items-center">
-          <ChartPieIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
-          گزارش سود و زیان
-        </h1>
-      </div>
-
       <div className="bg-surface shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-end">
           <div className="w-full sm:w-auto">

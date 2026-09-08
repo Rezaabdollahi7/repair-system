@@ -14,7 +14,6 @@ import {
   CogIcon,
   DocumentTextIcon,
   BanknotesIcon,
-  HomeIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency } from "../utils/formatters";
 import type {
@@ -156,11 +155,6 @@ export default function Dashboard() {
 
   return (
     <div dir="rtl" className="mx-auto">
-      <h1 className="text-2xl font-bold text-text-primary mb-6 flex gap-2">
-        <HomeIcon className="w-6 h-6 text-text-secondary" />
-        داشبورد مدیریتی
-      </h1>
-
       <hr className="border-border" />
       <h2 className="text-lg font-medium text-text-primary my-8">
         آمار دستگاه‌ها

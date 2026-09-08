@@ -1,5 +1,6 @@
 // src/components/PurchaseInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import axios from "axios";
 import { createPurchaseInvoice, getItems, createItem } from "../api";
 import toast from "react-hot-toast";
@@ -17,6 +18,7 @@ import type {
   PurchaseInvoiceCreateBody,
 } from "../types/api";
 import type { SelectOption, SelectValue } from "./SearchableSelect";
+import { modalPanel } from "../motion";
 
 /** The server answers with { error } on every failing path. */
 function errorText(error: unknown, fallback: string): string {
@@ -107,7 +109,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div
-        className="bg-surface rounded-xl p-4 sm:p-6 w-full max-w-md"
+        className="bg-surface border border-border rounded-card shadow-xl p-4 sm:p-6 w-full max-w-md"
         dir="rtl"
       >
         <h3 className="text-base sm:text-lg font-bold text-text-primary mb-3 sm:mb-4">
@@ -116,42 +118,42 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-2 sm:space-y-3">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 کد کالا *
               </label>
               <input
                 name="code"
                 value={formData.code}
                 onChange={handleChange}
-                className={`w-full border rounded px-3 py-2 text-sm bg-surface text-text-primary ${errors.code ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.code ? "border-danger" : "border-border"}`}
               />
               {errors.code && (
-                <p className="text-xs text-danger mt-1">{errors.code}</p>
+                <p className="text-body-xs text-danger mt-1">{errors.code}</p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 نام کالا *
               </label>
               <input
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className={`w-full border rounded px-3 py-2 text-sm bg-surface text-text-primary ${errors.name ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.name ? "border-danger" : "border-border"}`}
               />
               {errors.name && (
-                <p className="text-xs text-danger mt-1">{errors.name}</p>
+                <p className="text-body-xs text-danger mt-1">{errors.name}</p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 واحد
               </label>
               <select
                 name="unit"
                 value={formData.unit}
                 onChange={handleChange}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-surface text-text-primary"
+                className="w-full border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               >
                 <option value="عدد">عدد</option>
                 <option value="متر">متر</option>
@@ -164,14 +166,18 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-border rounded hover:bg-surface-alt text-text-primary order-2 sm:order-1"
+              className="px-4 py-2.5 rounded-field border border-border bg-surface text-body-sm font-bold
+                         text-text-primary hover:border-border-strong transition-colors cursor-pointer
+                         order-2 sm:order-1"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-primary text-text-inverse rounded hover:bg-primary-hover disabled:opacity-50 order-1 sm:order-2"
+              className="px-4 py-2.5 rounded-field bg-primary text-primary-fg text-body-sm font-bold
+                         shadow-primary hover:bg-primary-hover transition-colors cursor-pointer
+                         disabled:opacity-60 disabled:cursor-not-allowed order-1 sm:order-2"
             >
               {loading ? "در حال ثبت..." : "ثبت"}
             </button>
@@ -341,18 +347,21 @@ export default function PurchaseInvoiceFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-6xl my-2 sm:my-8"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-2">
             <ShoppingCartIcon className="w-5 h-5 text-text-secondary" />
             ثبت فاکتور خرید جدید
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -361,13 +370,13 @@ export default function PurchaseInvoiceFormModal({
         <form onSubmit={handleSubmit} className="p-3 sm:p-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <div className="lg:col-span-1 space-y-4 sm:space-y-6">
-              <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+              <div className="bg-surface shadow rounded-field p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
                   اطلاعات فاکتور
                 </h2>
                 <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
+                    <label className="block text-body-sm font-medium text-text-primary mb-2">
                       نام فروشنده
                     </label>
                     <input
@@ -375,12 +384,12 @@ export default function PurchaseInvoiceFormModal({
                       name="supplier_name"
                       value={formData.supplier_name}
                       onChange={handleInputChange}
-                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="مثلاً: فروشگاه قطعات الکترونیک"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
+                    <label className="block text-body-sm font-medium text-text-primary mb-2">
                       تاریخ فاکتور
                     </label>
                     <PersianDatePicker
@@ -392,7 +401,7 @@ export default function PurchaseInvoiceFormModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
+                    <label className="block text-body-sm font-medium text-text-primary mb-2">
                       توضیحات
                     </label>
                     <textarea
@@ -400,26 +409,26 @@ export default function PurchaseInvoiceFormModal({
                       value={formData.note}
                       onChange={handleInputChange}
                       rows={3}
-                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="توضیحات اضافی..."
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+              <div className="bg-surface shadow rounded-field p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
                   خلاصه پرداخت
                 </h2>
                 <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between py-2 text-sm sm:text-base">
+                  <div className="flex justify-between py-2 text-body-sm sm:text-base">
                     <span className="text-text-secondary">جمع کل:</span>
                     <span className="font-medium text-text-primary">
                       {formatCurrency(calculateTotal())} ریال
                     </span>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
+                    <label className="block text-body-sm font-medium text-text-primary mb-2">
                       مبلغ پرداختی
                     </label>
                     <input
@@ -429,15 +438,15 @@ export default function PurchaseInvoiceFormModal({
                       onChange={handleInputChange}
                       min="0"
                       step="1000"
-                      className={`w-full border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary ${errors.paid_amount ? "border-danger" : "border-border"}`}
+                      className={`w-full border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border"}`}
                     />
                     {errors.paid_amount && (
-                      <p className="mt-1 text-xs text-danger">
+                      <p className="mt-1 text-body-xs text-danger">
                         {errors.paid_amount}
                       </p>
                     )}
                   </div>
-                  <div className="flex justify-between py-2 border-t border-border text-sm sm:text-base">
+                  <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base">
                     <span className="text-text-secondary">مانده:</span>
                     <span
                       className={`font-medium ${calculateRemaining() > 0 ? "text-danger" : "text-success"}`}
@@ -450,7 +459,7 @@ export default function PurchaseInvoiceFormModal({
             </div>
 
             <div className="lg:col-span-2">
-              <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+              <div className="bg-surface shadow rounded-field p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                   <h2 className="text-base sm:text-lg font-medium text-text-primary">
                     اقلام فاکتور
@@ -459,7 +468,7 @@ export default function PurchaseInvoiceFormModal({
                     <button
                       type="button"
                       onClick={() => setShowQuickModal(true)}
-                      className="bg-success-soft text-success px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-success-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                     >
                       <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       تعریف سریع کالا
@@ -467,7 +476,7 @@ export default function PurchaseInvoiceFormModal({
                     <button
                       type="button"
                       onClick={handleAddItem}
-                      className="bg-primary text-text-inverse px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-primary-hover text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      className="bg-primary text-primary-fg px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-hover text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                     >
                       <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       افزودن کالا
@@ -476,15 +485,15 @@ export default function PurchaseInvoiceFormModal({
                 </div>
 
                 {errors.items && (
-                  <p className="mb-3 sm:mb-4 text-sm text-danger">
+                  <p className="mb-3 sm:mb-4 text-body-sm text-danger">
                     {errors.items}
                   </p>
                 )}
 
                 {selectedItems.length === 0 ? (
-                  <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-lg">
+                  <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-field">
                     <p>هیچ کالایی انتخاب نشده است</p>
-                    <p className="text-xs sm:text-sm mt-1">
+                    <p className="text-body-xs sm:text-body-sm mt-1">
                       از دکمه "افزودن کالا" استفاده کنید
                     </p>
                   </div>
@@ -493,11 +502,11 @@ export default function PurchaseInvoiceFormModal({
                     {selectedItems.map((item, index) => (
                       <div
                         key={index}
-                        className="border border-border rounded-lg p-3 sm:p-4 bg-surface-alt"
+                        className="border border-border rounded-field p-3 sm:p-4 bg-surface-alt"
                       >
                         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3 items-center">
                           <div className="col-span-2 sm:col-span-5">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               کالا <span className="text-danger">*</span>
                             </label>
                             <SearchableSelect
@@ -513,7 +522,7 @@ export default function PurchaseInvoiceFormModal({
                             />
                           </div>
                           <div className="col-span-1 sm:col-span-2">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               تعداد <span className="text-danger">*</span>
                             </label>
                             <input
@@ -527,16 +536,16 @@ export default function PurchaseInvoiceFormModal({
                                 )
                               }
                               min="1"
-                              className={`w-full border rounded-lg px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary ${errors[`quantity_${index}`] ? "border-danger" : "border-border"}`}
+                              className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`quantity_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`quantity_${index}`] && (
-                              <p className="mt-1 text-xs text-danger">
+                              <p className="mt-1 text-body-xs text-danger">
                                 {errors[`quantity_${index}`]}
                               </p>
                             )}
                           </div>
                           <div className="col-span-2 sm:col-span-2">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               قیمت واحد (ریال){" "}
                               <span className="text-danger">*</span>
                             </label>
@@ -551,19 +560,19 @@ export default function PurchaseInvoiceFormModal({
                                 )
                               }
                               min="0"
-                              className={`w-full border rounded-lg px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary ${errors[`price_${index}`] ? "border-danger" : "border-border"}`}
+                              className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`price_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`price_${index}`] && (
-                              <p className="mt-1 text-xs text-danger">
+                              <p className="mt-1 text-body-xs text-danger">
                                 {errors[`price_${index}`]}
                               </p>
                             )}
                           </div>
                           <div className="col-span-2 sm:col-span-2">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               جمع
                             </label>
-                            <div className="px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium bg-surface border border-border rounded-lg text-text-primary">
+                            <div className="px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-text-primary">
                               {formatCurrency(
                                 calculateItemTotal(
                                   item.quantity,
@@ -576,7 +585,7 @@ export default function PurchaseInvoiceFormModal({
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(index)}
-                              className="w-full px-2 py-2 text-danger hover:bg-danger-soft rounded-lg"
+                              className="w-full px-2 py-2 text-danger hover:bg-danger-soft rounded-field"
                             >
                               <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />
                             </button>
@@ -594,20 +603,20 @@ export default function PurchaseInvoiceFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 sm:px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt order-2 sm:order-1"
+              className="px-3 sm:px-4 py-2 border border-border rounded-field text-text-primary hover:bg-surface-alt order-2 sm:order-1"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 order-1 sm:order-2 justify-center"
+              className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 order-1 sm:order-2 justify-center"
             >
               {loading ? "در حال ثبت..." : "ثبت فاکتور"}
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
 
       <QuickItemModal
         isOpen={showQuickModal}

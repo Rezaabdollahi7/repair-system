@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import axios from "axios";
 import {
   createRepairInvoice,
@@ -35,6 +36,7 @@ import type {
   RepairInvoiceCreateBody,
   RepairLineType,
 } from "../types/api";
+import { modalPanel } from "../motion";
 
 /** The server answers with { error } on every failing path. */
 function errorText(error: unknown, fallback: string): string {
@@ -491,7 +493,7 @@ export default function RepairInvoiceFormModal({
   if (initialLoading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-surface rounded-xl p-8">
+        <div className="bg-surface border border-border rounded-card shadow-xl p-8">
           <div className="text-center py-4 text-text-primary" dir="rtl">
             در حال بارگذاری...
           </div>
@@ -502,17 +504,20 @@ export default function RepairInvoiceFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-7xl my-2 sm:my-8"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-lg sm:text-xl font-bold text-text-primary">
             {isEditMode ? "ویرایش فاکتور تعمیر" : "ثبت فاکتور تعمیر جدید"}
           </h2>
           <button
             onClick={handleModalClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -522,7 +527,7 @@ export default function RepairInvoiceFormModal({
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               <div className="lg:col-span-1 space-y-4 sm:space-y-6">
-                <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+                <div className="bg-surface shadow rounded-field p-4 sm:p-6">
                   <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
                     <WrenchScrewdriverIcon className="w-5 h-5 text-text-secondary" />
                     اطلاعات دستگاه
@@ -530,7 +535,7 @@ export default function RepairInvoiceFormModal({
 
                   <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-text-primary mb-2">
+                      <label className="block text-body-sm font-medium text-text-primary mb-2">
                         انتخاب دستگاه <span className="text-danger">*</span>
                       </label>
                       <SearchableSelect
@@ -547,7 +552,7 @@ export default function RepairInvoiceFormModal({
                     {formData.device_id && (
                       <>
                         <div>
-                          <label className="block text-sm font-medium text-text-primary mb-2">
+                          <label className="block text-body-sm font-medium text-text-primary mb-2">
                             نام مشتری
                           </label>
                           <input
@@ -555,17 +560,17 @@ export default function RepairInvoiceFormModal({
                             value={formData.customer_name || "—"}
                             readOnly
                             disabled
-                            className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-sm"
+                            className="w-full border border-border rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
                           />
                           {!formData.customer_name && (
-                            <p className="text-warning text-xs mt-1">
+                            <p className="text-warning text-body-xs mt-1">
                               ⚠️ این دستگاه مشتری ثبت شده ندارد.
                             </p>
                           )}
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-text-primary mb-2">
+                          <label className="block text-body-sm font-medium text-text-primary mb-2">
                             شماره تماس
                           </label>
                           <input
@@ -573,7 +578,7 @@ export default function RepairInvoiceFormModal({
                             value={formData.customer_phone || "—"}
                             readOnly
                             disabled
-                            className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-sm"
+                            className="w-full border border-border rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
                           />
                         </div>
                       </>
@@ -581,14 +586,14 @@ export default function RepairInvoiceFormModal({
                   </div>
                 </div>
 
-                <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+                <div className="bg-surface shadow rounded-field p-4 sm:p-6">
                   <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
                     جزئیات فاکتور
                   </h2>
 
                   <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-text-primary mb-2">
+                      <label className="block text-body-sm font-medium text-text-primary mb-2">
                         تاریخ فاکتور
                       </label>
                       <PersianDatePicker
@@ -603,14 +608,14 @@ export default function RepairInvoiceFormModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-text-primary mb-2">
+                      <label className="block text-body-sm font-medium text-text-primary mb-2">
                         تعمیرکار
                       </label>
                       <select
                         name="technician_id"
                         value={formData.technician_id}
                         onChange={handleInputChange}
-                        className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 bg-surface text-text-primary text-sm"
+                        className="w-full border border-border rounded-field px-3 sm:px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] text-body-sm"
                       >
                         <option value="">انتخاب تعمیرکار...</option>
                         {technicianOptions.map((t) => (
@@ -622,7 +627,7 @@ export default function RepairInvoiceFormModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-text-primary mb-2">
+                      <label className="block text-body-sm font-medium text-text-primary mb-2">
                         گارانتی (ماه)
                       </label>
                       <input
@@ -631,12 +636,12 @@ export default function RepairInvoiceFormModal({
                         value={formData.warranty_months}
                         onChange={handleInputChange}
                         min="0"
-                        className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                        className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-text-primary mb-2">
+                      <label className="block text-body-sm font-medium text-text-primary mb-2">
                         توضیحات
                       </label>
                       <textarea
@@ -644,7 +649,7 @@ export default function RepairInvoiceFormModal({
                         value={formData.notes}
                         onChange={handleInputChange}
                         rows={3}
-                        className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                        className="w-full border border-border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                         placeholder="توضیحات اضافی..."
                       />
                     </div>
@@ -653,7 +658,7 @@ export default function RepairInvoiceFormModal({
               </div>
 
               <div className="lg:col-span-2">
-                <div className="bg-surface shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                <div className="bg-surface shadow rounded-field p-3 sm:p-4 mb-4 sm:mb-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
                     <h2 className="text-base sm:text-lg font-medium text-text-primary flex items-center gap-2">
                       <CubeIcon className="w-5 h-5 text-text-secondary" />
@@ -664,7 +669,7 @@ export default function RepairInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => setShowItemModal(true)}
-                        className="bg-success-soft text-success px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-success-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         تعریف کالای جدید
@@ -672,7 +677,7 @@ export default function RepairInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("inventory")}
-                        className="bg-success-soft text-success px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-success-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         از انبار
@@ -680,7 +685,7 @@ export default function RepairInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("service")}
-                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-primary-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-soft text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         خدمت
@@ -688,7 +693,7 @@ export default function RepairInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("custom")}
-                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-primary-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-soft text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         دلخواه
@@ -697,15 +702,15 @@ export default function RepairInvoiceFormModal({
                   </div>
 
                   {errors.items && (
-                    <p className="text-sm text-danger mb-3 sm:mb-4">
+                    <p className="text-body-sm text-danger mb-3 sm:mb-4">
                       {errors.items}
                     </p>
                   )}
 
                   {selectedItems.length === 0 ? (
-                    <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-lg">
+                    <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-field">
                       <p>هیچ آیتمی اضافه نشده است</p>
-                      <p className="text-xs sm:text-sm mt-1">
+                      <p className="text-body-xs sm:text-body-sm mt-1">
                         از دکمه‌های بالا برای افزودن آیتم استفاده کنید
                       </p>
                     </div>
@@ -714,14 +719,14 @@ export default function RepairInvoiceFormModal({
                       {selectedItems.map((item, index) => (
                         <div
                           key={index}
-                          className="border border-border rounded-lg p-3 sm:p-4 bg-surface-alt"
+                          className="border border-border rounded-field p-3 sm:p-4 bg-surface-alt"
                         >
                           <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-center">
                             <div className="col-span-1 sm:col-span-2">
                               <span
-                                className={`text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
+                                className={`text-body-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
                                   item.item_type === "inventory"
-                                    ? "bg-success-soft text-success"
+                                    ? "bg-success-soft text-success-fg"
                                     : item.item_type === "service"
                                       ? "bg-primary-soft text-primary"
                                       : "bg-primary-soft text-primary"
@@ -758,7 +763,7 @@ export default function RepairInvoiceFormModal({
                                       e.target.value,
                                     )
                                   }
-                                  className="w-full border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                  className="w-full border border-border rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 >
                                   <option value="">انتخاب خدمت...</option>
                                   {services.map((s) => (
@@ -782,7 +787,7 @@ export default function RepairInvoiceFormModal({
                                     )
                                   }
                                   placeholder="نام آیتم"
-                                  className="w-full border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                  className="w-full border border-border rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 />
                               )}
                             </div>
@@ -800,7 +805,7 @@ export default function RepairInvoiceFormModal({
                                 }
                                 min="0.01"
                                 step="0.01"
-                                className="w-full border border-border rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                className="w-full border border-border rounded-field px-1 sm:px-2 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                               />
                             </div>
 
@@ -815,7 +820,7 @@ export default function RepairInvoiceFormModal({
                                     e.target.value,
                                   )
                                 }
-                                className="w-full border border-border rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                className="w-full border border-border rounded-field px-1 sm:px-2 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                               />
                             </div>
 
@@ -831,12 +836,12 @@ export default function RepairInvoiceFormModal({
                                   )
                                 }
                                 min="0"
-                                className="w-full border border-border rounded px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary"
+                                className="w-full border border-border rounded-field px-1 sm:px-2 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                               />
                             </div>
 
                             <div className="col-span-3 sm:col-span-1 text-left">
-                              <span className="text-xs sm:text-sm font-medium text-text-primary">
+                              <span className="text-body-xs sm:text-body-sm font-medium text-text-primary">
                                 {formatPersianCurrency(
                                   calculateItemTotal(item),
                                 )}
@@ -855,7 +860,7 @@ export default function RepairInvoiceFormModal({
                           </div>
 
                           {errors[`item_${index}_quantity`] && (
-                            <p className="text-xs text-danger mt-1">
+                            <p className="text-body-xs text-danger mt-1">
                               {errors[`item_${index}_quantity`]}
                             </p>
                           )}
@@ -865,13 +870,13 @@ export default function RepairInvoiceFormModal({
                   )}
                 </div>
 
-                <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+                <div className="bg-surface shadow rounded-field p-4 sm:p-6">
                   <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
                     محاسبات
                   </h2>
 
                   <div className="space-y-2 sm:space-y-3">
-                    <div className="flex justify-between text-sm sm:text-base text-text-primary">
+                    <div className="flex justify-between text-body-sm sm:text-base text-text-primary">
                       <span>جمع کل:</span>
                       <span className="font-medium">
                         {formatPersianCurrency(calculateSubtotal())} ریال
@@ -883,7 +888,7 @@ export default function RepairInvoiceFormModal({
                         name="discount_type"
                         value={formData.discount_type}
                         onChange={handleInputChange}
-                        className="border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-surface text-text-primary"
+                        className="border border-border rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm bg-surface text-text-primary"
                       >
                         <option value="">بدون تخفیف</option>
                         <option value="percentage">درصدی</option>
@@ -897,9 +902,9 @@ export default function RepairInvoiceFormModal({
                             value={formData.discount_value}
                             onChange={handleInputChange}
                             min="0"
-                            className="border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm w-24 sm:w-32 bg-surface text-text-primary"
+                            className="border border-border rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm w-24 sm:w-32 bg-surface text-text-primary"
                           />
-                          <span className="text-danger text-sm sm:mr-auto">
+                          <span className="text-danger text-body-sm sm:mr-auto">
                             -{formatPersianCurrency(calculateDiscount())} ریال
                           </span>
                         </>
@@ -907,7 +912,7 @@ export default function RepairInvoiceFormModal({
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                      <span className="text-sm text-text-primary">
+                      <span className="text-body-sm text-text-primary">
                         مالیات (%):
                       </span>
                       <input
@@ -918,9 +923,9 @@ export default function RepairInvoiceFormModal({
                         min="0"
                         max="100"
                         step="0.5"
-                        className="border border-border rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm w-20 sm:w-24 bg-surface text-text-primary"
+                        className="border border-border rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm w-20 sm:w-24 bg-surface text-text-primary"
                       />
-                      <span className="text-primary text-sm sm:mr-auto">
+                      <span className="text-primary text-body-sm sm:mr-auto">
                         +{formatPersianCurrency(calculateTax())} ریال
                       </span>
                     </div>
@@ -938,14 +943,14 @@ export default function RepairInvoiceFormModal({
                   <button
                     type="button"
                     onClick={handleModalClose}
-                    className="px-3 sm:px-4 py-2 border border-border rounded-lg hover:bg-surface-alt text-text-primary text-sm sm:text-base order-2 sm:order-1"
+                    className="px-3 sm:px-4 py-2 border border-border rounded-field hover:bg-surface-alt text-text-primary text-body-sm sm:text-base order-2 sm:order-1"
                   >
                     انصراف
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2"
+                    className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm sm:text-base order-1 sm:order-2"
                   >
                     {loading
                       ? "در حال ذخیره..."
@@ -958,7 +963,7 @@ export default function RepairInvoiceFormModal({
             </div>
           </form>
         </div>
-      </div>
+      </motion.div>
 
       {/* مودال ثبت کالا */}
       <ItemFormModal

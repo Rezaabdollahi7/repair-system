@@ -1,5 +1,6 @@
 // src/components/PurchaseInvoiceDetailModal.jsx
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   getPurchaseInvoice,
   deletePurchaseInvoice,
@@ -17,8 +18,9 @@ import {
   ExclamationCircleIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
 import type { Id, PaymentStatus, PurchaseInvoiceDetail } from "../types/api";
+import { modalPanel } from "../motion";
 
 interface BadgeStyle {
   label: string;
@@ -30,17 +32,17 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const map: Record<string, BadgeStyle> = {
     paid: {
       label: "پرداخت شده",
-      color: "bg-success-soft text-success",
+      color: "bg-success-soft text-success-fg",
       icon: CheckCircleIcon,
     },
     partial: {
       label: "پرداخت ناقص",
-      color: "bg-warning-soft text-warning",
+      color: "bg-warning-soft text-warning-fg",
       icon: ExclamationCircleIcon,
     },
     pending: {
       label: "در انتظار",
-      color: "bg-warning-soft text-warning",
+      color: "bg-warning-soft text-warning-fg",
       icon: ClockIcon,
     },
   };
@@ -51,7 +53,7 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const Icon = s.icon;
   return (
     <span
-      className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 w-fit ${s.color}`}
+      className={`px-3 py-1 rounded-full text-body-sm font-medium flex items-center gap-1 w-fit ${s.color}`}
     >
       {Icon && <Icon className="w-4 h-4" />}
       {s.label}
@@ -68,9 +70,9 @@ interface InfoRowProps {
 function InfoRow({ label, value, highlight }: InfoRowProps) {
   return (
     <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-sm text-text-secondary">{label}</span>
+      <span className="text-body-sm text-text-secondary">{label}</span>
       <span
-        className={`text-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
+        className={`text-body-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
       >
         {value || "—"}
       </span>
@@ -161,19 +163,22 @@ export default function PurchaseInvoiceDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-6xl my-8"
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
             <ShoppingCartIcon className="w-5 h-5 text-text-secondary" />
             فاکتور خرید
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -198,7 +203,9 @@ export default function PurchaseInvoiceDetailModal({
                   {isAtLeast("admin") && (
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="px-4 py-2 bg-danger text-text-inverse rounded-lg hover:bg-danger-hover flex items-center gap-2"
+                      className="px-4 py-2.5 rounded-field bg-danger-soft text-danger-fg text-body-sm font-bold
+                        border border-danger/25 hover:bg-danger/15 transition-colors cursor-pointer
+                        flex items-center gap-2"
                     >
                       <TrashIcon className="w-4 h-4" />
                       حذف فاکتور
@@ -210,7 +217,7 @@ export default function PurchaseInvoiceDetailModal({
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left - Info */}
                 <div className="lg:col-span-1 space-y-6">
-                  <div className="bg-surface shadow rounded-lg p-6">
+                  <div className="bg-surface shadow rounded-field p-6">
                     <h3 className="text-lg font-medium text-text-primary mb-4">
                       اطلاعات فاکتور
                     </h3>
@@ -239,12 +246,12 @@ export default function PurchaseInvoiceDetailModal({
                   </div>
 
                   {/* Payment Box */}
-                  <div className="bg-surface shadow rounded-lg p-6">
+                  <div className="bg-surface shadow rounded-field p-6">
                     <h3 className="text-lg font-medium text-text-primary mb-4">
                       وضعیت پرداخت
                     </h3>
                     <div className="space-y-4">
-                      <div className="bg-surface-alt p-4 rounded-lg">
+                      <div className="bg-surface-alt p-4 rounded-field">
                         <div className="flex justify-between mb-2">
                           <span className="text-text-secondary">جمع کل:</span>
                           <span className="font-bold text-text-primary">
@@ -274,7 +281,7 @@ export default function PurchaseInvoiceDetailModal({
 
                       {invoice.payment_status !== "paid" && (
                         <div>
-                          <label className="block text-sm font-medium text-text-primary mb-2">
+                          <label className="block text-body-sm font-medium text-text-primary mb-2">
                             بروزرسانی پرداخت
                           </label>
                           <div className="flex gap-2">
@@ -284,12 +291,12 @@ export default function PurchaseInvoiceDetailModal({
                               max={invoice.total_amount}
                               value={paymentAmount}
                               onChange={(e) => setPaymentAmount(e.target.value)}
-                              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm bg-surface text-text-primary"
+                              className="flex-1 border border-border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary"
                             />
                             <button
                               onClick={handlePaymentUpdate}
                               disabled={updatingPayment}
-                              className="px-4 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50"
+                              className="px-4 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50"
                             >
                               {updatingPayment ? "..." : "ذخیره"}
                             </button>
@@ -302,29 +309,29 @@ export default function PurchaseInvoiceDetailModal({
 
                 {/* Right - Items */}
                 <div className="lg:col-span-2">
-                  <div className="bg-surface shadow rounded-lg p-6">
+                  <div className="bg-surface shadow rounded-field p-6">
                     <h3 className="text-lg font-medium text-text-primary mb-4">
                       اقلام فاکتور
                     </h3>
                     <table className="min-w-full divide-y divide-border">
                       <thead className="bg-surface-alt">
                         <tr>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                          <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                             کد
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                          <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                             نام کالا
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                          <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                             تعداد
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                          <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                             واحد
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                          <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                             قیمت واحد
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                          <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                             جمع
                           </th>
                         </tr>
@@ -332,10 +339,10 @@ export default function PurchaseInvoiceDetailModal({
                       <tbody className="divide-y divide-border">
                         {invoice.items?.map((item) => (
                           <tr key={item.id}>
-                            <td className="px-4 py-3 text-sm font-mono text-text-primary">
+                            <td className="px-4 py-3 text-body-sm font-mono text-text-primary">
                               {item.item_code}
                             </td>
-                            <td className="px-4 py-3 text-sm">
+                            <td className="px-4 py-3 text-body-sm">
                               <button
                                 onClick={() => {
                                   onClose();
@@ -346,16 +353,16 @@ export default function PurchaseInvoiceDetailModal({
                                 {item.item_name}
                               </button>
                             </td>
-                            <td className="px-4 py-3 text-sm text-text-primary">
-                              {item.quantity}
+                            <td className="px-4 py-3 text-body-sm text-text-primary">
+                              {toPersianDigits(item.quantity)}
                             </td>
-                            <td className="px-4 py-3 text-sm text-text-secondary">
+                            <td className="px-4 py-3 text-body-sm text-text-secondary">
                               {item.item_unit}
                             </td>
-                            <td className="px-4 py-3 text-sm text-text-primary">
+                            <td className="px-4 py-3 text-body-sm text-text-primary">
                               {formatPersianCurrency(item.unit_price)}
                             </td>
-                            <td className="px-4 py-3 text-sm font-medium text-text-primary">
+                            <td className="px-4 py-3 text-body-sm font-medium text-text-primary">
                               {formatPersianCurrency(item.total_price)}
                             </td>
                           </tr>
@@ -369,7 +376,7 @@ export default function PurchaseInvoiceDetailModal({
                           >
                             جمع کل:
                           </td>
-                          <td className="px-4 py-3 text-sm font-bold text-text-primary">
+                          <td className="px-4 py-3 text-body-sm font-bold text-text-primary">
                             {formatPersianCurrency(invoice.total_amount)} ریال
                           </td>
                         </tr>
@@ -381,7 +388,7 @@ export default function PurchaseInvoiceDetailModal({
             </>
           ) : null}
         </div>
-      </div>
+      </motion.div>
 
       {/* Delete Confirm Modal */}
       <ConfirmModal

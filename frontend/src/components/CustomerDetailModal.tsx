@@ -26,35 +26,12 @@ import LoadingSpinner from "./LoadingSpinner";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import type { Customer, CustomerDevice, CustomerStats, Id } from "../types/api";
 import { modalPanel } from "../motion";
+import DeviceStatusBadge from "./DeviceStatusBadge";
 
 /**
  * Neither map covers "received", the schema's default, so a device nobody
  * has touched yet falls through to its raw status. Left as it was.
  */
-const statusColor: Record<string, string> = {
-  pending: "bg-warning-soft text-warning-fg",
-  diagnosing: "bg-primary-soft text-primary",
-  repairing: "bg-warning-soft text-warning-fg",
-  repaired: "bg-success-soft text-success-fg",
-  delivered: "bg-primary-soft text-primary",
-  unrepairable: "bg-danger-soft text-danger-fg",
-  not_repaired: "bg-danger-soft text-danger-fg",
-  ready_for_pickup: "bg-primary-soft text-primary",
-  waiting_for_parts: "bg-warning-soft text-warning-fg",
-};
-
-const statusLabel: Record<string, string> = {
-  pending: "در انتظار",
-  diagnosing: "در حال بررسی",
-  repairing: "در حال تعمیر",
-  repaired: "تعمیر شد",
-  delivered: "تحویل داده شد",
-  unrepairable: "غیر قابل تعمیر",
-  not_repaired: "تعمیر نشد",
-  ready_for_pickup: "آماده تحویل",
-  waiting_for_parts: "در انتظار قطعه",
-};
-
 function toJalali(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("fa-IR");
@@ -133,10 +110,8 @@ function DeviceTimeline({ devices, openDeviceDetail }: DeviceTimelineProps) {
                     </p>
                   )}
                 </div>
-                <span
-                  className={`text-body-xs px-2 py-1 rounded-full whitespace-nowrap font-medium self-start sm:self-center ${statusColor[device.status] ?? "bg-surface-alt text-text-secondary"}`}
-                >
-                  {statusLabel[device.status] ?? device.status}
+                <span className="self-start sm:self-center">
+                  <DeviceStatusBadge status={device.status} />
                 </span>
               </div>
 

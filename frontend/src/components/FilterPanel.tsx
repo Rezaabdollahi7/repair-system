@@ -19,6 +19,8 @@ import { backdrop, modalPanel } from "../motion";
 import { searchCustomers, getPersonnel } from "../api";
 import { useDebounce } from "../utils/helpers";
 import type { CustomerListRow, Personnel } from "../types/api";
+import DeviceStatusBadge from "./DeviceStatusBadge";
+import { DEVICE_STATUSES } from "../utils/deviceStatus";
 
 /**
  * The device filter state. Owned by DeviceList and edited here, so the shape
@@ -44,53 +46,18 @@ interface FilterPanelProps {
   onClose: () => void;
 }
 
-const STATUS_OPTIONS = [
-  {
-    value: "pending",
-    label: "در انتظار بررسی",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  {
-    value: "diagnosing",
-    label: "در حال بررسی",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "waiting_for_parts",
-    label: "در انتظار قطعه",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  {
-    value: "repairing",
-    label: "در حال تعمیر",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "repaired",
-    label: "تعمیر شده",
-    color: "bg-surface-alt text-text-secondary",
-  },
-  {
-    value: "delivered",
-    label: "تحویل داده شده",
-    color: "bg-success-soft text-success-fg",
-  },
-  {
-    value: "ready_for_pickup",
-    label: "آماده تحویل",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "unrepairable",
-    label: "غیرقابل تعمیر",
-    color: "bg-danger-soft text-danger-fg",
-  },
-  {
-    value: "not_repaired",
-    label: "تعمیر نشد",
-    color: "bg-warning-soft text-danger-fg",
-  },
-];
+/*
+ * Derived from the shared status list rather than written out again.
+ *
+ * This was the fifth of six copies of the same nine rows, each with its own
+ * labels and its own colours, and they had drifted — the panel called a job
+ * «تعمیر شده» while the customer modal called it «تعمیر شد». Only the value
+ * and the label are needed here; the colour comes with the badge.
+ */
+const STATUS_OPTIONS = DEVICE_STATUSES.map((status) => ({
+  value: status.key,
+  label: status.label,
+}));
 
 const INVOICE_STATUS_OPTIONS = [
   {
@@ -546,7 +513,7 @@ export default function FilterPanel({
                                   </svg>
                                 )}
                               </span>
-                              <span className={opt.color}>{opt.label}</span>
+                              <DeviceStatusBadge status={opt.value} />
                             </button>
                           );
                         })}

@@ -19,34 +19,7 @@ import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
 import type { Device, Id, ListedDeviceImage } from "../types/api";
 import { modalPanel } from "../motion";
-
-/** "received", the schema default, is deliberately absent — as it was. */
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: {
-    label: "در انتظار بررسی",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  diagnosing: { label: "در حال بررسی", color: "bg-primary-soft text-primary" },
-  waiting_for_parts: {
-    label: "در انتظار قطعه",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  repairing: { label: "در حال تعمیر", color: "bg-primary-soft text-primary" },
-  repaired: { label: "تعمیر شده", color: "bg-success-soft text-success-fg" },
-  delivered: {
-    label: "تحویل داده شده",
-    color: "bg-success-soft text-success-fg",
-  },
-  unrepairable: {
-    label: "غیرقابل تعمیر",
-    color: "bg-danger-soft text-danger-fg",
-  },
-  ready_for_pickup: {
-    label: "آماده تحویل",
-    color: "bg-primary-soft text-primary",
-  },
-  not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger-fg" },
-};
+import DeviceStatusBadge from "./DeviceStatusBadge";
 
 interface InfoRowProps {
   label: string;
@@ -241,11 +214,7 @@ export default function DeviceDetailModal({
                     <p className="text-body-xs text-text-secondary mb-1">
                       وضعیت
                     </p>
-                    <span
-                      className={`inline-block px-3 py-1.5 rounded-full text-body-xs sm:text-body-sm font-medium ${STATUS_MAP[device.status]?.color || "bg-surface-alt text-text-secondary"}`}
-                    >
-                      {STATUS_MAP[device.status]?.label || device.status}
-                    </span>
+                    <DeviceStatusBadge status={device.status} />
                   </div>
                 </div>
 

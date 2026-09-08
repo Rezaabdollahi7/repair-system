@@ -8,8 +8,15 @@
  * while each page still writes its own markup.
  */
 
+/*
+ * `rounded-panel` (24px) rather than `rounded-card` (12px), matching the
+ * dashboard's cards. Changed here rather than overridden on the devices page:
+ * a corner radius is the one thing in a design system that has to agree
+ * everywhere, and one list page with softer corners than the other seven
+ * reads as a mistake rather than as a redesign in progress.
+ */
 export const tableCard =
-  "bg-surface border border-border rounded-card shadow-sm overflow-hidden";
+  "bg-surface border border-border rounded-panel shadow-sm overflow-hidden";
 
 /** Wide tables scroll here, inside the card, rather than widening the page. */
 export const tableScroll = "overflow-x-auto";
@@ -45,7 +52,7 @@ export const iconButton =
 
 /** The card shown in place of the table below `lg`. */
 export const rowCard =
-  "bg-surface border border-border rounded-card shadow-sm p-4 transition-colors";
+  "bg-surface border border-border rounded-panel shadow-sm p-4 transition-colors";
 
 /* ── Toolbar ────────────────────────────────────────────────────────── */
 

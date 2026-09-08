@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ChartEmpty } from "./chartKit";
-import { SERIES } from "./series";
+import { SERIES } from "../../utils/chartSeries";
 
 export interface BarRow {
   label: string;

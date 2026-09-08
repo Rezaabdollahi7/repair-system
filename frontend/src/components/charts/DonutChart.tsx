@@ -2,11 +2,26 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toPersianDigits } from "../../utils/formatters";
 import { ChartEmpty } from "./chartKit";
-import { SERIES, SERIES_LIMIT, foldToOther } from "./series";
 
 export interface DonutSlice {
   label: string;
   value: number;
+  /**
+   * The slice's colour, supplied by the caller.
+   *
+   * The chart used to pick this itself, by taking series slot N for the Nth
+   * slice after sorting by size — which meant colour followed a slice's
+   * *rank*. One busy week reordering the statuses would have recoloured every
+   * segment, so the ring said something different from one day to the next
+   * and disagreed with the same statuses listed on the devices page. Colour
+   * has to follow the entity, so the entity's own map now provides it.
+   *
+   * The caller also fixes the order, which is the other half of the same
+   * problem: only neighbouring segments touch, so the palette's
+   * colour-blindness check is a check on *which pairs end up adjacent*, and
+   * a ring sorted by size has no fixed adjacency to validate.
+   */
+  color: string;
 }
 
 const SIZE = 168;
@@ -25,11 +40,10 @@ const GAP = 2;
  * the one job a categorical palette exists for. The bars this replaced were
  * deliberately monochrome, because at the time the only palette available was
  * the semantic one, and spending good/warning/danger on nine workflow states
- * would have implied severities that do not exist. With a real series palette
- * the objection goes away; the reserved status colours are still untouched.
+ * would have implied severities that do not exist.
  *
- * Past eight statuses the ninth does not get a new colour: the smallest are
- * summed into «سایر», with their count, so the ring never runs out of hues.
+ * Slices arrive already coloured and already ordered; this draws them and
+ * does not rank them. See the note on `DonutSlice.color`.
  */
 export default function DonutChart({
   slices,
@@ -43,18 +57,10 @@ export default function DonutChart({
   const reduceMotion = useReducedMotion();
   const [active, setActive] = useState<number | null>(null);
 
-  const { kept, other, otherCount } = foldToOther(slices, SERIES_LIMIT);
-  // «سایر» carries its own count: a legend entry that says only "other" is
-  // hiding the tail rather than summarising it. Written with a dash rather
-  // than brackets — bidi mirrors a bracket pair around Persian text and the
-  // label comes out looking broken.
-  const rows =
-    other > 0
-      ? [
-          ...kept,
-          { label: `سایر — ${toPersianDigits(otherCount)} مورد`, value: other },
-        ]
-      : kept;
+  // Empty slices are dropped rather than drawn: a zero-length segment is
+  // invisible on the ring but still takes a row in the legend, so a workshop
+  // using four of the nine statuses would read a list of nine.
+  const rows = slices.filter((slice) => slice.value > 0);
 
   const total = rows.reduce((sum, row) => sum + row.value, 0);
   if (total === 0) return <ChartEmpty message={emptyMessage} />;
@@ -84,7 +90,6 @@ export default function DonutChart({
     const length = (row.value / total) * CIRCUMFERENCE;
     arcs.push({
       ...row,
-      color: SERIES[index],
       // A one-slice ring has no neighbour to be separated from, and a segment
       // shorter than the gap would otherwise render as a negative dash.
       dash: rows.length === 1 ? length : Math.max(length - GAP, 0.5),

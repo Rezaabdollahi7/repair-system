@@ -156,6 +156,20 @@
      chart sitting on white, one for a chart on a dark card. */
   --chart-track: var(--sand-200);
   --chart-grid: var(--sand-200);
+
+  /*
+   * The one repair status that takes a reserved colour instead of a series
+   * slot — see utils/deviceStatus.ts. It is its own token because the dark
+   * theme cannot reuse --danger here: #f87171 sits at OKLCH L 0.71, above the
+   * 0.67 ceiling a mark has to stay under on a dark surface, and it collapsed
+   * against the teal beside it in the ring (ΔE 4.0 under protanopia).
+   *
+   * Validated in the ring's own order, wrap included: light passes every
+   * check; dark passes with the adjacent pair to its teal neighbour in the
+   * 6–8 floor band (7.8), which is legal here because the ring ships 2px gaps
+   * between segments, a labelled legend and a table view.
+   */
+  --device-dead: #ef4444;
 }
 
 /* ===================================================================
@@ -407,6 +421,8 @@
   --chart-grid: #414140;
   --chart-surface: var(--surface);
 
+  --device-dead: #d94a3e;
+
   /* Darker than --surface here, not lighter: the panel has to separate from
      the cards around it, and on this theme those are already the ink. */
   --panel-ink: #141413;
@@ -516,6 +532,8 @@
   --color-panel-ink: var(--panel-ink);
   --color-panel-ink-border: var(--panel-ink-border);
   --color-panel-ink-track: var(--panel-ink-track);
+
+  --color-device-dead: var(--device-dead);
 
   --color-chart-track: var(--chart-track);
   --color-chart-grid: var(--chart-grid);

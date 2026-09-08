@@ -13,7 +13,7 @@ import {
   Legend,
   type TooltipState,
 } from "./chartKit";
-import { SERIES } from "./series";
+import { SERIES } from "../../utils/chartSeries";
 import { useElementWidth } from "./useElementWidth";
 
 export interface TrendPoint {

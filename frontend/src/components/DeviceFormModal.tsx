@@ -37,6 +37,7 @@ import type {
   Personnel,
 } from "../types/api";
 import { modalPanel } from "../motion";
+import { DEVICE_STATUSES } from "../utils/deviceStatus";
 
 /**
  * The form holds every field as the inputs produce it. `customer_id` carries
@@ -82,53 +83,14 @@ const INITIAL_CUSTOMER: CustomerBody = { name: "", phone: "" };
 const INITIAL_DEVICE_NAME = { name: "" };
 const INITIAL_BRAND = { name: "" };
 
-const STATUS_OPTIONS = [
-  {
-    value: "pending",
-    label: "در انتظار بررسی",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  {
-    value: "diagnosing",
-    label: "در حال بررسی",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "waiting_for_parts",
-    label: "در انتظار قطعه",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  {
-    value: "repairing",
-    label: "در حال تعمیر",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "repaired",
-    label: "تعمیر شده",
-    color: "bg-surface-alt text-text-secondary",
-  },
-  {
-    value: "ready_for_pickup",
-    label: "آماده تحویل",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "delivered",
-    label: "تحویل داده شده",
-    color: "bg-success-soft text-success-fg",
-  },
-  {
-    value: "unrepairable",
-    label: "غیرقابل تعمیر",
-    color: "bg-danger-soft text-danger-fg",
-  },
-  {
-    value: "not_repaired",
-    label: "تعمیر نشد",
-    color: "bg-warning-soft text-danger-fg",
-  },
-];
+/*
+ * From the shared status list. This is a <select>, so only the value and the
+ * label are used — the colours the local copy carried were never rendered.
+ */
+const STATUS_OPTIONS = DEVICE_STATUSES.map((status) => ({
+  value: status.key,
+  label: status.label,
+}));
 
 interface SectionTitleProps {
   icon: React.ComponentType<{ className?: string }>;

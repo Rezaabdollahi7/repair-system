@@ -26,7 +26,8 @@ import {
 import { jalaliDayAndMonth } from "../utils/jalali";
 import { staggerContainer, staggerItem, transition } from "../motion";
 import { ChartCard, ChartTable } from "../components/charts/chartKit";
-import { SERIES } from "../components/charts/series";
+import { SERIES } from "../utils/chartSeries";
+import { DEVICE_STATUSES, deviceStatusOf } from "../utils/deviceStatus";
 import DonutChart from "../components/charts/DonutChart";
 import BarList from "../components/charts/BarList";
 import Gauge from "../components/charts/Gauge";
@@ -36,19 +37,6 @@ import type {
   DashboardTopItem,
   DashboardTransaction,
 } from "../types/api";
-
-/** Two more than the four the schema's default status list carries. */
-const DEVICE_STATUS_LABELS: Record<string, string> = {
-  pending: "در انتظار",
-  diagnosing: "در حال بررسی",
-  waiting_for_parts: "منتظر قطعه",
-  repairing: "در حال تعمیر",
-  repaired: "تعمیر شده",
-  delivered: "تحویل شده",
-  unrepairable: "غیرقابل تعمیر",
-  ready_for_pickup: "آماده تحویل",
-  not_repaired: "تعمیر نشد",
-};
 
 /**
  * A tile's tint.
@@ -383,10 +371,40 @@ export default function Dashboard() {
   const collectedRatio =
     billed > 0 ? stats.repair_invoices.month_paid / billed : 0;
 
-  const statusSlices = stats.devices.by_status.map((row) => ({
-    label: DEVICE_STATUS_LABELS[row.status] || row.status,
-    value: row.count,
+  /*
+   * The ring is built by walking the workflow in its own order and looking
+   * each status up in the response, rather than by mapping over the response.
+   *
+   * That is what pins a colour to a status instead of to its position in a
+   * list the server sorted by count: the second-busiest state one week is the
+   * fourth-busiest the next, and mapping the response would have repainted
+   * both. It also fixes which segments end up adjacent, which is the pairing
+   * the palette was validated on.
+   */
+  const counts = new Map(
+    stats.devices.by_status.map((row) => [row.status, row.count]),
+  );
+  const statusSlices = DEVICE_STATUSES.map((status) => ({
+    label: status.label,
+    value: counts.get(status.key) ?? 0,
+    color: status.color,
   }));
+
+  // Anything the response carries that this build does not know about, summed
+  // rather than dropped — the ring's total has to match the device count
+  // beside it, and a silently missing status would make it not.
+  const knownKeys = new Set(DEVICE_STATUSES.map((status) => status.key));
+  const unknown = stats.devices.by_status.filter(
+    (row) => !knownKeys.has(row.status),
+  );
+  if (unknown.length > 0) {
+    statusSlices.push({
+      label:
+        unknown.length === 1 ? deviceStatusOf(unknown[0].status).label : "سایر",
+      value: unknown.reduce((sum, row) => sum + row.count, 0),
+      color: "var(--text-muted)",
+    });
+  }
 
   const topItemRows = stats.top_items.map((item: DashboardTopItem) => ({
     label: item.name ?? "—",

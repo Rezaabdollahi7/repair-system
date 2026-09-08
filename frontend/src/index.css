@@ -122,6 +122,17 @@
   --info-strong-fg: var(--info-strong);
   --info-soft: var(--info-tint);
 
+  /*
+   * Solid status buttons — «حذف», «غیرفعال کن». The base tones are fills
+   * for dots and bars, and white on #f59e0b is 2.1:1, so a button painted
+   * with one cannot be read. These are the strong steps, which carry white
+   * at 6:1 or better; --on-status is what goes on top of any of them.
+   */
+  --danger-fill: var(--error-strong);
+  --warning-fill: var(--warning-strong);
+  --success-fill: var(--success-strong);
+  --on-status: #ffffff;
+
   /* سایه‌ها دو لایه‌اند: یک لبهٔ تیزِ نزدیک و یک پخشِ دور. تک‌لایه‌بودن
      همان چیزی است که کارت‌های فعلی را «تخت» نشان می‌دهد. */
   --shadow-color: 16 22 39;
@@ -203,6 +214,14 @@
   --info-strong-fg: #67e8f9;
   --info-soft: #082f36;
 
+  /* Inverted here: on a dark page the strong steps are too close to the
+     background to read as a button, so the fill is the light tone and the
+     label goes dark — the same trade --primary-fg makes. */
+  --danger-fill: #f87171;
+  --warning-fill: #fbbf24;
+  --success-fill: #4ade80;
+  --on-status: #060d1c;
+
   /* سایه روی زمینهٔ تیره تقریباً دیده نمی‌شود، پس تیره‌تر و عمیق‌تر
      می‌شود و بار جداسازی لایه‌ها بیشتر روی --border می‌افتد. */
   --shadow-color: 0 0 0;
@@ -280,6 +299,11 @@
   --color-info: var(--info);
   --color-info-fg: var(--info-strong-fg);
   --color-info-soft: var(--info-soft);
+
+  --color-danger-fill: var(--danger-fill);
+  --color-warning-fill: var(--warning-fill);
+  --color-success-fill: var(--success-fill);
+  --color-on-status: var(--on-status);
 
   /* بازتعریف مقیاس سایهٔ Tailwind، تا `shadow-md` در تم تیره هم درست
      دربیاید و صفحات مجبور نباشند برای هر تم کلاس جدا بنویسند. */

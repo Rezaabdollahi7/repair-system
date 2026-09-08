@@ -232,14 +232,14 @@ export default function CategoryManageModal({
                             setEditTarget(cat);
                             setEditName(cat.name);
                           }}
-                          className="p-1.5 rounded-field text-success hover:opacity-80 transition"
+                          className="p-1.5 rounded-field text-success-fg hover:opacity-80 transition"
                           title="ویرایش"
                         >
                           <PencilSquareIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteTarget(cat)}
-                          className="p-1.5 rounded-field text-danger hover:opacity-80 transition"
+                          className="p-1.5 rounded-field text-danger-fg hover:opacity-80 transition"
                           title="حذف"
                         >
                           <TrashIcon className="w-4 h-4" />

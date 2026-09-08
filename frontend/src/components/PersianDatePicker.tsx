@@ -221,7 +221,7 @@ export default function PersianDatePicker({
             tabIndex={-1}
             aria-label="پاک کردن تاریخ"
             onClick={clearValue}
-            className="shrink-0 p-0.5 rounded-md text-text-muted hover:text-danger transition-colors cursor-pointer"
+            className="shrink-0 p-0.5 rounded-md text-text-muted hover:text-danger-fg transition-colors cursor-pointer"
           >
             <XMarkIcon className="w-4 h-4" />
           </span>

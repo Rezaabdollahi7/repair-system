@@ -97,7 +97,7 @@ export default function CustomerFormModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              نام <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+              نام <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
             </label>
             <div className="relative">
               <UserIcon className="absolute right-3 top-2.5 w-4 h-4 text-text-secondary" />
@@ -113,7 +113,7 @@ export default function CustomerFormModal({
 
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              شماره تماس <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+              شماره تماس <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
             </label>
             <div className="relative">
               <PhoneIcon className="absolute right-3 top-2.5 w-4 h-4 text-text-secondary" />

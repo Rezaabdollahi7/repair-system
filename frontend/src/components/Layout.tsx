@@ -358,7 +358,7 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
               role="menuitem"
               onClick={onLogout}
               className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-field text-body-sm
-                         text-danger hover:bg-danger-soft transition-colors cursor-pointer"
+                         text-danger-fg hover:bg-danger-soft transition-colors cursor-pointer"
             >
               <ArrowRightStartOnRectangleIcon className="w-[1.15rem] h-[1.15rem]" />
               خروج

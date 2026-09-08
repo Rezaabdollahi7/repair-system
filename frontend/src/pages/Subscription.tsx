@@ -112,7 +112,7 @@ export default function Subscription() {
 
   if (!status) {
     return (
-      <div className="text-text-secondary text-sm">در حال بارگذاری...</div>
+      <div className="text-text-secondary text-body-sm">در حال بارگذاری...</div>
     );
   }
 
@@ -124,9 +124,9 @@ export default function Subscription() {
         </h2>
 
         {status.never_expires ? (
-          <p className="text-sm text-success">اشتراک این کارگاه دائمی است.</p>
+          <p className="text-body-sm text-success-fg">اشتراک این کارگاه دائمی است.</p>
         ) : (
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1 text-body-sm">
             <p className="text-text-secondary">
               تاریخ پایان:{" "}
               <span className="text-text-primary font-medium">
@@ -137,7 +137,7 @@ export default function Subscription() {
               <p
                 className={
                   remaining <= 0
-                    ? "text-danger font-medium"
+                    ? "text-danger-fg font-medium"
                     : "text-text-secondary"
                 }
               >
@@ -150,7 +150,7 @@ export default function Subscription() {
         )}
 
         {status.referral_applies && (
-          <p className="mt-3 text-sm text-success flex items-center gap-2">
+          <p className="mt-3 text-body-sm text-success-fg flex items-center gap-2">
             <CheckCircleIcon className="w-5 h-5 shrink-0" />
             تخفیف ۱۰٪ دعوت روی اولین خرید شما اعمال شده است.
           </p>
@@ -161,7 +161,7 @@ export default function Subscription() {
         <h2 className="text-lg font-bold text-text-primary mb-1">
           تمدید اشتراک
         </h2>
-        <p className="text-sm text-text-secondary mb-4">
+        <p className="text-body-sm text-text-secondary mb-4">
           مدت خریداری‌شده به اعتبار فعلی شما اضافه می‌شود.
         </p>
 
@@ -175,7 +175,7 @@ export default function Subscription() {
                 key={plan.code}
                 type="button"
                 onClick={() => setSelected(plan.code)}
-                className={`text-right p-4 rounded-2xl border transition-colors ${
+                className={`text-right p-4 rounded-card border transition-colors ${
                   active
                     ? "border-primary bg-primary-soft"
                     : "border-border hover:bg-surface-alt"
@@ -184,10 +184,10 @@ export default function Subscription() {
                 <p className="font-medium text-text-primary">{plan.name}</p>
                 <p className="mt-2 text-lg font-bold text-text-primary">
                   {toToman(plan.amount_rials)}
-                  <span className="text-sm font-normal"> تومان</span>
+                  <span className="text-body-sm font-normal"> تومان</span>
                 </p>
                 {discounted && (
-                  <p className="text-xs text-text-secondary line-through">
+                  <p className="text-body-xs text-text-secondary line-through">
                     {toToman(plan.base_price_rials)} تومان
                   </p>
                 )}
@@ -203,7 +203,7 @@ export default function Subscription() {
             onChange={(event) => setDiscountCode(event.target.value)}
             placeholder="کد تخفیف (اختیاری)"
             disabled={!selected}
-            className="flex-1 px-4 py-2 rounded-2xl border border-border bg-surface text-text-primary disabled:opacity-50"
+            className="flex-1 px-4 py-2 rounded-card border border-border bg-surface text-text-primary disabled:opacity-50"
           />
           <button
             type="button"
@@ -212,20 +212,20 @@ export default function Subscription() {
               const plan = status.plans.find((p) => p.code === selected);
               if (plan) void handleCheckout(plan);
             }}
-            className="px-6 py-2 rounded-2xl bg-primary text-text-inverse font-medium disabled:opacity-50 hover:bg-primary-hover transition-colors"
+            className="px-6 py-2 rounded-card bg-primary text-primary-fg font-medium disabled:opacity-50 hover:bg-primary-hover transition-colors"
           >
             {submitting ? "در حال انتقال..." : "پرداخت"}
           </button>
         </div>
 
         {selected && (
-          <div className="mt-4 pt-4 border-t border-border text-sm">
+          <div className="mt-4 pt-4 border-t border-border text-body-sm">
             {quoting && <p className="text-text-secondary">در حال محاسبه...</p>}
 
             {!quoting && quote && (
               <>
                 {quote.code_accepted === false && (
-                  <p className="text-danger mb-2">
+                  <p className="text-danger-fg mb-2">
                     این کد تخفیف معتبر نیست یا قبلاً استفاده شده است.
                   </p>
                 )}
@@ -236,7 +236,7 @@ export default function Subscription() {
                 </div>
 
                 {quote.discount_rials > 0 && (
-                  <div className="flex justify-between text-success mt-1">
+                  <div className="flex justify-between text-success-fg mt-1">
                     <span>
                       {quote.discount_kind === "referral"
                         ? "تخفیف دعوت"
@@ -255,7 +255,7 @@ export default function Subscription() {
           </div>
         )}
 
-        <p className="mt-3 text-xs text-text-secondary">
+        <p className="mt-3 text-body-xs text-text-secondary">
           پرداخت از طریق درگاه امن زیبال انجام می‌شود.
         </p>
       </div>
@@ -267,7 +267,7 @@ export default function Subscription() {
           </h2>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-body-sm">
               <thead>
                 <tr className="text-text-secondary text-right">
                   <th className="pb-2 font-medium">تاریخ</th>
@@ -288,9 +288,9 @@ export default function Subscription() {
                     <td
                       className={`py-2 ${
                         payment.status === "verified"
-                          ? "text-success"
+                          ? "text-success-fg"
                           : payment.status === "failed"
-                            ? "text-danger"
+                            ? "text-danger-fg"
                             : "text-text-secondary"
                       }`}
                     >
@@ -301,7 +301,7 @@ export default function Subscription() {
                         <button
                           type="button"
                           onClick={() => setReceipt(payment)}
-                          className="text-primary text-xs underline"
+                          className="text-primary text-body-xs underline"
                         >
                           رسید
                         </button>

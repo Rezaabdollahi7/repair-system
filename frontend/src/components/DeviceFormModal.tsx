@@ -126,7 +126,7 @@ const STATUS_OPTIONS = [
   {
     value: "not_repaired",
     label: "تعمیر نشد",
-    color: "bg-warning-soft text-danger",
+    color: "bg-warning-soft text-danger-fg",
   },
 ];
 
@@ -684,7 +684,7 @@ export default function DeviceFormModal({
               {/* Device name */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
-                  نام دستگاه <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                  نام دستگاه <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -886,7 +886,7 @@ export default function DeviceFormModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
-                  تاریخ ورود <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                  تاریخ ورود <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
                 </label>
                 <PersianDatePicker
                   value={form.entry_date}

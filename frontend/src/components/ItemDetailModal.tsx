@@ -220,7 +220,7 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
             </div>
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
-                تعداد <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                تعداد <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 type="number"
@@ -232,7 +232,7 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                 required
               />
               {errors.quantity && (
-                <p className="text-body-xs text-danger mt-1">{errors.quantity}</p>
+                <p className="text-body-xs text-danger-fg mt-1">{errors.quantity}</p>
               )}
             </div>
             <div>
@@ -289,18 +289,18 @@ function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
   const isCritical = current === 0;
   const isLow = current > 0 && current <= min;
   let bgColor = "bg-success-soft border-success-soft";
-  let textColor = "text-success";
-  let icon = <ArrowTrendingUpIcon className="w-8 h-8 text-success" />;
+  let textColor = "text-success-fg";
+  let icon = <ArrowTrendingUpIcon className="w-8 h-8 text-success-fg" />;
   let statusText = "موجودی کافی";
   if (isCritical) {
     bgColor = "bg-danger-soft border-danger-soft";
-    textColor = "text-danger";
-    icon = <ExclamationTriangleIcon className="w-8 h-8 text-danger" />;
+    textColor = "text-danger-fg";
+    icon = <ExclamationTriangleIcon className="w-8 h-8 text-danger-fg" />;
     statusText = "اتمام موجودی";
   } else if (isLow) {
     bgColor = "bg-warning-soft border-warning-soft";
-    textColor = "text-warning";
-    icon = <ArrowTrendingDownIcon className="w-8 h-8 text-warning" />;
+    textColor = "text-warning-fg";
+    icon = <ArrowTrendingDownIcon className="w-8 h-8 text-warning-fg" />;
     statusText = "کم‌موجود";
   }
   return (
@@ -567,9 +567,9 @@ export default function ItemDetailModal({
                             </td>
                             <td className="px-4 py-2 text-body-sm">
                               {tx.type === "purchase" ? (
-                                <span className="text-success">خرید</span>
+                                <span className="text-success-fg">خرید</span>
                               ) : tx.type === "sale" ? (
-                                <span className="text-danger">فروش</span>
+                                <span className="text-danger-fg">فروش</span>
                               ) : (
                                 <span className="text-text-secondary">
                                   تنظیم موجودی
@@ -580,8 +580,8 @@ export default function ItemDetailModal({
                               <span
                                 className={
                                   tx.quantity > 0
-                                    ? "text-success"
-                                    : "text-danger"
+                                    ? "text-success-fg"
+                                    : "text-danger-fg"
                                 }
                               >
                                 {tx.quantity > 0 ? "+" : ""}

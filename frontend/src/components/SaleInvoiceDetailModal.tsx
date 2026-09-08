@@ -447,8 +447,8 @@ export default function SaleInvoiceDetailModal({
                       </div>
 
                       <div className="flex justify-between py-2 text-body-sm border-b border-border">
-                        <span className="text-success">دریافت شده (ریال):</span>
-                        <span className="font-medium text-success">
+                        <span className="text-success-fg">دریافت شده (ریال):</span>
+                        <span className="font-medium text-success-fg">
                           {formatPersianCurrency(invoice.paid_amount)}
                         </span>
                       </div>
@@ -458,8 +458,8 @@ export default function SaleInvoiceDetailModal({
                         <span
                           className={
                             invoice.total_amount - invoice.paid_amount > 0
-                              ? "text-danger"
-                              : "text-success"
+                              ? "text-danger-fg"
+                              : "text-success-fg"
                           }
                         >
                           {formatPersianCurrency(

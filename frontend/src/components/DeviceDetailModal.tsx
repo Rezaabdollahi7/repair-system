@@ -36,7 +36,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
     label: "آماده تحویل",
     color: "bg-primary-soft text-primary",
   },
-  not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
+  not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger-fg" },
 };
 
 interface InfoRowProps {

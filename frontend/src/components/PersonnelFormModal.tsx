@@ -156,7 +156,7 @@ export default function PersonnelFormModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              نام و نام خانوادگی <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+              نام و نام خانوادگی <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
             </label>
             <input
               type="text"
@@ -171,7 +171,7 @@ export default function PersonnelFormModal({
 
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              شماره موبایل <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+              شماره موبایل <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
             </label>
             <input
               type="tel"
@@ -196,7 +196,7 @@ export default function PersonnelFormModal({
                   (خالی = بدون تغییر)
                 </span>
               ) : (
-                <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
               )}
             </label>
             <input
@@ -230,7 +230,7 @@ export default function PersonnelFormModal({
 
           <div>
             <label className="block text-body-sm font-medium text-text-primary mb-1">
-              نقش <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+              نقش <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
             </label>
             <select
               name="role_id"

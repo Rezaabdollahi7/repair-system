@@ -120,7 +120,7 @@ export default function SearchableSelect({
           }`}
         >
           {selectedOption?.label || placeholder}
-          {required && <span className="text-danger mr-1">*</span>}
+          {required && <span className="text-danger-fg mr-1">*</span>}
         </span>
         <ChevronDownIcon
           className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-150 ${
@@ -211,7 +211,7 @@ export default function SearchableSelect({
         )}
       </AnimatePresence>
 
-      {error && <p className="mt-1.5 text-body-xs text-danger">{error}</p>}
+      {error && <p className="mt-1.5 text-body-xs text-danger-fg">{error}</p>}
     </div>
   );
 }

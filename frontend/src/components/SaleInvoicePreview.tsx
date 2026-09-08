@@ -115,7 +115,7 @@ export default function SaleInvoicePreview({
               </button>
               <button
                 onClick={handleDownloadPDF}
-                className="px-3 py-2 bg-success text-text-inverse rounded-lg hover:bg-success-hover flex items-center gap-1 text-sm"
+                className="px-3 py-2 bg-success-fill text-on-status rounded-field hover:opacity-90 transition-opacity flex items-center gap-1 text-sm"
               >
                 <ArrowDownTrayIcon className="w-4 h-4" />
                 PDF
@@ -128,7 +128,7 @@ export default function SaleInvoicePreview({
               </button>
             </div>
           </div>
-          <p className="text-xs text-warning mt-2">
+          <p className="text-xs text-warning-fg mt-2">
             ⚠️ برای حذف تاریخ/ساعت و آدرس بالا و پایین فاکتور، در پنجره‌ی چاپ
             گزینه‌ی «More settings → Headers and footers» را غیرفعال کنید.
           </p>

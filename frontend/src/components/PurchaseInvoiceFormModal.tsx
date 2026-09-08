@@ -128,7 +128,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
                 className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.code ? "border-danger" : "border-border"}`}
               />
               {errors.code && (
-                <p className="text-body-xs text-danger mt-1">{errors.code}</p>
+                <p className="text-body-xs text-danger-fg mt-1">{errors.code}</p>
               )}
             </div>
             <div>
@@ -142,7 +142,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
                 className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.name ? "border-danger" : "border-border"}`}
               />
               {errors.name && (
-                <p className="text-body-xs text-danger mt-1">{errors.name}</p>
+                <p className="text-body-xs text-danger-fg mt-1">{errors.name}</p>
               )}
             </div>
             <div>
@@ -441,7 +441,7 @@ export default function PurchaseInvoiceFormModal({
                       className={`w-full border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border"}`}
                     />
                     {errors.paid_amount && (
-                      <p className="mt-1 text-body-xs text-danger">
+                      <p className="mt-1 text-body-xs text-danger-fg">
                         {errors.paid_amount}
                       </p>
                     )}
@@ -449,7 +449,7 @@ export default function PurchaseInvoiceFormModal({
                   <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base">
                     <span className="text-text-secondary">مانده:</span>
                     <span
-                      className={`font-medium ${calculateRemaining() > 0 ? "text-danger" : "text-success"}`}
+                      className={`font-medium ${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
                     >
                       {formatCurrency(calculateRemaining())} ریال
                     </span>
@@ -485,7 +485,7 @@ export default function PurchaseInvoiceFormModal({
                 </div>
 
                 {errors.items && (
-                  <p className="mb-3 sm:mb-4 text-body-sm text-danger">
+                  <p className="mb-3 sm:mb-4 text-body-sm text-danger-fg">
                     {errors.items}
                   </p>
                 )}
@@ -507,7 +507,7 @@ export default function PurchaseInvoiceFormModal({
                         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3 items-center">
                           <div className="col-span-2 sm:col-span-5">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              کالا <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                              کالا <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
                             </label>
                             <SearchableSelect
                               options={itemOptions}
@@ -523,7 +523,7 @@ export default function PurchaseInvoiceFormModal({
                           </div>
                           <div className="col-span-1 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              تعداد <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                              تعداد <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
                             </label>
                             <input
                               type="number"
@@ -539,7 +539,7 @@ export default function PurchaseInvoiceFormModal({
                               className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`quantity_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`quantity_${index}`] && (
-                              <p className="mt-1 text-body-xs text-danger">
+                              <p className="mt-1 text-body-xs text-danger-fg">
                                 {errors[`quantity_${index}`]}
                               </p>
                             )}
@@ -547,7 +547,7 @@ export default function PurchaseInvoiceFormModal({
                           <div className="col-span-2 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-1">
                               قیمت واحد (ریال){" "}
-                              <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                              <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
                             </label>
                             <input
                               type="number"
@@ -563,7 +563,7 @@ export default function PurchaseInvoiceFormModal({
                               className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`price_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`price_${index}`] && (
-                              <p className="mt-1 text-body-xs text-danger">
+                              <p className="mt-1 text-body-xs text-danger-fg">
                                 {errors[`price_${index}`]}
                               </p>
                             )}
@@ -585,7 +585,7 @@ export default function PurchaseInvoiceFormModal({
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(index)}
-                              className="w-full px-2 py-2 text-danger hover:bg-danger-soft rounded-field"
+                              className="w-full px-2 py-2 text-danger-fg hover:bg-danger-soft rounded-field"
                             >
                               <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />
                             </button>

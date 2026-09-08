@@ -56,7 +56,7 @@ export default function ImageSlider({
       </button>
 
       {/* Counter */}
-      <div className="absolute top-4 right-4 text-text-inverse/70 text-sm bg-black/40 px-3 py-1 rounded-full z-10">
+      <div className="absolute top-4 right-4 text-text-inverse/70 text-body-sm bg-black/40 px-3 py-1 rounded-full z-10">
         {current + 1} / {images.length}
       </div>
 
@@ -82,7 +82,7 @@ export default function ImageSlider({
           key={current}
           src={images[current].url}
           alt={`عکس ${current + 1}`}
-          className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl animate-fade"
+          className="max-h-[75vh] max-w-full object-contain rounded-field shadow-2xl animate-fade"
         />
 
         {images.length > 1 && (
@@ -130,7 +130,7 @@ export default function ImageSlider({
         </div>
       )}
 
-      <p className="mt-3 text-text-inverse/40 text-xs">
+      <p className="mt-3 text-text-inverse/40 text-body-xs">
         {images[current].filename}
       </p>
     </div>

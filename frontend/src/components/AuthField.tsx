@@ -57,7 +57,7 @@ export default function AuthField({
           htmlFor={id}
           className={`absolute -top-2 right-3 z-10 px-1.5 bg-surface flex items-baseline gap-1
                       text-body-xs font-bold pointer-events-none
-                      ${error ? "text-danger" : "text-text-primary"}`}
+                      ${error ? "text-danger-fg" : "text-text-primary"}`}
         >
           {label}
           {/* The asterisk is decorative — `required` on the input is what a
@@ -65,7 +65,7 @@ export default function AuthField({
           {required && (
             <span
               aria-hidden
-              className="text-danger text-[0.85em] leading-none self-start"
+              className="text-danger-fg text-[0.85em] leading-none self-start"
             >
               *
             </span>
@@ -130,7 +130,7 @@ export default function AuthField({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={transition.fast}
-            className="text-body-xs text-danger mt-1.5"
+            className="text-body-xs text-danger-fg mt-1.5"
           >
             {error}
           </motion.p>

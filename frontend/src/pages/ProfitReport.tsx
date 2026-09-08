@@ -5,6 +5,10 @@ import { ArrowTrendingUpIcon } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
 import { useModal } from "../context/ModalContext";
 import { formatPersianCurrency } from "../utils/formatters";
+import {
+  th,
+  thead,
+} from "../utils/tableClasses";
 import type {
   ProfitReport as ProfitReportData,
   QueryParams,
@@ -40,10 +44,10 @@ export default function ProfitReport() {
 
   return (
     <div dir="rtl" className="px-2 sm:px-0 mx-auto">
-      <div className="bg-surface shadow rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+      <div className="bg-surface shadow rounded-field p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-end">
           <div className="w-full sm:w-auto">
-            <label className="block text-xs text-text-secondary mb-1">
+            <label className="block text-body-xs text-text-secondary mb-1">
               از تاریخ
             </label>
             <PersianDatePicker
@@ -55,7 +59,7 @@ export default function ProfitReport() {
             />
           </div>
           <div className="w-full sm:w-auto">
-            <label className="block text-xs text-text-secondary mb-1">
+            <label className="block text-body-xs text-text-secondary mb-1">
               تا تاریخ
             </label>
             <PersianDatePicker
@@ -68,7 +72,7 @@ export default function ProfitReport() {
           </div>
           <button
             onClick={fetchReport}
-            className="bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover text-sm w-full sm:w-auto"
+            className="bg-primary text-primary-fg px-4 py-2 rounded-field hover:bg-primary-hover text-body-sm w-full sm:w-auto"
           >
             اعمال فیلتر
           </button>
@@ -78,65 +82,65 @@ export default function ProfitReport() {
       {report && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <div className="bg-primary-soft rounded-lg shadow p-3 sm:p-4 border border-primary-soft">
-              <p className="text-xs sm:text-sm text-primary">کل فروش</p>
+            <div className="bg-primary-soft rounded-field shadow p-3 sm:p-4 border border-primary-soft">
+              <p className="text-body-xs sm:text-body-sm text-primary">کل فروش</p>
               <p className="text-lg sm:text-2xl font-bold text-primary break-words">
                 {formatPersianCurrency(report.summary.total_revenue)} ریال
               </p>
             </div>
-            <div className="bg-warning-soft rounded-lg shadow p-3 sm:p-4 border border-warning-soft">
-              <p className="text-xs sm:text-sm text-warning">هزینه کل</p>
-              <p className="text-lg sm:text-2xl font-bold text-warning break-words">
+            <div className="bg-warning-soft rounded-field shadow p-3 sm:p-4 border border-warning-soft">
+              <p className="text-body-xs sm:text-body-sm text-warning-fg">هزینه کل</p>
+              <p className="text-lg sm:text-2xl font-bold text-warning-fg break-words">
                 {formatPersianCurrency(report.summary.total_cost)} ریال
               </p>
             </div>
             <div
-              className={`rounded-lg shadow p-3 sm:p-4 border ${report.summary.total_profit >= 0 ? "bg-success-soft border-success-soft" : "bg-danger-soft border-danger-soft"}`}
+              className={`rounded-field shadow p-3 sm:p-4 border ${report.summary.total_profit >= 0 ? "bg-success-soft border-success-soft" : "bg-danger-soft border-danger-soft"}`}
             >
               <p
-                className={`text-xs sm:text-sm ${report.summary.total_profit >= 0 ? "text-success" : "text-danger"}`}
+                className={`text-body-xs sm:text-body-sm ${report.summary.total_profit >= 0 ? "text-success-fg" : "text-danger-fg"}`}
               >
                 سود خالص
               </p>
               <p
-                className={`text-lg sm:text-2xl font-bold ${report.summary.total_profit >= 0 ? "text-success" : "text-danger"} break-words`}
+                className={`text-lg sm:text-2xl font-bold ${report.summary.total_profit >= 0 ? "text-success-fg" : "text-danger-fg"} break-words`}
               >
                 {formatPersianCurrency(report.summary.total_profit)} ریال
               </p>
             </div>
             <div
-              className={`rounded-lg shadow p-3 sm:p-4 border ${report.summary.profit_margin >= 0 ? "bg-primary-soft border-primary-soft" : "bg-surface-alt border-border"}`}
+              className={`rounded-field shadow p-3 sm:p-4 border ${report.summary.profit_margin >= 0 ? "bg-primary-soft border-primary-soft" : "bg-surface-alt border-border"}`}
             >
-              <p className="text-xs sm:text-sm text-primary">حاشیه سود</p>
+              <p className="text-body-xs sm:text-body-sm text-primary">حاشیه سود</p>
               <p className="text-lg sm:text-2xl font-bold text-primary">
                 {formatPercent(report.summary.profit_margin)}
               </p>
             </div>
           </div>
 
-          <div className="bg-surface shadow rounded-lg overflow-hidden overflow-x-auto">
+          <div className="bg-surface shadow rounded-field overflow-hidden overflow-x-auto">
             <table className="min-w-[640px] sm:min-w-full divide-y divide-border">
-              <thead className="bg-primary-soft">
+              <thead className={thead}>
                 <tr>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
+                  <th className={th}>
                     کد
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
+                  <th className={th}>
                     نام کالا
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
+                  <th className={th}>
                     تعداد فروش
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
+                  <th className={th}>
                     درآمد
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
+                  <th className={th}>
                     هزینه
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border border-l text-xs sm:text-sm">
+                  <th className={th}>
                     سود
                   </th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center font-semibold text-text-primary border-b border-border text-xs sm:text-sm">
+                  <th className={th}>
                     حاشیه سود
                   </th>
                 </tr>
@@ -144,10 +148,10 @@ export default function ProfitReport() {
               <tbody className="divide-y divide-border">
                 {report.data.map((item) => (
                   <tr key={item.item_id} className="hover:bg-surface-alt">
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono text-center border-l border-border text-text-primary">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm font-mono text-center text-text-primary">
                       {item.item_code}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-border">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm text-center">
                       <button
                         onClick={() => {
                           if (item.item_id) openItemDetail(item.item_id);
@@ -157,23 +161,23 @@ export default function ProfitReport() {
                         {item.item_name}
                       </button>
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-border text-text-primary">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm text-center text-text-primary">
                       {item.total_quantity}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-border text-text-primary">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm text-center text-text-primary">
                       {formatPersianCurrency(item.total_revenue)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center border-l border-border text-text-primary">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm text-center text-text-primary">
                       {formatPersianCurrency(item.total_cost)}
                     </td>
                     <td
-                      className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-center border-l border-border ${item.profit >= 0 ? "text-success" : "text-danger"}`}
+                      className={`px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm font-medium text-center ${item.profit >= 0 ? "text-success-fg" : "text-danger-fg"}`}
                     >
                       {formatPersianCurrency(item.profit)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border-border">
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 text-body-xs sm:text-body-sm border-border">
                       <span
-                        className={`flex items-center gap-1 justify-center ${item.profit_margin >= 0 ? "text-success" : "text-danger"}`}
+                        className={`flex items-center gap-1 justify-center ${item.profit_margin >= 0 ? "text-success-fg" : "text-danger-fg"}`}
                       >
                         <ArrowTrendingUpIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         {formatPercent(item.profit_margin)}

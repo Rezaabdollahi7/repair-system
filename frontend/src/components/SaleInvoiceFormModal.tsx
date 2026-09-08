@@ -167,7 +167,7 @@ function QuickCustomerModal({
           <div className="space-y-2 sm:space-y-3">
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
-                نام مشتری <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                نام مشتری <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 name="name"
@@ -177,7 +177,7 @@ function QuickCustomerModal({
                 placeholder="مثلاً: علی احمدی"
               />
               {errors.name && (
-                <p className="text-body-xs text-danger mt-1">{errors.name}</p>
+                <p className="text-body-xs text-danger-fg mt-1">{errors.name}</p>
               )}
             </div>
             <div>
@@ -760,7 +760,7 @@ export default function SaleInvoiceFormModal({
                   </div>
 
                   {errors.items && (
-                    <p className="text-body-sm text-danger mb-3 sm:mb-4">
+                    <p className="text-body-sm text-danger-fg mb-3 sm:mb-4">
                       {errors.items}
                     </p>
                   )}
@@ -863,7 +863,7 @@ export default function SaleInvoiceFormModal({
                                   white space
                                 </p>
                                 {errors[`quantity_${index}`] && (
-                                  <p className="text-[10px] text-danger mt-0.5">
+                                  <p className="text-[10px] text-danger-fg mt-0.5">
                                     {errors[`quantity_${index}`]}
                                   </p>
                                 )}
@@ -919,7 +919,7 @@ export default function SaleInvoiceFormModal({
                                   white space
                                 </p>
                                 {errors[`price_${index}`] && (
-                                  <p className="text-[10px] text-danger mt-0.5">
+                                  <p className="text-[10px] text-danger-fg mt-0.5">
                                     {errors[`price_${index}`]}
                                   </p>
                                 )}
@@ -948,7 +948,7 @@ export default function SaleInvoiceFormModal({
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveItem(index)}
-                                  className="text-danger hover:text-danger p-1"
+                                  className="text-danger-fg hover:text-danger-fg p-1"
                                 >
                                   <TrashIcon className="w-3.5 h-3.5" />
                                 </button>
@@ -993,7 +993,7 @@ export default function SaleInvoiceFormModal({
                         className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border"}`}
                       />
                       {errors.paid_amount && (
-                        <p className="mt-1 text-body-xs text-danger">
+                        <p className="mt-1 text-body-xs text-danger-fg">
                           {errors.paid_amount}
                         </p>
                       )}
@@ -1002,7 +1002,7 @@ export default function SaleInvoiceFormModal({
                     <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base font-bold">
                       <span className="text-text-primary">مانده (ریال):</span>
                       <span
-                        className={`${calculateRemaining() > 0 ? "text-danger" : "text-success"}`}
+                        className={`${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
                       >
                         {formatPersianCurrency(calculateRemaining())}
                       </span>

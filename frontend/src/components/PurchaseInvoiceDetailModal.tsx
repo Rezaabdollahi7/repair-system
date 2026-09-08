@@ -262,14 +262,14 @@ export default function PurchaseInvoiceDetailModal({
                           <span className="text-text-secondary">
                             پرداخت شده:
                           </span>
-                          <span className="text-success">
+                          <span className="text-success-fg">
                             {formatPersianCurrency(invoice.paid_amount)} ریال
                           </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-border">
                           <span className="text-text-secondary">مانده:</span>
                           <span
-                            className={`font-bold ${invoice.total_amount - invoice.paid_amount > 0 ? "text-danger" : "text-success"}`}
+                            className={`font-bold ${invoice.total_amount - invoice.paid_amount > 0 ? "text-danger-fg" : "text-success-fg"}`}
                           >
                             {formatPersianCurrency(
                               invoice.total_amount - invoice.paid_amount,

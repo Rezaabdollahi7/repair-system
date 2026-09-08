@@ -293,7 +293,8 @@ export default function RepairInvoiceDetailModal({
                         onClose();
                         if (invoiceId) openRepairInvoiceEdit(invoiceId);
                       }}
-                      className="px-4 py-2 bg-success-fill text-on-status rounded-field hover:bg-success-hover flex items-center gap-2"
+                      className="px-4 py-2.5 rounded-field bg-success-fill text-on-status text-body-sm font-bold
+                        hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2"
                     >
                       <PencilSquareIcon className="w-4 h-4" />
                       ویرایش
@@ -442,7 +443,7 @@ export default function RepairInvoiceDetailModal({
                           </div>
                           <div className="flex justify-between mb-2 text-text-primary">
                             <span>پرداخت شده:</span>
-                            <span className="text-success">
+                            <span className="text-success-fg">
                               {formatPersianCurrency(invoice.paid_amount)} ریال
                             </span>
                           </div>
@@ -451,8 +452,8 @@ export default function RepairInvoiceDetailModal({
                             <span
                               className={
                                 invoice.total_amount - invoice.paid_amount > 0
-                                  ? "text-danger"
-                                  : "text-success"
+                                  ? "text-danger-fg"
+                                  : "text-success-fg"
                               }
                             >
                               {formatPersianCurrency(
@@ -558,7 +559,7 @@ export default function RepairInvoiceDetailModal({
                                 <td className="px-4 py-3 text-body-sm text-text-primary">
                                   {formatPersianCurrency(item.unit_price)}
                                 </td>
-                                <td className="px-4 py-3 text-body-sm text-danger">
+                                <td className="px-4 py-3 text-body-sm text-danger-fg">
                                   {item.discount_amount > 0
                                     ? `-${formatPersianCurrency(item.discount_amount)}`
                                     : "—"}
@@ -589,7 +590,7 @@ export default function RepairInvoiceDetailModal({
                                 >
                                   تخفیف:
                                 </td>
-                                <td className="px-4 py-3 text-body-sm text-danger">
+                                <td className="px-4 py-3 text-body-sm text-danger-fg">
                                   -
                                   {formatPersianCurrency(
                                     invoice.discount_amount,
@@ -649,7 +650,7 @@ export default function RepairInvoiceDetailModal({
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-success-soft flex items-center justify-center">
-                                <CurrencyDollarIcon className="w-5 h-5 text-success" />
+                                <CurrencyDollarIcon className="w-5 h-5 text-success-fg" />
                               </div>
                               <div>
                                 <p className="font-medium text-text-primary">

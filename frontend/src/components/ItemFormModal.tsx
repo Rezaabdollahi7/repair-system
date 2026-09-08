@@ -220,7 +220,7 @@ export default function ItemFormModal({
             {/* Code */}
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-2">
-                کد کالا <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                کد کالا <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 type="text"
@@ -232,14 +232,14 @@ export default function ItemFormModal({
                 placeholder="مثلاً: CAP-1000-16"
               />
               {errors.code && (
-                <p className="mt-1 text-body-xs text-danger">{errors.code}</p>
+                <p className="mt-1 text-body-xs text-danger-fg">{errors.code}</p>
               )}
             </div>
 
             {/* Name */}
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-2">
-                نام کالا <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                نام کالا <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
               </label>
               <input
                 type="text"
@@ -251,7 +251,7 @@ export default function ItemFormModal({
                 placeholder="مثلاً: خازن ۱۰۰۰ میکروفاراد ۱۶ ولت"
               />
               {errors.name && (
-                <p className="mt-1 text-body-xs text-danger">{errors.name}</p>
+                <p className="mt-1 text-body-xs text-danger-fg">{errors.name}</p>
               )}
             </div>
 
@@ -279,7 +279,7 @@ export default function ItemFormModal({
             {/* Unit */}
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-2">
-                واحد شمارش <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                واحد شمارش <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
               </label>
               <select
                 name="unit"
@@ -295,7 +295,7 @@ export default function ItemFormModal({
                 ))}
               </select>
               {errors.unit && (
-                <p className="mt-1 text-body-xs text-danger">{errors.unit}</p>
+                <p className="mt-1 text-body-xs text-danger-fg">{errors.unit}</p>
               )}
             </div>
 
@@ -315,7 +315,7 @@ export default function ItemFormModal({
                 className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.minStock ? "border-danger" : "border-border"}`}
               />
               {errors.minStock && (
-                <p className="mt-1 text-body-xs text-danger">{errors.minStock}</p>
+                <p className="mt-1 text-body-xs text-danger-fg">{errors.minStock}</p>
               )}
               <p className="mt-1 text-body-xs text-text-secondary">
                 وقتی موجودی به این عدد برسد، هشدار کم‌موجودی نمایش داده می‌شود
@@ -339,7 +339,7 @@ export default function ItemFormModal({
                   className={`w-full border rounded-field px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.initialStock ? "border-danger" : "border-border"}`}
                 />
                 {errors.initialStock && (
-                  <p className="mt-1 text-body-xs text-danger">
+                  <p className="mt-1 text-body-xs text-danger-fg">
                     {errors.initialStock}
                   </p>
                 )}

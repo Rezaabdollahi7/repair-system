@@ -536,7 +536,7 @@ export default function RepairInvoiceFormModal({
                   <div className="space-y-3 sm:space-y-4">
                     <div>
                       <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        انتخاب دستگاه <span aria-hidden className="text-danger text-[0.85em] leading-none align-super">*</span>
+                        انتخاب دستگاه <span aria-hidden className="text-danger-fg text-[0.85em] leading-none align-super">*</span>
                       </label>
                       <SearchableSelect
                         options={deviceOptions}
@@ -563,7 +563,7 @@ export default function RepairInvoiceFormModal({
                             className="w-full border border-border rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
                           />
                           {!formData.customer_name && (
-                            <p className="text-warning text-body-xs mt-1">
+                            <p className="text-warning-fg text-body-xs mt-1">
                               ⚠️ این دستگاه مشتری ثبت شده ندارد.
                             </p>
                           )}
@@ -702,7 +702,7 @@ export default function RepairInvoiceFormModal({
                   </div>
 
                   {errors.items && (
-                    <p className="text-body-sm text-danger mb-3 sm:mb-4">
+                    <p className="text-body-sm text-danger-fg mb-3 sm:mb-4">
                       {errors.items}
                     </p>
                   )}
@@ -852,7 +852,7 @@ export default function RepairInvoiceFormModal({
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(index)}
-                                className="text-danger hover:text-danger"
+                                className="text-danger-fg hover:text-danger-fg"
                               >
                                 <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                               </button>
@@ -860,7 +860,7 @@ export default function RepairInvoiceFormModal({
                           </div>
 
                           {errors[`item_${index}_quantity`] && (
-                            <p className="text-body-xs text-danger mt-1">
+                            <p className="text-body-xs text-danger-fg mt-1">
                               {errors[`item_${index}_quantity`]}
                             </p>
                           )}
@@ -904,7 +904,7 @@ export default function RepairInvoiceFormModal({
                             min="0"
                             className="border border-border rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm w-24 sm:w-32 bg-surface text-text-primary"
                           />
-                          <span className="text-danger text-body-sm sm:mr-auto">
+                          <span className="text-danger-fg text-body-sm sm:mr-auto">
                             -{formatPersianCurrency(calculateDiscount())} ریال
                           </span>
                         </>

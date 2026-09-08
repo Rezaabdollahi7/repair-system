@@ -69,7 +69,7 @@ export default function InvoicePreview({
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="px-3 py-2 bg-success text-text-inverse rounded-lg hover:bg-success-hover flex items-center gap-1 text-sm"
+              className="px-3 py-2 bg-success-fill text-on-status rounded-field hover:opacity-90 transition-opacity flex items-center gap-1 text-sm"
             >
               <ArrowDownTrayIcon className="w-4 h-4" />
               PDF
@@ -264,7 +264,7 @@ export default function InvoicePreview({
                       >
                         تخفیف:
                       </td>
-                      <td className="border border-border px-3 py-2 text-sm text-left text-danger">
+                      <td className="border border-border px-3 py-2 text-sm text-left text-danger-fg">
                         ({formatPersianCurrency(invoice.discount_amount)})
                       </td>
                     </tr>

@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   useRef,
   useCallback,
@@ -103,6 +104,22 @@ export function ModalProvider({ children }: { children: ReactNode }) {
       refreshCallbackRef.current();
     }
   }, [modalStack.length]);
+
+  /**
+   * Escape closes the topmost modal.
+   *
+   * Listened for here rather than inside each modal: they render as a stack,
+   * so fourteen components each holding their own listener would pop the
+   * whole stack on one keypress instead of the one dialog in front.
+   */
+  useEffect(() => {
+    if (modalStack.length === 0) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [modalStack.length, closeModal]);
 
   const closeAllModals = useCallback(() => {
     setModalStack([]);

@@ -181,8 +181,13 @@ export default function PersianDatePicker({
   const isToday = (jd: number) =>
     today.jy === viewYear && today.jm === viewMonth && today.jd === jd;
 
+  // Persian-digit like every other date the app prints. The calendar cells
+  // were converted; the field showing the chosen date was still Latin, so
+  // picking ۱۷ put "17" in the box.
   const displayValue = value
-    ? `${selectedJalali.jy}/${String(selectedJalali.jm).padStart(2, "0")}/${String(selectedJalali.jd).padStart(2, "0")}`
+    ? toPersianDigits(
+        `${selectedJalali.jy}/${String(selectedJalali.jm).padStart(2, "0")}/${String(selectedJalali.jd).padStart(2, "0")}`,
+      )
     : "";
 
   const yearList = Array.from(

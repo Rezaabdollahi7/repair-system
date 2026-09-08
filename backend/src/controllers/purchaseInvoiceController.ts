@@ -50,6 +50,10 @@ export const getAll = async (req: Request, res: Response) => {
       };
     }
 
+    if (query.payment_status?.length) {
+      where.paymentStatus = { in: query.payment_status };
+    }
+
     const invoiceDate = dateFilter(query.from_date, query.to_date);
     if (invoiceDate) {
       where.invoiceDate = invoiceDate;

@@ -87,3 +87,17 @@ export function formatPersianCompact(
 
   return sign + toPersianDigits(Math.round(abs));
 }
+
+/**
+ * A timestamp as a Jalali date — `۱۴۰۵/۰۶/۱۷`.
+ *
+ * Six pages were each carrying their own two-line copy of this, all calling
+ * toLocaleDateString("fa-IR") and all handling null slightly differently.
+ * The em dash for a missing date is the app's convention for "no value".
+ */
+export function formatPersianDate(date: string | null | undefined): string {
+  if (!date) return "—";
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString("fa-IR");
+}

@@ -21,6 +21,11 @@ import { useDebounce } from "../utils/helpers";
 import type { CustomerListRow, Personnel } from "../types/api";
 import DeviceStatusBadge from "./DeviceStatusBadge";
 import { DEVICE_STATUSES } from "../utils/deviceStatus";
+import StatusPill from "./StatusPill";
+import {
+  DEVICE_INVOICE_STATUSES,
+  deviceInvoiceStatusOf,
+} from "../utils/invoiceStatus";
 
 /**
  * The device filter state. Owned by DeviceList and edited here, so the shape
@@ -59,28 +64,11 @@ const STATUS_OPTIONS = DEVICE_STATUSES.map((status) => ({
   label: status.label,
 }));
 
-const INVOICE_STATUS_OPTIONS = [
-  {
-    value: "no_invoice",
-    label: "فاکتور ندارد",
-    color: "bg-surface-alt text-text-secondary",
-  },
-  {
-    value: "paid",
-    label: "پرداخت شده",
-    color: "bg-success-soft text-success-fg",
-  },
-  {
-    value: "unpaid",
-    label: "پرداخت نشده",
-    color: "bg-danger-soft text-danger-fg",
-  },
-  {
-    value: "not_needed",
-    label: "نیاز به فاکتور ندارد",
-    color: "bg-primary-soft text-primary",
-  },
-];
+/* From the shared list — see the note there on why these four had drifted. */
+const INVOICE_STATUS_OPTIONS = DEVICE_INVOICE_STATUSES.map((status) => ({
+  value: status.key,
+  label: status.label,
+}));
 
 const dropdownBtnClass =
   "w-full border border-border rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-right " +
@@ -608,7 +596,11 @@ export default function FilterPanel({
                                   </svg>
                                 )}
                               </span>
-                              <span className={opt.color}>{opt.label}</span>
+                              <StatusPill
+                                label={opt.label}
+                                color={deviceInvoiceStatusOf(opt.value).color}
+                                tone={deviceInvoiceStatusOf(opt.value).tone}
+                              />
                             </button>
                           );
                         })}

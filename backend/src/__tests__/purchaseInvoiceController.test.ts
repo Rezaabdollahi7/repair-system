@@ -100,6 +100,22 @@ beforeEach(() => {
 });
 
 describe("purchaseInvoiceController.getAll", () => {
+  it("counts the same rows it returns when filtering", async () => {
+    db.purchaseInvoice.count.mockResolvedValue(0);
+    db.purchaseInvoice.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, payment_status: ["pending"] } }),
+      mockResponse(),
+    );
+
+    // The total drives the pager, so it has to be counted over the filtered
+    // set — otherwise three rows come back under thirty pages of them.
+    expect(db.purchaseInvoice.count.mock.calls[0][0].where).toEqual(
+      db.purchaseInvoice.findMany.mock.calls[0][0].where,
+    );
+  });
+
   it("converts Decimal columns to numbers", async () => {
     db.purchaseInvoice.count.mockResolvedValue(1);
     db.purchaseInvoice.findMany.mockResolvedValue([invoiceRow()]);
@@ -139,6 +155,23 @@ describe("purchaseInvoiceController.getAll", () => {
     expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
       workspaceId: WORKSPACE_ID,
       supplierName: { contains: "پارس", mode: "insensitive" },
+    });
+  });
+
+  it("filters by payment status", async () => {
+    db.purchaseInvoice.count.mockResolvedValue(0);
+    db.purchaseInvoice.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({
+        query: { ...listQuery, payment_status: ["pending", "partial"] },
+      }),
+      mockResponse(),
+    );
+
+    expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      paymentStatus: { in: ["pending", "partial"] },
     });
   });
 

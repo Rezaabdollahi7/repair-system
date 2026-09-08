@@ -42,6 +42,17 @@ export const td = "px-3 py-3 text-body-sm text-center text-text-primary";
 
 export const tdMuted = "px-3 py-3 text-body-sm text-center text-text-secondary";
 
+/**
+ * A cell whose text colour the caller sets.
+ *
+ * `td` carries `text-text-primary`, so composing it as `${td} text-success-fg`
+ * put two colour utilities on one element and left the winner to whichever
+ * Tailwind emitted last — which was the primary one. The invoice tables had
+ * been asking for a green «پرداخت‌شده» and a red «مانده» since they were
+ * written, and getting neither.
+ */
+export const tdBare = "px-3 py-3 text-body-sm text-center";
+
 /** Status pills. Pair with a `bg-*-soft text-*-fg` tone from the palette. */
 export const badge =
   "inline-flex items-center px-2.5 py-1 rounded-pill text-body-xs font-bold whitespace-nowrap";

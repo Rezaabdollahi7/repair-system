@@ -1,8 +1,30 @@
 import { z } from "zod";
 import { paginationQuerySchema } from "./common";
 
+/*
+ * A comma-separated list, the same shape the devices and sale-invoice lists
+ * already take. Written out here rather than shared: three schemas each have
+ * their own copy of these six lines, and pulling them into common.ts is a
+ * refactor of all three, not part of adding one filter.
+ */
+const csvStrings = z
+  .string()
+  .transform((value) =>
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean),
+  )
+  .pipe(z.array(z.string()));
+
 export const purchaseInvoiceListQuerySchema = paginationQuerySchema.extend({
   supplier: z.string().trim().optional(),
+  /*
+   * Filtering purchases by payment state, which the sale-invoice list has
+   * always had and this one had not — so the two pages could not offer the
+   * same control. It is what a shop uses to find what it still owes.
+   */
+  payment_status: csvStrings.optional(),
   from_date: z.coerce.date().optional(),
   to_date: z.coerce.date().optional(),
 });

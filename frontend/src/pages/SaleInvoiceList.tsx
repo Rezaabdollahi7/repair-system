@@ -3,27 +3,35 @@ import { getSaleInvoices, deleteSaleInvoice } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
-import { formatPersianPhone, formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import {
+  formatPersianCurrency,
+  formatPersianDate,
+  formatPersianPhone,
+  toPersianDigits,
+} from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { motion } from "framer-motion";
 import {
   PlusIcon,
-  EyeIcon,
-  TrashIcon,
-  PencilSquareIcon,
   MagnifyingGlassIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
   FunnelIcon,
   CurrencyDollarIcon,
 } from "@heroicons/react/24/solid";
-import LoadingSpinner from "../components/LoadingSpinner";
+/* Outline for the row's own controls — a solid heroicon at 18px is a disc. */
+import {
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
+import { PAYMENT_STATUSES, paymentStatusOf } from "../utils/invoiceStatus";
+import { staggerContainer, staggerItem } from "../motion";
 import SaleInvoiceFilterPanel from "../components/SaleInvoiceFilterPanel";
 import { useDebounce } from "../utils/helpers";
 import {
-  badge,
   iconButton,
+  rowCard,
   primaryButton,
   searchField,
   searchIcon,
@@ -32,6 +40,7 @@ import {
   tableScroll,
   tbody,
   td,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -43,47 +52,33 @@ import {
 import type { SaleInvoiceFilters } from "../components/SaleInvoiceFilterPanel";
 import type { PaymentStatus, QueryParams, SaleInvoice } from "../types/api";
 
-interface BadgeStyle {
-  label: string;
-  color: string;
-  icon?: React.ComponentType<{ className?: string }>;
-}
-
-/**
- * Bound to success/warning/danger rather than primary: these carry a fixed
- * meaning — paid is always green — and must not follow the brand colour when
- * the theme changes.
- */
-function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const map: Record<string, BadgeStyle> = {
-    paid: {
-      label: "پرداخت شده",
-      color: "bg-success-soft text-success-fg",
-      icon: CheckCircleIcon,
-    },
-    partial: {
-      label: "پرداخت ناقص",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ExclamationCircleIcon,
-    },
-    pending: {
-      label: "در انتظار پرداخت",
-      color: "bg-danger-soft text-danger-fg",
-      icon: ClockIcon,
-    },
-  };
-  const s = map[status] || {
-    label: status,
-    color: "bg-surface-alt text-text-secondary",
-  };
-  const Icon = s.icon;
+/** Mirrors the table and the phone cards so the page does not jump. */
+function InvoiceListSkeleton() {
   return (
-    <span
-      className={`${badge} gap-1 mx-auto ${s.color}`}
-    >
-      {Icon && <Icon className="w-3 h-3" />}
-      {s.label}
-    </span>
+    <div className="animate-pulse">
+      <div className="hidden lg:block bg-surface border border-border rounded-panel p-5">
+        <div className="h-4 w-full rounded-field bg-surface-alt mb-5" />
+        {Array.from({ length: 8 }, (_, row) => (
+          <div key={row} className="flex gap-3 mb-4">
+            {[3, 4, 3, 2, 3, 3].map((span, cell) => (
+              <div
+                key={cell}
+                className="h-4 rounded-field bg-surface-alt"
+                style={{ flexGrow: span, flexBasis: 0 }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="lg:hidden space-y-3">
+        {[0, 1, 2, 3].map((card) => (
+          <div
+            key={card}
+            className="h-36 rounded-panel border border-border bg-surface"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -176,11 +171,142 @@ export default function SaleInvoiceList() {
     });
   }, [refreshList, fetchInvoices, debouncedSearch, filters, page, limit]);
 
-  const formatDate = (dateStr: string | null | undefined) =>
-    dateStr ? new Date(dateStr).toLocaleDateString("fa-IR") : "—";
+  const filtering = debouncedSearch !== "" || activeFilterCount > 0;
+
+  /**
+   * Adds or removes one payment status from the filter.
+   *
+   * Writes into the same `filters.payment_status` array the filter panel uses
+   * rather than keeping a second piece of state — and stays multi-select for
+   * the same reason the panel is: «هرچه وصول نشده» is pending and partial
+   * together, which is the question a shop chasing money actually asks.
+   */
+  const togglePaymentStatus = (key: PaymentStatus) => {
+    setFilters((current) => ({
+      ...current,
+      payment_status: current.payment_status.includes(key)
+        ? current.payment_status.filter((value) => value !== key)
+        : [...current.payment_status, key],
+    }));
+    setPage(1);
+  };
+
+  /*
+   * Row actions, shared by the table row and the phone card. Neutral until
+   * hovered: three tinted squares on every line competed with the payment
+   * badge, which is the colour the row is meant to be read by.
+   */
+  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
+
+  const rowActions = (invoice: SaleInvoice) => (
+    <div className="flex gap-1 justify-end items-center">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          openSaleInvoiceDetail(invoice.id);
+        }}
+        className={actionButton}
+        title="مشاهده جزئیات"
+      >
+        <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
+      </button>
+      {isAtLeast("admin") && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openSaleInvoiceEdit(invoice.id);
+            }}
+            className={actionButton}
+            title="ویرایش فاکتور"
+          >
+            <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget(invoice);
+            }}
+            className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+            title="حذف"
+          >
+            <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div dir="rtl">
+      <header className="mb-5">
+        <h1 className="text-headline-md font-bold text-text-primary">
+          فاکتورهای فروش
+        </h1>
+        <p className="text-body-sm text-text-secondary mt-0.5">
+          {loading
+            ? "در حال بارگذاری…"
+            : filtering
+              ? `${toPersianDigits(total)} نتیجه از این فیلتر`
+              : `${toPersianDigits(total)} فاکتور فروش ثبت شده`}
+        </p>
+
+        <div
+          className="flex gap-2 mt-4 overflow-x-auto pb-1
+                     sm:flex-wrap sm:overflow-x-visible sm:pb-0"
+          role="group"
+          aria-label="فیلتر وضعیت پرداخت"
+        >
+          <button
+            onClick={() => {
+              setFilters((current) => ({ ...current, payment_status: [] }));
+              setPage(1);
+            }}
+            aria-pressed={filters.payment_status.length === 0}
+            className={`shrink-0 px-3 py-1.5 rounded-pill text-body-xs font-bold border
+                        transition-colors cursor-pointer ${
+                          filters.payment_status.length === 0
+                            ? "bg-primary text-primary-fg border-primary"
+                            : "bg-surface text-text-secondary border-border hover:border-border-strong"
+                        }`}
+          >
+            همه
+          </button>
+          {PAYMENT_STATUSES.map((status) => {
+            const active = filters.payment_status.includes(status.key);
+            return (
+              <button
+                key={status.key}
+                onClick={() => togglePaymentStatus(status.key)}
+                aria-pressed={active}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill
+                            text-body-xs font-bold border transition-colors cursor-pointer
+                            ${
+                              active
+                                ? "text-text-primary"
+                                : "bg-surface text-text-secondary border-border hover:border-border-strong"
+                            }`}
+                style={
+                  active
+                    ? {
+                        backgroundColor: `color-mix(in oklab, ${status.color} 16%, var(--surface))`,
+                        borderColor: `color-mix(in oklab, ${status.color} 55%, var(--surface))`,
+                      }
+                    : undefined
+                }
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: status.color }}
+                  aria-hidden="true"
+                />
+                {status.label}
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
       <div className={toolbar}>
         <div className={toolbarSearch}>
           <MagnifyingGlassIcon className={searchIcon} />
@@ -195,7 +321,10 @@ export default function SaleInvoiceList() {
         </div>
 
         <div className={toolbarActions}>
-          <button onClick={() => setFilterOpen(true)} className={secondaryButton}>
+          <button
+            onClick={() => setFilterOpen(true)}
+            className={secondaryButton}
+          >
             <FunnelIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
             فیلترها
             {activeFilterCount > 0 && (
@@ -204,7 +333,10 @@ export default function SaleInvoiceList() {
               </span>
             )}
           </button>
-          <button onClick={() => openSaleInvoiceCreate()} className={primaryButton}>
+          <button
+            onClick={() => openSaleInvoiceCreate()}
+            className={primaryButton}
+          >
             <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             فاکتور جدید
           </button>
@@ -227,154 +359,251 @@ export default function SaleInvoiceList() {
       />
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" />
-        </div>
+        <InvoiceListSkeleton />
       ) : invoices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-20 px-4">
-          <span className="w-14 h-14 rounded-card bg-surface-alt flex items-center justify-center mb-4">
-            <CurrencyDollarIcon className="w-7 h-7 text-text-muted" />
+        <div className="bg-surface border border-border rounded-panel flex flex-col items-center justify-center text-center py-16 px-4">
+          <span className="w-14 h-14 rounded-panel bg-surface-alt flex items-center justify-center mb-4">
+            <CurrencyDollarIcon
+              className="w-7 h-7 text-text-muted"
+              aria-hidden="true"
+            />
           </span>
           <p className="text-body-md font-bold text-text-primary">
-            {searchInput || activeFilterCount > 0
-              ? "نتیجه‌ای یافت نشد"
-              : "هنوز فاکتور فروشی ثبت نشده"}
+            {filtering ? "نتیجه‌ای یافت نشد" : "هنوز فاکتور فروشی ثبت نشده"}
           </p>
-          <p className="text-body-sm text-text-secondary mt-1">
-            {searchInput || activeFilterCount > 0
-              ? "فیلترها را بردارید یا عبارت دیگری را امتحان کنید."
+          <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
+            {filtering
+              ? "این ترکیب فیلترها چیزی برنگرداند. یکی از آن‌ها را بردارید."
               : "فروش قطعات به مشتری از اینجا فاکتور می‌شود."}
           </p>
+          {filtering ? (
+            <button
+              onClick={() => {
+                setSearchInput("");
+                setFilters(EMPTY_FILTERS);
+                setPage(1);
+              }}
+              className={`${secondaryButton} mt-5 flex-none`}
+            >
+              پاک‌کردن جستجو و فیلترها
+            </button>
+          ) : (
+            <button
+              onClick={() => openSaleInvoiceCreate()}
+              className={`${primaryButton} mt-5 flex-none`}
+            >
+              <PlusIcon
+                className="w-[1.15rem] h-[1.15rem]"
+                aria-hidden="true"
+              />
+              فاکتور جدید
+            </button>
+          )}
         </div>
       ) : (
-        <div className={tableCard}>
-          <div className={tableScroll}>
-            <table className="min-w-[1040px] w-full">
-              <thead className={thead}>
-                <tr>
-                  <th className={th}>
-                    شماره فاکتور
-                  </th>
-                  <th className={th}>
-                    مشتری
-                  </th>
-                  <th className={th}>
-                    تلفن
-                  </th>
-                  <th className={th}>
-                    تاریخ
-                  </th>
-                  <th className={th}>
-                    مبلغ کل
-                  </th>
-                  <th className={th}>
-                    پرداخت شده
-                  </th>
-                  <th className={th}>
-                    مانده
-                  </th>
-                  <th className={th}>
-                    وضعیت
-                  </th>
-                  <th className={th}>
-                    عملیات
-                  </th>
-                </tr>
-              </thead>
-              <tbody className={tbody}>
-                {invoices.map((invoice, index) => {
-                  const remaining = invoice.total_amount - invoice.paid_amount;
-                  return (
-                    <tr
-                      key={invoice.id}
-                      onClick={() => openSaleInvoiceDetail(invoice.id)}
-                      className={trClickable}
-                    >
-                      <td className={`${td} tabular-nums`}>
+        <>
+          {/* Below lg the table becomes one card per invoice — nine columns
+              needed 1040px, which a phone had to be dragged across. */}
+          <motion.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="lg:hidden space-y-3"
+          >
+            {invoices.map((invoice) => {
+              const remaining = invoice.total_amount - invoice.paid_amount;
+              const status = paymentStatusOf(invoice.payment_status);
+              return (
+                <motion.li key={invoice.id} variants={staggerItem}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openSaleInvoiceDetail(invoice.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openSaleInvoiceDetail(invoice.id);
+                      }
+                    }}
+                    className={`${rowCard} cursor-pointer hover:border-border-strong
+                                relative overflow-hidden ps-5`}
+                  >
+                    <span
+                      className="absolute inset-y-0 start-0 w-1.5"
+                      style={{ backgroundColor: status.color }}
+                      aria-hidden="true"
+                    />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-body-sm font-bold text-text-primary truncate">
+                          {invoice.customer_name || "مشتری متفرقه"}
+                        </p>
+                        <p
+                          className="text-body-xs text-text-muted tabular-nums"
+                          dir="ltr"
+                        >
+                          {formatPersianPhone(invoice.customer_phone)}
+                        </p>
+                      </div>
+                      <span
+                        className="text-body-xs text-text-muted shrink-0 tabular-nums"
+                        dir="ltr"
+                      >
                         {invoice.invoice_number}
-                      </td>
-                      <td className={td}>
-                        {invoice.customer_id ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (invoice.customer_id)
-                                openCustomerDetail(invoice.customer_id);
-                            }}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            {invoice.customer_name || "—"}
-                          </button>
-                        ) : (
-                          <span className="text-text-primary">
-                            {invoice.customer_name || "—"}
-                          </span>
-                        )}
-                      </td>
-                      <td className={tdMuted}>
-                        {formatPersianPhone(invoice.customer_phone)}
-                      </td>
-                      <td className={tdMuted}>
-                        {formatDate(invoice.invoice_date)}
-                      </td>
-                      <td className={td}>
-                        {formatPersianCurrency(invoice.total_amount)}
-                      </td>
-                      <td className={`${td} text-success-fg`}>
-                        {formatPersianCurrency(invoice.paid_amount)}
-                      </td>
-                      <td className={`${td} text-danger-fg`}>
-                        {remaining > 0 ? formatPersianCurrency(remaining) : "—"}
-                      </td>
-                      <td className="px-3 py-3">
-                        <PaymentStatusBadge status={invoice.payment_status} />
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex gap-1.5 justify-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openSaleInvoiceDetail(invoice.id);
-                            }}
-                            className={`${iconButton} bg-primary-soft text-primary`}
-                            title="مشاهده جزئیات"
-                          >
-                            <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
-                          </button>
-                          {/* Edit, admin only */}
-                          {isAtLeast("admin") && (
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <PaymentStatusBadge status={invoice.payment_status} />
+                      <span className="text-body-xs text-text-muted">
+                        {formatPersianDate(invoice.invoice_date)}
+                      </span>
+                    </div>
+
+                    {/*
+                      The three money figures side by side. «مانده» is the one
+                      a shop acts on, so it keeps the danger tone the table
+                      gives it — and only while something is left to collect.
+                    */}
+                    <dl className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border-subtle">
+                      <div>
+                        <dt className="text-body-xs text-text-muted">
+                          مبلغ کل
+                        </dt>
+                        <dd className="text-body-sm font-bold text-text-primary tabular-nums">
+                          {formatPersianCurrency(invoice.total_amount)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-body-xs text-text-muted">
+                          پرداخت‌شده
+                        </dt>
+                        <dd
+                          className={`text-body-sm font-bold tabular-nums ${
+                            invoice.paid_amount > 0
+                              ? "text-success-fg"
+                              : "text-text-muted"
+                          }`}
+                        >
+                          {invoice.paid_amount > 0
+                            ? formatPersianCurrency(invoice.paid_amount)
+                            : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-body-xs text-text-muted">مانده</dt>
+                        <dd
+                          className={`text-body-sm font-bold tabular-nums ${
+                            remaining > 0
+                              ? "text-danger-fg"
+                              : "text-text-secondary"
+                          }`}
+                        >
+                          {remaining > 0
+                            ? formatPersianCurrency(remaining)
+                            : "—"}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="flex items-center justify-end mt-3">
+                      {rowActions(invoice)}
+                    </div>
+                  </div>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+
+          <div className={`hidden lg:block ${tableCard}`}>
+            <div className={tableScroll}>
+              <table className="min-w-[1040px] w-full">
+                <thead className={thead}>
+                  <tr>
+                    <th className={th}>شماره فاکتور</th>
+                    <th className={th}>مشتری</th>
+                    <th className={th}>تلفن</th>
+                    <th className={th}>تاریخ</th>
+                    <th className={th}>مبلغ کل (ریال)</th>
+                    <th className={th}>پرداخت شده (ریال)</th>
+                    <th className={th}>مانده (ریال)</th>
+                    <th className={th}>وضعیت</th>
+                    <th className={th}>عملیات</th>
+                  </tr>
+                </thead>
+                <tbody className={tbody}>
+                  {invoices.map((invoice) => {
+                    const remaining =
+                      invoice.total_amount - invoice.paid_amount;
+                    return (
+                      <tr
+                        key={invoice.id}
+                        onClick={() => openSaleInvoiceDetail(invoice.id)}
+                        className={trClickable}
+                      >
+                        <td className={`${td} tabular-nums`}>
+                          {invoice.invoice_number}
+                        </td>
+                        <td className={td}>
+                          {invoice.customer_id ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openSaleInvoiceEdit(invoice.id);
+                                if (invoice.customer_id)
+                                  openCustomerDetail(invoice.customer_id);
                               }}
-                              className={`${iconButton} bg-surface-alt text-text-secondary`}
-                              title="ویرایش فاکتور"
+                              className="text-primary hover:underline font-medium"
                             >
-                              <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
+                              {invoice.customer_name || "—"}
                             </button>
+                          ) : (
+                            <span className="text-text-primary">
+                              {invoice.customer_name || "—"}
+                            </span>
                           )}
-                          {isAtLeast("admin") && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget(invoice);
-                              }}
-                              className={`${iconButton} bg-danger-soft text-danger-fg`}
-                              title="حذف"
-                            >
-                              <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className={tdMuted}>
+                          {formatPersianPhone(invoice.customer_phone)}
+                        </td>
+                        <td className={tdMuted}>
+                          {formatPersianDate(invoice.invoice_date)}
+                        </td>
+                        <td className={td}>
+                          {formatPersianCurrency(invoice.total_amount)}
+                        </td>
+                        {/* Green only once something has actually come in: a
+                          zero in success green reads as "collected". */}
+                        <td
+                          className={`${tdBare} ${
+                            invoice.paid_amount > 0
+                              ? "text-success-fg"
+                              : "text-text-muted"
+                          }`}
+                        >
+                          {invoice.paid_amount > 0
+                            ? formatPersianCurrency(invoice.paid_amount)
+                            : "—"}
+                        </td>
+                        <td className={`${tdBare} text-danger-fg`}>
+                          {remaining > 0
+                            ? formatPersianCurrency(remaining)
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <PaymentStatusBadge
+                            status={invoice.payment_status}
+                            size="sm"
+                          />
+                        </td>
+                        <td className="px-3 py-3">{rowActions(invoice)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {!loading && invoices.length > 0 && (

@@ -13,6 +13,8 @@ import {
 import PersianDatePicker from "./PersianDatePicker";
 import type { PaymentStatus } from "../types/api";
 import { backdrop, modalPanel } from "../motion";
+import PaymentStatusBadge from "./PaymentStatusBadge";
+import { PAYMENT_STATUSES } from "../utils/invoiceStatus";
 
 /**
  * The filter state this panel edits. Exported because SaleInvoiceList owns
@@ -37,27 +39,16 @@ interface SaleInvoiceFilterPanelProps {
   onClose: () => void;
 }
 
-const PAYMENT_STATUS_OPTIONS: {
-  value: PaymentStatus;
-  label: string;
-  color: string;
-}[] = [
-  {
-    value: "paid",
-    label: "پرداخت شده",
-    color: "bg-success-soft text-success-fg",
-  },
-  {
-    value: "partial",
-    label: "پرداخت ناقص",
-    color: "bg-warning-soft text-warning-fg",
-  },
-  {
-    value: "pending",
-    label: "در انتظار پرداخت",
-    color: "bg-warning-soft text-warning-fg",
-  },
-];
+/*
+ * From the shared status list. This was the fourth copy, and it carried the
+ * same collision the purchases page did: `partial` and `pending` both amber,
+ * so a half-paid invoice and an unpaid one looked the same in the very panel
+ * you open to tell them apart.
+ */
+const PAYMENT_STATUS_OPTIONS = PAYMENT_STATUSES.map((status) => ({
+  value: status.key,
+  label: status.label,
+}));
 
 interface SectionTitleProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -292,7 +283,7 @@ export default function SaleInvoiceFilterPanel({
                                 </svg>
                               )}
                             </span>
-                            <span className={opt.color}>{opt.label}</span>
+                            <PaymentStatusBadge status={opt.value} />
                           </button>
                         );
                       })}

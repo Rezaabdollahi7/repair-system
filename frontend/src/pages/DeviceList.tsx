@@ -29,13 +29,14 @@ import {
 } from "@heroicons/react/24/outline";
 import ConfirmModal from "../components/ConfirmModal";
 import DeviceStatusBadge from "../components/DeviceStatusBadge";
+import StatusPill from "../components/StatusPill";
+import { deviceInvoiceStateOf } from "../utils/invoiceStatus";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import { backdrop, modalPanel, staggerContainer, staggerItem } from "../motion";
 import {
-  badge,
   iconButton,
   primaryButton,
   rowCard,
@@ -59,29 +60,15 @@ import type { DeviceFilters } from "../components/FilterPanel";
 import type { Device, DeviceAssignee, QueryParams } from "../types/api";
 
 /**
- * Payment state, which unlike the repair status genuinely is a severity —
- * paid is good, unpaid is not, and "no invoice yet" is a thing to act on. So
- * this one keeps the reserved semantic tones rather than a series colour.
+ * Whether this device has been invoiced, and if so whether it was paid.
+ *
+ * The four states and their wording live in utils/invoiceStatus.ts, beside
+ * the payment statuses — this page and its filter panel used to describe them
+ * separately and disagree.
  */
 function InvoiceStatusBadge({ device }: { device: Device }) {
-  const getInvoiceStatus = () => {
-    if (!device.needs_invoice) {
-      return {
-        label: "فاکتور نیاز ندارد",
-        color: "bg-surface-alt text-text-secondary",
-      };
-    }
-    if (device.invoice_count > 0) {
-      return device.invoice_status === "paid"
-        ? { label: "پرداخت شده", color: "bg-success-soft text-success-fg" }
-        : { label: "پرداخت نشده", color: "bg-danger-soft text-danger-fg" };
-    }
-    return { label: "فاکتور ندارد", color: "bg-warning-soft text-warning-fg" };
-  };
-
-  const status = getInvoiceStatus();
-
-  return <span className={`${badge} ${status.color}`}>{status.label}</span>;
+  const { label, color, tone } = deviceInvoiceStateOf(device);
+  return <StatusPill label={label} color={color} tone={tone} size="sm" />;
 }
 
 interface StatusBadgeProps {

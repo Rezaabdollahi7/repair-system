@@ -1,85 +1,107 @@
-import { CheckIcon } from "@heroicons/react/24/solid";
-import { useTheme, THEMES, type Theme } from "../context/ThemeContext";
+import { motion, useReducedMotion } from "framer-motion";
+import { SunIcon, MoonIcon, ComputerDesktopIcon } from "@heroicons/react/24/solid";
+import {
+  useTheme,
+  THEME_OPTIONS,
+  type ThemePreference,
+} from "../context/ThemeContext";
+import { spring, transition } from "../motion";
 
 /**
- * Preview swatches, deliberately independent of the real CSS variables: each
- * one must show its own colours regardless of which theme is currently
- * applied to the page.
- *
- * Keyed by Theme, so a theme added to THEMES without a swatch here is a
- * compile error rather than an undefined lookup at render time.
+ * Keyed by preference, so an option added to THEME_OPTIONS without an icon
+ * here is a compile error rather than a blank button at render time.
  */
-const THEME_PREVIEWS: Record<Theme, { bg: string; primary: string; surface: string }> = {
-  light: { bg: "#f8fafc", primary: "#2563eb", surface: "#ffffff" },
-  dark: { bg: "#0f172a", primary: "#3b82f6", surface: "#1e293b" },
-  blue: { bg: "#eff6ff", primary: "#1d4ed8", surface: "#ffffff" },
-  yellow: { bg: "#fefce8", primary: "#ca8a04", surface: "#ffffff" },
-  orange: { bg: "#fff7ed", primary: "#ea580c", surface: "#ffffff" },
-  purple: { bg: "#110e2d", primary: "#7c5cfc", surface: "#1b1640" },
+const ICONS: Record<
+  ThemePreference,
+  React.ComponentType<{ className?: string }>
+> = {
+  light: SunIcon,
+  dark: MoonIcon,
+  system: ComputerDesktopIcon,
+};
+
+const DESCRIPTIONS: Record<ThemePreference, string> = {
+  light: "همیشه روشن",
+  dark: "همیشه تیره",
+  system: "مطابق تنظیم دستگاه",
 };
 
 export default function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const reduceMotion = useReducedMotion();
 
   return (
-    <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
-      <h2 className="text-base sm:text-lg font-medium text-text-primary mb-1">
-        پوسته برنامه
+    <section className="bg-surface border border-border rounded-card p-4 sm:p-6 shadow-sm">
+      <h2 className="text-base sm:text-lg font-bold text-text-primary">
+        پوستهٔ برنامه
       </h2>
-      <p className="text-sm text-text-secondary mb-4">
-        یکی از تم‌های زیر را برای نمایش برنامه انتخاب کنید
+      <p className="text-sm text-text-secondary mt-1 mb-5">
+        {theme === "system"
+          ? `الان ${resolvedTheme === "dark" ? "تیره" : "روشن"} است، چون دستگاه شما همین را می‌خواهد`
+          : "این انتخاب روی همین مرورگر ذخیره می‌شود"}
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {THEMES.map((t) => {
-          const preview = THEME_PREVIEWS[t.value];
-          const isActive = theme === t.value;
+      {/*
+        A segmented control rather than three separate buttons: the options
+        are mutually exclusive and the indicator sliding between them says so
+        without a caption. role="radiogroup" is what carries the same meaning
+        to a screen reader, which sees no indicator at all.
+      */}
+      <div
+        role="radiogroup"
+        aria-label="انتخاب پوسته"
+        className="relative grid grid-cols-3 gap-1 p-1 bg-surface-alt rounded-field"
+      >
+        {THEME_OPTIONS.map((option) => {
+          const Icon = ICONS[option.value];
+          const isActive = theme === option.value;
 
           return (
             <button
-              key={t.value}
+              key={option.value}
               type="button"
-              onClick={() => setTheme(t.value)}
-              className={`relative rounded-lg border-2 p-3 flex flex-col items-center gap-2 transition-colors ${
-                isActive
-                  ? "border-primary"
-                  : "border-border hover:border-text-secondary"
-              }`}
+              role="radio"
+              aria-checked={isActive}
+              onClick={() => setTheme(option.value)}
+              title={DESCRIPTIONS[option.value]}
+              className="relative flex flex-col items-center justify-center gap-1.5 py-3 rounded-[0.6rem] cursor-pointer"
             >
+              {/*
+                One shared layoutId across the three buttons: framer-motion
+                animates the single element from the old position to the new
+                one, which is why the pill appears to slide rather than
+                disappear and reappear.
+              */}
               {isActive && (
-                <span className="absolute top-1.5 left-1.5 bg-primary text-text-inverse rounded-full p-0.5">
-                  <CheckIcon className="w-3 h-3" />
-                </span>
+                <motion.span
+                  layoutId="theme-indicator"
+                  transition={reduceMotion ? { duration: 0 } : spring}
+                  className="absolute inset-0 bg-surface rounded-[0.6rem] shadow-sm border border-border"
+                />
               )}
 
-              {/* Colour preview */}
-              <div
-                className="w-full h-12 rounded-md border border-black/5 overflow-hidden flex"
-                style={{ backgroundColor: preview.bg }}
+              <motion.span
+                className="relative z-10 flex flex-col items-center gap-1.5"
+                animate={{ scale: isActive ? 1 : 0.96 }}
+                transition={transition.fast}
               >
-                <div
-                  className="w-1/3 h-full"
-                  style={{ backgroundColor: preview.surface }}
+                <Icon
+                  className={`w-5 h-5 transition-colors ${
+                    isActive ? "text-primary" : "text-text-secondary"
+                  }`}
                 />
-                <div className="flex-1 h-full flex items-center justify-center">
-                  <span
-                    className="w-6 h-2 rounded-full"
-                    style={{ backgroundColor: preview.primary }}
-                  />
-                </div>
-              </div>
-
-              <span
-                className={`text-xs sm:text-sm font-medium ${
-                  isActive ? "text-primary" : "text-text-primary"
-                }`}
-              >
-                {t.label}
-              </span>
+                <span
+                  className={`text-xs sm:text-sm font-medium transition-colors ${
+                    isActive ? "text-text-primary" : "text-text-secondary"
+                  }`}
+                >
+                  {option.label}
+                </span>
+              </motion.span>
             </button>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

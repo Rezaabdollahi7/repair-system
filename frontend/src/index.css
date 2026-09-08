@@ -380,12 +380,19 @@ body {
   line-height: 1.7;
 }
 
-/* حلقهٔ فوکوس یک‌دست برای همهٔ عناصر تعاملی. `:focus-visible` یعنی فقط
-   وقتی دیده می‌شود که کاربر با کیبورد حرکت کند، نه بعد از هر کلیک ماوس. */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-  border-radius: var(--radius-field);
+/* حلقهٔ فوکوس پیش‌فرض برای عناصر تعاملی. `:focus-visible` یعنی فقط وقتی
+   دیده می‌شود که کاربر با کیبورد حرکت کند، نه بعد از هر کلیک ماوس.
+   -------------------------------------------------------------------
+   داخل @layer base، وگرنه قابل لغو نیست: قاعده‌ای که در هیچ لایه‌ای
+   نباشد بر utilityهای Tailwind (که در @layer utilities هستند) مقدم
+   می‌شود، و کامپوننتی که حلقهٔ خودش را دارد و `focus:outline-none`
+   نوشته، هر دو را با هم می‌گرفت. */
+@layer base {
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-field);
+  }
 }
 
 ::selection {

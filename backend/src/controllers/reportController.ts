@@ -292,6 +292,31 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       paymentStatus: { in: ["pending", "partial"] },
     };
 
+    /*
+     * Which devices still have work in them.
+     *
+     * `IN_PROGRESS` is the set the «در حال تعمیر» figure has always counted,
+     * pulled out of its query so the two cannot drift. `OPEN` adds the ones
+     * that have arrived and not been looked at yet — a device sitting in
+     * `pending` is on somebody's bench even though nobody has touched it,
+     * and the workload card would be lying if it left those out.
+     *
+     * Everything else is finished as far as a technician is concerned:
+     * `repaired` and `ready_for_pickup` are waiting on the customer, and
+     * `delivered`, `unrepairable` and `not_repaired` are closed.
+     *
+     * The test is the status rather than `exitDate`. That column exists and
+     * would read more naturally, but nothing in the app sets it except a
+     * field on the edit form, so a shop that never fills it in would show
+     * every device it has ever taken in as open.
+     */
+    const IN_PROGRESS = ["diagnosing", "repairing", "waiting_for_parts"];
+    const OPEN = ["pending", ...IN_PROGRESS];
+    const openDevice: Prisma.DeviceWhereInput = {
+      workspaceId,
+      status: { in: OPEN },
+    };
+
     // Issued in parallel: they're independent reads and the dashboard waits
     // on the slowest, not the sum.
     const [
@@ -312,6 +337,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       todayDevices,
       repairingDevices,
       devicesByStatus,
+      openDevices,
+      unassignedDevices,
+      openAssignments,
       trendRepairInvoices,
       trendSaleInvoices,
       monthRepairPayments,
@@ -369,16 +397,39 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       prisma.device.count({ where: { workspaceId } }),
       prisma.device.count({ where: { workspaceId, createdAt: today } }),
       prisma.device.count({
-        where: {
-          workspaceId,
-          status: { in: ["diagnosing", "repairing", "waiting_for_parts"] },
-        },
+        where: { workspaceId, status: { in: IN_PROGRESS } },
       }),
       prisma.device.groupBy({
         by: ["status"],
         where: { workspaceId },
         _count: { status: true },
         orderBy: { _count: { status: "desc" } },
+      }),
+      prisma.device.count({ where: openDevice }),
+      /*
+       * Open devices nobody owns. `assignments: { none: {} }` rather than a
+       * null `personnelId`: the schema still has that column but the app
+       * assigns through device_assignments, and a device can have more than
+       * one technician on it.
+       */
+      prisma.device.count({
+        where: { ...openDevice, assignments: { none: {} } },
+      }),
+      /*
+       * The assignments themselves, counted in JS.
+       *
+       * groupBy would count them in one query but cannot bring the name
+       * along, so it would be a groupBy plus a findMany over the ids it
+       * returned — two round trips for a list that is at most one row per
+       * open device per technician. A workshop has single digits of
+       * technicians and hundreds of open devices at the very most.
+       */
+      prisma.deviceAssignment.findMany({
+        where: { workspaceId, device: { status: { in: OPEN } } },
+        select: {
+          personnelId: true,
+          personnel: { select: { fullName: true, username: true } },
+        },
       }),
       /*
        * The two trend reads pull rows and bucket them in JS rather than
@@ -426,6 +477,38 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // optional, so the property access can produce it.
     const amount = (value: { toNumber(): number } | null | undefined) =>
       value?.toNumber() ?? 0;
+
+    /*
+     * How many open devices each technician has, busiest first.
+     *
+     * A device may carry more than one technician, so these counts can add
+     * up to more than `openDevices` — each one answers "how much is on this
+     * person's bench", not "what share of the total is theirs". The card
+     * scales its bars against the busiest person rather than against a sum
+     * for exactly that reason.
+     *
+     * The username is the fallback name because it is never null and it is a
+     * phone number, which a shop will recognise. `fullName` is a form field
+     * and can be blank.
+     */
+    const loadByTechnician = new Map<number, { name: string; count: number }>();
+    for (const assignment of openAssignments) {
+      const existing = loadByTechnician.get(assignment.personnelId);
+      if (existing) {
+        existing.count += 1;
+        continue;
+      }
+      loadByTechnician.set(assignment.personnelId, {
+        name:
+          assignment.personnel.fullName?.trim() ||
+          assignment.personnel.username,
+        count: 1,
+      });
+    }
+
+    const technicianLoad = [...loadByTechnician.entries()]
+      .map(([id, row]) => ({ id, name: row.name, count: row.count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "fa"));
 
     /*
      * One bucket per day in the window, zero-filled before anything is added.
@@ -500,6 +583,11 @@ export const getDashboardStats = async (req: Request, res: Response) => {
           status: row.status,
           count: row._count.status,
         })),
+      },
+      technician_load: {
+        open_devices: openDevices,
+        unassigned: unassignedDevices,
+        technicians: technicianLoad,
       },
       repair_invoices: {
         today_count: todayRepairCount,

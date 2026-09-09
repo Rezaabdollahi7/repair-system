@@ -16,6 +16,7 @@ jest.mock("../lib/prisma", () => ({
     },
     inventoryTransaction: { findMany: jest.fn() },
     device: { count: jest.fn(), groupBy: jest.fn() },
+    deviceAssignment: { findMany: jest.fn() },
   },
 }));
 
@@ -27,6 +28,7 @@ const db = prisma as unknown as {
   repairInvoice: Record<string, jest.Mock>;
   inventoryTransaction: Record<string, jest.Mock>;
   device: Record<string, jest.Mock>;
+  deviceAssignment: Record<string, jest.Mock>;
 };
 
 function decimal(value: number) {
@@ -342,6 +344,7 @@ describe("reportController.getDashboardStats", () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([]);
     db.device.count.mockResolvedValue(0);
     db.device.groupBy.mockResolvedValue([]);
+    db.deviceAssignment.findMany.mockResolvedValue([]);
     // The two reads behind the trend series. Rows rather than aggregates,
     // because a daily bucket cannot be grouped in SQL through Prisma.
     db.repairInvoice.findMany.mockResolvedValue([]);
@@ -365,8 +368,8 @@ describe("reportController.getDashboardStats", () => {
 
     await controller.getDashboardStats(mockRequest(), mockResponse());
 
-    // Twenty parallel queries; a workspace filter missing from any one of
-    // them would leak another shop's figures into this dashboard.
+    // Twenty-three parallel queries; a workspace filter missing from any
+    // one of them would leak another shop's figures into this dashboard.
     const everyWhere = [
       ...db.repairInvoice.count.mock.calls,
       ...db.repairInvoice.aggregate.mock.calls,
@@ -380,6 +383,7 @@ describe("reportController.getDashboardStats", () => {
       ...db.saleInvoiceItem.groupBy.mock.calls,
       ...db.device.count.mock.calls,
       ...db.device.groupBy.mock.calls,
+      ...db.deviceAssignment.findMany.mock.calls,
     ].map(([args]) => args?.where);
 
     expect(everyWhere.length).toBeGreaterThan(0);
@@ -543,5 +547,108 @@ describe("reportController.getDashboardStats", () => {
       { status: "repairing", count: 4 },
       { status: "delivered", count: 2 },
     ]);
+  });
+
+  it("counts each technician's open devices, busiest first", async () => {
+    stubDashboard();
+    db.deviceAssignment.findMany.mockResolvedValue([
+      {
+        personnelId: 2,
+        personnel: { fullName: "علی رضایی", username: "09120000002" },
+      },
+      {
+        personnelId: 3,
+        personnel: { fullName: "سارا نوری", username: "09120000003" },
+      },
+      {
+        personnelId: 2,
+        personnel: { fullName: "علی رضایی", username: "09120000002" },
+      },
+      {
+        personnelId: 2,
+        personnel: { fullName: "علی رضایی", username: "09120000002" },
+      },
+    ]);
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    expect(res.json.mock.calls[0][0].technician_load.technicians).toEqual([
+      { id: 2, name: "علی رضایی", count: 3 },
+      { id: 3, name: "سارا نوری", count: 1 },
+    ]);
+  });
+
+  it("falls back to the username when a technician has no full name", async () => {
+    stubDashboard();
+    db.deviceAssignment.findMany.mockResolvedValue([
+      {
+        personnelId: 4,
+        personnel: { fullName: "   ", username: "09120000004" },
+      },
+    ]);
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    expect(res.json.mock.calls[0][0].technician_load.technicians).toEqual([
+      { id: 4, name: "09120000004", count: 1 },
+    ]);
+  });
+
+  it("reports an empty workload rather than omitting it", async () => {
+    stubDashboard();
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    expect(res.json.mock.calls[0][0].technician_load).toEqual({
+      open_devices: 0,
+      unassigned: 0,
+      technicians: [],
+    });
+  });
+
+  it("counts only devices a technician still has work on", async () => {
+    stubDashboard();
+
+    await controller.getDashboardStats(mockRequest(), mockResponse());
+
+    // «در حال تعمیر» keeps the three statuses it has always counted; the
+    // workload card adds the ones that have arrived and not been looked at.
+    const statusFilters = db.device.count.mock.calls
+      .map(([args]) => args?.where?.status?.in)
+      .filter(Boolean);
+
+    expect(statusFilters).toContainEqual([
+      "diagnosing",
+      "repairing",
+      "waiting_for_parts",
+    ]);
+    expect(statusFilters).toContainEqual([
+      "pending",
+      "diagnosing",
+      "repairing",
+      "waiting_for_parts",
+    ]);
+    expect(db.deviceAssignment.findMany.mock.calls[0][0].where.device).toEqual({
+      status: {
+        in: ["pending", "diagnosing", "repairing", "waiting_for_parts"],
+      },
+    });
+  });
+
+  it("asks for unassigned devices by the absence of an assignment", async () => {
+    stubDashboard();
+
+    await controller.getDashboardStats(mockRequest(), mockResponse());
+
+    // Not a null personnelId: that column is still on the table but the app
+    // assigns through device_assignments, and a device may have several.
+    const unassigned = db.device.count.mock.calls
+      .map(([args]) => args?.where)
+      .find((where) => where?.assignments !== undefined);
+
+    expect(unassigned?.assignments).toEqual({ none: {} });
   });
 });

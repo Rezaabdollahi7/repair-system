@@ -9,6 +9,16 @@ export interface BarRow {
   value: number;
   /** Already formatted, already in Persian digits. */
   display: string;
+  /**
+   * Overrides the list's hue for this row alone.
+   *
+   * The rule below still holds — one series, one colour — and this is for the
+   * row that is not part of the series. The technician workload list ends in
+   * «تخصیص‌نیافته», which is an absence rather than a person: it belongs in
+   * the same ranking, and painting it the same blue as the technicians would
+   * say it is one of them.
+   */
+  color?: string;
 }
 
 /**
@@ -60,7 +70,7 @@ export default function BarList({
           <div className="h-2.5 rounded-pill bg-chart-track overflow-hidden">
             <motion.div
               className="h-full rounded-pill origin-right"
-              style={{ backgroundColor: color }}
+              style={{ backgroundColor: row.color ?? color }}
               initial={reduceMotion ? false : { scaleX: 0 }}
               animate={{ scaleX: Math.max(row.value / peak, 0.02) }}
               transition={

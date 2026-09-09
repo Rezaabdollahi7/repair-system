@@ -935,6 +935,18 @@ export interface DashboardStats {
     month_unpaid: number;
   };
   revenue_series: DashboardRevenuePoint[];
+  /**
+   * Open devices per technician, busiest first.
+   *
+   * The counts can add up to more than `open_devices`: a device may carry
+   * several technicians, so each row answers "how much is on this person's
+   * bench" rather than "what share of the total is theirs".
+   */
+  technician_load: {
+    open_devices: number;
+    unassigned: number;
+    technicians: { id: number; name: string; count: number }[];
+  };
 }
 
 /**

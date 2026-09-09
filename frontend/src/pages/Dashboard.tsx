@@ -407,6 +407,36 @@ export default function Dashboard() {
     display: `${formatPersianCompact(item.revenue)} ریال`,
   }));
 
+  /*
+   * The technicians, then the work nobody owns.
+   *
+   * «تخصیص‌نیافته» goes last and in the warning tone rather than sorted in
+   * among the people by its count: it is the only row on the list that is a
+   * problem rather than a fact, and a shop reading down the list should find
+   * it at the bottom whether it holds one device or twenty.
+   *
+   * It is dropped entirely at zero. A row saying «۰ دستگاه» is an answer to
+   * a question nobody asked, and a bar of length zero in a list of bars
+   * reads as a rendering fault.
+   */
+  const workloadRows = [
+    ...stats.technician_load.technicians.map((technician) => ({
+      label: technician.name,
+      value: technician.count,
+      display: `${toPersianDigits(technician.count)} دستگاه`,
+    })),
+    ...(stats.technician_load.unassigned > 0
+      ? [
+          {
+            label: "تخصیص‌نیافته",
+            value: stats.technician_load.unassigned,
+            display: `${toPersianDigits(stats.technician_load.unassigned)} دستگاه`,
+            color: "var(--warning)",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div dir="rtl">
       {/*
@@ -524,24 +554,57 @@ export default function Dashboard() {
         icon={WrenchScrewdriverIcon}
         action={{ label: "همهٔ دستگاه‌ها", to: "/devices" }}
       >
-        <ChartCard
-          title="توزیع وضعیت دستگاه‌ها"
-          subtitle={`${toPersianDigits(stats.devices.total)} دستگاه در کارگاه`}
-        >
-          <DonutChart
-            slices={statusSlices}
-            centreLabel="کل دستگاه‌ها"
-            emptyMessage="هنوز دستگاهی ثبت نشده"
-          />
-          <ChartTable
-            caption="نمایش اعداد به‌صورت جدول"
-            columns={["وضعیت", "تعداد"]}
-            rows={statusSlices.map((slice) => [
-              slice.label,
-              toPersianDigits(slice.value),
-            ])}
-          />
-        </ChartCard>
+        {/*
+          Two cards, not one. The donut had the row to itself and a ring plus
+          its legend does not need nine hundred pixels — most of the card was
+          empty, and a chart with that much air around it reads as unfinished
+          rather than as spacious.
+
+          The pair answers two halves of one question: the ring says what
+          state the work is in, the list says whose bench it is on.
+        */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ChartCard
+            title="توزیع وضعیت دستگاه‌ها"
+            subtitle={`${toPersianDigits(stats.devices.total)} دستگاه در کارگاه`}
+          >
+            <DonutChart
+              slices={statusSlices}
+              centreLabel="کل دستگاه‌ها"
+              emptyMessage="هنوز دستگاهی ثبت نشده"
+            />
+            <ChartTable
+              caption="نمایش اعداد به‌صورت جدول"
+              columns={["وضعیت", "تعداد"]}
+              rows={statusSlices.map((slice) => [
+                slice.label,
+                toPersianDigits(slice.value),
+              ])}
+            />
+          </ChartCard>
+
+          <ChartCard
+            title="بار کاری تعمیرکارها"
+            subtitle={`${toPersianDigits(stats.technician_load.open_devices)} دستگاه در جریان`}
+            aside={
+              <Link
+                to="/personnel"
+                className="text-body-sm text-primary hover:underline"
+              >
+                پرسنل
+              </Link>
+            }
+          >
+            <BarList rows={workloadRows} emptyMessage="دستگاهی در جریان نیست" />
+            {workloadRows.length > 0 && (
+              <ChartTable
+                caption="نمایش اعداد به‌صورت جدول"
+                columns={["تعمیرکار", "دستگاه در جریان"]}
+                rows={workloadRows.map((row) => [row.label, row.display])}
+              />
+            )}
+          </ChartCard>
+        </div>
       </Section>
 
       <Section

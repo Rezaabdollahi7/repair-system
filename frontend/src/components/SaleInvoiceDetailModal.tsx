@@ -14,9 +14,6 @@ import SaleInvoicePreview from "./SaleInvoicePreview";
 import {
   XMarkIcon,
   TrashIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
   PrinterIcon,
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
@@ -24,67 +21,15 @@ import {
   PhoneIcon,
   CalendarIcon,
 } from "@heroicons/react/24/solid";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
-import type { Id, PaymentStatus, SaleInvoiceDetail } from "../types/api";
+import {
+  formatPersianCurrency,
+  formatPersianPhone,
+  toPersianDigits,
+} from "../utils/formatters";
+import type { Id, SaleInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
-
-interface BadgeStyle {
-  label: string;
-  color: string;
-  icon?: React.ComponentType<{ className?: string }>;
-}
-
-function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const map: Record<string, BadgeStyle> = {
-    paid: {
-      label: "پرداخت شده",
-      color: "bg-success-soft text-success-fg",
-      icon: CheckCircleIcon,
-    },
-    partial: {
-      label: "پرداخت ناقص",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ExclamationCircleIcon,
-    },
-    pending: {
-      label: "در انتظار",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ClockIcon,
-    },
-  };
-  const s = map[status] || {
-    label: status,
-    color: "bg-surface-alt text-text-secondary",
-  };
-  const Icon = s.icon;
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-body-sm font-medium flex items-center gap-1 w-fit ${s.color}`}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      {s.label}
-    </span>
-  );
-}
-
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-  highlight?: boolean;
-}
-
-function InfoRow({ label, value, highlight }: InfoRowProps) {
-  return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-body-sm text-text-secondary">{label}</span>
-      <span
-        className={`text-body-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
-      >
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
+import InfoRow from "./InfoRow";
+import PaymentStatusBadge from "./PaymentStatusBadge";
 
 interface SaleInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -171,7 +116,7 @@ export default function SaleInvoiceDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* هدر */}
@@ -209,7 +154,9 @@ export default function SaleInvoiceDetailModal({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowPreview(true)}
-                      className="px-3 py-1.5 sm:px-4 sm:py-2 bg-surface-alt text-text-primary rounded-field hover:bg-surface-alt flex items-center gap-2 text-body-sm"
+                      className="px-3 py-1.5 sm:px-4 sm:py-2 text-body-sm rounded-field border border-border bg-surface text-text-primary
+                      font-bold hover:bg-surface-alt hover:border-border-strong
+                      transition-colors cursor-pointer flex items-center gap-2"
                     >
                       <PrinterIcon className="w-4 h-4" />
                       چاپ
@@ -217,7 +164,9 @@ export default function SaleInvoiceDetailModal({
                     {isAtLeast("admin") && (
                       <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="px-3 py-1.5 sm:px-4 sm:py-2 bg-danger-fill text-on-status rounded-field hover:bg-danger-hover flex items-center gap-2 text-body-sm"
+                        className="px-3 py-1.5 sm:px-4 sm:py-2 text-body-sm rounded-field bg-danger-soft text-danger-fg font-bold
+                        border border-danger/25 hover:bg-danger-soft-hover
+                        transition-colors cursor-pointer flex items-center gap-2"
                       >
                         <TrashIcon className="w-4 h-4" />
                         حذف
@@ -256,7 +205,7 @@ export default function SaleInvoiceDetailModal({
                       شماره تماس
                     </label>
                     <p className="text-body-sm text-text-primary">
-                      {invoice.customer_phone || "—"}
+                      {formatPersianPhone(invoice.customer_phone)}
                     </p>
                   </div>
                   <div>

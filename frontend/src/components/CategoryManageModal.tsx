@@ -17,7 +17,7 @@ import {
 } from "@heroicons/react/24/solid";
 import ConfirmModal from "./ConfirmModal";
 
-import axios from "axios";
+import { errorText } from "../utils/errors";
 import type { Category } from "../types/api";
 import { modalPanel } from "../motion";
 
@@ -25,15 +25,6 @@ interface CategoryManageModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-}
-
-/** Shared by the three handlers; the server answers with { error } throughout. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
 }
 
 export default function CategoryManageModal({
@@ -138,7 +129,7 @@ export default function CategoryManageModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-lg"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-lg"
         dir="rtl"
       >
         {/* Header */}

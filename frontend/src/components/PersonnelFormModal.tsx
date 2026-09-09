@@ -133,7 +133,7 @@ export default function PersonnelFormModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-md"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-md"
         dir="rtl"
       >
         <div className="flex items-center justify-between p-4 border-b border-border">

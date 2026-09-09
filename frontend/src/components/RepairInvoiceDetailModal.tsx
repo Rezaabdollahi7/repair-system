@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import axios from "axios";
+import { errorText } from "../utils/errors";
 import {
   getRepairInvoice,
   deleteRepairInvoice,
@@ -16,9 +16,6 @@ import {
   XMarkIcon,
   TrashIcon,
   CheckCircleIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
-  DocumentTextIcon,
   XCircleIcon,
   PrinterIcon,
   CurrencyDollarIcon,
@@ -26,119 +23,21 @@ import {
   WrenchScrewdriverIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import {
+  formatPersianCurrency,
+  formatPersianPhone,
+  toPersianDigits,
+} from "../utils/formatters";
 import type {
   Id,
-  PaymentStatus,
   RepairInvoiceDetail,
   RepairInvoiceStatus,
 } from "../types/api";
 import { modalPanel } from "../motion";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
-
-interface BadgeStyle {
-  label: string;
-  color: string;
-  icon?: React.ComponentType<{ className?: string }>;
-}
-
-function StatusBadge({ status }: { status: RepairInvoiceStatus }) {
-  const map: Record<string, BadgeStyle> = {
-    draft: {
-      label: "پیش‌نویس",
-      color: "bg-surface-alt text-text-secondary",
-      icon: DocumentTextIcon,
-    },
-    issued: {
-      label: "صادر شده",
-      color: "bg-primary-soft text-primary",
-      icon: CheckCircleIcon,
-    },
-    paid: {
-      label: "پرداخت شده",
-      color: "bg-success-soft text-success-fg",
-      icon: CheckCircleIcon,
-    },
-    cancelled: {
-      label: "ابطال شده",
-      color: "bg-danger-soft text-danger-fg",
-      icon: XCircleIcon,
-    },
-  };
-  const s = map[status] || {
-    label: status,
-    color: "bg-surface-alt",
-  };
-  const Icon = s.icon;
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-body-sm font-medium flex items-center gap-1 w-fit ${s.color}`}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      {s.label}
-    </span>
-  );
-}
-
-function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const map: Record<string, BadgeStyle> = {
-    paid: {
-      label: "پرداخت شده",
-      color: "bg-success-soft text-success-fg",
-      icon: CheckCircleIcon,
-    },
-    partial: {
-      label: "پرداخت ناقص",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ExclamationCircleIcon,
-    },
-    pending: {
-      label: "در انتظار",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ClockIcon,
-    },
-  };
-  const s = map[status] || {
-    label: status,
-    color: "bg-surface-alt text-text-secondary",
-  };
-  const Icon = s.icon;
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-body-sm font-medium flex items-center gap-1 w-fit ${s.color}`}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      {s.label}
-    </span>
-  );
-}
-
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-  highlight?: boolean;
-}
-
-function InfoRow({ label, value, highlight = false }: InfoRowProps) {
-  return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-body-sm text-text-secondary">{label}</span>
-      <span
-        className={`text-body-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
-      >
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
+import InfoRow from "./InfoRow";
+import PaymentStatusBadge from "./PaymentStatusBadge";
+import RepairInvoiceStatusBadge from "./RepairInvoiceStatusBadge";
+import LineItemTypeChip from "./LineItemTypeChip";
 
 interface RepairInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -253,7 +152,7 @@ export default function RepairInvoiceDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
@@ -283,7 +182,7 @@ export default function RepairInvoiceDetailModal({
                   <span className="text-lg font-mono text-text-primary">
                     {invoice.invoice_number}
                   </span>
-                  <StatusBadge status={invoice.status} />
+                  <RepairInvoiceStatusBadge status={invoice.status} />
                   <PaymentStatusBadge status={invoice.payment_status} />
                 </div>
                 <div className="flex gap-2">
@@ -302,7 +201,9 @@ export default function RepairInvoiceDetailModal({
                   )}
                   <button
                     onClick={() => setShowPreview(true)}
-                    className="px-4 py-2 bg-surface-alt text-text-primary rounded-field hover:bg-surface-alt flex items-center gap-2"
+                    className="px-4 py-2 text-body-sm rounded-field border border-border bg-surface text-text-primary
+                      font-bold hover:bg-surface-alt hover:border-border-strong
+                      transition-colors cursor-pointer flex items-center gap-2"
                   >
                     <PrinterIcon className="w-4 h-4" />
                     چاپ
@@ -340,7 +241,7 @@ export default function RepairInvoiceDetailModal({
                             }}
                             className="text-primary hover:underline"
                           >
-                            {invoice.device_id}
+                            {toPersianDigits(invoice.device_id)}
                           </button>
                         }
                       />
@@ -361,7 +262,7 @@ export default function RepairInvoiceDetailModal({
                       />
                       <InfoRow
                         label="شماره تماس"
-                        value={invoice.customer_phone || "—"}
+                        value={formatPersianPhone(invoice.customer_phone)}
                       />
                     </div>
                   </div>
@@ -385,7 +286,9 @@ export default function RepairInvoiceDetailModal({
                         invoice.status !== "paid" && (
                           <button
                             onClick={() => setShowStatusConfirm("cancelled")}
-                            className="w-full px-4 py-2 bg-danger-soft text-danger-fg rounded-field hover:bg-danger-soft flex items-center justify-center gap-2"
+                            className="w-full px-4 py-2 bg-danger-soft text-danger-fg rounded-field
+                                       hover:bg-danger-soft-hover transition-colors
+                                       cursor-pointer flex items-center justify-center gap-2"
                           >
                             <XCircleIcon className="w-4 h-4" />
                             ابطال فاکتور
@@ -418,7 +321,7 @@ export default function RepairInvoiceDetailModal({
                             label="گارانتی"
                             value={
                               invoice.warranty_months > 0
-                                ? `${invoice.warranty_months} ماه`
+                                ? `${toPersianDigits(invoice.warranty_months)} ماه`
                                 : "بدون گارانتی"
                             }
                           />
@@ -522,15 +425,7 @@ export default function RepairInvoiceDetailModal({
                                   {index + 1}
                                 </td>
                                 <td className="px-4 py-3 text-body-sm">
-                                  <span
-                                    className={`text-body-xs px-2 py-1 rounded-full ${item.item_type === "inventory" ? "bg-success-soft text-success-fg" : item.item_type === "service" ? "bg-primary-soft text-primary" : "bg-primary-soft text-primary"}`}
-                                  >
-                                    {item.item_type === "inventory"
-                                      ? "انبار"
-                                      : item.item_type === "service"
-                                        ? "خدمت"
-                                        : "دلخواه"}
-                                  </span>
+                                  <LineItemTypeChip type={item.item_type} />
                                 </td>
                                 <td className="px-4 py-3 text-body-sm">
                                   {item.item_type === "inventory" ? (
@@ -578,7 +473,7 @@ export default function RepairInvoiceDetailModal({
                               >
                                 جمع کل:
                               </td>
-                              <td className="px-4 py-3 text-body-sm font-medium text-text-primary">
+                              <td className="px-4 py-3 text-body-sm font-medium text-text-primary whitespace-nowrap tabular-nums">
                                 {formatPersianCurrency(invoice.subtotal)} ریال
                               </td>
                             </tr>
@@ -590,8 +485,8 @@ export default function RepairInvoiceDetailModal({
                                 >
                                   تخفیف:
                                 </td>
-                                <td className="px-4 py-3 text-body-sm text-danger-fg">
-                                  -
+                                <td className="px-4 py-3 text-body-sm text-danger-fg whitespace-nowrap tabular-nums">
+                                  −
                                   {formatPersianCurrency(
                                     invoice.discount_amount,
                                   )}{" "}
@@ -605,9 +500,9 @@ export default function RepairInvoiceDetailModal({
                                   colSpan={7}
                                   className="px-4 py-3 text-left text-body-sm text-text-primary"
                                 >
-                                  مالیات ({invoice.tax_rate}%):
+                                  مالیات ({toPersianDigits(invoice.tax_rate)}٪):
                                 </td>
-                                <td className="px-4 py-3 text-body-sm text-primary">
+                                <td className="px-4 py-3 text-body-sm text-primary whitespace-nowrap tabular-nums">
                                   +{formatPersianCurrency(invoice.tax_amount)}{" "}
                                   ریال
                                 </td>
@@ -620,7 +515,7 @@ export default function RepairInvoiceDetailModal({
                               >
                                 مبلغ نهایی:
                               </td>
-                              <td className="px-4 py-3 text-body-sm font-bold text-primary">
+                              <td className="px-4 py-3 text-body-sm font-bold text-primary whitespace-nowrap tabular-nums">
                                 {formatPersianCurrency(invoice.total_amount)}{" "}
                                 ریال
                               </td>
@@ -691,7 +586,7 @@ export default function RepairInvoiceDetailModal({
       {showPaymentModal && invoice && (
         <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60]">
           <div
-            className="bg-surface border border-border rounded-card shadow-xl p-6 w-full max-w-md"
+            className="bg-surface border border-border rounded-panel shadow-xl p-6 w-full max-w-md"
             dir="rtl"
           >
             <h3 className="text-lg font-bold text-text-primary mb-4">

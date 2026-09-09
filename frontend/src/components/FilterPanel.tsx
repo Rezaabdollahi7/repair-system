@@ -385,7 +385,7 @@ export default function FilterPanel({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="relative bg-surface border border-border rounded-card shadow-xl w-full max-w-4xl my-2 sm:my-8"
+        className="relative bg-surface border border-border rounded-panel shadow-xl w-full max-w-4xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
@@ -480,7 +480,7 @@ export default function FilterPanel({
                             <button
                               key={opt.value}
                               onClick={() => toggleStatus(opt.value)}
-                              className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-primary-soft" : ""}`}
+                              className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-accent-soft" : ""}`}
                             >
                               <span
                                 className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-primary border-primary text-primary-fg" : "border-border"}`}
@@ -575,7 +575,7 @@ export default function FilterPanel({
                             <button
                               key={opt.value}
                               onClick={() => toggleInvoiceStatus(opt.value)}
-                              className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-primary-soft" : ""}`}
+                              className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-accent-soft" : ""}`}
                             >
                               <span
                                 className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-primary border-primary text-primary-fg" : "border-border"}`}
@@ -684,7 +684,7 @@ export default function FilterPanel({
                                 setCustomerSearch("");
                                 setCustomerResults([]);
                               }}
-                              className={`w-full text-right px-3 py-2.5 text-body-sm hover:bg-surface-alt transition-colors ${String(filters.customer_id) === String(c.id) ? "bg-primary-soft text-primary font-bold" : "text-text-primary"}`}
+                              className={`w-full text-right px-3 py-2.5 text-body-sm hover:bg-surface-alt transition-colors ${String(filters.customer_id) === String(c.id) ? "bg-accent-soft font-bold text-text-primary" : "text-text-primary"}`}
                             >
                               <div className="font-medium">{c.name}</div>
                               {c.phone && (
@@ -790,7 +790,7 @@ export default function FilterPanel({
                                   setPersonnelResults([]);
                                   setPersonnelDropdownOpen(false);
                                 }}
-                                className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-primary-soft" : ""}`}
+                                className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${isSelected ? "bg-accent-soft" : ""}`}
                               >
                                 <span
                                   className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}

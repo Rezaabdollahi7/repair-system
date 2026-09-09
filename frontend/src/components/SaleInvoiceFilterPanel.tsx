@@ -158,7 +158,7 @@ export default function SaleInvoiceFilterPanel({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="relative bg-surface border border-border rounded-card shadow-xl w-full max-w-2xl my-2 sm:my-8"
+        className="relative bg-surface border border-border rounded-panel shadow-xl w-full max-w-2xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* هدر */}
@@ -257,7 +257,7 @@ export default function SaleInvoiceFilterPanel({
                             key={opt.value}
                             onClick={() => togglePaymentStatus(opt.value)}
                             className={`w-full text-right px-3 py-2.5 text-body-sm flex items-center gap-3 hover:bg-surface-alt transition-colors ${
-                              isSelected ? "bg-primary-soft" : ""
+                              isSelected ? "bg-accent-soft" : ""
                             }`}
                           >
                             <span

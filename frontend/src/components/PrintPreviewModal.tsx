@@ -70,7 +70,7 @@ export default function PrintPreviewModal({
         exit="exit"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth }}
-        className="bg-surface border border-border rounded-card shadow-xl w-full
+        className="bg-surface border border-border rounded-panel shadow-xl w-full
                    max-h-[90vh] overflow-hidden flex flex-col"
         dir="rtl"
         role="dialog"

@@ -223,7 +223,7 @@ export default function CustomerDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-3xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-3xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import axios from "axios";
+import { errorText } from "../utils/errors";
 import {
   getItem,
   deleteItem,
@@ -23,15 +23,7 @@ import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
 import type { Id, InventoryTransaction, Item } from "../types/api";
 import { modalPanel } from "../motion";
 import { stockStatusOf } from "../utils/stockStatus";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
+import InfoRow from "./InfoRow";
 
 interface QuickModalProps {
   isOpen: boolean;
@@ -351,25 +343,6 @@ function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
   );
 }
 
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-  highlight?: boolean;
-}
-
-function InfoRow({ label, value, highlight = false }: InfoRowProps) {
-  return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-body-sm text-text-secondary">{label}</span>
-      <span
-        className={`text-body-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
-      >
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
-
 // ─── Main Component ────────────────────────────────────────────
 interface ItemDetailModalProps {
   itemId?: Id | null;
@@ -440,7 +413,7 @@ export default function ItemDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-8"
         dir="rtl"
       >
         {/* Header */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import axios from "axios";
+import { errorText } from "../utils/errors";
 import {
   createSaleInvoice,
   updateSaleInvoice,
@@ -35,15 +35,7 @@ import type {
   SaleInvoiceCreateBody,
 } from "../types/api";
 import { modalPanel } from "../motion";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
+import LineItemTypeChip from "./LineItemTypeChip";
 
 const UNIT_OPTIONS = [
   { value: "عدد", label: "عدد" },
@@ -157,7 +149,7 @@ function QuickCustomerModal({
   return (
     <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div
-        className="bg-surface border border-border rounded-card shadow-xl p-4 sm:p-6 w-full max-w-md"
+        className="bg-surface border border-border rounded-panel shadow-xl p-4 sm:p-6 w-full max-w-md"
         dir="rtl"
       >
         <h3 className="text-base sm:text-lg font-bold text-text-primary mb-3 sm:mb-4">
@@ -589,7 +581,7 @@ export default function SaleInvoiceFormModal({
   if (loadingInvoice) {
     return (
       <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
-        <div className="bg-surface border border-border rounded-card shadow-xl p-8">
+        <div className="bg-surface border border-border rounded-panel shadow-xl p-8">
           <div className="text-center py-4 text-text-primary" dir="rtl">
             در حال بارگذاری فاکتور...
           </div>
@@ -604,7 +596,7 @@ export default function SaleInvoiceFormModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-7xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* هدر مودال */}
@@ -656,7 +648,9 @@ export default function SaleInvoiceFormModal({
                     <button
                       type="button"
                       onClick={() => setShowCustomerModal(true)}
-                      className="px-3 py-2 bg-success-soft text-success-fg rounded-field hover:bg-success-soft shrink-0"
+                      className="px-3 py-2 bg-success-soft text-success-fg rounded-field
+                                 hover:bg-success-soft-hover transition-colors
+                                 cursor-pointer shrink-0"
                       title="ثبت سریع مشتری"
                     >
                       <UserPlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -751,7 +745,7 @@ export default function SaleInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("inventory")}
-                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-soft text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         از انبار
@@ -759,7 +753,7 @@ export default function SaleInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("custom")}
-                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-soft text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         دلخواه
@@ -794,11 +788,7 @@ export default function SaleInvoiceFormModal({
                             <div className="grid grid-cols-12 gap-2 items-center">
                               {/* نوع آیتم */}
                               <div className="col-span-1">
-                                <span className="text-body-xs px-1.5 py-0.5 rounded-full bg-primary-soft text-primary whitespace-nowrap">
-                                  {item.item_type === "inventory"
-                                    ? "انبار"
-                                    : "دلخواه"}
-                                </span>
+                                <LineItemTypeChip type={item.item_type} />
                               </div>
 
                               {/* شرح / انتخاب کالا */}

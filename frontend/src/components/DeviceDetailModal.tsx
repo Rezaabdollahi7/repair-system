@@ -20,24 +20,8 @@ import LoadingSpinner from "./LoadingSpinner";
 import type { Device, Id, ListedDeviceImage } from "../types/api";
 import { modalPanel } from "../motion";
 import DeviceStatusBadge from "./DeviceStatusBadge";
-
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-}
-
-function InfoRow({ label, value }: InfoRowProps) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-border pb-2 sm:pb-3 mb-2 sm:mb-3 last:border-0">
-      <span className="text-body-xs sm:text-body-sm text-text-secondary mb-1 sm:mb-0">
-        {label}
-      </span>
-      <span className="text-body-sm sm:text-base text-text-primary font-medium break-words">
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
+import InfoRow from "./InfoRow";
+import { formatPersianPhone } from "../utils/formatters";
 
 interface SectionTitleProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -145,7 +129,7 @@ export default function DeviceDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-4xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-4xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
@@ -260,7 +244,10 @@ export default function DeviceDetailModal({
                   <SectionTitle icon={UserIcon} title="اطلاعات مشتری" />
                   <div className="space-y-1">
                     <InfoRow label="نام مشتری" value={device.customer_name} />
-                    <InfoRow label="شماره تماس" value={device.customer_phone} />
+                    <InfoRow
+                      label="شماره تماس"
+                      value={formatPersianPhone(device.customer_phone)}
+                    />
                   </div>
                 </div>
 

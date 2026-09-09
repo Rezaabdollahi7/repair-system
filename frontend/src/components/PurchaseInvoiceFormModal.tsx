@@ -1,7 +1,7 @@
 // src/components/PurchaseInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import axios from "axios";
+import { errorText } from "../utils/errors";
 import { createPurchaseInvoice, getItems, createItem } from "../api";
 import toast from "react-hot-toast";
 import {
@@ -19,15 +19,6 @@ import type {
 } from "../types/api";
 import type { SelectOption, SelectValue } from "./SearchableSelect";
 import { modalPanel } from "../motion";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
 
 /** An option carrying the item's own price, so picking one prefills it. */
 interface ItemOption extends SelectOption {
@@ -109,7 +100,7 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
   return (
     <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div
-        className="bg-surface border border-border rounded-card shadow-xl p-4 sm:p-6 w-full max-w-md"
+        className="bg-surface border border-border rounded-panel shadow-xl p-4 sm:p-6 w-full max-w-md"
         dir="rtl"
       >
         <h3 className="text-base sm:text-lg font-bold text-text-primary mb-3 sm:mb-4">
@@ -355,7 +346,7 @@ export default function PurchaseInvoiceFormModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">

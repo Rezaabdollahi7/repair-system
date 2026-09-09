@@ -187,10 +187,17 @@ export default function SearchableSelect({
                       // No divider between rows: the hover tint already
                       // separates them, and a line under every option in a
                       // sixty-row list reads as a table.
+                      //
+                      // The selected row is the accent rather than
+                      // `bg-primary-soft`, which is what it was: --primary-soft
+                      // and --surface-alt are both var(--sand-100), so the
+                      // chosen option was drawn in exactly the colour the row
+                      // under the cursor gets, and only its bold weight told
+                      // them apart.
                       className={`w-full flex items-start justify-between gap-2 text-right
                                   px-3 py-2 rounded-field text-body-sm transition-colors cursor-pointer ${
                                     selected
-                                      ? "bg-primary-soft text-primary font-bold"
+                                      ? "bg-accent-soft font-bold text-text-primary"
                                       : "text-text-primary hover:bg-surface-alt"
                                   }`}
                     >

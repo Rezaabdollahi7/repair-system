@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import axios from "axios";
+import { errorText } from "../utils/errors";
 import {
   createRepairInvoice,
   updateRepairInvoice,
@@ -37,15 +37,7 @@ import type {
   RepairLineType,
 } from "../types/api";
 import { modalPanel } from "../motion";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
+import LineItemTypeChip from "./LineItemTypeChip";
 
 /** A line as the form holds it, before the server fills in the totals. */
 interface FormLine {
@@ -493,7 +485,7 @@ export default function RepairInvoiceFormModal({
   if (initialLoading) {
     return (
       <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
-        <div className="bg-surface border border-border rounded-card shadow-xl p-8">
+        <div className="bg-surface border border-border rounded-panel shadow-xl p-8">
           <div className="text-center py-4 text-text-primary" dir="rtl">
             در حال بارگذاری...
           </div>
@@ -508,7 +500,7 @@ export default function RepairInvoiceFormModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-7xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
@@ -691,7 +683,7 @@ export default function RepairInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("service")}
-                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-soft text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         خدمت
@@ -699,7 +691,7 @@ export default function RepairInvoiceFormModal({
                       <button
                         type="button"
                         onClick={() => handleAddItem("custom")}
-                        className="bg-primary-soft text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-soft text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                       >
                         <PencilSquareIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         دلخواه
@@ -729,21 +721,7 @@ export default function RepairInvoiceFormModal({
                         >
                           <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-center">
                             <div className="col-span-1 sm:col-span-2">
-                              <span
-                                className={`text-body-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
-                                  item.item_type === "inventory"
-                                    ? "bg-success-soft text-success-fg"
-                                    : item.item_type === "service"
-                                      ? "bg-primary-soft text-primary"
-                                      : "bg-primary-soft text-primary"
-                                }`}
-                              >
-                                {item.item_type === "inventory"
-                                  ? "انبار"
-                                  : item.item_type === "service"
-                                    ? "خدمت"
-                                    : "دلخواه"}
-                              </span>
+                              <LineItemTypeChip type={item.item_type} />
                             </div>
 
                             <div className="col-span-7 sm:col-span-4">

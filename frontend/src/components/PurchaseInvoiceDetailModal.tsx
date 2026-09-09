@@ -13,72 +13,13 @@ import ConfirmModal from "./ConfirmModal";
 import {
   XMarkIcon,
   TrashIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationCircleIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
 import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
-import type { Id, PaymentStatus, PurchaseInvoiceDetail } from "../types/api";
+import type { Id, PurchaseInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
-
-interface BadgeStyle {
-  label: string;
-  color: string;
-  icon?: React.ComponentType<{ className?: string }>;
-}
-
-function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const map: Record<string, BadgeStyle> = {
-    paid: {
-      label: "پرداخت شده",
-      color: "bg-success-soft text-success-fg",
-      icon: CheckCircleIcon,
-    },
-    partial: {
-      label: "پرداخت ناقص",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ExclamationCircleIcon,
-    },
-    pending: {
-      label: "در انتظار",
-      color: "bg-warning-soft text-warning-fg",
-      icon: ClockIcon,
-    },
-  };
-  const s = map[status] || {
-    label: status,
-    color: "bg-surface-alt text-text-secondary",
-  };
-  const Icon = s.icon;
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-body-sm font-medium flex items-center gap-1 w-fit ${s.color}`}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      {s.label}
-    </span>
-  );
-}
-
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-  highlight?: boolean;
-}
-
-function InfoRow({ label, value, highlight }: InfoRowProps) {
-  return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-body-sm text-text-secondary">{label}</span>
-      <span
-        className={`text-body-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
-      >
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
+import InfoRow from "./InfoRow";
+import PaymentStatusBadge from "./PaymentStatusBadge";
 
 interface PurchaseInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -167,7 +108,7 @@ export default function PurchaseInvoiceDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-6xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}

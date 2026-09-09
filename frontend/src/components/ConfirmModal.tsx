@@ -86,7 +86,7 @@ export default function ConfirmModal({
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="relative bg-surface border border-border rounded-card w-full max-w-md shadow-xl"
+            className="relative bg-surface border border-border rounded-panel w-full max-w-md shadow-xl"
             dir="rtl"
           >
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">

@@ -429,7 +429,7 @@ export default function DeviceFormModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-card shadow-xl w-full max-w-5xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-5xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
@@ -528,7 +528,10 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewCustomer(true)}
-                    className="px-3 py-2 text-body-sm bg-primary-soft text-primary rounded-card hover:opacity-80 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-body-sm font-bold rounded-field border border-border
+                             bg-surface text-text-primary hover:bg-surface-alt
+                             hover:border-border-strong transition-colors
+                             cursor-pointer whitespace-nowrap"
                   >
                     + جدید
                   </button>
@@ -702,7 +705,10 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewDeviceName(true)}
-                    className="px-3 py-2 text-body-sm bg-primary-soft text-primary rounded-card hover:opacity-80 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-body-sm font-bold rounded-field border border-border
+                             bg-surface text-text-primary hover:bg-surface-alt
+                             hover:border-border-strong transition-colors
+                             cursor-pointer whitespace-nowrap"
                   >
                     + جدید
                   </button>
@@ -788,7 +794,10 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewBrand(true)}
-                    className="px-3 py-2 text-body-sm bg-primary-soft text-primary rounded-card hover:opacity-80 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-body-sm font-bold rounded-field border border-border
+                             bg-surface text-text-primary hover:bg-surface-alt
+                             hover:border-border-strong transition-colors
+                             cursor-pointer whitespace-nowrap"
                   >
                     + جدید
                   </button>

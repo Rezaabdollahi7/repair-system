@@ -245,6 +245,7 @@
   --success: var(--success-base);
   --success-strong-fg: var(--success-strong);
   --success-soft: var(--success-tint);
+  --success-soft-hover: #d8f0e1;
   --warning: var(--warning-base);
   --warning-strong-fg: var(--warning-strong);
   --warning-soft: var(--warning-tint);
@@ -252,6 +253,7 @@
   --danger-hover: var(--error-strong);
   --danger-strong-fg: var(--error-strong);
   --danger-soft: var(--error-tint);
+  --danger-soft-hover: #fbe2de;
   --info: var(--info-base);
   --info-strong-fg: var(--info-strong);
   --info-soft: var(--info-tint);
@@ -360,6 +362,7 @@
   --success: #4ade80;
   --success-strong-fg: #86efac;
   --success-soft: #16301f;
+  --success-soft-hover: #1d4029;
   --warning: #fbbf24;
   --warning-strong-fg: #fcd34d;
   --warning-soft: #33270c;
@@ -367,6 +370,7 @@
   --danger-hover: #fca5a5;
   --danger-strong-fg: #fca5a5;
   --danger-soft: #351b1a;
+  --danger-soft-hover: #452321;
   --info: #22d3ee;
   --info-strong-fg: #67e8f9;
   --info-soft: #123339;
@@ -497,6 +501,7 @@
   --color-success: var(--success);
   --color-success-fg: var(--success-strong-fg);
   --color-success-soft: var(--success-soft);
+  --color-success-soft-hover: var(--success-soft-hover);
   --color-warning: var(--warning);
   --color-warning-fg: var(--warning-strong-fg);
   --color-warning-soft: var(--warning-soft);
@@ -504,6 +509,7 @@
   --color-danger-hover: var(--danger-hover);
   --color-danger-fg: var(--danger-strong-fg);
   --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-hover: var(--danger-soft-hover);
   --color-info: var(--info);
   --color-info-fg: var(--info-strong-fg);
   --color-info-soft: var(--info-soft);

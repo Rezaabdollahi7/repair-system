@@ -62,8 +62,28 @@ export const PAYMENT_STATUSES: InvoiceStatus<PaymentStatus>[] = [
   },
 ];
 
+/**
+ * A voided repair invoice, which owes nothing.
+ *
+ * Deliberately outside `PAYMENT_STATUSES`: that list is what the filter chips
+ * are built from, and «ابطال شده» is not a payment state a shop filters by —
+ * it is the invoice's own status, and the status filter already offers it.
+ * This entry exists so the lookup has a word for the value rather than
+ * printing the raw key, and it is neutral rather than red because there is
+ * nothing here to act on.
+ */
+const CANCELLED_PAYMENT: InvoiceStatus = {
+  key: "cancelled",
+  label: "ابطال شده",
+  color: "var(--text-muted)",
+  tone: NEUTRAL_TONE,
+};
+
 const PAYMENT_BY_KEY: Map<string, InvoiceStatus> = new Map(
-  PAYMENT_STATUSES.map((status) => [status.key, status]),
+  [...PAYMENT_STATUSES, CANCELLED_PAYMENT].map((status) => [
+    status.key,
+    status,
+  ]),
 );
 
 export function paymentStatusOf(key: string): InvoiceStatus {
@@ -75,6 +95,23 @@ export function paymentStatusOf(key: string): InvoiceStatus {
       tone: NEUTRAL_TONE,
     }
   );
+}
+
+/**
+ * What a repair invoice still owes.
+ *
+ * A cancelled invoice owes nothing, whatever the difference between its two
+ * amounts happens to be — those stay on the row as the historical record.
+ * Reading the subtraction directly is what made a voided invoice show a
+ * balance the shop had no way to collect.
+ */
+export function repairOutstanding(invoice: {
+  status: string;
+  total_amount: number;
+  paid_amount: number;
+}): number {
+  if (invoice.status === "cancelled") return 0;
+  return invoice.total_amount - invoice.paid_amount;
 }
 
 /**

@@ -28,6 +28,8 @@ import { SERIES } from "./chartSeries";
  * reasons: that is when a shop discovers a job cannot be saved, and putting
  * it last left the reserved red adjacent to the gold of `pending` where the
  * ring closes, a pair that fails the colour-blindness check.
+ *
+ * The slots the first two read are not 1 and 2 — see the note on the list.
  */
 export interface DeviceStatus {
   key: string;
@@ -36,9 +38,20 @@ export interface DeviceStatus {
   color: string;
 }
 
+/*
+ * The first two take slots 2 and 1, in that order, rather than 1 and 2.
+ *
+ * The ring's colour *sequence* is what was validated, not its slot numbers,
+ * and when the palette swapped slots 1 and 2 — so charts would lead with the
+ * blue instead of the gold — following the numbers here would have changed
+ * the sequence and broken it in two places at once: the reserved red landed
+ * beside the gold (ΔE 3.1 deutan), and the blue landed beside the closing
+ * cyan (ΔE 11.4 with normal vision). Reading the slots in the other order
+ * reproduces the sequence that passes.
+ */
 export const DEVICE_STATUSES: DeviceStatus[] = [
-  { key: "pending", label: "در انتظار بررسی", color: SERIES[0] },
-  { key: "diagnosing", label: "در حال بررسی", color: SERIES[1] },
+  { key: "pending", label: "در انتظار بررسی", color: SERIES[1] },
+  { key: "diagnosing", label: "در حال بررسی", color: SERIES[0] },
   /*
    * The one state that takes a reserved colour rather than a series slot:
    * a job that cannot be repaired is an outcome, not another step, and it is

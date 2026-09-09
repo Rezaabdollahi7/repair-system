@@ -165,8 +165,7 @@ export default function Subscription() {
   return (
     <div dir="rtl" className="space-y-4">
       <header>
-        <h1 className="text-headline-md font-bold text-text-primary">اشتراک</h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           وضعیت اعتبار کارگاه و تمدید آن
         </p>
       </header>

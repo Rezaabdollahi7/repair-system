@@ -40,7 +40,7 @@ interface StockFilters {
 /**
  * One of the four figures above the table.
  *
- * `accent` is the brand yellow and is used once — on the total value, which
+ * `accent` is the brand and is used once — on the total value, which
  * is the number a shop opens this report for. The other three are neutral
  * cards with a coloured dot, rather than three fully tinted panels: a row of
  * solid warning-and-danger blocks read as an alarm even when the counts were
@@ -189,10 +189,7 @@ export default function StockReport() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <h1 className="text-headline-md font-bold text-text-primary">
-          گزارش موجودی انبار
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {loading
             ? "در حال بارگذاری…"
             : `${toPersianDigits(rows.length)} کالا در این گزارش`}

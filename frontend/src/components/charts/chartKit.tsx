@@ -29,7 +29,13 @@ const CARD_TONE: Record<NonNullable<ChartCardProps["tone"]>, string> = {
   // than inherited, because --text-primary follows the theme and on the light
   // theme it would put near-black text on a near-black card — which is
   // exactly what happened the first time this card was drawn.
-  ink: "bg-panel-ink border-panel-ink-border [--text-primary:#f7f5ef] [--text-secondary:#b9b5ab] [--text-muted:#9c9890] [--chart-track:var(--panel-ink-track)]",
+  //
+  // --accent is overridden for the same reason. The light theme's accent is a
+  // deep blue meant to carry white text, and on this near-black panel it
+  // measures 2.55:1 — the figure inside this card was drawn in it, and it
+  // came out barely there. Inside the panel the accent is the dark theme's
+  // lighter step, whichever theme is on outside.
+  ink: "bg-panel-ink border-panel-ink-border [--text-primary:#f1f3f8] [--text-secondary:#b4b9c6] [--text-muted:#969ba8] [--accent:#6ea8fa] [--accent-hover:#8ec0fc] [--accent-fg:#2d3038] [--chart-track:var(--panel-ink-track)]",
   accent: "bg-accent border-accent-border text-accent-fg",
 };
 

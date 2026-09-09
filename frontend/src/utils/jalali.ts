@@ -46,3 +46,35 @@ export function jalaliDayAndMonth(dayKey: string): string {
   const jalali = toJalaali(year, month, day);
   return `${persian(jalali.jd)} ${SHORT_MONTHS[jalali.jm - 1]}`;
 }
+
+/**
+ * Persian weekday names, indexed by `Date.getDay()` — so Sunday first, since
+ * that is what the platform returns, not because the week starts there.
+ */
+const WEEKDAYS = [
+  "یکشنبه",
+  "دوشنبه",
+  "سه‌شنبه",
+  "چهارشنبه",
+  "پنجشنبه",
+  "جمعه",
+  "شنبه",
+];
+
+/**
+ * Today, spelled out: «دوشنبه ۲۱ مرداد ۱۴۰۵».
+ *
+ * Read in *local* time, unlike the two above. Those parse a UTC day key the
+ * backend produced and have to match its boundary; this one answers "what
+ * day is it where the shop is", and a shop in Tehran opening the app at
+ * 02:00 would otherwise be told it was still yesterday.
+ */
+export function jalaliToday(now: Date = new Date()): string {
+  const jalali = toJalaali(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    now.getDate(),
+  );
+  const weekday = WEEKDAYS[now.getDay()];
+  return `${weekday} ${persian(jalali.jd)} ${SHORT_MONTHS[jalali.jm - 1]} ${persian(jalali.jy)}`;
+}

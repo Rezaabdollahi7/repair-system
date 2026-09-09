@@ -260,10 +260,7 @@ export default function ExportList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <h1 className="text-headline-md font-bold text-text-primary">
-          خروجی اطلاعات
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {loading
             ? "در حال بارگذاری…"
             : exports.length === 0

@@ -267,10 +267,7 @@ export default function Settings() {
        extra `px-2 sm:px-4` made this the one page inset from the others. */
     <div dir="rtl">
       <header className="mb-5">
-        <h1 className="text-headline-md font-bold text-text-primary">
-          تنظیمات
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {isSuperAdmin
             ? "ظاهر برنامه، اطلاعات کارگاه و پیش‌فرض‌های فاکتور"
             : "دسترسی محدود — فقط تنظیمات ظاهری"}

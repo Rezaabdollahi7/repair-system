@@ -201,7 +201,7 @@ function AssigneeBadge({ assignees }: { assignees: DeviceAssignee[] }) {
                   bg-surface-alt text-text-primary text-body-xs font-bold
                   whitespace-nowrap ${shared ? "cursor-help" : ""}`}
     >
-      {/* A step of the surface rather than the accent. Ten yellow discs down
+      {/* A step of the surface rather than the accent. Ten accent discs down
           the technician column pulled the eye there instead of to the status,
           and the accent is meant to be spent once per screen. */}
       <span
@@ -480,10 +480,7 @@ export default function DeviceList() {
       <header className="mb-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-headline-md font-bold text-text-primary">
-              دستگاه‌ها
-            </h1>
-            <p className="text-body-sm text-text-secondary mt-0.5">
+            <p className="text-body-sm text-text-secondary">
               {loading
                 ? "در حال بارگذاری…"
                 : filtering

@@ -16,88 +16,98 @@
    * of these or a step derived from one, and the derivations say why they had
    * to exist.
    *
-   *   --brand    #FFD85F  the yellow
-   *   --ink      #303030  near-black; text, and the dark surfaces
+   *   --brand    #2563EB  the blue
+   *   --ink      #2D3038  near-black; text, and the dark surfaces
    *   --paper    #FFFFFF  cards
-   *   --cream    #F9F6EE  the page behind them
-   *   --grey     #898989  the neutral
-   */
-  --brand: #ffd85f;
-  --ink: #303030;
-  --paper: #ffffff;
-  --cream: #f9f6ee;
-  --grey: #898989;
-
-  /*
-   * Brand steps. The yellow given is a fill, not a scale: it is bright enough
-   * that a tint of it disappears against cream and a shade of it turns olive
-   * before it turns dark. So only four steps, each with a job.
+   *   --mist     #F3F6FB  the page behind them
+   *   --grey     #838893  the neutral
    *
-   * --brand-tint is the softest wash that still reads as yellow on cream
-   * (a "selected row", a bar's empty track); --brand-soft is one step up for
-   * the same job on white; --brand-deep is the hover of a yellow fill.
+   * These were a warm set — a yellow brand on cream, with sand-toned
+   * neutrals — and the whole palette is now cool. The neutrals moved with
+   * the brand rather than staying put: a warm cream page under a blue
+   * accent reads as two palettes that met by accident, and the ground is
+   * most of what you actually see. Every step below keeps the contrast
+   * measurement its warm predecessor was chosen for, so nothing that was
+   * legible became less so.
    */
-  --brand-tint: #fdf6dd;
-  --brand-soft: #fbeaa8;
+  --brand: #2563eb;
+  --ink: #2d3038;
+  --paper: #ffffff;
+  --mist: #f3f6fb;
+  --grey: #838893;
+
+  /*
+   * Brand steps, each with a job.
+   *
+   * --brand-tint is the softest wash that still reads as blue on the page
+   * ground (a "selected row", a bar's empty track); --brand-soft is one step
+   * up for the same job on white; --brand-deep is the hover of a blue fill.
+   */
+  --brand-tint: #eaf1fe;
+  --brand-soft: #cfe0fc;
   --brand-strong: var(--brand);
-  --brand-deep: #f2c53c;
+  --brand-deep: #1d4ed8;
 
   /*
-   * The yellow cannot be a text colour. #FFD85F on white is 1.35:1 — it is
-   * invisible, not merely low-contrast — so anywhere the brand has to be
-   * *written* rather than *filled*, this gold stands in: 5.07:1 on white,
-   * 4.7:1 on cream. It is the same hue family, darkened until it is legible.
+   * The blue can be a text colour, which the yellow could not: #2563EB is
+   * 5.17:1 on white and 4.77:1 on the page ground, where #FFD85F measured
+   * 1.35:1 and needed a separate gold invented for it. This darker step
+   * exists anyway, for writing on the brand's own tints where the fill
+   * colour would sit too close to its wash — 6.88:1 on white.
    */
-  --brand-text: #8a6a00;
+  --brand-text: #1b52c4;
 
   /*
-   * Ink steps. The interface's interactive colour is the ink, not the yellow —
-   * a dark pill for the active nav item, a dark button, dark links — with the
-   * yellow reserved for highlight and for data. That is how the reference
-   * design actually works, and it is also the only arrangement in which the
-   * app's existing `text-primary` / `bg-primary` classes stay legible: white
-   * on ink is 13.2:1, ink on white is the same, and a yellow `--primary`
-   * would have made unreadable text of every link on every page.
+   * Ink steps. The interface's pressable colour is the ink, not the brand —
+   * a dark button, dark links — with the brand kept for emphasis: the active
+   * nav item, a selected row. That arrangement was forced when the brand was
+   * a yellow, because `--primary` feeds every `text-primary` in the app and
+   * a yellow one would have made unreadable text of every link on every
+   * page. The blue would survive as a text colour, but the split is worth
+   * keeping on its own merits: when everything pressable is the brand,
+   * nothing stands out, and the emphasis colour has no work left to do.
+   * White on ink is 13.2:1, ink on white the same.
    */
-  --ink-900: #1c1c1c;
-  --ink-800: #262626;
+  --ink-900: #1a1c21;
+  --ink-800: #23252c;
   --ink-700: var(--ink);
-  --ink-600: #3d3d3d;
-  --ink-500: #4a4a4a;
+  --ink-600: #3a3e47;
+  --ink-500: #474b55;
 
   /*
    * Neutral steps, and the one place this palette has to depart from the five
    * tones it was given.
    *
-   * #898989 measures 3.50:1 on white and 3.24:1 on cream. That is enough for
-   * a border, an icon or a 24px number, and short of the 4.5:1 body text
-   * needs — and #898989 is exactly the tone every hint, placeholder and
+   * #838893 measures 3.55:1 on white and 3.28:1 on the page ground. That is
+   * enough for a border, an icon or a 24px number, and short of the 4.5:1
+   * body text needs — and it is exactly the tone every hint, placeholder and
    * empty-state line in this app is written in. So the grey keeps its job as
-   * the decorative neutral, and two darker steps carry the text: 7.0:1 and
-   * 5.1:1 on white, 6.5:1 and 4.7:1 on cream. The hierarchy between them
-   * survives; it is just readable now.
+   * the decorative neutral, and two darker steps carry the text: 6.9:1 and
+   * 4.9:1 on white, 6.4:1 and 4.5:1 on the ground. The hierarchy between
+   * them survives; it is just readable.
    */
-  --grey-text: #575757;
-  --grey-text-soft: #6e6e6e;
+  --grey-text: #545a69;
+  --grey-text-soft: #6b7180;
   --grey-line: var(--grey);
 
-  /* Warm neutrals, mixed toward the cream rather than pure greys — a cool
-     #f5f5f5 next to #F9F6EE reads as a stain rather than a second surface. */
-  --sand-50: var(--cream);
-  --sand-100: #f4f0e6;
-  --sand-200: #ece7da;
-  --sand-300: #ded8c9;
-  --sand-400: #c9c2b1;
+  /* Neutrals mixed toward the ground rather than pure greys — a flat
+     #f5f5f5 next to #F3F6FB reads as a stain rather than a second surface. */
+  --mist-50: var(--mist);
+  --mist-100: #e9eef7;
+  --mist-200: #dde5f1;
+  --mist-300: #c9d4e6;
+  --mist-400: #aebbd0;
 
   /*
    * Semantic, three steps each: a strong shade for text, a base for fills and
    * dots, a soft one for badge backgrounds. The base alone is not enough —
    * #22c55e as text on white is about 2.3:1, well under AA.
    *
-   * These stay in their own hues. The warning tone in particular is *not*
-   * the brand yellow: a low-stock banner and a highlighted KPI have to be
-   * distinguishable, and painting both #FFD85F would have made the alert
-   * read as decoration.
+   * These stay in their own hues, and that mattered more when the brand was
+   * a yellow: the warning tone had to be kept distinct from it so a
+   * low-stock banner did not read as decoration. With a blue brand the
+   * collision is gone, but the rule stands — a status colour earns its
+   * meaning by not being reachable from the brand.
    */
   --success-strong: #15803d;
   --success-base: #22c55e;
@@ -125,17 +135,25 @@
    * its own step at 3.1:1.
    */
   --field-border-light: var(--grey);
-  --field-border-dark: #6b6b6b;
+  --field-border-dark: #6d7280;
 
   /*
    * ── Chart series ──────────────────────────────────────────────────────
    *
    * Eight hues in a fixed order, assigned to series in sequence and never
-   * cycled. Slot 1 is the brand's gold — the yellow itself sits at OKLCH
-   * L 0.89, far above the 0.43–0.77 band a mark has to stay inside to be
-   * seen against white, so the series version of it is darkened until it
-   * clears 3:1 (#C08000, 3.06:1). The yellow keeps the jobs where it is a
-   * large fill with ink on top.
+   * cycled.
+   *
+   * Slots 1 and 2 are swapped from what they were, and that is the only
+   * change the brand's move to blue made here. The scale used to open on the
+   * gold, because the brand was gold — and with a blue brand a gold trend
+   * line and gold bars were the last of the yellow left on the screen,
+   * reading as leftovers rather than as data.
+   *
+   * The eight values are otherwise untouched: this is the series blue that
+   * was already slot 2, not the brand blue, so the emphasis colour and the
+   * data colour stay distinguishable. Reordering is not free — the order is
+   * exactly what guarantees adjacent separation — so the swapped sequence
+   * was re-validated in both themes before it landed.
    *
    * The set is validated, not chosen by eye: lightness band, chroma floor,
    * adjacent-pair separation under protanopia and deuteranopia, the
@@ -143,8 +161,8 @@
    * five (worst adjacent ΔE 8.5 protan, 17.9 normal-vision, all ≥ 3:1).
    * Re-run the check before changing any of them.
    */
-  --series-1: #c08000;
-  --series-2: #2e7bd6;
+  --series-1: #2e7bd6;
+  --series-2: #c08000;
   --series-3: #17a67c;
   --series-4: #ee6c4d;
   --series-5: #7c5cd6;
@@ -154,8 +172,8 @@
 
   /* The ground a bar or ring segment is missing from. Two steps: one for a
      chart sitting on white, one for a chart on a dark card. */
-  --chart-track: var(--sand-200);
-  --chart-grid: var(--sand-200);
+  --chart-track: var(--mist-200);
+  --chart-grid: var(--mist-200);
 
   /*
    * The one repair status that takes a reserved colour instead of a series
@@ -197,17 +215,17 @@
   color-scheme: light;
 
   /* سطوح — کارت سفید روی زمینهٔ کِرِم؛ برعکس تم قبلی که سفید روی خاکستری بود */
-  --bg: var(--cream);
+  --bg: var(--mist);
   --surface: var(--paper);
-  --surface-alt: var(--sand-100);
-  --surface-sunken: var(--sand-200);
+  --surface-alt: var(--mist-100);
+  --surface-sunken: var(--mist-200);
   --surface-raised: var(--paper);
 
-  --border: var(--sand-200);
-  --border-strong: var(--sand-300);
+  --border: var(--mist-200);
+  --border-strong: var(--mist-300);
   /* Only for inputs, selects and textareas — see the note in section ۱. */
   --border-field: var(--field-border-light);
-  --border-subtle: var(--sand-100);
+  --border-subtle: var(--mist-100);
 
   --text-primary: var(--ink);
   --text-secondary: var(--grey-text);
@@ -215,7 +233,7 @@
   --text-inverse: var(--paper);
 
   /*
-   * The ink, not the yellow — see the note on the ink steps above. Every
+   * The ink, not the brand — see the note on the ink steps above. Every
    * `bg-primary` in the app becomes a dark button with white text, and every
    * `text-primary` a dark link, which is what the reference design does and
    * what keeps the other pages legible while only the dashboard is redrawn.
@@ -223,23 +241,27 @@
   --primary: var(--ink-700);
   --primary-hover: var(--ink-900);
   --primary-active: #111111;
-  --primary-soft: var(--sand-100);
-  --primary-soft-hover: var(--sand-200);
-  --primary-border: var(--sand-300);
+  --primary-soft: var(--mist-100);
+  --primary-soft-hover: var(--mist-200);
+  --primary-border: var(--mist-300);
   --primary-fg: var(--paper);
 
   /*
-   * The yellow, as its own token. `--primary` is pressable; `--accent` is
-   * highlight and data: a KPI's fill, a selected row, the brand series in a
-   * chart. --accent-fg is what goes on top of it, and it is the ink — white
-   * on #FFD85F is 1.35:1, ink on it is 9.58:1.
+   * The blue, as its own token. `--primary` is pressable; `--accent` is
+   * emphasis: the active nav pill, a selected row, a KPI's fill.
+   *
+   * --accent-fg is what goes on top of it, and it is now the paper rather
+   * than the ink — white on #2563EB is 5.17:1, where white on the old
+   * #FFD85F was 1.35:1 and every accent fill had to carry a dark label.
+   * That inversion is the one behavioural change in this palette: a filled
+   * accent surface is light-on-dark now, not dark-on-light.
    */
   --accent: var(--brand);
   --accent-hover: var(--brand-deep);
   --accent-soft: var(--brand-soft);
   --accent-tint: var(--brand-tint);
   --accent-border: var(--brand-soft);
-  --accent-fg: var(--ink);
+  --accent-fg: var(--paper);
   --accent-text: var(--brand-text);
 
   --success: var(--success-base);
@@ -263,9 +285,9 @@
   --success-fill: var(--success-strong);
   --on-status: var(--paper);
 
-  /* سایه‌ها دو لایه‌اند: یک لبهٔ تیزِ نزدیک و یک پخشِ دور. رنگ‌شان از
-     خاکستریِ سرد به قهوه‌ایِ گرم عوض شده تا روی کِرِم خاکی به نظر نرسد. */
-  --shadow-color: 62 52 32;
+  /* سایه‌ها دو لایه‌اند: یک لبهٔ تیزِ نزدیک و یک پخشِ دور. رنگ‌شان کمی
+     آبی است، هم‌رنگِ زمینه، تا روی صفحهٔ سرد قهوه‌ای به نظر نرسد. */
+  --shadow-color: 32 42 66;
   --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.05);
   --shadow-sm:
     0 1px 2px rgb(var(--shadow-color) / 0.04),
@@ -280,16 +302,16 @@
     0 8px 16px rgb(var(--shadow-color) / 0.05),
     0 28px 56px rgb(var(--shadow-color) / 0.11);
 
-  --shadow-primary: 0 2px 8px rgb(48 48 48 / 0.2);
-  /* The yellow's own halo, for the accent buttons and the KPI card. */
-  --shadow-accent: 0 4px 14px rgb(255 216 95 / 0.45);
+  --shadow-primary: 0 2px 8px rgb(45 48 56 / 0.2);
+  /* The brand's own halo, for the accent buttons and the KPI card. */
+  --shadow-accent: 0 4px 14px rgb(37 99 235 / 0.28);
 
-  /* پنل برند صفحات ورود: از یاسیِ گرم به زردِ برند. */
+  /* پنل برند صفحات ورود: از آبیِ برند به آبیِ عمیق. */
   --brand-panel: linear-gradient(
     155deg,
-    var(--brand) 0%,
-    var(--brand-deep) 45%,
-    #e0a800 100%
+    #3b7bf0 0%,
+    var(--brand) 45%,
+    #12379a 100%
   );
 
   /* نمودارها روی سطح سفید می‌نشینند. */
@@ -299,14 +321,14 @@
    * The one dark panel per screen — the reference design's black card.
    *
    * A semantic token rather than --ink used directly, because in the dark
-   * theme a #303030 card sits on a #303030 surface and disappears. There it
+   * theme a #2D3038 card sits on a #2D3038 surface and disappears. There it
    * becomes the darkest step instead, so the panel still reads as a distinct
    * layer. The text on it is near-white in both themes, which is why the
    * card sets its own text tokens rather than inheriting them.
    */
   --panel-ink: var(--ink);
   --panel-ink-border: var(--ink);
-  --panel-ink-track: #4a4a48;
+  --panel-ink-track: #474b57;
 }
 
 [data-theme="dark"] {
@@ -314,24 +336,28 @@
 
   /*
    * The dark theme is the given ink, spread into a scale rather than used at
-   * one value: #303030 is the *surface*, with the page behind it darker and
+   * one value: #2D3038 is the *surface*, with the page behind it darker and
    * the raised layer lighter, so the three still separate. Pure black is
    * avoided for the same reason as before — on OLED it deletes the edges.
+   *
+   * These moved cool with the rest of the palette. The greys were warm, and
+   * warm greys under a blue accent are the same mismatch here as cream was
+   * in the light theme, just less visible.
    */
-  --bg: #1a1a19;
+  --bg: #1f2128;
   --surface: var(--ink-700);
   --surface-alt: var(--ink-600);
-  --surface-sunken: #141413;
+  --surface-sunken: #191b21;
   --surface-raised: var(--ink-600);
 
-  --border: #434343;
-  --border-strong: #565656;
+  --border: #414551;
+  --border-strong: #545a68;
   --border-field: var(--field-border-dark);
-  --border-subtle: #3a3a3a;
+  --border-subtle: #383c46;
 
-  --text-primary: #f5f2ea;
-  --text-secondary: #bdb9b0;
-  --text-muted: #9c9890;
+  --text-primary: #f1f3f8;
+  --text-secondary: #b8bcc8;
+  --text-muted: #969ba8;
   --text-inverse: var(--ink);
 
   /*
@@ -339,23 +365,25 @@
    * page, so the pressable surface becomes the near-white and the label
    * goes dark. Contrast is the same 13:1, just the other way round.
    */
-  --primary: #f5f2ea;
+  --primary: #f1f3f8;
   --primary-hover: var(--paper);
-  --primary-active: #e6e2d8;
-  --primary-soft: #3a3a38;
-  --primary-soft-hover: #464644;
-  --primary-border: #565654;
+  --primary-active: #dfe3ec;
+  --primary-soft: #363a44;
+  --primary-soft-hover: #424754;
+  --primary-border: #545a68;
   --primary-fg: var(--ink);
 
-  /* The yellow needs no adjusting here — 11:1 on this surface, and it is the
-     one colour that should look identical in both themes. */
-  --accent: var(--brand);
-  --accent-hover: #ffe28a;
-  --accent-soft: #4a3f1c;
-  --accent-tint: #3a3324;
-  --accent-border: #6b5a24;
+  /* The blue does need adjusting here, where the yellow did not: #2563EB on
+     this surface is 2.55:1, so a nav pill painted with it would be a dark
+     patch on a dark ground. The dark theme takes a lighter step — 5.43:1 —
+     and with it the fill goes back to carrying a dark label. */
+  --accent: #6ea8fa;
+  --accent-hover: #8ec0fc;
+  --accent-soft: #1e3356;
+  --accent-tint: #1b2a44;
+  --accent-border: #2f4d7e;
   --accent-fg: var(--ink);
-  --accent-text: #ffd85f;
+  --accent-text: #8ec0fc;
 
   /* پایه‌ها روشن‌تر و tintها به تیره برمی‌گردند — یک بج با پس‌زمینهٔ
      روشن روی صفحهٔ تیره مثل برچسب فسفری می‌زند. */
@@ -396,24 +424,29 @@
     0 28px 56px rgb(var(--shadow-color) / 0.55);
 
   --shadow-primary: 0 2px 8px rgb(0 0 0 / 0.4);
-  --shadow-accent: 0 4px 14px rgb(255 216 95 / 0.18);
+  --shadow-accent: 0 4px 14px rgb(110 168 250 / 0.2);
 
-  --brand-panel: linear-gradient(155deg, #4a3f1c 0%, #33301f 55%, #1f1e18 100%);
+  --brand-panel: linear-gradient(155deg, #1e3356 0%, #1d2740 55%, #171b26 100%);
 
   /*
    * The dark theme's own series steps, selected rather than flipped: the band
    * a mark has to sit in on a dark surface is OKLCH L 0.48–0.67, much
    * narrower than the light one, and every light-theme step is above it.
-   * Validated against #303030 — all eight inside the band, worst adjacent
-   * ΔE 8.8 deutan, 17.9 normal-vision, all ≥ 3:1.
+   * Re-validated against the cooled #2D3038 surface with slots 1 and 2
+   * swapped — all eight inside the band, worst adjacent ΔE 8.8 deutan,
+   * 17.2 normal-vision, all ≥ 3:1.
    *
-   * Slot 1 is the muddiest compromise in the palette and knowingly so: gold
-   * is intrinsically light, and forcing it under L 0.67 costs it most of its
-   * cheer. The brand yellow keeps every job where it is a fill rather than a
-   * thin mark, and there it stays #FFD85F in both themes.
+   * The dark theme could not simply take the light theme's new slot 1: the
+   * accent blue it would have wanted, #6EA8FA, sits at L 0.727, above this
+   * band's 0.67 ceiling. It takes #4A8FE0, which was already its slot 2.
+   *
+   * Slot 2 is now the muddiest step in the palette and knowingly so: gold is
+   * intrinsically light, and forcing it under L 0.67 costs it most of its
+   * cheer. It stays because the order is what makes adjacent pairs
+   * separable.
    */
-  --series-1: #b98a1b;
-  --series-2: #4a8fe0;
+  --series-1: #4a8fe0;
+  --series-2: #b98a1b;
   --series-3: #16a278;
   --series-4: #db5f3c;
   --series-5: #8e6ee8;
@@ -429,9 +462,9 @@
 
   /* Darker than --surface here, not lighter: the panel has to separate from
      the cards around it, and on this theme those are already the ink. */
-  --panel-ink: #141413;
-  --panel-ink-border: #2e2e2c;
-  --panel-ink-track: #3a3a38;
+  --panel-ink: #191b21;
+  --panel-ink-border: #2b2e37;
+  --panel-ink-track: #363a44;
 }
 
 /* -------------------------------------------------------------------
@@ -486,8 +519,9 @@
   --color-primary-border: var(--primary-border);
   --color-primary-fg: var(--primary-fg);
 
-  /* The yellow. `bg-accent text-accent-fg` is the highlight pair;
-     `text-accent-text` is the only legible way to *write* in the brand. */
+  /* The blue. `bg-accent text-accent-fg` is the emphasis pair — light on
+     dark in the light theme, dark on light in the dark one, since the fill
+     flips. `text-accent-text` is the step for writing in the brand. */
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);

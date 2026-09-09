@@ -589,6 +589,67 @@ describe("repairInvoiceController.changeStatus", () => {
 
     expect(db.__tx.item.update).not.toHaveBeenCalled();
   });
+
+  it("clears the payment obligation when cancelling", async () => {
+    db.repairInvoice.findFirst.mockResolvedValue({
+      status: "issued",
+      totalAmount: decimal(530000),
+      paidAmount: decimal(0),
+      items: lines,
+    });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 7 });
+
+    await controller.changeStatus(
+      mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
+      mockResponse(),
+    );
+
+    expect(db.__tx.repairInvoice.update.mock.calls[0][0].data).toEqual({
+      status: "cancelled",
+      paymentStatus: "cancelled",
+    });
+  });
+
+  it("clears it for a part-paid invoice too, and keeps the amounts", async () => {
+    db.repairInvoice.findFirst.mockResolvedValue({
+      status: "issued",
+      totalAmount: decimal(530000),
+      paidAmount: decimal(200000),
+      items: lines,
+    });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 7 });
+
+    await controller.changeStatus(
+      mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
+      mockResponse(),
+    );
+
+    // Not «partial», which is what it used to stay. And neither amount is
+    // touched: the 200,000 the customer handed over is still on the record.
+    const { data } = db.__tx.repairInvoice.update.mock.calls[0][0];
+    expect(data).toEqual({ status: "cancelled", paymentStatus: "cancelled" });
+    expect(data).not.toHaveProperty("paidAmount");
+    expect(data).not.toHaveProperty("totalAmount");
+  });
+
+  it("still marks a fully-paid invoice paid rather than cancelled", async () => {
+    db.repairInvoice.findFirst.mockResolvedValue({
+      status: "issued",
+      totalAmount: decimal(530000),
+      paidAmount: decimal(530000),
+      items: lines,
+    });
+
+    await controller.changeStatus(
+      mockRequest({ params: { id: 5 }, body: { status: "paid" } }, 3),
+      mockResponse(),
+    );
+
+    expect(db.__tx.repairInvoice.update.mock.calls[0][0].data).toEqual({
+      status: "paid",
+      paymentStatus: "paid",
+    });
+  });
 });
 
 describe("repairInvoiceController.addPayment", () => {

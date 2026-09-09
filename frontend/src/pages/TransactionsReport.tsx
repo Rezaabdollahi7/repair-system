@@ -120,10 +120,7 @@ export default function TransactionsReport() {
           <ArrowRightIcon className="w-4 h-4" aria-hidden="true" />
           بازگشت به داشبورد
         </Link>
-        <h1 className="text-headline-md font-bold text-text-primary">
-          آخرین تراکنش‌های انبار
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {loading
             ? "در حال بارگذاری…"
             : `${toPersianDigits(transactions.length)} حرکت اخیر موجودی`}

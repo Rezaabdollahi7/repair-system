@@ -428,6 +428,16 @@ export interface ToggleActiveResponse {
 /** Every invoice kind uses these three; the column is a plain string. */
 export type PaymentStatus = "paid" | "partial" | "pending";
 
+/**
+ * A repair invoice can also be voided, and then it owes nothing.
+ *
+ * Only repair invoices carry this fourth value — they are the only kind with
+ * a cancel action — so it is a separate union rather than a widening of
+ * `PaymentStatus`, which would let it through on a sale or a purchase where
+ * nothing can produce it.
+ */
+export type RepairPaymentStatus = PaymentStatus | "cancelled";
+
 /** GET /purchase-invoices — the list rows carry no items. */
 export interface PurchaseInvoice {
   id: number;
@@ -625,7 +635,7 @@ export interface RepairInvoice {
   tax_amount: number;
   total_amount: number;
   paid_amount: number;
-  payment_status: PaymentStatus;
+  payment_status: RepairPaymentStatus;
   warranty_months: number;
   warranty_until: string | null;
   technician_id: number | null;

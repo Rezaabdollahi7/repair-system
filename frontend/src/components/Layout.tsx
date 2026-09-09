@@ -28,6 +28,7 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
+import { jalaliToday } from "../utils/jalali";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -152,6 +153,18 @@ const MENU: MenuSection[] = [
   },
 ];
 
+/**
+ * Screens the nav does not list, by exact path. Keyed exactly rather than by
+ * prefix: these are leaves, and a prefix match here would shadow a future
+ * nav entry underneath the same path.
+ */
+const OFF_MENU: Record<string, { name: string; section: string }> = {
+  "/reports/transactions": {
+    name: "تراکنش‌های انبار",
+    section: "گزارش‌ها و حساب",
+  },
+};
+
 const COLLAPSE_KEY = "dofixo-sidebar-collapsed";
 
 function readCollapsed(): boolean {
@@ -220,10 +233,10 @@ function SidebarNav({
                     } ${active ? "" : "hover:bg-surface-alt"}`}
                   >
                     {/*
-                      The active pill is the brand yellow.
+                      The active pill is the brand.
                       -------------------------------------------------------
                       It was `bg-primary-soft`, and once the palette made
-                      that a warm off-white the indicator all but vanished
+                      that an off-white the indicator all but vanished
                       against the sidebar's own white — the item was legible
                       only by its dark icon square, which is a weak signal for
                       the one thing a sidebar always has to say.
@@ -232,7 +245,9 @@ function SidebarNav({
                       is that once: it is chrome rather than content, there is
                       exactly one active item, and "where am I" is the most
                       useful place in the app to put an unmissable colour.
-                      Ink on it measures 9.6:1.
+                      With the blue that pill carries a white label rather
+                      than a dark one — `text-accent-fg` follows the theme, so
+                      nothing here had to change for it.
                     */}
                     {active && (
                       <motion.span
@@ -398,6 +413,9 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Once per mount. See the note beside where it is rendered.
+  const today = useMemo(() => jalaliToday(), []);
+
   useEffect(() => {
     try {
       localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
@@ -449,6 +467,18 @@ export default function Layout() {
     sections.find((section) => section.items.some((i) => i === active))
       ?.title ?? null;
 
+  /**
+   * Pages that are not in the sidebar still need a name in the header.
+   *
+   * There is one: the stock-movements report, reached from the dashboard's
+   * «مشاهده همه» rather than the nav. With the pages' own <h1>s gone the
+   * header is the only thing that names a screen, and this one would have
+   * been titled «دوفیکسو» — the fallback for "no idea where we are".
+   */
+  const offMenu = OFF_MENU[location.pathname] ?? null;
+  const title = active?.name ?? offMenu?.name ?? "دوفیکسو";
+  const section = activeSection ?? offMenu?.section ?? null;
+
   const isDark = resolvedTheme === "dark";
 
   const brand = (
@@ -458,9 +488,11 @@ export default function Layout() {
         alt=""
         className="w-9 h-9 shrink-0 rounded-field bg-primary-soft p-1"
       />
-      <span className="font-bold text-text-primary truncate">
-        مدیریت تعمیرات
-      </span>
+      {/* The product's name, not a description of it. It read «مدیریت
+          تعمیرات» — which is what the app does, printed where its name
+          belongs, so the one place a shop would look to know what they had
+          opened said nothing. */}
+      <span className="font-bold text-text-primary truncate">دوفیکسو</span>
     </div>
   );
 
@@ -561,7 +593,7 @@ export default function Layout() {
           was nowhere to put anything that belongs to the shell.
         */}
         <header className="sticky top-0 z-20 h-16 bg-surface/85 backdrop-blur border-b border-border">
-          <div className="h-full flex items-center gap-3 px-3 sm:px-5">
+          <div className="relative h-full flex items-center gap-3 px-3 sm:px-5">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
@@ -573,58 +605,97 @@ export default function Layout() {
             </button>
 
             {/*
-              A breadcrumb, not a heading.
+              The page's title, and the only one.
               ---------------------------------------------------------------
-              This was an <h1> carrying the nav item's name — which was right
-              while the pages had no titles of their own. They all have one
-              now, and each says exactly what this said, so every screen was
-              announcing itself twice and shipping two <h1>s.
+              Every page used to print its own <h1> and a line of blurb under
+              it, which said what this says — with the sidebar's highlighted
+              item saying it a third time. So this is now the heading itself
+              rather than a muted breadcrumb beside a heading, at title size,
+              with the section it belongs to ahead of it.
 
-              The line stays because the header is sticky: once a long list is
-              scrolled, this is the only thing left on screen saying where you
-              are. Muted and at body size, so it reads as location rather than
-              competing with the page's own title.
+              It is an <h1>: there is exactly one per screen again, and it
+              lives in the shell because the shell is the thing that knows
+              which page is open.
             */}
-            <nav aria-label="مسیر" className="min-w-0 flex-1">
-              <p className="text-body-sm text-text-secondary truncate">
-                {activeSection && (
-                  <span className="hidden sm:inline text-text-muted">
-                    {activeSection}
-                    <span className="mx-1.5 text-text-muted" aria-hidden="true">
+            {/* Capped on desktop so a long name cannot run under the
+                centred date; below md the date is hidden and it may have the
+                whole row. */}
+            <nav aria-label="مسیر" className="min-w-0 flex-1 md:max-w-[32%]">
+              <h1 className="text-title-sm text-text-secondary truncate sm:text-title-md">
+                {section && (
+                  <span className="hidden text-body-sm text-text-muted sm:inline">
+                    {section}
+                    <span className="mx-1.5" aria-hidden="true">
                       ›
                     </span>
                   </span>
                 )}
-                <span className="font-bold text-text-primary">
-                  {active?.name ?? "مدیریت تعمیرات"}
-                </span>
-              </p>
+                <span className="font-bold text-text-primary">{title}</span>
+              </h1>
             </nav>
 
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={isDark ? "روشن کردن پوسته" : "تیره کردن پوسته"}
-              title={isDark ? "پوستهٔ روشن" : "پوستهٔ تیره"}
-              className="p-2.5 rounded-field text-text-secondary hover:text-text-primary
-                         hover:bg-surface-alt transition-colors cursor-pointer shrink-0"
-            >
-              <motion.span
-                key={resolvedTheme}
-                initial={reduceMotion ? false : { rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                transition={transition.base}
-                className="block"
-              >
-                {isDark ? (
-                  <SunIcon className="w-5 h-5" />
-                ) : (
-                  <MoonIcon className="w-5 h-5" />
-                )}
-              </motion.span>
-            </button>
+            {/*
+              Today's date, centred in the header.
+              ---------------------------------------------------------------
+              Absolutely positioned rather than a third flex child: the title
+              on one side and the controls on the other are different widths
+              on every page, so a flex-centred item would drift left and right
+              as you navigated. This stays put.
 
-            <UserMenu onLogout={handleLogout} />
+              `pointer-events-none` because it sits over the row — without it
+              the invisible box would swallow clicks meant for the title or
+              the theme button. Hidden below md, where there is no room for it
+              between the two.
+
+              Computed once per mount, not on a timer. A shop that leaves the
+              tab open past midnight sees yesterday until it next navigates,
+              which is a smaller lie than a clock that repaints the header
+              every second to be right about a date that changes once a day.
+            */}
+            <div
+              className="pointer-events-none absolute inset-0 hidden items-center
+                         justify-center md:flex"
+            >
+              <p className="text-body-sm font-bold text-text-secondary">
+                {today}
+              </p>
+            </div>
+
+            {/*
+              `ms-auto` pins these to the far end of the row.
+              ---------------------------------------------------------------
+              Without it they sit immediately after the title, which is
+              capped — so the free space fell to the *outside* of them and
+              they came to rest near the middle of the header, directly under
+              the centred date. The two overlapped and the date was
+              unreadable.
+            */}
+            <div className="ms-auto flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={isDark ? "روشن کردن پوسته" : "تیره کردن پوسته"}
+                title={isDark ? "پوستهٔ روشن" : "پوستهٔ تیره"}
+                className="p-2.5 rounded-field text-text-secondary hover:text-text-primary
+                           hover:bg-surface-alt transition-colors cursor-pointer shrink-0"
+              >
+                <motion.span
+                  key={resolvedTheme}
+                  initial={reduceMotion ? false : { rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  transition={transition.base}
+                  className="block"
+                >
+                  {isDark ? (
+                    <SunIcon className="w-5 h-5" />
+                  ) : (
+                    <MoonIcon className="w-5 h-5" />
+                  )}
+                </motion.span>
+              </button>
+
+              <UserMenu onLogout={handleLogout} />
+            </div>
           </div>
         </header>
 

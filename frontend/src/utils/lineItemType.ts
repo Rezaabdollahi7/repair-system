@@ -35,7 +35,10 @@ export interface LineItemType {
 
 export const LINE_ITEM_TYPES: LineItemType[] = [
   { key: "inventory", label: "انبار", color: SERIES[2] },
-  { key: "service", label: "خدمت", color: SERIES[1] },
+  // Slot 1, not slot 2. The palette later swapped those two, and following
+  // the number would have put the gold here — beside the orange of «دلخواه»,
+  // which is the one pair among these three that does not separate.
+  { key: "service", label: "خدمت", color: SERIES[0] },
   { key: "custom", label: "دلخواه", color: SERIES[3] },
 ];
 

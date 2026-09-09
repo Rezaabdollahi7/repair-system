@@ -73,9 +73,7 @@ export default function AuthLayout({
               alt=""
               className="w-9 h-9 rounded-field bg-primary-soft p-1"
             />
-            <span className="font-bold text-text-primary">
-              سیستم مدیریت تعمیرات
-            </span>
+            <span className="font-bold text-text-primary">دوفیکسو</span>
           </div>
 
           <button

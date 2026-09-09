@@ -44,7 +44,7 @@ interface DateRange {
 /**
  * One of the four figures above the table.
  *
- * `accent` is the brand yellow and is spent once — on net profit, which is
+ * `accent` is the brand and is spent once — on net profit, which is
  * what the page is called. The others are neutral cards; a row of four fully
  * tinted panels (which is what this was) reads as an alarm whatever the
  * numbers say, and two of them were `bg-primary-soft text-primary`, so after
@@ -211,10 +211,7 @@ export default function ProfitReport() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <h1 className="text-headline-md font-bold text-text-primary">
-          گزارش سود و زیان
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {loading
             ? "در حال بارگذاری…"
             : filtering

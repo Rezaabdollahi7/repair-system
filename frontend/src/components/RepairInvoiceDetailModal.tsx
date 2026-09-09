@@ -37,6 +37,7 @@ import { modalPanel } from "../motion";
 import InfoRow from "./InfoRow";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 import RepairInvoiceStatusBadge from "./RepairInvoiceStatusBadge";
+import { repairOutstanding } from "../utils/invoiceStatus";
 import LineItemTypeChip from "./LineItemTypeChip";
 
 interface RepairInvoiceDetailModalProps {
@@ -55,6 +56,13 @@ export default function RepairInvoiceDetailModal({
   const { openItemDetail, openDeviceDetail, openRepairInvoiceEdit } =
     useModal();
   const [invoice, setInvoice] = useState<RepairInvoiceDetail | null>(null);
+  /**
+   * What is still owed — zero on a cancelled invoice, whatever the two
+   * amounts say. Computed once here rather than subtracted at each of the
+   * four places that used to, which is how a voided invoice ended up
+   * showing a balance and offering a «ثبت پرداخت» button.
+   */
+  const outstanding = invoice ? repairOutstanding(invoice) : 0;
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -120,8 +128,7 @@ export default function RepairInvoiceDetailModal({
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0)
       return toast.error("مبلغ باید بیشتر از صفر باشد");
-    if (amount > invoice.total_amount - invoice.paid_amount)
-      return toast.error("مبلغ بیشتر از مانده است");
+    if (amount > outstanding) return toast.error("مبلغ بیشتر از مانده است");
     setSubmitting(true);
     try {
       await addRepairInvoicePayment(invoiceId, {
@@ -354,21 +361,18 @@ export default function RepairInvoiceDetailModal({
                             <span>مانده:</span>
                             <span
                               className={
-                                invoice.total_amount - invoice.paid_amount > 0
+                                outstanding > 0
                                   ? "text-danger-fg"
                                   : "text-success-fg"
                               }
                             >
-                              {formatPersianCurrency(
-                                invoice.total_amount - invoice.paid_amount,
-                              )}{" "}
-                              ریال
+                              {formatPersianCurrency(outstanding)} ریال
                             </span>
                           </div>
                         </div>
                         {(invoice.status === "issued" ||
                           invoice.status === "paid") &&
-                          invoice.total_amount - invoice.paid_amount > 0 && (
+                          outstanding > 0 && (
                             <button
                               onClick={() => setShowPaymentModal(true)}
                               className="w-full px-4 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover flex items-center justify-center gap-2"
@@ -603,7 +607,7 @@ export default function RepairInvoiceDetailModal({
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     min="1"
-                    max={invoice.total_amount - invoice.paid_amount}
+                    max={outstanding}
                     className="w-full border border-border-field rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     required
                     autoFocus

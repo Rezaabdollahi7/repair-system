@@ -67,10 +67,7 @@ export default function Referral() {
   return (
     <div dir="rtl" className="space-y-4">
       <header>
-        <h1 className="text-headline-md font-bold text-text-primary">
-          دعوت از دوستان
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {/* Persian digits, like every other figure in the app — these three
               counts and the two below were the last Latin numerals left. */}
           هر تعمیرگاهی که با کد شما ثبت‌نام کند و اشتراک بخرد،{" "}

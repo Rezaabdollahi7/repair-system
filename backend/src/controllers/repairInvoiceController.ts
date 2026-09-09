@@ -525,8 +525,25 @@ export const changeStatus = async (req: Request, res: Response) => {
       status === "cancelled" &&
       (invoice.status === "issued" || invoice.status === "paid");
 
+    /**
+     * A cancelled invoice owes nothing.
+     *
+     * This used to leave `paymentStatus` alone, so a voided invoice kept
+     * saying «در انتظار پرداخت» and kept reporting a balance the shop had no
+     * way to collect and no reason to. `totalAmount` and `paidAmount` are
+     * untouched — they are the historical record, and the payments table
+     * still holds every row — but the obligation is gone, and that is what
+     * `paymentStatus` describes.
+     *
+     * The column is a plain string rather than an enum, so the fourth value
+     * costs no migration. The dashboard's receivables already scoped
+     * themselves to `status: "issued"`, so those figures were never wrong;
+     * it was only the invoice's own display.
+     */
     let paymentStatus: string | null = null;
-    if (status === "paid") {
+    if (status === "cancelled") {
+      paymentStatus = "cancelled";
+    } else if (status === "paid") {
       paymentStatus = "paid";
     } else if (paidAmount > 0 && paidAmount < totalAmount) {
       paymentStatus = "partial";

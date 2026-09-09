@@ -23,7 +23,6 @@ import {
   formatPersianCurrency,
   toPersianDigits,
 } from "../utils/formatters";
-import { jalaliDayAndMonth } from "../utils/jalali";
 import { staggerContainer, staggerItem, transition } from "../motion";
 import { ChartCard, ChartTable } from "../components/charts/chartKit";
 import { SERIES } from "../utils/chartSeries";
@@ -41,15 +40,15 @@ import type {
 /**
  * A tile's tint.
  *
- * `accent` is the brand yellow and is spent once per screen — on the figure
- * the shop opens the page to see. A second yellow tile halves the emphasis of
- * the first, and a row of four makes the colour mean nothing at all.
+ * `accent` is the brand and is spent once per screen — on the figure the
+ * shop opens the page to see. A second accent tile halves the emphasis of the
+ * first, and a row of four makes the colour mean nothing at all.
  */
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 const TONE_ICON: Record<Tone, string> = {
   neutral: "bg-surface-alt text-text-secondary",
-  // On the yellow fill, so both are stated against the accent, not the page.
+  // On the accent fill, so both are stated against it rather than the page.
   accent: "bg-accent-fg/10 text-accent-fg",
   success: "bg-success-soft text-success-fg",
   warning: "bg-warning-soft text-warning-fg",
@@ -343,11 +342,6 @@ function DashboardSkeleton() {
 
 const TILE_GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4";
 
-/** Today's date as a Jalali `۲۳ شهریور`, from the same UTC key the API uses. */
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -417,9 +411,13 @@ export default function Dashboard() {
     <div dir="rtl">
       {/*
         The header sits on the page rather than in a card, with a soft wash of
-        the brand yellow behind it. The wash is the one purely decorative
-        thing on the screen and is kept to the header for that reason — under
-        a chart it would tint the marks and quietly break their contrast.
+        the brand behind it. The wash is the one purely decorative thing on
+        the screen and is kept to the header for that reason — under a chart
+        it would tint the marks and quietly break their contrast.
+
+        Its opacity dropped from 0.5 to 0.18 when the brand went from a pale
+        yellow to a saturated blue: the same wash that read as a warm hint
+        behind the greeting became a blue field with text sitting in it.
       */}
       <header className="relative mb-6 overflow-hidden rounded-panel">
         <div
@@ -427,17 +425,27 @@ export default function Dashboard() {
           style={{
             background:
               "radial-gradient(110% 150% at 90% -30%, var(--accent) 0%, var(--accent-soft) 34%, transparent 68%)",
-            opacity: 0.5,
+            opacity: 0.18,
           }}
           aria-hidden="true"
         />
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-2">
           <div className="min-w-0">
-            <h1 className="text-headline-md sm:text-display-sm font-bold text-text-primary">
+            {/*
+              A greeting, not a heading — the shell's header carries the one
+              <h1> on the screen now, and it says «داشبورد». This said
+              «خوش آمدید، …», which is not the page's name, so it stays as
+              text at heading size rather than becoming a second <h1>.
+
+              The date used to be repeated here. It is in the header of every
+              screen now, so saying it again three centimetres away was the
+              kind of duplication this pass exists to remove.
+            */}
+            <p className="text-headline-md sm:text-display-sm font-bold text-text-primary">
               خوش آمدید، {user?.full_name ?? "مدیر"}
-            </h1>
+            </p>
             <p className="text-body-sm text-text-secondary mt-1">
-              امروز {jalaliDayAndMonth(todayKey())} — خلاصهٔ وضعیت تعمیرگاه
+              خلاصهٔ وضعیت تعمیرگاه
             </p>
           </div>
           <div className="flex items-end gap-6 sm:gap-9 shrink-0">
@@ -461,8 +469,13 @@ export default function Dashboard() {
 
         {/*
           Three ratios that exist in the data, rather than four bars invented
-          to fill the row. Each takes a series slot in order, so the same
-          colour means the same thing here as it does in the charts below.
+          to fill the row — one per module, in the order the page below runs.
+
+          The first one borrows its colour from the device status it counts
+          instead of taking the next series slot. It used to take slot 1,
+          which meant the bar labelled «در حال تعمیر» and the donut arc
+          labelled «در حال تعمیر» three centimetres below it were different
+          colours on the same screen.
         */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 mt-6 pt-5 border-t border-border">
           <MeterPill
@@ -473,7 +486,7 @@ export default function Dashboard() {
                 : 0
             }
             detail={`${toPersianDigits(stats.devices.repairing)} از ${toPersianDigits(stats.devices.total)} دستگاه`}
-            color={SERIES[0]}
+            color={deviceStatusOf("repairing").color}
           />
           <MeterPill
             label="وصول این ماه"
@@ -494,88 +507,42 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {stats.items.low_stock > 0 && (
-        <div className="flex items-center gap-3 bg-warning-soft border border-warning/25 rounded-panel p-4 mb-4">
-          <span className="shrink-0 w-9 h-9 rounded-field bg-warning/15 flex items-center justify-center">
-            <ExclamationTriangleIcon
-              className="w-5 h-5 text-warning-fg"
-              aria-hidden="true"
-            />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-body-sm font-bold text-warning-fg">
-              هشدار کم‌موجودی
-            </p>
-            <p className="text-body-sm text-warning-fg/80">
-              {toPersianDigits(stats.items.low_stock)} کالا به حداقل موجودی
-              رسیده یا کمتر از آن است
-            </p>
-          </div>
-          <Link
-            to="/reports/stock?lowStock=true"
-            className="shrink-0 text-body-sm font-bold px-3.5 py-2 rounded-field
-                       bg-surface/70 border border-current/20 text-warning-fg
-                       hover:bg-surface transition-colors"
-          >
-            مشاهده
-          </Link>
-        </div>
-      )}
+      {/*
+        Below the header the page is one block per module, in the order a
+        shop thinks about them: the devices on the bench, the invoices they
+        produce, the trade those settle, and the parts they consume.
 
-      {/* Trend beside the collection ring: the first says how the month has
-          been going, the second how much of it has actually been paid for. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <ChartCard
-          title="روند درآمد روزانه"
-          subtitle="۱۴ روز گذشته — محور زمان از راست به چپ"
-          className="lg:col-span-2"
-        >
-          <TrendChart series={stats.revenue_series} />
-        </ChartCard>
+        It used to interleave them. The revenue trend came before the
+        invoice tiles it summarised, the device donut shared a row with the
+        top-selling-goods bar, and the low-stock warning opened the page
+        three screens above the stock content it was about — so reading it
+        meant holding four subjects at once.
+      */}
 
+      <Section
+        title="دستگاه‌ها"
+        icon={WrenchScrewdriverIcon}
+        action={{ label: "همهٔ دستگاه‌ها", to: "/devices" }}
+      >
         <ChartCard
-          tone="ink"
-          title="وصول مطالبات"
-          subtitle="فاکتورهای تعمیر این ماه"
+          title="توزیع وضعیت دستگاه‌ها"
+          subtitle={`${toPersianDigits(stats.devices.total)} دستگاه در کارگاه`}
         >
-          <Gauge
-            ratio={collectedRatio}
-            caption="از مبلغ صورت‌حساب‌شده وصول شده"
+          <DonutChart
+            slices={statusSlices}
+            centreLabel="کل دستگاه‌ها"
+            emptyMessage="هنوز دستگاهی ثبت نشده"
           />
-          <dl className="mt-5 space-y-2.5">
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-body-xs text-text-secondary">وصول‌شده</dt>
-              <dd className="text-body-sm font-bold text-accent tabular-nums">
-                {formatPersianCurrency(stats.repair_invoices.month_paid)}
-              </dd>
-            </div>
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-body-xs text-text-secondary">باقی‌مانده</dt>
-              <dd className="text-body-sm font-bold text-text-primary tabular-nums">
-                {formatPersianCurrency(stats.repair_invoices.month_unpaid)}
-              </dd>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 pt-2.5 border-t border-on-dark/10">
-              <dt className="text-body-xs text-text-secondary">
-                در انتظار پرداخت
-              </dt>
-              <dd className="text-body-sm font-bold text-text-primary tabular-nums">
-                {toPersianDigits(stats.repair_invoices.pending_payment_count)}{" "}
-                فاکتور
-              </dd>
-            </div>
-          </dl>
-          <Link
-            to="/repair-invoices"
-            className="mt-4 w-full flex items-center justify-center gap-1.5 text-body-sm font-bold
-                       px-4 py-2.5 rounded-field bg-accent text-accent-fg
-                       hover:bg-accent-hover transition-colors"
-          >
-            فاکتورهای تعمیر
-            <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
-          </Link>
+          <ChartTable
+            caption="نمایش اعداد به‌صورت جدول"
+            columns={["وضعیت", "تعداد"]}
+            rows={statusSlices.map((slice) => [
+              slice.label,
+              toPersianDigits(slice.value),
+            ])}
+          />
         </ChartCard>
-      </div>
+      </Section>
 
       <Section
         title="فاکتورهای تعمیر"
@@ -617,54 +584,63 @@ export default function Dashboard() {
             tone="warning"
           />
         </div>
-      </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <ChartCard
-          title="توزیع وضعیت دستگاه‌ها"
-          subtitle={`${toPersianDigits(stats.devices.total)} دستگاه در کارگاه`}
-        >
-          <DonutChart
-            slices={statusSlices}
-            centreLabel="کل دستگاه‌ها"
-            emptyMessage="هنوز دستگاهی ثبت نشده"
-          />
-          <ChartTable
-            caption="نمایش اعداد به‌صورت جدول"
-            columns={["وضعیت", "تعداد"]}
-            rows={statusSlices.map((slice) => [
-              slice.label,
-              toPersianDigits(slice.value),
-            ])}
-          />
-        </ChartCard>
+        {/* The trend beside the collection ring: the first says how the
+              month has been going, the second how much of it has actually been
+              paid for. */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <ChartCard
+            title="روند درآمد روزانه"
+            subtitle="۱۴ روز گذشته — محور زمان از راست به چپ"
+            className="lg:col-span-2"
+          >
+            <TrendChart series={stats.revenue_series} />
+          </ChartCard>
 
-        <ChartCard
-          title="پرفروش‌ترین کالاها"
-          subtitle="بر اساس مبلغ فروش"
-          aside={
-            <Link
-              to="/reports/profit"
-              className="text-body-sm text-primary hover:underline"
-            >
-              گزارش کامل
-            </Link>
-          }
-        >
-          <BarList rows={topItemRows} emptyMessage="هنوز فروشی ثبت نشده" />
-          {stats.top_items.length > 0 && (
-            <ChartTable
-              caption="نمایش اعداد به‌صورت جدول"
-              columns={["کالا", "مبلغ فروش (ریال)", "تعداد فروش"]}
-              rows={stats.top_items.map((item) => [
-                item.name ?? "—",
-                formatPersianCurrency(item.revenue),
-                toPersianDigits(item.sold_quantity),
-              ])}
+          <ChartCard
+            tone="ink"
+            title="وصول مطالبات"
+            subtitle="فاکتورهای تعمیر این ماه"
+          >
+            <Gauge
+              ratio={collectedRatio}
+              caption="از مبلغ صورت‌حساب‌شده وصول شده"
             />
-          )}
-        </ChartCard>
-      </div>
+            <dl className="mt-5 space-y-2.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-body-xs text-text-secondary">وصول‌شده</dt>
+                <dd className="text-body-sm font-bold text-accent tabular-nums">
+                  {formatPersianCurrency(stats.repair_invoices.month_paid)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-body-xs text-text-secondary">باقی‌مانده</dt>
+                <dd className="text-body-sm font-bold text-text-primary tabular-nums">
+                  {formatPersianCurrency(stats.repair_invoices.month_unpaid)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 pt-2.5 border-t border-on-dark/10">
+                <dt className="text-body-xs text-text-secondary">
+                  در انتظار پرداخت
+                </dt>
+                <dd className="text-body-sm font-bold text-text-primary tabular-nums">
+                  {toPersianDigits(stats.repair_invoices.pending_payment_count)}{" "}
+                  فاکتور
+                </dd>
+              </div>
+            </dl>
+            <Link
+              to="/repair-invoices"
+              className="mt-4 w-full flex items-center justify-center gap-1.5 text-body-sm font-bold
+                         px-4 py-2.5 rounded-field bg-accent text-accent-fg
+                         hover:bg-accent-hover transition-colors"
+            >
+              فاکتورهای تعمیر
+              <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </ChartCard>
+        </div>
+      </Section>
 
       <Section
         title="فروش و خرید"
@@ -700,30 +676,93 @@ export default function Dashboard() {
         </div>
       </Section>
 
-      <ChartCard
-        title="آخرین تراکنش‌های انبار"
-        subtitle="ده مورد اخیر"
-        aside={
-          <Link
-            to="/reports/transactions"
-            className="text-body-sm text-primary hover:underline"
-          >
-            مشاهده همه
-          </Link>
-        }
+      <Section
+        title="انبار و کالاها"
+        icon={CubeIcon}
+        action={{ label: "همهٔ کالاها", to: "/items" }}
       >
-        {stats.recent_transactions.length === 0 ? (
-          <p className="text-center text-body-sm text-text-muted py-8">
-            هنوز تراکنشی ثبت نشده
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
-            {stats.recent_transactions.map((tx) => (
-              <RecentTransactionItem key={tx.id} tx={tx} />
-            ))}
+        {stats.items.low_stock > 0 && (
+          <div className="flex items-center gap-3 bg-warning-soft border border-warning/25 rounded-panel p-4 mb-4">
+            <span className="shrink-0 w-9 h-9 rounded-field bg-warning/15 flex items-center justify-center">
+              <ExclamationTriangleIcon
+                className="w-5 h-5 text-warning-fg"
+                aria-hidden="true"
+              />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-body-sm font-bold text-warning-fg">
+                هشدار کم‌موجودی
+              </p>
+              <p className="text-body-sm text-warning-fg/80">
+                {toPersianDigits(stats.items.low_stock)} کالا به حداقل موجودی
+                رسیده یا کمتر از آن است
+              </p>
+            </div>
+            <Link
+              to="/reports/stock?lowStock=true"
+              className="shrink-0 text-body-sm font-bold px-3.5 py-2 rounded-field
+                         bg-surface/70 border border-current/20 text-warning-fg
+                         hover:bg-surface transition-colors"
+            >
+              مشاهده
+            </Link>
           </div>
         )}
-      </ChartCard>
+
+        {/* What is running out, what earns its shelf space, and what moved —
+            the three questions a shop asks about its parts, together. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartCard
+            title="پرفروش‌ترین کالاها"
+            subtitle="بر اساس مبلغ فروش"
+            aside={
+              <Link
+                to="/reports/profit"
+                className="text-body-sm text-primary hover:underline"
+              >
+                گزارش کامل
+              </Link>
+            }
+          >
+            <BarList rows={topItemRows} emptyMessage="هنوز فروشی ثبت نشده" />
+            {stats.top_items.length > 0 && (
+              <ChartTable
+                caption="نمایش اعداد به‌صورت جدول"
+                columns={["کالا", "مبلغ فروش (ریال)", "تعداد فروش"]}
+                rows={stats.top_items.map((item) => [
+                  item.name ?? "—",
+                  formatPersianCurrency(item.revenue),
+                  toPersianDigits(item.sold_quantity),
+                ])}
+              />
+            )}
+          </ChartCard>
+          <ChartCard
+            title="آخرین تراکنش‌های انبار"
+            subtitle="ده مورد اخیر"
+            aside={
+              <Link
+                to="/reports/transactions"
+                className="text-body-sm text-primary hover:underline"
+              >
+                مشاهده همه
+              </Link>
+            }
+          >
+            {stats.recent_transactions.length === 0 ? (
+              <p className="text-center text-body-sm text-text-muted py-8">
+                هنوز تراکنشی ثبت نشده
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
+                {stats.recent_transactions.map((tx) => (
+                  <RecentTransactionItem key={tx.id} tx={tx} />
+                ))}
+              </div>
+            )}
+          </ChartCard>
+        </div>
+      </Section>
     </div>
   );
 }

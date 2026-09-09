@@ -27,6 +27,7 @@ import RepairInvoiceStatusBadge from "../components/RepairInvoiceStatusBadge";
 import {
   REPAIR_INVOICE_STATUSES,
   repairInvoiceStatusOf,
+  repairOutstanding,
 } from "../utils/invoiceStatus";
 import { staggerContainer, staggerItem } from "../motion";
 import { useDebounce } from "../utils/helpers";
@@ -218,10 +219,7 @@ export default function RepairInvoiceList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <h1 className="text-headline-md font-bold text-text-primary">
-          فاکتورهای تعمیر
-        </h1>
-        <p className="text-body-sm text-text-secondary mt-0.5">
+        <p className="text-body-sm text-text-secondary">
           {loading
             ? "در حال بارگذاری…"
             : filtering
@@ -367,7 +365,7 @@ export default function RepairInvoiceList() {
             className="lg:hidden space-y-3"
           >
             {invoices.map((invoice) => {
-              const remaining = invoice.total_amount - invoice.paid_amount;
+              const remaining = repairOutstanding(invoice);
               const status = repairInvoiceStatusOf(invoice.status);
               return (
                 <motion.li key={invoice.id} variants={staggerItem}>
@@ -491,8 +489,7 @@ export default function RepairInvoiceList() {
                 </thead>
                 <tbody className={tbody}>
                   {invoices.map((invoice) => {
-                    const remaining =
-                      invoice.total_amount - invoice.paid_amount;
+                    const remaining = repairOutstanding(invoice);
                     return (
                       <tr
                         key={invoice.id}

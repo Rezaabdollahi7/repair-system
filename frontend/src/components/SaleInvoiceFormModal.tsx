@@ -785,17 +785,25 @@ export default function SaleInvoiceFormModal({
                             key={index}
                             className="border border-border rounded-field p-3 sm:p-4 bg-surface-alt"
                           >
-                            <div className="grid grid-cols-12 gap-2 items-center">
+                            {/*
+                            The line row runs on the same twelve-column mapping
+                            in all three invoice forms — نوع ۱ | شرح ۴ |
+                            تعداد ۱ | واحد ۱ | قیمت ۲ | جمع ۲ | حذف ۱ — and
+                            falls back to six columns on a phone. Twelve tracks
+                            across 380 pixels left the quantity field about
+                            thirty of them.
+                        */}
+                            <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 items-start sm:items-center">
                               {/* نوع آیتم */}
-                              <div className="col-span-1">
+                              <div className="col-span-2 sm:col-span-1">
                                 <LineItemTypeChip type={item.item_type} />
                               </div>
 
                               {/* شرح / انتخاب کالا */}
-                              <div className="col-span-4">
+                              <div className="col-span-4 sm:col-span-4">
                                 {item.item_type === "inventory" ? (
                                   <>
-                                    <label className="block text-[13px] font-medium text-text-secondary mb-0.5">
+                                    <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                       نام کالا
                                     </label>
                                     <SearchableSelect
@@ -811,7 +819,7 @@ export default function SaleInvoiceFormModal({
                                   </>
                                 ) : (
                                   <>
-                                    <label className="block text-[13px] font-medium text-text-secondary mb-0.5">
+                                    <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                       نام کالا
                                     </label>
                                     <input
@@ -838,8 +846,8 @@ export default function SaleInvoiceFormModal({
                               </div>
 
                               {/* تعداد - کوچک‌تر */}
-                              <div className="col-span-1">
-                                <label className="block text-[13px] font-medium text-text-secondary mb-0.5">
+                              <div className="col-span-2 sm:col-span-1">
+                                <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   تعداد
                                 </label>
                                 <input
@@ -868,8 +876,8 @@ export default function SaleInvoiceFormModal({
                               </div>
 
                               {/* واحد - به صورت دراپ‌داون */}
-                              <div className="col-span-1">
-                                <label className="block text-[13px] font-medium text-text-secondary mb-0.5">
+                              <div className="col-span-2 sm:col-span-1">
+                                <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   واحد
                                 </label>
                                 <select
@@ -895,8 +903,8 @@ export default function SaleInvoiceFormModal({
                               </div>
 
                               {/* قیمت واحد */}
-                              <div className="col-span-2">
-                                <label className="block text-[13px] font-medium text-text-secondary mb-0.5">
+                              <div className="col-span-2 sm:col-span-2">
+                                <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   قیمت واحد (ریال)
                                 </label>
                                 <input
@@ -924,8 +932,8 @@ export default function SaleInvoiceFormModal({
                               </div>
 
                               {/* جمع - بزرگ‌تر */}
-                              <div className="col-span-2">
-                                <label className="block text-[13px] font-medium text-text-secondary mb-0.5">
+                              <div className="col-span-4 sm:col-span-2">
+                                <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   جمع (ریال)
                                 </label>
                                 <div className="w-full px-1 py-1.5 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-left text-text-primary">
@@ -942,7 +950,7 @@ export default function SaleInvoiceFormModal({
                               </div>
 
                               {/* دکمه حذف */}
-                              <div className="col-span-1 mt-1 text-center">
+                              <div className="col-span-2 sm:col-span-1 mt-1 text-center">
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveItem(index)}

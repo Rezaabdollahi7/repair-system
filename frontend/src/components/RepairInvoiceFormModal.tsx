@@ -517,146 +517,150 @@ export default function RepairInvoiceFormModal({
 
         <div className="p-3 sm:p-6">
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-              <div className="lg:col-span-1 space-y-4 sm:space-y-6">
-                <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
-                    <WrenchScrewdriverIcon className="w-5 h-5 text-text-secondary" />
-                    اطلاعات دستگاه
-                  </h2>
+            {/*
+              ===== بخش اطلاعات دستگاه و فاکتور (افقی) =====
 
-                  <div className="space-y-3 sm:space-y-4">
-                    <div>
-                      <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        انتخاب دستگاه{" "}
-                        <span
-                          aria-hidden
-                          className="text-danger-fg text-[0.85em] leading-none align-super"
-                        >
-                          *
-                        </span>
-                      </label>
-                      <SearchableSelect
-                        options={deviceOptions}
-                        value={formData.device_id}
-                        onChange={handleDeviceSelect}
-                        onSearch={handleDeviceSearch}
-                        onOpen={() => handleDeviceSearch("")}
-                        placeholder="جستجو و انتخاب دستگاه..."
-                        error={errors.device_id}
-                        required
-                      />
-                    </div>
-                    {formData.device_id && (
-                      <>
-                        <div>
-                          <label className="block text-body-sm font-medium text-text-primary mb-2">
-                            نام مشتری
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.customer_name || "—"}
-                            readOnly
-                            disabled
-                            className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
-                          />
-                          {!formData.customer_name && (
-                            <p className="text-warning-fg text-body-xs mt-1">
-                              ⚠️ این دستگاه مشتری ثبت شده ندارد.
-                            </p>
-                          )}
-                        </div>
+              One band across the top, as on the sales form. This was two
+              stacked cards in a narrow left column — the mirror image of the
+              sales layout, so the two forms for the two documents a shop
+              issues most read as different screens. The device fields and the
+              invoice's own fields are one subject here: who and what, before
+              the lines.
 
-                        <div>
-                          <label className="block text-body-sm font-medium text-text-primary mb-2">
-                            شماره تماس
-                          </label>
-                          <input
-                            type="tel"
-                            value={formData.customer_phone || "—"}
-                            readOnly
-                            disabled
-                            className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
+              Four across, and the two read-only customer fields appear only
+              once a device is chosen: with none, the row is exactly four
+              fields wide.
+            */}
+            <div className="bg-surface shadow rounded-field p-4 sm:p-6 mb-4 sm:mb-6">
+              <h2 className="text-base sm:text-lg font-medium text-text-primary mb-4 flex items-center gap-2">
+                <WrenchScrewdriverIcon className="w-5 h-5 text-text-secondary" />
+                اطلاعات دستگاه و فاکتور
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                    انتخاب دستگاه{" "}
+                    <span
+                      aria-hidden
+                      className="text-danger-fg text-[0.85em] leading-none align-super"
+                    >
+                      *
+                    </span>
+                  </label>
+                  <SearchableSelect
+                    options={deviceOptions}
+                    value={formData.device_id}
+                    onChange={handleDeviceSelect}
+                    onSearch={handleDeviceSearch}
+                    onOpen={() => handleDeviceSearch("")}
+                    placeholder="جستجو و انتخاب دستگاه..."
+                    error={errors.device_id}
+                  />
                 </div>
-
-                <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
-                    جزئیات فاکتور
-                  </h2>
-
-                  <div className="space-y-3 sm:space-y-4">
+                {formData.device_id && (
+                  <>
                     <div>
-                      <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        تاریخ فاکتور
-                      </label>
-                      <PersianDatePicker
-                        value={formData.invoice_date}
-                        onChange={(val) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            invoice_date: val,
-                          }))
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        تعمیرکار
-                      </label>
-                      <select
-                        name="technician_id"
-                        value={formData.technician_id}
-                        onChange={handleInputChange}
-                        className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] text-body-sm"
-                      >
-                        <option value="">انتخاب تعمیرکار...</option>
-                        {technicianOptions.map((t) => (
-                          <option key={t.value} value={t.value}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        گارانتی (ماه)
+                      <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                        نام مشتری
                       </label>
                       <input
-                        type="number"
-                        name="warranty_months"
-                        value={formData.warranty_months}
-                        onChange={handleInputChange}
-                        min="0"
-                        className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                        type="text"
+                        value={formData.customer_name || "—"}
+                        readOnly
+                        disabled
+                        className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
                       />
+                      {!formData.customer_name && (
+                        <p className="text-warning-fg text-body-xs mt-1">
+                          ⚠️ این دستگاه مشتری ثبت شده ندارد.
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-body-sm font-medium text-text-primary mb-2">
-                        توضیحات
+                      <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                        شماره تماس
                       </label>
-                      <textarea
-                        name="notes"
-                        value={formData.notes}
-                        onChange={handleInputChange}
-                        rows={3}
-                        className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-                        placeholder="توضیحات اضافی..."
+                      <input
+                        type="tel"
+                        value={formData.customer_phone || "—"}
+                        readOnly
+                        disabled
+                        className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 bg-surface-alt text-text-secondary cursor-not-allowed text-body-sm"
                       />
                     </div>
-                  </div>
+                  </>
+                )}
+                <div>
+                  <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                    تاریخ فاکتور
+                  </label>
+                  <PersianDatePicker
+                    value={formData.invoice_date}
+                    onChange={(val) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        invoice_date: val,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                    تعمیرکار
+                  </label>
+                  <select
+                    name="technician_id"
+                    value={formData.technician_id}
+                    onChange={handleInputChange}
+                    className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] text-body-sm"
+                  >
+                    <option value="">انتخاب تعمیرکار...</option>
+                    {technicianOptions.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                    گارانتی (ماه)
+                  </label>
+                  <input
+                    type="number"
+                    name="warranty_months"
+                    value={formData.warranty_months}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  />
                 </div>
               </div>
 
-              <div className="lg:col-span-2">
-                <div className="bg-surface shadow rounded-field p-3 sm:p-4 mb-4 sm:mb-6">
+              <div className="mt-3 sm:mt-4">
+                <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                  توضیحات
+                </label>
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  rows={2}
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  placeholder="توضیحات اضافی..."
+                />
+              </div>
+            </div>
+
+            {/* ===== گرید اصلی: اقلام فاکتور (9/12) + محاسبات (3/12) ===== */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+              {/* ستون راست - اقلام فاکتور (9/12) */}
+              <div className="lg:col-span-9">
+                <div className="bg-surface shadow rounded-field p-3 sm:p-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
                     <h2 className="text-base sm:text-lg font-medium text-text-primary flex items-center gap-2">
                       <CubeIcon className="w-5 h-5 text-text-secondary" />
@@ -719,12 +723,27 @@ export default function RepairInvoiceFormModal({
                           key={index}
                           className="border border-border rounded-field p-3 sm:p-4 bg-surface-alt"
                         >
-                          <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-center">
-                            <div className="col-span-1 sm:col-span-2">
+                          {/*
+                          The line row runs on the same twelve-column mapping
+                          in all three invoice forms — نوع ۱ | شرح ۴ |
+                          تعداد ۱ | واحد ۱ | قیمت ۲ | جمع ۲ | حذف ۱ — and
+                          falls back to six columns on a phone. Twelve tracks
+                          across 380 pixels left the quantity field about
+                          thirty of them.
+                        */}
+                          <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 items-start sm:items-center">
+                            <div className="col-span-2 sm:col-span-1">
                               <LineItemTypeChip type={item.item_type} />
                             </div>
 
-                            <div className="col-span-7 sm:col-span-4">
+                            <div className="col-span-4 sm:col-span-4">
+                              <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                                {item.item_type === "service"
+                                  ? "خدمت"
+                                  : item.item_type === "inventory"
+                                    ? "نام کالا"
+                                    : "نام آیتم"}
+                              </label>
                               {item.item_type === "inventory" ? (
                                 <SearchableSelect
                                   options={itemOptions}
@@ -777,6 +796,9 @@ export default function RepairInvoiceFormModal({
                             </div>
 
                             <div className="col-span-2 sm:col-span-1">
+                              <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                                تعداد
+                              </label>
                               <input
                                 type="number"
                                 value={item.quantity}
@@ -794,6 +816,9 @@ export default function RepairInvoiceFormModal({
                             </div>
 
                             <div className="col-span-2 sm:col-span-1">
+                              <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                                واحد
+                              </label>
                               <input
                                 type="text"
                                 value={item.unit}
@@ -808,7 +833,10 @@ export default function RepairInvoiceFormModal({
                               />
                             </div>
 
-                            <div className="col-span-3 sm:col-span-2">
+                            <div className="col-span-2 sm:col-span-2">
+                              <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                                قیمت واحد (ریال)
+                              </label>
                               <input
                                 type="number"
                                 value={item.unit_price}
@@ -824,15 +852,18 @@ export default function RepairInvoiceFormModal({
                               />
                             </div>
 
-                            <div className="col-span-3 sm:col-span-1 text-left">
-                              <span className="text-body-xs sm:text-body-sm font-medium text-text-primary">
+                            <div className="col-span-4 sm:col-span-2">
+                              <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                                جمع (ریال)
+                              </label>
+                              <div className="w-full px-1 py-1.5 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-left text-text-primary">
                                 {formatPersianCurrency(
                                   calculateItemTotal(item),
                                 )}
-                              </span>
+                              </div>
                             </div>
 
-                            <div className="col-span-1 sm:col-span-1 text-center">
+                            <div className="col-span-2 sm:col-span-1 mt-1 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(index)}
@@ -853,26 +884,44 @@ export default function RepairInvoiceFormModal({
                     </div>
                   )}
                 </div>
+              </div>
 
-                <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
+              {/*
+                ستون چپ - محاسبات (3/12)
+
+                The one place the three forms cannot be identical: this column
+                holds *inputs* — a discount type, its value, a tax rate —
+                where the sales and purchase forms hold one. So its rows stack
+                vertically rather than sitting side by side; `sm:flex-row` was
+                a viewport breakpoint, not a container one, and would have
+                tried to fit a select, a number field and a figure across
+                250 pixels.
+              */}
+              <div className="lg:col-span-3">
+                <div className="bg-surface shadow rounded-field p-4 sm:p-6 sticky top-24">
+                  <h2 className="text-base sm:text-lg font-medium text-text-primary mb-4">
                     محاسبات
                   </h2>
 
-                  <div className="space-y-2 sm:space-y-3">
-                    <div className="flex justify-between text-body-sm sm:text-base text-text-primary">
-                      <span>جمع کل:</span>
-                      <span className="font-medium">
-                        {formatPersianCurrency(calculateSubtotal())} ریال
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 text-body-sm sm:text-base">
+                      <span className="text-text-secondary">
+                        جمع کل (ریال):
+                      </span>
+                      <span className="font-medium text-text-primary tabular-nums">
+                        {formatPersianCurrency(calculateSubtotal())}
                       </span>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                    <div className="border-t border-border pt-3">
+                      <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                        تخفیف
+                      </label>
                       <select
                         name="discount_type"
                         value={formData.discount_type}
                         onChange={handleInputChange}
-                        className="border border-border-field rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm bg-surface text-text-primary"
+                        className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       >
                         <option value="">بدون تخفیف</option>
                         <option value="percentage">درصدی</option>
@@ -886,19 +935,24 @@ export default function RepairInvoiceFormModal({
                             value={formData.discount_value}
                             onChange={handleInputChange}
                             min="0"
-                            className="border border-border-field rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm w-24 sm:w-32 bg-surface text-text-primary"
+                            className="mt-2 w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                           />
-                          <span className="text-danger-fg text-body-sm sm:mr-auto">
-                            -{formatPersianCurrency(calculateDiscount())} ریال
-                          </span>
+                          <div className="mt-2 flex justify-between text-body-sm">
+                            <span className="text-text-secondary">
+                              تخفیف (ریال)
+                            </span>
+                            <span className="text-danger-fg tabular-nums">
+                              −{formatPersianCurrency(calculateDiscount())}
+                            </span>
+                          </div>
                         </>
                       )}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                      <span className="text-body-sm text-text-primary">
-                        مالیات (%):
-                      </span>
+                    <div className="border-t border-border pt-3">
+                      <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                        مالیات (٪)
+                      </label>
                       <input
                         type="number"
                         name="tax_rate"
@@ -907,43 +961,51 @@ export default function RepairInvoiceFormModal({
                         min="0"
                         max="100"
                         step="0.5"
-                        className="border border-border-field rounded-field px-2 sm:px-3 py-1.5 sm:py-2 text-body-sm w-20 sm:w-24 bg-surface text-text-primary"
+                        className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       />
-                      <span className="text-primary text-body-sm sm:mr-auto">
-                        +{formatPersianCurrency(calculateTax())} ریال
-                      </span>
+                      <div className="mt-2 flex justify-between text-body-sm">
+                        <span className="text-text-secondary">
+                          مالیات (ریال)
+                        </span>
+                        <span className="text-text-primary tabular-nums">
+                          +{formatPersianCurrency(calculateTax())}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between pt-2 sm:pt-3 border-t border-border text-base sm:text-lg font-bold">
-                      <span className="text-text-primary">مبلغ نهایی:</span>
-                      <span className="text-primary">
-                        {formatPersianCurrency(calculateTotal())} ریال
+                    <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base font-bold">
+                      <span className="text-text-primary">
+                        مبلغ نهایی (ریال):
+                      </span>
+                      <span className="text-text-primary tabular-nums">
+                        {formatPersianCurrency(calculateTotal())}
                       </span>
                     </div>
                   </div>
                 </div>
-
-                <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-                  <button
-                    type="button"
-                    onClick={handleModalClose}
-                    className="px-3 sm:px-4 py-2 border border-border rounded-field hover:bg-surface-alt text-text-primary text-body-sm sm:text-base order-2 sm:order-1"
-                  >
-                    انصراف
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm sm:text-base order-1 sm:order-2"
-                  >
-                    {loading
-                      ? "در حال ذخیره..."
-                      : isEditMode
-                        ? "ویرایش فاکتور"
-                        : "ثبت فاکتور"}
-                  </button>
-                </div>
               </div>
+            </div>
+
+            {/* ===== دکمه‌های اقدام ===== */}
+            <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={handleModalClose}
+                className="px-3 sm:px-4 py-2 border border-border rounded-field hover:bg-surface-alt text-text-primary text-body-sm sm:text-base order-2 sm:order-1"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm sm:text-base order-1 sm:order-2"
+              >
+                {loading
+                  ? "در حال ذخیره..."
+                  : isEditMode
+                    ? "ویرایش فاکتور"
+                    : "ثبت فاکتور تعمیر"}
+              </button>
             </div>
           </form>
         </div>

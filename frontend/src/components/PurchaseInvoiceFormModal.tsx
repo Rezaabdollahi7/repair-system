@@ -9,6 +9,7 @@ import {
   PlusIcon,
   TrashIcon,
   ShoppingCartIcon,
+  CubeIcon,
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
@@ -19,6 +20,13 @@ import type {
 } from "../types/api";
 import type { SelectOption, SelectValue } from "./SearchableSelect";
 import { modalPanel } from "../motion";
+/*
+ * This file had its own `const formatCurrency = (amount) =>
+ * Number(amount).toLocaleString()`, which resolves the browser's default
+ * locale — so the purchase form was the one screen in the app printing
+ * «18,400,000» while every other amount read «۱۸٬۴۰۰٬۰۰۰».
+ */
+import { formatPersianCurrency } from "../utils/formatters";
 
 /** An option carrying the item's own price, so picking one prefills it. */
 interface ItemOption extends SelectOption {
@@ -336,8 +344,6 @@ export default function PurchaseInvoiceFormModal({
     }
   };
 
-  const formatCurrency = (amount: number) => Number(amount).toLocaleString();
-
   if (!isOpen) return null;
 
   return (
@@ -346,7 +352,7 @@ export default function PurchaseInvoiceFormModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
@@ -363,100 +369,70 @@ export default function PurchaseInvoiceFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-3 sm:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            <div className="lg:col-span-1 space-y-4 sm:space-y-6">
-              <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
-                  اطلاعات فاکتور
-                </h2>
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-primary mb-2">
-                      نام فروشنده
-                    </label>
-                    <input
-                      type="text"
-                      name="supplier_name"
-                      value={formData.supplier_name}
-                      onChange={handleInputChange}
-                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-                      placeholder="مثلاً: فروشگاه قطعات الکترونیک"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-primary mb-2">
-                      تاریخ فاکتور
-                    </label>
-                    <PersianDatePicker
-                      value={formData.invoice_date}
-                      onChange={(val) =>
-                        setFormData((prev) => ({ ...prev, invoice_date: val }))
-                      }
-                      placeholder="انتخاب تاریخ"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-primary mb-2">
-                      توضیحات
-                    </label>
-                    <textarea
-                      name="note"
-                      value={formData.note}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-                      placeholder="توضیحات اضافی..."
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* ===== بخش اطلاعات فاکتور (افقی) ===== */}
+          <div className="bg-surface shadow rounded-field p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-4 flex items-center gap-2">
+              <ShoppingCartIcon className="w-5 h-5 text-text-secondary" />
+              اطلاعات فاکتور
+            </h2>
 
-              <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
-                  خلاصه پرداخت
-                </h2>
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between py-2 text-body-sm sm:text-base">
-                    <span className="text-text-secondary">جمع کل:</span>
-                    <span className="font-medium text-text-primary">
-                      {formatCurrency(calculateTotal())} ریال
-                    </span>
-                  </div>
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-primary mb-2">
-                      مبلغ پرداختی
-                    </label>
-                    <input
-                      type="number"
-                      name="paid_amount"
-                      value={formData.paid_amount}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="1000"
-                      className={`w-full border rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border"}`}
-                    />
-                    {errors.paid_amount && (
-                      <p className="mt-1 text-body-xs text-danger-fg">
-                        {errors.paid_amount}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base">
-                    <span className="text-text-secondary">مانده:</span>
-                    <span
-                      className={`font-medium ${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
-                    >
-                      {formatCurrency(calculateRemaining())} ریال
-                    </span>
-                  </div>
-                </div>
+            {/*
+              Two fields across rather than the sales form's four: this form
+              has two, and stretching them over four columns would leave half
+              the band empty. The grid is the same one, filled as far as the
+              content goes.
+            */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div>
+                <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                  نام فروشنده
+                </label>
+                <input
+                  type="text"
+                  name="supplier_name"
+                  value={formData.supplier_name}
+                  onChange={handleInputChange}
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  placeholder="مثلاً: فروشگاه قطعات الکترونیک"
+                />
+              </div>
+              <div>
+                <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                  تاریخ فاکتور
+                </label>
+                <PersianDatePicker
+                  value={formData.invoice_date}
+                  onChange={(val) =>
+                    setFormData((prev) => ({ ...prev, invoice_date: val }))
+                  }
+                  placeholder="انتخاب تاریخ"
+                />
               </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <div className="bg-surface shadow rounded-field p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                  <h2 className="text-base sm:text-lg font-medium text-text-primary">
+            <div className="mt-3 sm:mt-4">
+              <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                توضیحات
+              </label>
+              <textarea
+                name="note"
+                value={formData.note}
+                onChange={handleInputChange}
+                rows={2}
+                className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                placeholder="توضیحات اضافی..."
+              />
+            </div>
+          </div>
+
+          {/* ===== گرید اصلی: اقلام فاکتور (9/12) + خلاصه پرداخت (3/12) ===== */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+            {/* ستون راست - اقلام فاکتور (9/12) */}
+            <div className="lg:col-span-9">
+              <div className="bg-surface shadow rounded-field p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
+                  <h2 className="text-base sm:text-lg font-medium text-text-primary flex items-center gap-2">
+                    <CubeIcon className="w-5 h-5 text-text-secondary" />
                     اقلام فاکتور
                   </h2>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -468,10 +444,14 @@ export default function PurchaseInvoiceFormModal({
                       <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       تعریف سریع کالا
                     </button>
+                    {/* Bordered, like its neighbour and like all three of the
+                        sales form's add-buttons. It was the one filled
+                        `bg-primary` among them, which made adding a line look
+                        like the form's main action instead of submitting it. */}
                     <button
                       type="button"
                       onClick={handleAddItem}
-                      className="bg-primary text-primary-fg px-2 sm:px-3 py-1.5 sm:py-2 rounded-field hover:bg-primary-hover text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                     >
                       <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       افزودن کالا
@@ -499,16 +479,17 @@ export default function PurchaseInvoiceFormModal({
                         key={index}
                         className="border border-border rounded-field p-3 sm:p-4 bg-surface-alt"
                       >
-                        <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3 items-center">
-                          <div className="col-span-2 sm:col-span-5">
-                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              کالا{" "}
-                              <span
-                                aria-hidden
-                                className="text-danger-fg text-[0.85em] leading-none align-super"
-                              >
-                                *
-                              </span>
+                        {/*
+                        Six columns on a phone, twelve from `sm` up, as on
+                        the other two forms. Purchase has no type chip and no
+                        unit column — every line here is a stocked good — so
+                        its twelve are کالا ۵ | تعداد ۲ | قیمت ۲ | جمع ۲ |
+                        حذف ۱.
+                      */}
+                        <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 sm:gap-3 items-start sm:items-center">
+                          <div className="col-span-6 sm:col-span-5">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              کالا
                             </label>
                             <SearchableSelect
                               options={itemOptions}
@@ -518,19 +499,12 @@ export default function PurchaseInvoiceFormModal({
                               }
                               placeholder="جستجو و انتخاب کالا..."
                               loading={loadingItems}
-                              required
                               error={errors[`item_${index}`]}
                             />
                           </div>
-                          <div className="col-span-1 sm:col-span-2">
-                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              تعداد{" "}
-                              <span
-                                aria-hidden
-                                className="text-danger-fg text-[0.85em] leading-none align-super"
-                              >
-                                *
-                              </span>
+                          <div className="col-span-2 sm:col-span-2">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              تعداد
                             </label>
                             <input
                               type="number"
@@ -552,14 +526,8 @@ export default function PurchaseInvoiceFormModal({
                             )}
                           </div>
                           <div className="col-span-2 sm:col-span-2">
-                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              قیمت واحد (ریال){" "}
-                              <span
-                                aria-hidden
-                                className="text-danger-fg text-[0.85em] leading-none align-super"
-                              >
-                                *
-                              </span>
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              قیمت واحد (ریال)
                             </label>
                             <input
                               type="number"
@@ -581,11 +549,11 @@ export default function PurchaseInvoiceFormModal({
                             )}
                           </div>
                           <div className="col-span-2 sm:col-span-2">
-                            <label className="block text-body-xs font-medium text-text-secondary mb-1">
-                              جمع
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              جمع (ریال)
                             </label>
                             <div className="px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-text-primary">
-                              {formatCurrency(
+                              {formatPersianCurrency(
                                 calculateItemTotal(
                                   item.quantity,
                                   item.unit_price,
@@ -593,7 +561,7 @@ export default function PurchaseInvoiceFormModal({
                               )}
                             </div>
                           </div>
-                          <div className="col-span-1 sm:col-span-1">
+                          <div className="col-span-6 sm:col-span-1">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(index)}
@@ -609,8 +577,56 @@ export default function PurchaseInvoiceFormModal({
                 )}
               </div>
             </div>
+
+            {/* ستون چپ - خلاصه پرداخت (3/12) */}
+            <div className="lg:col-span-3">
+              <div className="bg-surface shadow rounded-field p-4 sm:p-6 sticky top-24">
+                <h2 className="text-base sm:text-lg font-medium text-text-primary mb-4">
+                  خلاصه پرداخت
+                </h2>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2 text-body-sm sm:text-base border-b border-border">
+                    <span className="text-text-secondary">جمع کل (ریال):</span>
+                    <span className="font-medium text-text-primary">
+                      {formatPersianCurrency(calculateTotal())}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                      مبلغ پرداختی (ریال)
+                    </label>
+                    <input
+                      type="number"
+                      name="paid_amount"
+                      value={formData.paid_amount}
+                      onChange={handleInputChange}
+                      min="0"
+                      step="1000"
+                      className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border-field"}`}
+                    />
+                    {errors.paid_amount && (
+                      <p className="mt-1 text-body-xs text-danger-fg">
+                        {errors.paid_amount}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base font-bold">
+                    <span className="text-text-primary">مانده (ریال):</span>
+                    <span
+                      className={`${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
+                    >
+                      {formatPersianCurrency(calculateRemaining())}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
+          {/* ===== دکمه‌های اقدام ===== */}
           <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
             <button
               type="button"
@@ -622,9 +638,9 @@ export default function PurchaseInvoiceFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 order-1 sm:order-2 justify-center"
+              className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm sm:text-base order-1 sm:order-2"
             >
-              {loading ? "در حال ثبت..." : "ثبت فاکتور"}
+              {loading ? "در حال ثبت..." : "ثبت فاکتور خرید"}
             </button>
           </div>
         </form>

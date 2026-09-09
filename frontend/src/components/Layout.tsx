@@ -29,6 +29,9 @@ import {
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
 import { jalaliToday } from "../utils/jalali";
+import { toPersianDigits } from "../utils/formatters";
+import { roleStyleOf } from "../utils/roleStatus";
+import StatusPill from "./StatusPill";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -140,29 +143,29 @@ const MENU: MenuSection[] = [
       },
     ],
   },
-  {
-    title: "سیستم",
-    items: [
-      {
-        name: "تنظیمات",
-        path: "/settings",
-        icon: Cog6ToothIcon,
-        adminOnly: false,
-      },
-    ],
-  },
+  /*
+   * There is no «سیستم» section any more. It held one item — تنظیمات — and a
+   * section heading over a single link costs a heading, a gap and a divider
+   * to say what the link already says. Settings is a gear in the header now,
+   * beside the theme switch, which is where an app's settings live.
+   */
 ];
 
 /**
  * Screens the nav does not list, by exact path. Keyed exactly rather than by
  * prefix: these are leaves, and a prefix match here would shadow a future
  * nav entry underneath the same path.
+ *
+ * `section` is optional because settings has none: it is reached from the
+ * header rather than from a group of related pages, so a breadcrumb naming
+ * a parent would be inventing one.
  */
-const OFF_MENU: Record<string, { name: string; section: string }> = {
+const OFF_MENU: Record<string, { name: string; section?: string }> = {
   "/reports/transactions": {
     name: "تراکنش‌های انبار",
     section: "گزارش‌ها و حساب",
   },
+  "/settings": { name: "تنظیمات" },
 };
 
 const COLLAPSE_KEY = "dofixo-sidebar-collapsed";
@@ -341,13 +344,14 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
         >
           {initial}
         </span>
-        <span className="hidden sm:block text-right leading-tight">
-          <span className="block text-body-sm font-bold text-text-primary max-w-32 truncate">
-            {user?.full_name || user?.username}
-          </span>
-          <span className="block text-body-xs text-text-secondary">
-            {user?.role_label}
-          </span>
+        {/*
+          The name only. The role used to sit under it in 12px grey, which
+          made the button two lines tall in a 64px header and put a fact
+          nobody checks twice where the eye lands most often. It is in the
+          panel below now, next to the account it belongs to.
+        */}
+        <span className="hidden max-w-32 truncate text-body-sm font-bold text-text-primary sm:block">
+          {user?.full_name || user?.username}
         </span>
         <ChevronDownIcon
           className={`w-4 h-4 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
@@ -365,25 +369,26 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
             className="absolute left-0 mt-2 w-56 origin-top-left z-50 rounded-card
                        bg-surface border border-border shadow-lg p-1.5"
           >
-            <div className="px-2.5 py-2 border-b border-border mb-1.5">
-              <p className="text-body-sm font-bold text-text-primary truncate">
+            <div className="mb-1.5 border-b border-border px-2.5 py-2.5">
+              <p className="truncate text-body-sm font-bold text-text-primary">
                 {user?.full_name || user?.username}
               </p>
-              <p className="text-body-xs text-text-secondary" dir="ltr">
-                {user?.username}
+              <p className="mt-0.5 text-body-xs text-text-secondary" dir="ltr">
+                {toPersianDigits(user?.username ?? "")}
               </p>
+              {/* The same pill the personnel table uses for a role, from the
+                  same module — so a role looks like a role wherever it is
+                  shown, rather than like a caption here and a badge there. */}
+              {user?.role_label && (
+                <div className="mt-2">
+                  <StatusPill
+                    label={user.role_label}
+                    size="sm"
+                    {...roleStyleOf(user.role)}
+                  />
+                </div>
+              )}
             </div>
-
-            <Link
-              to="/settings"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded-field text-body-sm
-                         text-text-primary hover:bg-surface-alt transition-colors"
-            >
-              <Cog6ToothIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
-              تنظیمات
-            </Link>
 
             <button
               type="button"
@@ -476,6 +481,7 @@ export default function Layout() {
    * been titled «دوفیکسو» — the fallback for "no idea where we are".
    */
   const offMenu = OFF_MENU[location.pathname] ?? null;
+  const onSettings = location.pathname.startsWith("/settings");
   const title = active?.name ?? offMenu?.name ?? "دوفیکسو";
   const section = activeSection ?? offMenu?.section ?? null;
 
@@ -671,6 +677,29 @@ export default function Layout() {
               unreadable.
             */}
             <div className="ms-auto flex items-center gap-1 shrink-0">
+              {/*
+                Settings, where the sidebar's «سیستم» section used to be.
+                ------------------------------------------------------------
+                A link rather than a button, so it can be middle-clicked and
+                so `aria-current` can say when you are already on it — which
+                also gives it the only resting background of the three
+                controls, since a gear that looks the same on and off the
+                page it opens is a control that never tells you anything.
+              */}
+              <Link
+                to="/settings"
+                aria-label="تنظیمات"
+                title="تنظیمات"
+                aria-current={onSettings ? "page" : undefined}
+                className={`p-2.5 rounded-field transition-colors cursor-pointer shrink-0 ${
+                  onSettings
+                    ? "bg-accent-soft text-accent-text"
+                    : "text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+                }`}
+              >
+                <Cog6ToothIcon className="w-5 h-5" />
+              </Link>
+
               <button
                 type="button"
                 onClick={toggleTheme}

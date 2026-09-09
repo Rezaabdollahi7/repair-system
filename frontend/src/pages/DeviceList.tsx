@@ -50,6 +50,8 @@ import {
   tableScroll,
   tbody,
   td,
+  tdActions,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -460,8 +462,6 @@ export default function DeviceList() {
         </>
       )}
 
-      <span className="w-px h-5 bg-border mx-0.5" aria-hidden="true" />
-
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -811,7 +811,7 @@ export default function DeviceList() {
                       </td>
                       <td className={td}>{device.device_name}</td>
                       <td className={td}>{device.brand ?? "—"}</td>
-                      <td className="px-3 py-3">
+                      <td className={tdActions}>
                         <StatusBadge
                           status={device.status}
                           onStatusChange={(newStatus) =>
@@ -831,10 +831,10 @@ export default function DeviceList() {
 
                       {isAtLeast("admin") && (
                         <>
-                          <td className="px-3 py-3 text-center">
+                          <td className={tdBare}>
                             <InvoiceStatusBadge device={device} />
                           </td>
-                          <td className="px-3 py-3">{rowActions(device)}</td>
+                          <td className={tdActions}>{rowActions(device)}</td>
                         </>
                       )}
                     </tr>

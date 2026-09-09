@@ -34,6 +34,8 @@ import {
   tableScroll,
   tbody,
   td,
+  tdActions,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -326,10 +328,10 @@ export default function CustomerList() {
                       <td className={`${tdMuted} tabular-nums`} dir="ltr">
                         {formatPersianPhone(c.phone)}
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className={tdBare}>
                         {deviceChip(c.device_count ?? 0)}
                       </td>
-                      <td className="px-3 py-3">{rowActions(c)}</td>
+                      <td className={tdActions}>{rowActions(c)}</td>
                     </tr>
                   ))}
                 </tbody>

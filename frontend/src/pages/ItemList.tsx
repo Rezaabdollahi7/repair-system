@@ -40,6 +40,8 @@ import {
   tableScroll,
   tbody,
   td,
+  tdActions,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -510,7 +512,7 @@ export default function ItemList() {
                           in another — and the whole question on this page is
                           "how many, and is that enough".
                         */}
-                        <td className="px-3 py-3 text-center">
+                        <td className={tdBare}>
                           <StockStatusBadge
                             status={status}
                             quantity={item.currentStock || 0}
@@ -525,7 +527,7 @@ export default function ItemList() {
                             ? formatPersianCurrency(item.avgPurchasePrice)
                             : "—"}
                         </td>
-                        <td className="px-3 py-3">{rowActions(item)}</td>
+                        <td className={tdActions}>{rowActions(item)}</td>
                       </tr>
                     );
                   })}

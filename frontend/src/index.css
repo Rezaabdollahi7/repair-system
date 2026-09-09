@@ -128,14 +128,23 @@
   /*
    * Two derived steps for the boundary of a form control.
    *
-   * A divider only has to separate two things the eye already reads as
-   * separate, but on an input the border is the entire signal saying where
-   * the field begins, and WCAG asks 3:1 for that. --grey itself clears it on
-   * white (3.50:1); on the dark surface it does not, so the dark theme gets
-   * its own step at 3.1:1.
+   * ⚠️ These are deliberately below the 3:1 WCAG asks for the boundary of a
+   * control (1.4.11), and that is a decision rather than an oversight. The
+   * light step was --grey at 3.55:1, which met it; on a form of eight fields
+   * that read as eight boxes competing with their own contents, so it came
+   * down to 2.04:1 on white and 2.27:1 on the dark surface.
+   *
+   * What pays for it is the interaction states, which are untouched: hover
+   * takes the border to --border-strong and focus takes it to --primary plus
+   * a three-pixel ring. A field is unmistakable the moment it is reached by
+   * either mouse or keyboard; what is quieter is a field nobody is using, on
+   * a form the reader is already looking at.
+   *
+   * Raise these two values back to var(--grey) and #6D7280 to restore the
+   * measurement — nothing else has to change.
    */
-  --field-border-light: var(--grey);
-  --field-border-dark: #6d7280;
+  --field-border-light: #b0b6c2;
+  --field-border-dark: #5f6575;
 
   /*
    * ── Chart series ──────────────────────────────────────────────────────
@@ -757,6 +766,55 @@ body {
 }
 
 @layer base {
+  /*
+   * ── The list tables: a grid, and alternating rows ────────────────────
+   *
+   * Scoped to `.table-shell`, the marker on `tableCard`, so every one of the
+   * twelve list tables gets this and nothing else does — the collapsed
+   * relief tables inside the chart cards and the print sheets are outside it
+   * and keep their own quieter treatment.
+   *
+   * Written here rather than as utilities on `th`/`td` for one reason: a
+   * third of the cells in these tables carry hand-written classes rather
+   * than the shared ones, because they hold a badge or a row of action
+   * buttons rather than text. A rule on the table catches those too; a
+   * utility on the shared class would have drawn three of a row's six
+   * verticals and left the rest.
+   *
+   * In @layer base so the utilities still win: a row's `hover:bg-surface-alt`
+   * has to beat the stripe, or hovering an even row would do nothing.
+   */
+  .table-shell table :is(th, td) {
+    border-inline-start: 1px solid var(--border);
+  }
+
+  /* The first cell of each row is the outer edge — in RTL the right one —
+     and the card already draws a border there. */
+  .table-shell table :is(th, td):first-child {
+    border-inline-start: 0;
+  }
+
+  /* `tbody` carries `divide-y`, which rules between rows but not under the
+     head. Without this the grid opens with one missing line. */
+  .table-shell thead th {
+    border-bottom: 1px solid var(--border);
+  }
+
+  /*
+   * Half a step of --surface-alt rather than the whole thing: at full
+   * strength the alternating rows are the same tone as the header, and a
+   * table where every other row looks like a second header is harder to read
+   * across, not easier. The mix is against --surface, so the one declaration
+   * gives a light stripe on white and a dark one on the dark theme.
+   */
+  .table-shell tbody tr:nth-child(even) {
+    background-color: color-mix(
+      in oklab,
+      var(--surface-alt) 55%,
+      var(--surface)
+    );
+  }
+
   /*
    * framer-motion is handled at the root by <MotionConfig reducedMotion="user">
    * in App.tsx. This covers the other half — the CSS transitions and

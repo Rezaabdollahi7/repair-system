@@ -14,9 +14,15 @@
  * a corner radius is the one thing in a design system that has to agree
  * everywhere, and one list page with softer corners than the other seven
  * reads as a mistake rather than as a redesign in progress.
+ *
+ * `table-shell` is a marker, not a style: index.css hangs the cell grid and
+ * the alternating rows off it. It lives on the card rather than on the
+ * <table> so all twelve lists get both from the class they already use, and
+ * so the relief tables inside the chart cards — which are not in a card —
+ * keep their own quieter treatment.
  */
 export const tableCard =
-  "bg-surface border border-border rounded-panel shadow-sm overflow-hidden";
+  "table-shell bg-surface border border-border rounded-panel shadow-sm overflow-hidden";
 
 /** Wide tables scroll here, inside the card, rather than widening the page. */
 export const tableScroll = "overflow-x-auto";
@@ -70,6 +76,17 @@ export const tdMuted =
  * written, and getting neither.
  */
 export const tdBare = "px-2.5 py-3.5 text-table text-center";
+
+/**
+ * A cell holding controls rather than text — the row's action buttons.
+ *
+ * Padding only: the buttons align themselves, and a `text-center` here would
+ * fight the `justify-end` inside them. It exists because these cells were
+ * hand-written as `px-3 py-3`, which is the padding the table used two steps
+ * ago — so on every list the actions column sat two pixels shallower than
+ * the six columns beside it.
+ */
+export const tdActions = "px-2.5 py-3.5";
 
 /** Status pills. Pair with a `bg-*-soft text-*-fg` tone from the palette. */
 export const badge =

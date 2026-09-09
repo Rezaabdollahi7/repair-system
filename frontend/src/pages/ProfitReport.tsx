@@ -486,7 +486,7 @@ export default function ProfitReport() {
                           >
                             {formatPersianCurrency(item.profit)}
                           </td>
-                          <td className="px-3 py-3 text-center text-body-sm">
+                          <td className={tdBare}>
                             <MarginCell margin={item.profit_margin} />
                           </td>
                         </tr>

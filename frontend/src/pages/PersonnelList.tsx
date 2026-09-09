@@ -43,6 +43,8 @@ import {
   tableCard,
   tableScroll,
   tbody,
+  tdActions,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -412,7 +414,7 @@ export default function PersonnelList() {
                   {personnel.map((person) => {
                     return (
                       <tr key={person.id} className={tr}>
-                        <td className="px-3 py-3 whitespace-nowrap">
+                        <td className={`${tdActions} whitespace-nowrap`}>
                           <div className="flex items-center justify-center gap-2.5">
                             {avatar(person)}
                             <span className="text-body-sm font-bold text-text-primary">
@@ -426,20 +428,16 @@ export default function PersonnelList() {
                         >
                           {toPersianDigits(person.username)}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          {roleBadge(person)}
-                        </td>
+                        <td className={tdBare}>{roleBadge(person)}</td>
                         <td
                           className={`${tdMuted} whitespace-nowrap tabular-nums`}
                           dir="ltr"
                         >
                           {formatPersianPhone(person.phone)}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          {activeBadge(person)}
-                        </td>
+                        <td className={tdBare}>{activeBadge(person)}</td>
                         {canManage && (
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          <td className={`${tdActions} whitespace-nowrap`}>
                             {rowActions(person)}
                           </td>
                         )}

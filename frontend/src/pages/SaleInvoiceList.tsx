@@ -42,6 +42,7 @@ import {
   tableScroll,
   tbody,
   td,
+  tdActions,
   tdBare,
   tdMuted,
   th,
@@ -579,13 +580,13 @@ export default function SaleInvoiceList() {
                             ? formatPersianCurrency(remaining)
                             : "—"}
                         </td>
-                        <td className="px-3 py-3 text-center">
+                        <td className={tdBare}>
                           <PaymentStatusBadge
                             status={invoice.payment_status}
                             size="sm"
                           />
                         </td>
-                        <td className="px-3 py-3">{rowActions(invoice)}</td>
+                        <td className={tdActions}>{rowActions(invoice)}</td>
                       </tr>
                     );
                   })}

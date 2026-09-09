@@ -32,6 +32,8 @@ import {
   tableScroll,
   tbody,
   td,
+  tdActions,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -412,7 +414,7 @@ export default function ExportList() {
                       <td className={`${td} tabular-nums`}>
                         {formatDate(row.created_at)}
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className={tdBare}>
                         <StatusBadge status={row.status} />
                         {row.error && (
                           <p className="text-body-xs text-danger-fg mt-1">
@@ -427,7 +429,7 @@ export default function ExportList() {
                         {row.includes_images ? "دارد" : "ندارد"}
                       </td>
                       <td className={tdMuted}>{row.created_by_name ?? "—"}</td>
-                      <td className="px-3 py-3">{rowActions(row)}</td>
+                      <td className={tdActions}>{rowActions(row)}</td>
                     </tr>
                   ))}
                 </tbody>

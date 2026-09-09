@@ -20,6 +20,7 @@ import {
   tableScroll,
   tbody,
   td,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -441,7 +442,7 @@ export default function StockReport() {
                             <td className={tdMuted}>
                               {item.category_name || "—"}
                             </td>
-                            <td className="px-3 py-3 text-center">
+                            <td className={tdBare}>
                               <StockStatusBadge
                                 status={status}
                                 quantity={item.current_stock}

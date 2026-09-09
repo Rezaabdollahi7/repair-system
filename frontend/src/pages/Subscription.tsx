@@ -18,6 +18,7 @@ import {
   tableScroll,
   tbody,
   td,
+  tdBare,
   tdMuted,
   th,
   thead,
@@ -658,7 +659,7 @@ export default function Subscription() {
                         <td className={`${td} tabular-nums`}>
                           {toToman(payment.amount_rials)}
                         </td>
-                        <td className="px-3 py-3.5 text-center">
+                        <td className={tdBare}>
                           <StatusPill
                             label={paymentState.label}
                             color={paymentState.color}
@@ -666,7 +667,7 @@ export default function Subscription() {
                             size="sm"
                           />
                         </td>
-                        <td className="px-3 py-3.5 text-center">
+                        <td className={tdBare}>
                           {payment.status === "verified" ? (
                             <button
                               type="button"

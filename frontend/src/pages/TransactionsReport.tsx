@@ -247,7 +247,7 @@ export default function TransactionsReport() {
                         >
                           {formatPersianDate(tx.created_at)}
                         </td>
-                        <td className="px-3 py-3 text-center">
+                        <td className={tdBare}>
                           <StatusPill
                             label={kind.label}
                             color={kind.color}

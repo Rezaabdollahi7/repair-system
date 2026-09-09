@@ -16,19 +16,16 @@ import { EyeIcon, TrashIcon } from "@heroicons/react/24/outline";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import { PAYMENT_STATUSES, paymentStatusOf } from "../utils/invoiceStatus";
 import { staggerContainer, staggerItem } from "../motion";
-import {
-  formatPersianCurrency,
-  formatPersianDate,
-  toPersianDigits,
-} from "../utils/formatters";
+import { formatPersianCurrency, formatPersianDate } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import {
-  iconButton,
-  rowCard,
+  actionDelete,
+  actionView,
   primaryButton,
-  secondaryButton,
+  rowCard,
   searchField,
   searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -146,7 +143,6 @@ export default function PurchaseInvoiceList() {
    * hovered: they used to carry a tint each, which put a coloured square on
    * every line beside a row that already states its payment status.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (invoice: PurchaseInvoice) => (
     <div className="flex gap-1 justify-end items-center">
@@ -155,7 +151,7 @@ export default function PurchaseInvoiceList() {
           e.stopPropagation();
           openPurchaseInvoiceDetail(invoice.id);
         }}
-        className={actionButton}
+        className={actionView}
         title="مشاهده جزئیات"
       >
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -166,7 +162,7 @@ export default function PurchaseInvoiceList() {
             e.stopPropagation();
             setDeleteTarget(invoice);
           }}
-          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          className={actionDelete}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -180,14 +176,6 @@ export default function PurchaseInvoiceList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : filtering
-              ? `${toPersianDigits(total)} نتیجه از این فیلتر`
-              : `${toPersianDigits(total)} فاکتور خرید ثبت شده`}
-        </p>
-
         {/*
           Payment-state chips, the same control the sales list has. The
           purchases endpoint had no such filter until now, which is why this
@@ -437,7 +425,7 @@ export default function PurchaseInvoiceList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[1040px] w-full">
+              <table className="min-w-[1120px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>شماره فاکتور</th>

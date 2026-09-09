@@ -211,14 +211,6 @@ export default function ProfitReport() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : filtering
-              ? `${toPersianDigits(rows.length)} کالا در بازهٔ انتخابی`
-              : `${toPersianDigits(rows.length)} کالای فروش‌رفته، از ابتدا تا امروز`}
-        </p>
-
         <div className="flex flex-wrap items-end gap-3 mt-4">
           <div>
             <label className="block text-body-xs text-text-secondary mb-1.5">
@@ -439,7 +431,7 @@ export default function ProfitReport() {
 
               <div className={`hidden lg:block ${tableCard}`}>
                 <div className={tableScroll}>
-                  <table className="min-w-[880px] w-full">
+                  <table className="min-w-[940px] w-full">
                     <thead className={thead}>
                       <tr>
                         <th className={th}>کد</th>

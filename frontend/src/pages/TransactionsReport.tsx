@@ -120,11 +120,6 @@ export default function TransactionsReport() {
           <ArrowRightIcon className="w-4 h-4" aria-hidden="true" />
           بازگشت به داشبورد
         </Link>
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : `${toPersianDigits(transactions.length)} حرکت اخیر موجودی`}
-        </p>
       </header>
 
       {loading ? (
@@ -223,7 +218,7 @@ export default function TransactionsReport() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[760px] w-full">
+              <table className="min-w-[820px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>تاریخ</th>

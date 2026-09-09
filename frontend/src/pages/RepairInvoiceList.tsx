@@ -3,11 +3,7 @@ import { getRepairInvoices, deleteRepairInvoice } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
-import {
-  formatPersianCurrency,
-  formatPersianDate,
-  toPersianDigits,
-} from "../utils/formatters";
+import { formatPersianCurrency, formatPersianDate } from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
@@ -32,12 +28,14 @@ import {
 import { staggerContainer, staggerItem } from "../motion";
 import { useDebounce } from "../utils/helpers";
 import {
-  iconButton,
-  rowCard,
+  actionDelete,
+  actionEdit,
+  actionView,
   primaryButton,
-  secondaryButton,
+  rowCard,
   searchField,
   searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -175,7 +173,6 @@ export default function RepairInvoiceList() {
    * disabled on an issued invoice: a control that cannot do anything is worse
    * than no control.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (invoice: RepairInvoice) => (
     <div className="flex gap-1 justify-end items-center">
@@ -184,7 +181,7 @@ export default function RepairInvoiceList() {
           e.stopPropagation();
           openRepairInvoiceDetail(invoice.id);
         }}
-        className={actionButton}
+        className={actionView}
         title="جزئیات"
       >
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -195,7 +192,7 @@ export default function RepairInvoiceList() {
             e.stopPropagation();
             openRepairInvoiceEdit(invoice.id);
           }}
-          className={actionButton}
+          className={actionEdit}
           title="ویرایش"
         >
           <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -207,7 +204,7 @@ export default function RepairInvoiceList() {
             e.stopPropagation();
             setDeleteTarget(invoice);
           }}
-          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          className={actionDelete}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -219,14 +216,6 @@ export default function RepairInvoiceList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : filtering
-              ? `${toPersianDigits(total)} نتیجه از این فیلتر`
-              : `${toPersianDigits(total)} فاکتور صادر شده`}
-        </p>
-
         {/*
           The lifecycle as chips instead of a <select>. Four states in the
           order a document moves through them, each with the colour it wears
@@ -472,7 +461,7 @@ export default function RepairInvoiceList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[1040px] w-full">
+              <table className="min-w-[1120px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>شماره فاکتور</th>

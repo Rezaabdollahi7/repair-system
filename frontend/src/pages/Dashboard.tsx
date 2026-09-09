@@ -585,10 +585,16 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* The trend beside the collection ring: the first says how the
-              month has been going, the second how much of it has actually been
-              paid for. */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/*
+          The trend beside the collection ring: the first says how the month
+          has been going, the second how much of it has actually been paid
+          for.
+
+          `mt-6`, a step wider than the grid's own `gap-4`. Without it the two
+          rows sat exactly one gap apart and read as one eight-cell block
+          rather than four tiles and two charts.
+        */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
           <ChartCard
             title="روند درآمد روزانه"
             subtitle="۱۴ روز گذشته — محور زمان از راست به چپ"

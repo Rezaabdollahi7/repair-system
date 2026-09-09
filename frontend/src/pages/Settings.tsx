@@ -9,6 +9,7 @@ import {
   DocumentTextIcon,
   CheckCircleIcon,
   Cog6ToothIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/solid";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import type { SettingsForm } from "../types/api";
@@ -266,13 +267,22 @@ export default function Settings() {
     /* No padding of its own: <main> in the shell already provides it, and the
        extra `px-2 sm:px-4` made this the one page inset from the others. */
     <div dir="rtl">
-      <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {isSuperAdmin
-            ? "ظاهر برنامه، اطلاعات کارگاه و پیش‌فرض‌های فاکتور"
-            : "دسترسی محدود — فقط تنظیمات ظاهری"}
+      {/*
+        The descriptive half of this went with the page titles: «ظاهر برنامه،
+        اطلاعات کارگاه و پیش‌فرض‌های فاکتور» was a list of the tabs sitting
+        directly above the tabs. What is left is the half that tells a
+        technician why there is only one of them, which is not something the
+        page says anywhere else.
+      */}
+      {!isSuperAdmin && (
+        <p className="mb-4 flex items-center gap-2 rounded-panel border border-info/25 bg-info-soft px-4 py-3 text-body-sm text-info-fg">
+          <InformationCircleIcon
+            className="h-5 w-5 shrink-0"
+            aria-hidden="true"
+          />
+          دسترسی محدود — فقط تنظیمات ظاهری
         </p>
-      </header>
+      )}
 
       <div className="border-b border-border mb-4 sm:mb-6 overflow-x-auto">
         <nav className="flex gap-3 sm:gap-6 min-w-max">

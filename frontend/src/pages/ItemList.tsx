@@ -28,7 +28,9 @@ import { staggerContainer, staggerItem } from "../motion";
 import { STOCK_STATUSES, stockStatusOf } from "../utils/stockStatus";
 import type { StockStatusKey } from "../utils/stockStatus";
 import {
-  iconButton,
+  actionDelete,
+  actionEdit,
+  actionView,
   primaryButton,
   rowCard,
   searchField,
@@ -196,7 +198,6 @@ export default function ItemList() {
   };
 
   /** Row actions, shared by the table row and the phone card. */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (item: Item) => (
     <div className="flex gap-1 justify-end items-center">
@@ -205,7 +206,7 @@ export default function ItemList() {
           e.stopPropagation();
           openItemDetail(item.id);
         }}
-        className={actionButton}
+        className={actionView}
         title="مشاهده جزئیات"
       >
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -215,7 +216,7 @@ export default function ItemList() {
           e.stopPropagation();
           openItemEdit(item.id);
         }}
-        className={actionButton}
+        className={actionEdit}
         title="ویرایش"
       >
         <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -226,7 +227,7 @@ export default function ItemList() {
             e.stopPropagation();
             setDeleteTarget(item);
           }}
-          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          className={actionDelete}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -238,14 +239,6 @@ export default function ItemList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : filtering
-              ? `${toPersianDigits(total)} نتیجه از این فیلتر`
-              : `${toPersianDigits(total)} کالا در انبار`}
-        </p>
-
         {/*
           The three stock buckets, worst first.
           -----------------------------------------------------------------
@@ -472,7 +465,7 @@ export default function ItemList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[940px] w-full">
+              <table className="min-w-[1000px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>کد کالا</th>

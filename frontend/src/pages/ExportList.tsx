@@ -24,7 +24,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { staggerContainer, staggerItem } from "../motion";
 import {
-  iconButton,
+  actionConfirm,
+  actionDelete,
   primaryButton,
   rowCard,
   tableCard,
@@ -205,14 +206,13 @@ export default function ExportList() {
    * row, which put two colours beside a status badge already saying what the
    * row is.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (row: DataExport) => (
     <div className="flex gap-1 justify-end items-center">
       {row.status === "ready" && (
         <button
           onClick={() => handleDownload(row)}
-          className={actionButton}
+          className={actionConfirm}
           title="دانلود"
         >
           <ArrowDownTrayOutline className="w-[1.15rem] h-[1.15rem]" />
@@ -221,7 +221,7 @@ export default function ExportList() {
       {row.status !== "pending" && (
         <button
           onClick={() => setDeleteTarget(row)}
-          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          className={actionDelete}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -259,16 +259,6 @@ export default function ExportList() {
 
   return (
     <div dir="rtl">
-      <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : exports.length === 0
-              ? "هنوز خروجی‌ای ساخته نشده"
-              : `${toPersianDigits(exports.length)} خروجی ساخته شده`}
-        </p>
-      </header>
-
       {/*
         What this page is, and what it is not.
         -----------------------------------------------------------------
@@ -399,7 +389,7 @@ export default function ExportList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[760px] w-full">
+              <table className="min-w-[820px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>تاریخ</th>

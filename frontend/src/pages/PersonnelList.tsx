@@ -30,13 +30,16 @@ import StatusPill from "../components/StatusPill";
 import { roleStyleOf } from "../utils/roleStatus";
 import { staggerContainer, staggerItem } from "../motion";
 import {
+  actionConfirm,
+  actionDelete,
+  actionEdit,
+  actionNeutral,
   badge,
-  iconButton,
-  rowCard,
   primaryButton,
-  secondaryButton,
+  rowCard,
   searchField,
   searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -202,14 +205,13 @@ export default function PersonnelList() {
    * person is in — and that is already the «وضعیت» column's job, two cells
    * over, saying the opposite thing.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (person: Personnel) => (
     <div className="flex gap-1 justify-end items-center">
       {!outranks(person) && (
         <button
           onClick={() => openPersonnelEdit(person.id)}
-          className={actionButton}
+          className={actionEdit}
           title="ویرایش"
         >
           <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -218,7 +220,10 @@ export default function PersonnelList() {
       {person.id !== user?.id && !outranks(person) && (
         <button
           onClick={() => setToggleTarget(person)}
-          className={actionButton}
+          /* The toggle wears the colour of the state it moves to, not of
+             the button: switching someone off is the quiet, reversible one,
+             and switching them back on is the affirmative. */
+          className={person.is_active ? actionNeutral : actionConfirm}
           title={person.is_active ? "غیرفعال‌سازی" : "فعال‌سازی"}
         >
           {person.is_active ? (
@@ -231,7 +236,7 @@ export default function PersonnelList() {
       {canDelete && person.id !== user?.id && (
         <button
           onClick={() => setDeleteTarget(person)}
-          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          className={actionDelete}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -270,16 +275,6 @@ export default function PersonnelList() {
 
   return (
     <div dir="rtl">
-      <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : debouncedSearch
-              ? `${toPersianDigits(total)} نتیجه از این جستجو`
-              : `${toPersianDigits(total)} کاربر در این کارگاه`}
-        </p>
-      </header>
-
       <div className={toolbar}>
         <div className={toolbarSearch}>
           <MagnifyingGlassIcon className={searchIcon} />
@@ -402,7 +397,7 @@ export default function PersonnelList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[680px] w-full">
+              <table className="min-w-[720px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>نام</th>

@@ -189,12 +189,6 @@ export default function StockReport() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : `${toPersianDigits(rows.length)} کالا در این گزارش`}
-        </p>
-
         <div className="flex flex-wrap items-center gap-3 mt-4">
           <select
             value={filters.categoryId}
@@ -412,7 +406,7 @@ export default function StockReport() {
 
               <div className={`hidden lg:block ${tableCard}`}>
                 <div className={tableScroll}>
-                  <table className="min-w-[820px] w-full">
+                  <table className="min-w-[880px] w-full">
                     <thead className={thead}>
                       <tr>
                         <th className={th}>کد</th>

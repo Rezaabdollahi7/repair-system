@@ -271,6 +271,7 @@
   --warning: var(--warning-base);
   --warning-strong-fg: var(--warning-strong);
   --warning-soft: var(--warning-tint);
+  --warning-soft-hover: #fae5c9;
   --danger: var(--error-base);
   --danger-hover: var(--error-strong);
   --danger-strong-fg: var(--error-strong);
@@ -279,6 +280,7 @@
   --info: var(--info-base);
   --info-strong-fg: var(--info-strong);
   --info-soft: var(--info-tint);
+  --info-soft-hover: #d6edf5;
 
   --danger-fill: var(--error-strong);
   --warning-fill: var(--warning-strong);
@@ -394,6 +396,7 @@
   --warning: #fbbf24;
   --warning-strong-fg: #fcd34d;
   --warning-soft: #33270c;
+  --warning-soft-hover: #453413;
   --danger: #f87171;
   --danger-hover: #fca5a5;
   --danger-strong-fg: #fca5a5;
@@ -402,6 +405,7 @@
   --info: #22d3ee;
   --info-strong-fg: #67e8f9;
   --info-soft: #123339;
+  --info-soft-hover: #18444c;
 
   --danger-fill: #f87171;
   --warning-fill: #fbbf24;
@@ -539,6 +543,7 @@
   --color-warning: var(--warning);
   --color-warning-fg: var(--warning-strong-fg);
   --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-hover: var(--warning-soft-hover);
   --color-danger: var(--danger);
   --color-danger-hover: var(--danger-hover);
   --color-danger-fg: var(--danger-strong-fg);
@@ -547,6 +552,7 @@
   --color-info: var(--info);
   --color-info-fg: var(--info-strong-fg);
   --color-info-soft: var(--info-soft);
+  --color-info-soft-hover: var(--info-soft-hover);
 
   --color-scrim: var(--scrim);
   --color-on-dark: var(--on-dark);
@@ -625,6 +631,22 @@
   --text-body-sm--line-height: 1.7;
   --text-body-xs: 0.75rem; /* 12 */
   --text-body-xs--line-height: 1.65;
+
+  /*
+   * One step for the tables, between body-sm and body-md.
+   *
+   * The lists went from 14px to 16px and stopped fitting: the widest of them
+   * needs about 1200px of columns at that size, and the content area on a
+   * 1440px laptop is around 1150 — so every invoice table gained a horizontal
+   * scrollbar and the action column, the one a shop actually reaches for,
+   * ended up off the left edge.
+   *
+   * 15px is the size that reads larger and still fits. The line-height is
+   * tighter than body-md's 1.75 on purpose: 1.75 is a reading measure for
+   * paragraphs, and applied to a one-line cell it just makes the row taller.
+   */
+  --text-table: 0.9375rem; /* 15 */
+  --text-table--line-height: 1.5;
 }
 
 /* ===================================================================

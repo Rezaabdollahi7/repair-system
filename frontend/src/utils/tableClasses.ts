@@ -23,8 +23,25 @@ export const tableScroll = "overflow-x-auto";
 
 export const thead = "bg-surface-alt";
 
+/*
+ * A step up from `text-body-xs`/`text-body-sm`, which is where these started.
+ *
+ * 12px column headings and 14px cells are a dashboard's sizes, and this is
+ * not a dashboard — it is the screen a shop has open all day, reading part
+ * numbers and amounts off it across a counter. The row padding goes up with
+ * the type so the lines do not close ranks.
+ *
+ * `text-table` is 15px rather than body-md's 16: at 16 the widest of these
+ * tables no longer fit the content area on a laptop, and the column that
+ * fell off the edge was the actions one. See the note beside the token.
+ *
+ * The horizontal padding came down from `px-3` to `px-2.5` in the same
+ * pass to pay for the extra pixel of type. Ten columns times four pixels
+ * a side is forty pixels of table, which is the difference between the
+ * devices list fitting a laptop and scrolling.
+ */
 export const th =
-  "px-3 py-3 text-center text-body-xs font-bold text-text-secondary whitespace-nowrap";
+  "px-2.5 py-3.5 text-center text-table font-bold text-text-secondary whitespace-nowrap";
 
 export const tbody = "divide-y divide-border";
 
@@ -38,9 +55,10 @@ export const tr = "transition-colors hover:bg-surface-alt/70";
 /** Clickable rows say so, and keep a visible focus ring for the keyboard. */
 export const trClickable = `${tr} cursor-pointer`;
 
-export const td = "px-3 py-3 text-body-sm text-center text-text-primary";
+export const td = "px-2.5 py-3.5 text-table text-center text-text-primary";
 
-export const tdMuted = "px-3 py-3 text-body-sm text-center text-text-secondary";
+export const tdMuted =
+  "px-2.5 py-3.5 text-table text-center text-text-secondary";
 
 /**
  * A cell whose text colour the caller sets.
@@ -51,15 +69,49 @@ export const tdMuted = "px-3 py-3 text-body-sm text-center text-text-secondary";
  * been asking for a green «پرداخت‌شده» and a red «مانده» since they were
  * written, and getting neither.
  */
-export const tdBare = "px-3 py-3 text-body-sm text-center";
+export const tdBare = "px-2.5 py-3.5 text-table text-center";
 
 /** Status pills. Pair with a `bg-*-soft text-*-fg` tone from the palette. */
 export const badge =
   "inline-flex items-center px-2.5 py-1 rounded-pill text-body-xs font-bold whitespace-nowrap";
 
 /** Small square icon button in a row's action column. */
-export const iconButton =
-  "p-2 rounded-field transition-colors cursor-pointer hover:opacity-80";
+export const iconButton = "p-2 rounded-field transition-colors cursor-pointer";
+
+/*
+ * The row actions, one class per kind of action.
+ *
+ * All of them used to be `text-text-muted` until hovered, so a row ended in
+ * three identical grey squares and the only way to learn which one deleted
+ * the record was to point at it and read the tooltip. Each now wears the
+ * colour of what it does, at rest:
+ *
+ *   view      اطلاعات   the informational tone
+ *   edit      ویرایش    amber — a change, not yet a loss
+ *   delete    حذف       red
+ *   confirm   ساختن     green, for the actions that create or approve
+ *   neutral             the reversible toggles, which should stay quiet
+ *
+ * A tinted square with a strong icon rather than a strong square with a pale
+ * icon: at 34px a solid red button repeated down a column is louder than the
+ * data, and these sit beside numbers a shop is trying to read. The tints are
+ * the same `*-soft` steps the status badges use, so a row's actions and its
+ * badges belong to one palette.
+ *
+ * The brand blue is deliberately not among them. It is spent once per screen
+ * — on the active nav item — and eight rows of it down an action column is
+ * exactly the "everything is emphasised, so nothing is" the accent exists to
+ * avoid. `view` takes the informational tone instead.
+ */
+export const actionView = `${iconButton} bg-info-soft text-info-fg hover:bg-info-soft-hover`;
+
+export const actionEdit = `${iconButton} bg-warning-soft text-warning-fg hover:bg-warning-soft-hover`;
+
+export const actionDelete = `${iconButton} bg-danger-soft text-danger-fg hover:bg-danger-soft-hover`;
+
+export const actionConfirm = `${iconButton} bg-success-soft text-success-fg hover:bg-success-soft-hover`;
+
+export const actionNeutral = `${iconButton} bg-surface-alt text-text-secondary hover:bg-primary-soft-hover hover:text-text-primary`;
 
 /** The card shown in place of the table below `lg`. */
 export const rowCard =

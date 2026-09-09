@@ -22,12 +22,14 @@ import {
 import { toPersianDigits } from "../utils/formatters";
 import { staggerContainer, staggerItem } from "../motion";
 import {
-  iconButton,
+  actionDelete,
+  actionEdit,
+  actionView,
   primaryButton,
-  secondaryButton,
   rowCard,
   searchField,
   searchIcon,
+  secondaryButton,
   tableCard,
   tableScroll,
   tbody,
@@ -105,7 +107,6 @@ export default function CustomerList() {
    * hovered: a tinted square each put three colours in the last column of a
    * four-column table, which was most of the colour on the page.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (c: CustomerListRow) => (
     <div className="flex gap-1 justify-end items-center">
@@ -114,7 +115,7 @@ export default function CustomerList() {
           e.stopPropagation();
           openCustomerDetail(c.id);
         }}
-        className={actionButton}
+        className={actionView}
         title="مشاهده جزئیات"
       >
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -124,7 +125,7 @@ export default function CustomerList() {
           e.stopPropagation();
           openCustomerEdit(c.id);
         }}
-        className={actionButton}
+        className={actionEdit}
         title="ویرایش"
       >
         <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -135,7 +136,7 @@ export default function CustomerList() {
             e.stopPropagation();
             setDeleteTarget(c);
           }}
-          className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+          className={actionDelete}
           title="حذف"
         >
           <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -196,16 +197,6 @@ export default function CustomerList() {
 
   return (
     <div dir="rtl">
-      <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : debouncedSearch
-              ? `${toPersianDigits(total)} نتیجه از این جستجو`
-              : `${toPersianDigits(total)} مشتری ثبت شده`}
-        </p>
-      </header>
-
       <div className={toolbar}>
         <div className={toolbarSearch}>
           <MagnifyingGlassIcon className={searchIcon} />
@@ -313,7 +304,7 @@ export default function CustomerList() {
 
           <div className={`hidden sm:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[560px] w-full">
+              <table className="min-w-[600px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>نام</th>

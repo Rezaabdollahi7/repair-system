@@ -37,7 +37,10 @@ import { useModal } from "../context/ModalContext";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import { backdrop, modalPanel, staggerContainer, staggerItem } from "../motion";
 import {
-  iconButton,
+  actionConfirm,
+  actionDelete,
+  actionNeutral,
+  actionView,
   primaryButton,
   rowCard,
   searchField,
@@ -402,10 +405,9 @@ export default function DeviceList() {
    * title, and the destructive one turns red only when it is about to be
    * pressed.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (device: Device) => (
-    <div className="flex gap-2 justify-end items-center">
+    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
       {device.invoice_count > 0 ? (
         <button
           onClick={(e) => {
@@ -413,7 +415,7 @@ export default function DeviceList() {
             if (device.sale_invoice_id)
               openSaleInvoiceDetail(device.sale_invoice_id);
           }}
-          className={actionButton}
+          className={actionView}
           title={
             device.invoice_status === "paid"
               ? "فاکتور پرداخت شده"
@@ -428,7 +430,7 @@ export default function DeviceList() {
             e.stopPropagation();
             handleToggleNeedsInvoice(device.id, true);
           }}
-          className={actionButton}
+          className={actionNeutral}
           title="اگر نیاز به فاکتور دارد — کلیک کنید"
         >
           <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -440,7 +442,7 @@ export default function DeviceList() {
               e.stopPropagation();
               openSaleInvoiceCreate(device.id);
             }}
-            className={actionButton}
+            className={actionConfirm}
             title="ایجاد فاکتور فروش"
           >
             <DocumentCurrencyDollarIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -450,7 +452,7 @@ export default function DeviceList() {
               e.stopPropagation();
               handleToggleNeedsInvoice(device.id, false);
             }}
-            className={actionButton}
+            className={actionNeutral}
             title="فاکتور لازم نیست"
           >
             <XCircleIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -465,7 +467,7 @@ export default function DeviceList() {
           e.stopPropagation();
           setDeleteTarget(device);
         }}
-        className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+        className={actionDelete}
         title="حذف"
       >
         <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -478,18 +480,6 @@ export default function DeviceList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-body-sm text-text-secondary">
-              {loading
-                ? "در حال بارگذاری…"
-                : filtering
-                  ? `${toPersianDigits(total)} نتیجه از این فیلتر`
-                  : `${toPersianDigits(total)} دستگاه ثبت شده`}
-            </p>
-          </div>
-        </div>
-
         {/*
           Quick status filters.
           -----------------------------------------------------------------
@@ -762,7 +752,7 @@ export default function DeviceList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[1040px] w-full">
+              <table className="min-w-[1120px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>پذیرش</th>

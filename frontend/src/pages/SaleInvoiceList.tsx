@@ -30,9 +30,11 @@ import { staggerContainer, staggerItem } from "../motion";
 import SaleInvoiceFilterPanel from "../components/SaleInvoiceFilterPanel";
 import { useDebounce } from "../utils/helpers";
 import {
-  iconButton,
-  rowCard,
+  actionDelete,
+  actionEdit,
+  actionView,
   primaryButton,
+  rowCard,
   searchField,
   searchIcon,
   secondaryButton,
@@ -196,7 +198,6 @@ export default function SaleInvoiceList() {
    * hovered: three tinted squares on every line competed with the payment
    * badge, which is the colour the row is meant to be read by.
    */
-  const actionButton = `${iconButton} text-text-muted hover:text-text-primary hover:bg-surface-alt`;
 
   const rowActions = (invoice: SaleInvoice) => (
     <div className="flex gap-1 justify-end items-center">
@@ -205,7 +206,7 @@ export default function SaleInvoiceList() {
           e.stopPropagation();
           openSaleInvoiceDetail(invoice.id);
         }}
-        className={actionButton}
+        className={actionView}
         title="مشاهده جزئیات"
       >
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -217,7 +218,7 @@ export default function SaleInvoiceList() {
               e.stopPropagation();
               openSaleInvoiceEdit(invoice.id);
             }}
-            className={actionButton}
+            className={actionEdit}
             title="ویرایش فاکتور"
           >
             <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -227,7 +228,7 @@ export default function SaleInvoiceList() {
               e.stopPropagation();
               setDeleteTarget(invoice);
             }}
-            className={`${iconButton} text-text-muted hover:text-danger-fg hover:bg-danger-soft`}
+            className={actionDelete}
             title="حذف"
           >
             <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
@@ -240,14 +241,6 @@ export default function SaleInvoiceList() {
   return (
     <div dir="rtl">
       <header className="mb-5">
-        <p className="text-body-sm text-text-secondary">
-          {loading
-            ? "در حال بارگذاری…"
-            : filtering
-              ? `${toPersianDigits(total)} نتیجه از این فیلتر`
-              : `${toPersianDigits(total)} فاکتور فروش ثبت شده`}
-        </p>
-
         <div
           className="flex gap-2 mt-4 overflow-x-auto pb-1
                      sm:flex-wrap sm:overflow-x-visible sm:pb-0"
@@ -514,7 +507,7 @@ export default function SaleInvoiceList() {
 
           <div className={`hidden lg:block ${tableCard}`}>
             <div className={tableScroll}>
-              <table className="min-w-[1040px] w-full">
+              <table className="min-w-[1120px] w-full">
                 <thead className={thead}>
                   <tr>
                     <th className={th}>شماره فاکتور</th>

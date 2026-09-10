@@ -6,6 +6,10 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { paymentStatusFor } from "../utils/payment";
+import {
+  averageAfterAdding,
+  averageAfterRemoving,
+} from "../utils/avgPurchasePrice";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
 import type {
@@ -99,14 +103,17 @@ async function writeLines(
       select: { currentStock: true, avgPurchasePrice: true },
     });
 
-    const newStock = item.currentStock + line.quantity;
-    const currentValue = item.avgPurchasePrice.toNumber() * item.currentStock;
-    const newAvgPrice =
-      newStock > 0 ? (currentValue + totalPrice) / newStock : line.unit_price;
-
     await tx.item.update({
       where: { id: line.item_id },
-      data: { currentStock: newStock, avgPurchasePrice: newAvgPrice },
+      data: {
+        currentStock: item.currentStock + line.quantity,
+        avgPurchasePrice: averageAfterAdding({
+          avg: item.avgPurchasePrice.toNumber(),
+          stock: item.currentStock,
+          quantity: line.quantity,
+          unitPrice: line.unit_price,
+        }),
+      },
     });
 
     await tx.inventoryTransaction.create({
@@ -132,16 +139,15 @@ async function writeLines(
  * Takes the invoice's lines back out of stock — what delete does, and what
  * an edit has to do before writing the new lines.
  *
- * The average purchase price is deliberately left alone. It is a running
- * weighted average, so later purchases and sales have already moved it and
- * there is no old value to restore; recomputing it would need the whole
- * purchase history, not this one invoice. Delete has always worked this way
- * and an edit keeps the same behaviour rather than inventing a second one.
+ * The average purchase price comes back out with them, at the price each
+ * line was bought at. It used to be left standing, so deleting or editing
+ * an invoice valued the surviving stock at a price nobody had paid — and
+ * the stock report multiplies that figure by the quantity on hand.
  */
 async function reverseLines(
   tx: Prisma.TransactionClient,
   invoiceId: number,
-  lines: { itemId: number; quantity: number }[],
+  lines: { itemId: number; quantity: number; unitPrice: Prisma.Decimal }[],
   note: string,
   actorId: number | null,
   workspaceId: number,
@@ -149,14 +155,22 @@ async function reverseLines(
   for (const line of lines) {
     const item = await tx.item.findFirstOrThrow({
       where: { id: line.itemId, workspaceId },
-      select: { currentStock: true },
+      select: { currentStock: true, avgPurchasePrice: true },
     });
 
     await tx.item.update({
       where: { id: line.itemId },
-      // Clamped at zero, as before: the stock may already have been sold
-      // on, and a negative figure would be worse than an inexact one.
-      data: { currentStock: Math.max(0, item.currentStock - line.quantity) },
+      data: {
+        // Clamped at zero, as before: the stock may already have been sold
+        // on, and a negative figure would be worse than an inexact one.
+        currentStock: Math.max(0, item.currentStock - line.quantity),
+        avgPurchasePrice: averageAfterRemoving({
+          avg: item.avgPurchasePrice.toNumber(),
+          stock: item.currentStock,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice.toNumber(),
+        }),
+      },
     });
 
     await tx.inventoryTransaction.create({
@@ -327,7 +341,9 @@ export const update = async (req: Request, res: Response) => {
 
     const existing = await prisma.purchaseInvoice.findFirst({
       where: { id, workspaceId },
-      include: { items: { select: { itemId: true, quantity: true } } },
+      include: {
+        items: { select: { itemId: true, quantity: true, unitPrice: true } },
+      },
     });
 
     if (!existing) {
@@ -430,7 +446,7 @@ export const remove = async (req: Request, res: Response) => {
     const invoice = await prisma.purchaseInvoice.findFirst({
       where: { id, workspaceId },
       include: {
-        items: { select: { itemId: true, quantity: true } },
+        items: { select: { itemId: true, quantity: true, unitPrice: true } },
       },
     });
 

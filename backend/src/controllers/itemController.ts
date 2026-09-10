@@ -19,6 +19,7 @@ import type {
 } from "../schemas/item";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
+import { averageAfterAdding } from "../utils/avgPurchasePrice";
 
 const itemInclude = {
   category: { select: { name: true } },
@@ -466,10 +467,15 @@ export const quickPurchase = async (req: Request, res: Response) => {
     const totalAmount = body.quantity * body.unit_price;
     const newStock = item.currentStock + body.quantity;
 
-    // Weighted average: existing stock valued at the old average, plus this
-    // purchase at its own price, spread over the new total.
-    const currentValue = item.avgPurchasePrice.toNumber() * item.currentStock;
-    const newAvgPrice = (currentValue + totalAmount) / newStock;
+    // The same arithmetic a purchase-invoice line runs, from the same
+    // module: a quick purchase is a one-line purchase invoice and had no
+    // business computing the average its own way.
+    const newAvgPrice = averageAfterAdding({
+      avg: item.avgPurchasePrice.toNumber(),
+      stock: item.currentStock,
+      quantity: body.quantity,
+      unitPrice: body.unit_price,
+    });
 
     // One transaction: the invoice, its line, the stock adjustment and the
     // ledger entry have to land together or not at all, or stock and history

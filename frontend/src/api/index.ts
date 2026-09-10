@@ -364,6 +364,14 @@ export const getPurchaseInvoice = (id: Id) =>
   api.get<PurchaseInvoiceDetail>(`/purchase-invoices/${id}`);
 export const createPurchaseInvoice = (data: PurchaseInvoiceCreateBody) =>
   api.post<PurchaseInvoice>("/purchase-invoices", data);
+/*
+ * The same body as create, as with sale invoices: the server replaces the
+ * header and rebuilds the whole line list, so there is no partial shape.
+ */
+export const updatePurchaseInvoice = (
+  id: Id,
+  data: PurchaseInvoiceCreateBody,
+) => api.put<MessageResponse>(`/purchase-invoices/${id}`, data);
 export const updatePurchaseInvoicePayment = (id: Id, data: PaymentUpdateBody) =>
   api.put<PaymentUpdateResponse>(`/purchase-invoices/${id}/payment`, data);
 export const deletePurchaseInvoice = (id: Id) =>

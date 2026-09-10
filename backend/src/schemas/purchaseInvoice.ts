@@ -66,6 +66,19 @@ export type PurchaseInvoiceCreateBody = z.infer<
   typeof purchaseInvoiceCreateSchema
 >;
 
+/*
+ * The same shape as create. An edit replaces the header and rebuilds the
+ * whole line list — as the sale-invoice update does — because a purchase's
+ * lines are what moved the stock, and reconciling a partial change against
+ * what is already in the warehouse is a harder problem than resending the
+ * invoice as it should now read.
+ */
+export const purchaseInvoiceUpdateSchema = purchaseInvoiceCreateSchema;
+
+export type PurchaseInvoiceUpdateBody = z.infer<
+  typeof purchaseInvoiceUpdateSchema
+>;
+
 export const purchaseInvoicePaymentSchema = z.object({
   paid_amount: z.coerce.number().min(0),
 });

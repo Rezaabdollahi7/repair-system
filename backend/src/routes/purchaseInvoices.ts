@@ -7,6 +7,7 @@ import {
   purchaseInvoiceCreateSchema,
   purchaseInvoiceListQuerySchema,
   purchaseInvoicePaymentSchema,
+  purchaseInvoiceUpdateSchema,
 } from "../schemas/purchaseInvoice";
 
 const router = express.Router();
@@ -20,6 +21,11 @@ router.get(
 );
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getById);
 router.post("/", validate({ body: purchaseInvoiceCreateSchema }), ctrl.create);
+router.put(
+  "/:id",
+  validate({ params: idParamSchema, body: purchaseInvoiceUpdateSchema }),
+  ctrl.update,
+);
 router.put(
   "/:id/payment",
   validate({ params: idParamSchema, body: purchaseInvoicePaymentSchema }),

@@ -2,7 +2,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { errorText } from "../utils/errors";
-import { createPurchaseInvoice, getItems, createItem } from "../api";
+import {
+  createPurchaseInvoice,
+  getPurchaseInvoice,
+  updatePurchaseInvoice,
+  getItems,
+  createItem,
+} from "../api";
 import toast from "react-hot-toast";
 import {
   XMarkIcon,
@@ -14,6 +20,7 @@ import {
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import type {
+  Id,
   Item,
   ItemCreateBody,
   PurchaseInvoiceCreateBody,
@@ -195,6 +202,8 @@ interface PurchaseInvoiceFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /** Set to edit an existing invoice; omitted, the form creates one. */
+  invoiceId?: Id | null;
   zIndex?: number;
 }
 
@@ -202,8 +211,11 @@ export default function PurchaseInvoiceFormModal({
   isOpen,
   onClose,
   onSuccess,
+  invoiceId,
 }: PurchaseInvoiceFormModalProps) {
+  const isEditMode = Boolean(invoiceId);
   const [loading, setLoading] = useState(false);
+  const [loadingInvoice, setLoadingInvoice] = useState(isEditMode);
   const [items, setItems] = useState<Item[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -238,10 +250,46 @@ export default function PurchaseInvoiceFormModal({
     }
   };
 
+  const loadInvoiceData = async (id: Id) => {
+    setLoadingInvoice(true);
+    try {
+      const res = await getPurchaseInvoice(id);
+      const invoice = res.data;
+
+      setFormData({
+        supplier_name: invoice.supplier_name || "",
+        invoice_date:
+          invoice.invoice_date?.split("T")[0] ||
+          new Date().toISOString().split("T")[0],
+        paid_amount: invoice.paid_amount || 0,
+        note: invoice.note || "",
+      });
+
+      // Named `lines`, not `items`: that name already holds the catalogue
+      // this form searches.
+      const lines: InvoiceLine[] = invoice.items.map((line) => ({
+        item_id: line.item_id,
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+      }));
+      setSelectedItems(lines);
+    } catch (error) {
+      console.error("Failed to load invoice:", error);
+      toast.error("خطا در دریافت اطلاعات فاکتور");
+      onClose();
+    } finally {
+      setLoadingInvoice(false);
+    }
+  };
+
   useEffect(() => {
-    if (isOpen) fetchItems();
+    if (!isOpen) return;
+    void fetchItems();
+    if (isEditMode && invoiceId) {
+      void loadInvoiceData(invoiceId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, invoiceId, isEditMode]);
 
   const calculateItemTotal = (quantity: number, unitPrice: number) =>
     (quantity || 0) * (unitPrice || 0);
@@ -333,8 +381,13 @@ export default function PurchaseInvoiceFormModal({
           unit_price: item.unit_price,
         })),
       };
-      await createPurchaseInvoice(payload);
-      toast.success("فاکتور خرید با موفقیت ثبت شد");
+      if (isEditMode && invoiceId) {
+        await updatePurchaseInvoice(invoiceId, payload);
+        toast.success("فاکتور خرید با موفقیت ویرایش شد");
+      } else {
+        await createPurchaseInvoice(payload);
+        toast.success("فاکتور خرید با موفقیت ثبت شد");
+      }
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -345,6 +398,18 @@ export default function PurchaseInvoiceFormModal({
   };
 
   if (!isOpen) return null;
+
+  if (loadingInvoice) {
+    return (
+      <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
+        <div className="bg-surface border border-border rounded-panel shadow-xl p-8">
+          <div className="text-center py-4 text-text-primary" dir="rtl">
+            در حال بارگذاری فاکتور...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
@@ -358,7 +423,7 @@ export default function PurchaseInvoiceFormModal({
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-2">
             <ShoppingCartIcon className="w-5 h-5 text-text-secondary" />
-            ثبت فاکتور خرید جدید
+            {isEditMode ? "ویرایش فاکتور خرید" : "ثبت فاکتور خرید جدید"}
           </h2>
           <button
             onClick={onClose}
@@ -640,7 +705,11 @@ export default function PurchaseInvoiceFormModal({
               disabled={loading}
               className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm sm:text-base order-1 sm:order-2"
             >
-              {loading ? "در حال ثبت..." : "ثبت فاکتور خرید"}
+              {loading
+                ? "در حال ثبت..."
+                : isEditMode
+                  ? "ویرایش فاکتور"
+                  : "ثبت فاکتور خرید"}
             </button>
           </div>
         </form>

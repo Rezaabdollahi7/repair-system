@@ -10,8 +10,9 @@ jest.mock("../lib/prisma", () => {
     purchaseInvoice: {
       create: jest.fn(),
       delete: jest.fn(),
+      update: jest.fn(),
     },
-    purchaseInvoiceItem: { create: jest.fn() },
+    purchaseInvoiceItem: { create: jest.fn(), deleteMany: jest.fn() },
     // findFirstOrThrow rather than findUniqueOrThrow: the controller pairs
     // the item id with workspaceId now, which findUnique can't express.
     item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
@@ -531,6 +532,197 @@ describe("purchaseInvoiceController.remove", () => {
     expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
       currentStock: 0,
     });
+  });
+});
+
+describe("purchaseInvoiceController.update", () => {
+  const body = {
+    supplier_name: "تأمین‌کننده تازه",
+    invoice_date: new Date("2026-09-01T00:00:00.000Z"),
+    paid_amount: 0,
+    note: null,
+    items: [{ item_id: 2, quantity: 4, unit_price: 5000 }],
+  };
+
+  function existingInvoice(items: { itemId: number; quantity: number }[]) {
+    return { ...invoiceRow(), items };
+  }
+
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await controller.update(mockRequest({ params: { id: 9 }, body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(runInTx).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown item before touching any stock", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.update(mockRequest({ params: { id: 5 }, body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "کالا با شناسه 2 یافت نشد",
+    });
+    // The check runs outside the transaction, so a bad edit leaves the
+    // warehouse exactly as it was.
+    expect(runInTx).not.toHaveBeenCalled();
+  });
+
+  it("scopes the item check to this workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: 0,
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }),
+      mockResponse(),
+    );
+
+    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
+  it("takes the old lines out of stock before putting the new ones in", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(
+      existingInvoice([{ itemId: 2, quantity: 10 }]),
+    );
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      // the reversal reads the stock as it stands
+      .mockResolvedValueOnce({ currentStock: 30 })
+      // then the rewrite reads what the reversal left
+      .mockResolvedValueOnce({
+        currentStock: 20,
+        avgPurchasePrice: decimal(4000),
+      });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }, 3),
+      mockResponse(),
+    );
+
+    // 30 − 10 (the old line) then + 4 (the new one): an edit nets out to the
+    // difference rather than adding the line a second time.
+    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
+      currentStock: 20,
+    });
+    expect(db.__tx.item.update.mock.calls[1][0].data).toMatchObject({
+      currentStock: 24,
+    });
+  });
+
+  it("records the reversal as an adjustment against this invoice", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(
+      existingInvoice([{ itemId: 2, quantity: 10 }]),
+    );
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      .mockResolvedValueOnce({ currentStock: 30 })
+      .mockResolvedValueOnce({
+        currentStock: 20,
+        avgPurchasePrice: decimal(4000),
+      });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }, 3),
+      mockResponse(),
+    );
+
+    expect(
+      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+      type: "adjustment",
+      quantity: -10,
+      referenceId: 5,
+      referenceType: "purchase_invoice",
+      note: "ویرایش فاکتور خرید",
+      createdBy: 3,
+    });
+    // The stock history keeps both halves: the shop can see the invoice was
+    // edited rather than finding the original purchase silently rewritten.
+    expect(
+      db.__tx.inventoryTransaction.create.mock.calls[1][0].data,
+    ).toMatchObject({ type: "purchase", quantity: 4, referenceId: 5 });
+  });
+
+  it("replaces the line rows rather than appending to them", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(
+      existingInvoice([{ itemId: 2, quantity: 10 }]),
+    );
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      .mockResolvedValueOnce({ currentStock: 30 })
+      .mockResolvedValueOnce({
+        currentStock: 20,
+        avgPurchasePrice: decimal(4000),
+      });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }),
+      mockResponse(),
+    );
+
+    expect(db.__tx.purchaseInvoiceItem.deleteMany).toHaveBeenCalledWith({
+      where: { invoiceId: 5 },
+    });
+    expect(db.__tx.purchaseInvoiceItem.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("recomputes the total and the payment status from the new lines", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: 0,
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.update(
+      mockRequest(
+        { params: { id: 5 }, body: { ...body, paid_amount: 20000 } },
+        3,
+      ),
+      mockResponse(),
+    );
+
+    // 4 × 5000, paid in full — the status follows the edited lines, not what
+    // the invoice said before.
+    expect(db.__tx.purchaseInvoice.update.mock.calls[0][0].data).toMatchObject({
+      totalAmount: 20000,
+      paidAmount: 20000,
+      paymentStatus: "paid",
+    });
+  });
+
+  it("leaves the invoice number alone", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: 0,
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }),
+      mockResponse(),
+    );
+
+    // Numbering is gap-free per workspace; an edit that drew a new number
+    // would burn one and leave a hole in the sequence.
+    expect(
+      db.__tx.purchaseInvoice.update.mock.calls[0][0].data,
+    ).not.toHaveProperty("invoiceNumber");
+    expect(db.__tx.workspace.update).not.toHaveBeenCalled();
   });
 });
 

@@ -12,7 +12,11 @@ import {
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
 /* Outline for the row's own controls — a solid heroicon at 18px is a disc. */
-import { EyeIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import { PAYMENT_STATUSES, paymentStatusOf } from "../utils/invoiceStatus";
 import { staggerContainer, staggerItem } from "../motion";
@@ -20,6 +24,7 @@ import { formatPersianCurrency, formatPersianDate } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import {
   actionDelete,
+  actionEdit,
   actionView,
   primaryButton,
   rowCard,
@@ -78,8 +83,12 @@ export default function PurchaseInvoiceList() {
   const [searchInput, setSearchInput] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus[]>([]);
   const { isAtLeast } = useAuth();
-  const { openPurchaseInvoiceDetail, openPurchaseInvoiceCreate, refreshList } =
-    useModal();
+  const {
+    openPurchaseInvoiceDetail,
+    openPurchaseInvoiceCreate,
+    openPurchaseInvoiceEdit,
+    refreshList,
+  } = useModal();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -158,16 +167,28 @@ export default function PurchaseInvoiceList() {
         <EyeIcon className="w-[1.15rem] h-[1.15rem]" />
       </button>
       {isAtLeast("admin") && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setDeleteTarget(invoice);
-          }}
-          className={actionDelete}
-          title="حذف"
-        >
-          <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
-        </button>
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openPurchaseInvoiceEdit(invoice.id);
+            }}
+            className={actionEdit}
+            title="ویرایش فاکتور"
+          >
+            <PencilSquareIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget(invoice);
+            }}
+            className={actionDelete}
+            title="حذف"
+          >
+            <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+        </>
       )}
     </div>
   );

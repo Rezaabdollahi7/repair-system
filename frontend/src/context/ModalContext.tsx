@@ -39,6 +39,7 @@ type ModalType =
   | "saleInvoiceEdit"
   | "purchaseInvoiceDetail"
   | "purchaseInvoiceCreate"
+  | "purchaseInvoiceEdit"
   | "repairInvoiceDetail"
   | "repairInvoiceCreate"
   | "repairInvoiceEdit";
@@ -70,6 +71,7 @@ interface ModalContextValue {
   openSaleInvoiceEdit: (invoiceId: Id) => void;
   openPurchaseInvoiceDetail: (invoiceId: Id) => void;
   openPurchaseInvoiceCreate: () => void;
+  openPurchaseInvoiceEdit: (invoiceId: Id) => void;
   openRepairInvoiceDetail: (invoiceId: Id) => void;
   openRepairInvoiceCreate: (deviceId?: Id | null) => void;
   openRepairInvoiceEdit: (invoiceId: Id) => void;
@@ -158,6 +160,8 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     openModal("purchaseInvoiceDetail", invoiceId);
   const openPurchaseInvoiceCreate = () =>
     openModal("purchaseInvoiceCreate", null);
+  const openPurchaseInvoiceEdit = (invoiceId: Id) =>
+    openModal("purchaseInvoiceEdit", invoiceId);
   const openRepairInvoiceDetail = (id: Id) =>
     openModal("repairInvoiceDetail", id);
   const openRepairInvoiceCreate = (deviceId?: Id | null) =>
@@ -178,6 +182,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         openSaleInvoiceEdit, // ← اضافه شد
         openPurchaseInvoiceDetail,
         openPurchaseInvoiceCreate,
+        openPurchaseInvoiceEdit,
         openRepairInvoiceDetail,
         openRepairInvoiceCreate,
         openRepairInvoiceEdit,
@@ -321,6 +326,17 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                 isOpen={true}
                 onClose={closeModal}
                 onSuccess={closeModal}
+                zIndex={zIndex}
+              />
+            );
+          case "purchaseInvoiceEdit":
+            return (
+              <PurchaseInvoiceFormModal
+                key={`${modal.type}-${modal.id}-${index}`}
+                isOpen={true}
+                onClose={closeModal}
+                onSuccess={closeModal}
+                invoiceId={modal.id}
                 zIndex={zIndex}
               />
             );

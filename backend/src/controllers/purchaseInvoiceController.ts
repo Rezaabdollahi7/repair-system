@@ -12,6 +12,7 @@ import type {
   PurchaseInvoiceCreateBody,
   PurchaseInvoiceListQuery,
   PurchaseInvoicePaymentBody,
+  PurchaseInvoiceUpdateBody,
 } from "../schemas/purchaseInvoice";
 import { dateFilter } from "../utils/dateRange";
 import { workspaceIdOf } from "../utils/workspace";
@@ -30,6 +31,147 @@ function toInvoiceResponse(invoice: PurchaseInvoice) {
     created_at: invoice.createdAt.toISOString(),
     updated_at: invoice.updatedAt.toISOString(),
   };
+}
+
+interface LineInput {
+  item_id: number;
+  quantity: number;
+  unit_price: number;
+}
+
+/**
+ * Every id in the list must name an item this workspace owns. Checked up
+ * front, outside the transaction, so an unknown id is reported by its own
+ * number rather than surfacing as a foreign-key error — and scoped by
+ * workspace, so an id from another shop reads as missing.
+ *
+ * Returns the message to send back, or null when the lines are fine.
+ */
+async function findUnknownItem(
+  lines: LineInput[],
+  workspaceId: number,
+): Promise<string | null> {
+  const itemIds = [...new Set(lines.map((line) => line.item_id))];
+
+  const existing = await prisma.item.findMany({
+    where: { id: { in: itemIds }, workspaceId },
+    select: { id: true },
+  });
+
+  const existingIds = new Set(existing.map((item) => item.id));
+  const missing = itemIds.find((id) => !existingIds.has(id));
+
+  return missing === undefined ? null : `کالا با شناسه ${missing} یافت نشد`;
+}
+
+/**
+ * Writes the invoice's lines and moves the stock they bought in: the line
+ * row, the item's new stock and average price, and a ledger entry each.
+ * Shared by create and update so an edited invoice lands in the warehouse
+ * exactly as a new one would.
+ */
+async function writeLines(
+  tx: Prisma.TransactionClient,
+  invoiceId: number,
+  lines: LineInput[],
+  actorId: number | null,
+  workspaceId: number,
+): Promise<void> {
+  for (const line of lines) {
+    const totalPrice = line.quantity * line.unit_price;
+
+    await tx.purchaseInvoiceItem.create({
+      data: {
+        workspaceId,
+        invoiceId,
+        itemId: line.item_id,
+        quantity: line.quantity,
+        unitPrice: line.unit_price,
+        totalPrice,
+      },
+    });
+
+    // findFirstOrThrow rather than findUniqueOrThrow: the composite
+    // condition rules out an item from another workspace, and the ids
+    // were already verified above.
+    const item = await tx.item.findFirstOrThrow({
+      where: { id: line.item_id, workspaceId },
+      select: { currentStock: true, avgPurchasePrice: true },
+    });
+
+    const newStock = item.currentStock + line.quantity;
+    const currentValue = item.avgPurchasePrice.toNumber() * item.currentStock;
+    const newAvgPrice =
+      newStock > 0 ? (currentValue + totalPrice) / newStock : line.unit_price;
+
+    await tx.item.update({
+      where: { id: line.item_id },
+      data: { currentStock: newStock, avgPurchasePrice: newAvgPrice },
+    });
+
+    await tx.inventoryTransaction.create({
+      data: {
+        workspaceId,
+        itemId: line.item_id,
+        type: "purchase",
+        quantity: line.quantity,
+        unitPrice: line.unit_price,
+        // The old code passed null here while still setting
+        // referenceType, so purchases made through a full invoice never
+        // showed their invoice number in an item's stock history.
+        referenceId: invoiceId,
+        referenceType: "purchase_invoice",
+        note: "خرید از فاکتور",
+        createdBy: actorId,
+      },
+    });
+  }
+}
+
+/**
+ * Takes the invoice's lines back out of stock — what delete does, and what
+ * an edit has to do before writing the new lines.
+ *
+ * The average purchase price is deliberately left alone. It is a running
+ * weighted average, so later purchases and sales have already moved it and
+ * there is no old value to restore; recomputing it would need the whole
+ * purchase history, not this one invoice. Delete has always worked this way
+ * and an edit keeps the same behaviour rather than inventing a second one.
+ */
+async function reverseLines(
+  tx: Prisma.TransactionClient,
+  invoiceId: number,
+  lines: { itemId: number; quantity: number }[],
+  note: string,
+  actorId: number | null,
+  workspaceId: number,
+): Promise<void> {
+  for (const line of lines) {
+    const item = await tx.item.findFirstOrThrow({
+      where: { id: line.itemId, workspaceId },
+      select: { currentStock: true },
+    });
+
+    await tx.item.update({
+      where: { id: line.itemId },
+      // Clamped at zero, as before: the stock may already have been sold
+      // on, and a negative figure would be worse than an inexact one.
+      data: { currentStock: Math.max(0, item.currentStock - line.quantity) },
+    });
+
+    await tx.inventoryTransaction.create({
+      data: {
+        workspaceId,
+        itemId: line.itemId,
+        type: "adjustment",
+        quantity: -line.quantity,
+        referenceId: invoiceId,
+        referenceType: "purchase_invoice",
+        note,
+        createdBy: actorId,
+      },
+    });
+  }
 }
 
 // GET /api/purchase-invoices
@@ -134,21 +276,9 @@ export const create = async (req: Request, res: Response) => {
     // it: the request isn't available in there.
     const workspaceId = workspaceIdOf(req);
 
-    // Checked up front, outside the transaction, so an unknown id is reported
-    // by its own number rather than surfacing as a foreign-key error. Scoped
-    // by workspace too, so an id from another shop reads as missing.
-    const itemIds = [...new Set(body.items.map((line) => line.item_id))];
-    const existing = await prisma.item.findMany({
-      where: { id: { in: itemIds }, workspaceId },
-      select: { id: true },
-    });
-    const existingIds = new Set(existing.map((item) => item.id));
-    const missing = itemIds.find((id) => !existingIds.has(id));
-
-    if (missing !== undefined) {
-      return res
-        .status(400)
-        .json({ error: `کالا با شناسه ${missing} یافت نشد` });
+    const unknownItem = await findUnknownItem(body.items, workspaceId);
+    if (unknownItem) {
+      return res.status(400).json({ error: unknownItem });
     }
 
     const totalAmount = body.items.reduce(
@@ -175,63 +305,78 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      for (const line of body.items) {
-        const totalPrice = line.quantity * line.unit_price;
-
-        await tx.purchaseInvoiceItem.create({
-          data: {
-            workspaceId,
-            invoiceId: created.id,
-            itemId: line.item_id,
-            quantity: line.quantity,
-            unitPrice: line.unit_price,
-            totalPrice,
-          },
-        });
-
-        // findFirstOrThrow rather than findUniqueOrThrow: the composite
-        // condition rules out an item from another workspace, and the ids
-        // were already verified above.
-        const item = await tx.item.findFirstOrThrow({
-          where: { id: line.item_id, workspaceId },
-          select: { currentStock: true, avgPurchasePrice: true },
-        });
-
-        const newStock = item.currentStock + line.quantity;
-        const currentValue =
-          item.avgPurchasePrice.toNumber() * item.currentStock;
-        const newAvgPrice =
-          newStock > 0
-            ? (currentValue + totalPrice) / newStock
-            : line.unit_price;
-
-        await tx.item.update({
-          where: { id: line.item_id },
-          data: { currentStock: newStock, avgPurchasePrice: newAvgPrice },
-        });
-
-        await tx.inventoryTransaction.create({
-          data: {
-            workspaceId,
-            itemId: line.item_id,
-            type: "purchase",
-            quantity: line.quantity,
-            unitPrice: line.unit_price,
-            // The old code passed null here while still setting
-            // referenceType, so purchases made through a full invoice never
-            // showed their invoice number in an item's stock history.
-            referenceId: created.id,
-            referenceType: "purchase_invoice",
-            note: "خرید از فاکتور",
-            createdBy: actorId,
-          },
-        });
-      }
+      await writeLines(tx, created.id, body.items, actorId, workspaceId);
 
       return created;
     });
 
     res.status(201).json(toInvoiceResponse(invoice));
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+// PUT /api/purchase-invoices/:id
+export const update = async (req: Request, res: Response) => {
+  try {
+    const valid = (req as ValidatedRequest).valid;
+    const { id } = valid.params as IdParam;
+    const body = valid.body as PurchaseInvoiceUpdateBody;
+    const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
+
+    const existing = await prisma.purchaseInvoice.findFirst({
+      where: { id, workspaceId },
+      include: { items: { select: { itemId: true, quantity: true } } },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+
+    // Before the transaction, as create does, so an unknown id comes back as
+    // its own message and nothing has been touched yet.
+    const unknownItem = await findUnknownItem(body.items, workspaceId);
+    if (unknownItem) {
+      return res.status(400).json({ error: unknownItem });
+    }
+
+    const totalAmount = body.items.reduce(
+      (sum, line) => sum + line.quantity * line.unit_price,
+      0,
+    );
+
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      // The old lines come out of stock first, then the new ones go in — so
+      // an edit that only changes a quantity nets out to the difference
+      // rather than adding the whole line a second time.
+      await reverseLines(
+        tx,
+        id,
+        existing.items,
+        "ویرایش فاکتور خرید",
+        actorId,
+        workspaceId,
+      );
+
+      await tx.purchaseInvoiceItem.deleteMany({ where: { invoiceId: id } });
+
+      await tx.purchaseInvoice.update({
+        where: { id },
+        data: {
+          supplierName: body.supplier_name,
+          invoiceDate: body.invoice_date ?? new Date(),
+          totalAmount,
+          paidAmount: body.paid_amount,
+          paymentStatus: paymentStatusFor(body.paid_amount, totalAmount),
+          note: body.note,
+        },
+      });
+
+      await writeLines(tx, id, body.items, actorId, workspaceId);
+    });
+
+    res.json({ message: "فاکتور با موفقیت ویرایش شد" });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }
@@ -294,34 +439,14 @@ export const remove = async (req: Request, res: Response) => {
     }
 
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      for (const line of invoice.items) {
-        const item = await tx.item.findFirstOrThrow({
-          where: { id: line.itemId, workspaceId },
-          select: { currentStock: true },
-        });
-
-        await tx.item.update({
-          where: { id: line.itemId },
-          // Clamped at zero, as before: the stock may already have been sold
-          // on, and a negative figure would be worse than an inexact one.
-          data: {
-            currentStock: Math.max(0, item.currentStock - line.quantity),
-          },
-        });
-
-        await tx.inventoryTransaction.create({
-          data: {
-            workspaceId,
-            itemId: line.itemId,
-            type: "adjustment",
-            quantity: -line.quantity,
-            referenceId: id,
-            referenceType: "purchase_invoice",
-            note: "حذف فاکتور خرید",
-            createdBy: actorId,
-          },
-        });
-      }
+      await reverseLines(
+        tx,
+        id,
+        invoice.items,
+        "حذف فاکتور خرید",
+        actorId,
+        workspaceId,
+      );
 
       // The lines go with it via onDelete: Cascade.
       await tx.purchaseInvoice.delete({ where: { id } });

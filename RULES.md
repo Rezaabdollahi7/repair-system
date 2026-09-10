@@ -108,6 +108,10 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
 - **Tables come from `utils/tableClasses.ts`.** Don't hand-roll `px-3 py-2`
   on a `<td>`: the cell grid, the zebra striping and the row-action colours
   are already there, and a hand-rolled cell is the one that doesn't match.
+- **A Tailwind class name is not a CSS variable.** `text-info-fg` maps to
+  `--info-strong-fg`. Passing `var(--info-fg)` through a `style` prop
+  resolves to nothing and paints transparent — no error, no warning. Take
+  the variable name from `index.css`.
 - **Chart colours come from `utils/chartSeries.ts`**, which is validated for
   lightness, chroma, colour-blind separation and contrast. Adding a series
   colour means re-running that validation, not picking one that looks nice.

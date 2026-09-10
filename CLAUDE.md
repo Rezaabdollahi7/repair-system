@@ -49,7 +49,7 @@ frontend/   React SPA (Vite)
 - `src/components/` — shared/reusable components, including per-entity modals
   (`*FormModal.tsx`, `*DetailModal.tsx`) following a consistent CRUD-modal pattern
 - `src/context/` — `AuthContext`, `ModalContext`, `ThemeContext`,
-  `SubscriptionContext`. `ModalContext` holds the modal **stack** and its
+  `SubscriptionContext`, `BreadcrumbContext`. `ModalContext` holds the modal **stack** and its
   `open*` openers; a new modal needs a `ModalType` string, an opener, a line
   in the context value and a `case` in the switch — the string union makes a
   typo a compile error rather than a modal that never opens
@@ -66,6 +66,16 @@ frontend/   React SPA (Vite)
   values in it. See **Design System** below
 - `src/motion/` — the shared framer-motion variants (`modalPanel`,
   `staggerContainer`, `staggerItem`)
+
+**Detail screens: page or modal?** A record reached from one list, glanced
+at and dismissed, is a modal — that is most of them. A record reached from
+_several_ lists, that a shop reads for a while, is a page with a route:
+`/customers/:id` is one, because it is opened from the customer list, the
+device list and two invoice lists, and «back» has to mean the list rather
+than «wherever you came from». A page names itself to the shell through
+`usePageCrumb` (`BreadcrumbContext`) — the header derives every other title
+from the sidebar entry whose path matches, which for `/customers/5` would
+read «مشتریان». The `parent` in that crumb becomes the link back.
 
 ## Domain Model (current feature set)
 
@@ -100,6 +110,25 @@ Key entities:
     `utils/avgPurchasePrice.ts`, and a reversal (an invoice edited or deleted)
     removes each line **at the price that line was bought at**, which is the
     only inverse that lands back on what the surviving stock cost.
+- **Customer page** (`/customers/:id`) — the customer's own screen, not a
+  modal. `GET /customers/:id/overview` answers the whole page in one
+  request: header, summary, devices, a per-device repair timeline, invoices
+  and the shop's private note. One request because the page is one screen
+  and each separate call pays the RLS transaction's two round trips again.
+  - **`Customer.notes`** is staff-facing only — «pays late, don't release
+    the device» — never printed on an invoice. Saved through its own
+    `PUT /customers/:id/notes` so the panel need not hold, and cannot
+    stale-overwrite, the name and phone it does not show.
+  - **"Active" means still in the shop**: anything but `delivered`,
+    `unrepairable` and `not_repaired`. A repaired device on the shelf is
+    both active and a successful repair — the two counts answer different
+    questions.
+  - Purchase invoices are absent by nature: a purchase names a supplier,
+    not a customer. The empty state says so, because otherwise it reads as
+    a bug.
+  - Only repair invoices contribute a _paid_ event to the timeline. They
+    record each payment with its own date; a sale invoice carries a paid
+    amount and a status and no date to show.
 - **Reports** — low-stock report (items below minimum threshold), profit & loss report
   (sales, purchases, net, margin).
 
@@ -380,6 +409,12 @@ which is how a handful of components used to stay light in dark mode.
   `lg:col-span-3`, actions full width at the bottom, and a line row on a
   twelve-column mapping that falls back to six on a phone. The sale form is
   the reference; if the three ever drift again, that is the one to copy.
+- ⚠️ **A Tailwind class name is not a CSS variable.** `text-info-fg` is a
+  class that maps to `--info-strong-fg`; `var(--info-fg)` is nothing at all.
+  An undefined custom property resolves to the empty string rather than
+  failing, so the mistake ships as a transparent dot or an uncoloured bar.
+  When passing a colour through a `style` prop, take the variable name from
+  `index.css`, not from the class you would have written.
 - ⚠️ **One deliberate accessibility trade-off.** The resting field border
   (`--field-border-light` / `--field-border-dark`) sits below WCAG 1.4.11's
   3:1 — 2.04:1 light, 2.27:1 dark — because the compliant value read as an

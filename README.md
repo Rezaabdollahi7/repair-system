@@ -362,7 +362,7 @@ All routes are prefixed `/api` and require a bearer token except where noted.
 | --- | --- |
 | **Auth** | `login` · `register` · `send-otp` · `reset-password` · `refresh` · `logout` · `me` · `change-password` |
 | **Devices** | CRUD · images · assignments |
-| **Customers** | CRUD · devices · stats |
+| **Customers** | CRUD · overview (the customer page, in one request) · notes |
 | **Personnel** | CRUD · toggle active |
 | **Items** | CRUD · search · low-stock · transactions · quick purchase/sale |
 | **Categories · Services** | CRUD |

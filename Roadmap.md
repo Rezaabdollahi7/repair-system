@@ -477,6 +477,13 @@ exposed. Recorded here after the fact so the next session knows it happened.
       on top, lines at 9/12, summary sticky at 3/12, actions full width
 - [x] 11.10 Purchase invoices became editable (`PUT /api/purchase-invoices/:id`),
       the last of the three that could only be deleted and re-entered
+- [x] 11.11 `avg_purchase_price` reversal — closes 9.4; see that entry
+- [x] 11.12 The customer detail modal became a page, `/customers/:id`,
+      with six sections and a breadcrumb back to the list. Reached from
+      four different lists, which is what made a modal wrong: «back» has
+      to mean the list. Brings `Customer.notes`, one aggregate endpoint
+      (`GET /customers/:id/overview`) and `BreadcrumbContext`, through
+      which a detail page names itself to the shell
 
 Real defects found and fixed along the way, none of them styling: a cancelled
 repair invoice left its outstanding balance standing; the purchase form

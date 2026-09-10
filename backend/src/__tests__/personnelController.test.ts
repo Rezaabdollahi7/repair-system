@@ -17,12 +17,14 @@ jest.mock("../lib/prisma", () => ({
       delete: jest.fn(),
     },
     role: { findUnique: jest.fn() },
+    deviceAssignment: { findMany: jest.fn() },
   },
 }));
 
 const db = prisma as unknown as {
   user: Record<string, jest.Mock>;
   role: Record<string, jest.Mock>;
+  deviceAssignment: Record<string, jest.Mock>;
 };
 
 function mockResponse() {
@@ -437,5 +439,223 @@ describe("personnelController.remove", () => {
     expect(res.json).toHaveBeenCalledWith({
       message: "پرسنل با موفقیت حذف شد",
     });
+  });
+});
+
+describe("personnelController.getOverview", () => {
+  function assignment(
+    device: Record<string, unknown> = {},
+    assignedAt = "2026-09-01T00:00:00.000Z",
+  ) {
+    return {
+      assignedAt: new Date(assignedAt),
+      device: {
+        id: 10,
+        deviceName: "گوشی موبایل",
+        brand: "سامسونگ",
+        model: "Galaxy A54",
+        status: "repairing",
+        entryDate: new Date("2026-09-01T00:00:00.000Z"),
+        exitDate: null,
+        createdAt: new Date("2026-09-01T00:00:00.000Z"),
+        ...device,
+      },
+    };
+  }
+
+  function setup(assignments: unknown[] = []) {
+    db.user.findFirst.mockResolvedValue(userRow());
+    db.deviceAssignment.findMany.mockResolvedValue(assignments);
+  }
+
+  it("returns 404 for a user in another workspace", async () => {
+    db.user.findFirst.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 9 } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(db.deviceAssignment.findMany).not.toHaveBeenCalled();
+  });
+
+  it("scopes the assignment read to the workspace and the person", async () => {
+    setup([assignment()]);
+
+    await controller.getOverview(
+      mockRequest({ params: { id: 3 } }),
+      mockResponse(),
+    );
+
+    expect(db.deviceAssignment.findMany.mock.calls[0][0].where).toEqual({
+      personnelId: 3,
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
+  it("never selects the password column", async () => {
+    setup();
+
+    await controller.getOverview(
+      mockRequest({ params: { id: 3 } }),
+      mockResponse(),
+    );
+
+    expect(db.user.findFirst.mock.calls[0][0].select).not.toHaveProperty(
+      "password",
+    );
+  });
+
+  it("counts a shelved repair as both active and successful", async () => {
+    setup([
+      assignment({ id: 1, status: "repaired" }),
+      assignment({ id: 2, status: "delivered" }),
+      assignment({ id: 3, status: "unrepairable" }),
+      assignment({ id: 4, status: "repairing" }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    expect(res.json.mock.calls[0][0].kpi).toMatchObject({
+      // repaired and repairing are both still in the building
+      active_devices: 2,
+      // repaired + delivered + unrepairable have reached an outcome
+      completed_repairs: 3,
+      successful_repairs: 2,
+    });
+  });
+
+  it("averages turnaround over the jobs that have both ends", async () => {
+    setup([
+      assignment({
+        id: 1,
+        entryDate: new Date("2026-09-01T00:00:00.000Z"),
+        exitDate: new Date("2026-09-05T00:00:00.000Z"),
+      }),
+      assignment({
+        id: 2,
+        entryDate: new Date("2026-09-01T00:00:00.000Z"),
+        exitDate: new Date("2026-09-03T00:00:00.000Z"),
+      }),
+      // Still open — counting it as zero days would claim a speed nobody
+      // achieved.
+      assignment({ id: 3, exitDate: null }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    expect(res.json.mock.calls[0][0].kpi.avg_repair_days).toBe(3);
+  });
+
+  it("reports no average at all when nothing has finished", async () => {
+    setup([assignment({ exitDate: null })]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    // Null, not zero: «no data» and «instant» are different claims.
+    expect(res.json.mock.calls[0][0].kpi.avg_repair_days).toBeNull();
+  });
+
+  it("breaks the ring down by the statuses actually present", async () => {
+    setup([
+      assignment({ id: 1, status: "repairing" }),
+      assignment({ id: 2, status: "repairing" }),
+      assignment({ id: 3, status: "delivered" }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    // No zero-count slices for statuses this person has never held.
+    expect(res.json.mock.calls[0][0].status_breakdown).toEqual([
+      { status: "repairing", count: 2 },
+      { status: "delivered", count: 1 },
+    ]);
+  });
+
+  it("gives the history a turnaround only where the device has left", async () => {
+    setup([
+      assignment({
+        id: 1,
+        entryDate: new Date("2026-09-01T00:00:00.000Z"),
+        exitDate: new Date("2026-09-08T00:00:00.000Z"),
+      }),
+      assignment({ id: 2, exitDate: null }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    const [first, second] = res.json.mock.calls[0][0].history;
+    expect(first.repair_days).toBe(7);
+    expect(second.repair_days).toBeNull();
+  });
+
+  it("falls back to the row's creation date when a device has no intake", async () => {
+    setup([
+      assignment({
+        entryDate: null,
+        createdAt: new Date("2026-06-06T00:00:00.000Z"),
+      }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    expect(res.json.mock.calls[0][0].history[0].entry_date).toBe(
+      "2026-06-06T00:00:00.000Z",
+    );
+  });
+
+  it("returns twelve months whether or not anything happened in them", async () => {
+    setup();
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    const monthly = res.json.mock.calls[0][0].monthly;
+    // A gap month has to be a zero, not a missing point: a line that skips
+    // a month draws a slope that never happened.
+    expect(monthly).toHaveLength(12);
+    expect(monthly.every((month: { count: number }) => month.count === 0)).toBe(
+      true,
+    );
+    expect(monthly[0].label).toMatch(/ ۱۴۰/);
+  });
+
+  it("buckets a completion by the month it left, not the month it arrived", async () => {
+    const now = new Date();
+    const exit = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+    const entry = new Date(now.getTime() - 200 * 24 * 60 * 60 * 1000);
+
+    setup([assignment({ entryDate: entry, exitDate: exit })]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    const monthly = res.json.mock.calls[0][0].monthly;
+    const total = monthly.reduce(
+      (sum: number, month: { count: number }) => sum + month.count,
+      0,
+    );
+    // Two days ago is inside the window; two hundred days ago is not the
+    // month it should land in.
+    expect(total).toBe(1);
+    expect(monthly[monthly.length - 1].count).toBe(1);
+  });
+
+  it("leaves an unfinished device out of every month", async () => {
+    setup([assignment({ exitDate: null })]);
+
+    const res = mockResponse();
+    await controller.getOverview(mockRequest({ params: { id: 3 } }), res);
+
+    const total = res.json.mock.calls[0][0].monthly.reduce(
+      (sum: number, month: { count: number }) => sum + month.count,
+      0,
+    );
+    expect(total).toBe(0);
   });
 });

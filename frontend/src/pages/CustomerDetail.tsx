@@ -302,30 +302,37 @@ export default function CustomerDetail() {
   } = useModal();
 
   const [data, setData] = useState<CustomerOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  /*
+   * A route param that is not a number never reaches the server: there is
+   * nothing to load, so the page is not loading — it is already at its
+   * "no such record" state.
+   */
+  const validId = Number.isFinite(customerId);
+  const [loading, setLoading] = useState(validId);
+  const [failed, setFailed] = useState(false);
 
+  /*
+   * Never raises `loading` — it starts true and only ever falls. A reload
+   * after a modal closes is a background refresh, and blanking a page the
+   * reader is looking at, to redraw the same thing a moment later, is a
+   * flash rather than feedback.
+   */
   const load = useCallback(async () => {
-    if (!Number.isFinite(customerId)) {
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
+    if (!validId) return;
 
     try {
       const res = await getCustomerOverview(customerId);
       setData(res.data);
-      setNotFound(false);
+      setFailed(false);
     } catch (error) {
-      setNotFound(true);
+      setFailed(true);
       toast.error(errorText(error, "خطا در دریافت اطلاعات مشتری"));
     } finally {
       setLoading(false);
     }
-  }, [customerId]);
+  }, [customerId, validId]);
 
   useEffect(() => {
-    setLoading(true);
     void load();
   }, [load]);
 
@@ -363,7 +370,7 @@ export default function CustomerDetail() {
 
   if (loading) return <DetailSkeleton />;
 
-  if (notFound || !data) {
+  if (!validId || failed || !data) {
     return (
       <div className="bg-surface border border-border rounded-panel p-10 text-center">
         <p className="text-body-md text-text-secondary mb-4">

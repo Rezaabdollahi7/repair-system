@@ -469,6 +469,62 @@ export interface Personnel {
   role_label: string;
 }
 
+/* ── The personnel page ────────────────────────────────────────────────
+ *
+ * `GET /personnel/:id/overview` answers the whole page in one request, for
+ * the same reason the customer page does.
+ */
+
+export interface PersonnelKpi {
+  /** Assigned and still in the building. */
+  active_devices: number;
+  /** Reached an outcome, either way. */
+  completed_repairs: number;
+  successful_repairs: number;
+  /**
+   * Mean turnaround in days over the jobs that have both an intake and an
+   * exit. Null — not zero — when none has finished: «no data» and «instant»
+   * are different claims.
+   */
+  avg_repair_days: number | null;
+}
+
+/** One slice of the assignment ring. Only statuses actually present. */
+export interface PersonnelStatusCount {
+  status: string;
+  count: number;
+}
+
+export interface PersonnelHistoryRow {
+  device_id: number;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
+  status: string;
+  entry_date: string;
+  exit_date: string | null;
+  /** Whole days from intake to exit; null while the job is open. */
+  repair_days: number | null;
+  assigned_at: string;
+}
+
+/** One bar of the monthly chart. Twelve of them, gaps included as zeroes. */
+export interface PersonnelMonthlyPoint {
+  jy: number;
+  jm: number;
+  /** «مرداد ۱۴۰۵», ready to render. */
+  label: string;
+  count: number;
+}
+
+export interface PersonnelOverview {
+  personnel: Personnel;
+  kpi: PersonnelKpi;
+  status_breakdown: PersonnelStatusCount[];
+  history: PersonnelHistoryRow[];
+  monthly: PersonnelMonthlyPoint[];
+}
+
 /** `username` is a mobile number, shared with sign-up via phoneSchema. */
 export interface PersonnelCreateBody {
   full_name: string;

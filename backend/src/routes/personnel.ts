@@ -17,6 +17,14 @@ router.use(authenticate);
 // خواندن - همه نقش‌ها
 router.get("/", validate({ query: personnelListQuerySchema }), ctrl.getAll);
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getOne);
+// The personnel page in one request: profile, KPIs, the status breakdown
+// its ring draws, the assignment history and twelve Jalali months of
+// completions.
+router.get(
+  "/:id/overview",
+  validate({ params: idParamSchema }),
+  ctrl.getOverview,
+);
 
 // ایجاد و ویرایش - فقط admin و بالاتر
 router.post(

@@ -33,6 +33,7 @@ import type {
   QuickStockResponse,
   Personnel,
   PersonnelCreateBody,
+  PersonnelOverview,
   PersonnelUpdateBody,
   ToggleActiveResponse,
   PurchaseInvoice,
@@ -296,6 +297,9 @@ export const getPersonnel = (params?: QueryParams) =>
   api.get<Personnel[]>("/personnel", { params });
 export const getPersonnelOne = (id: Id) =>
   api.get<Personnel>(`/personnel/${id}`);
+/** The whole personnel page in one request — see `PersonnelOverview`. */
+export const getPersonnelOverview = (id: Id) =>
+  api.get<PersonnelOverview>(`/personnel/${id}/overview`);
 export const createPersonnel = (data: PersonnelCreateBody) =>
   api.post<Personnel>("/personnel", data);
 export const updatePersonnel = (id: Id, data: PersonnelUpdateBody) =>

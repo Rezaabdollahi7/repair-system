@@ -19,3 +19,19 @@ export function useGoToCustomer() {
     [navigate],
   );
 }
+
+/**
+ * Opening a member of staff.
+ *
+ * Same story as the customer: reached from the personnel list and from a
+ * technician's name on a device or an invoice, so `/personnel/:id` is a
+ * page rather than a modal.
+ */
+export function useGoToPersonnel() {
+  const navigate = useNavigate();
+
+  return useCallback(
+    (personnelId: Id) => navigate(`/personnel/${personnelId}`),
+    [navigate],
+  );
+}

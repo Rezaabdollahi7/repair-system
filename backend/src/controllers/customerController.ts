@@ -12,6 +12,11 @@ import type {
   CustomerNotesBody,
 } from "../schemas/customer";
 import { workspaceIdOf } from "../utils/workspace";
+import {
+  FAILED_STATUSES,
+  isActive,
+  SUCCESSFUL_STATUSES,
+} from "../utils/deviceStatus";
 
 // GET /api/customers
 export const getAll = async (req: Request, res: Response) => {
@@ -84,20 +89,6 @@ export const getOne = async (req: Request, res: Response) => {
     res.status(500).json({ error: errorMessage(error) });
   }
 };
-
-/**
- * A device is "active" while it is still the shop's problem. The three
- * terminal states are the two failures and the handover; everything else —
- * including `repaired` and `ready_for_pickup`, which are finished work
- * sitting on a shelf — is still in the building.
- */
-const TERMINAL_STATUSES = ["delivered", "unrepairable", "not_repaired"];
-
-/** Repairs that came out the other side. */
-const SUCCESSFUL_STATUSES = ["repaired", "ready_for_pickup", "delivered"];
-
-/** Repairs that did not. */
-const FAILED_STATUSES = ["unrepairable", "not_repaired"];
 
 /**
  * A cancelled invoice is not money owed and not money taken. It is excluded
@@ -317,9 +308,8 @@ export const getOverview = async (req: Request, res: Response) => {
       },
       summary: {
         total_devices: devices.length,
-        active_devices: devices.filter(
-          (device) => !TERMINAL_STATUSES.includes(device.status),
-        ).length,
+        active_devices: devices.filter((device) => isActive(device.status))
+          .length,
         successful_repairs: devices.filter((device) =>
           SUCCESSFUL_STATUSES.includes(device.status),
         ).length,

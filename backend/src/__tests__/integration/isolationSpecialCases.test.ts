@@ -298,6 +298,51 @@ describe("personnel", () => {
     expect(res.status).toBe(404);
   });
 
+  // The personnel page's aggregate reads assignments and devices as well as
+  // the user row, so it has three chances to lose its scope rather than one.
+  it("will not assemble another workspace's personnel page", async () => {
+    const technician = await foreignTechnician();
+
+    const res = await request(app)
+      .get(`/api/personnel/${technician.id}/overview`)
+      .set("Authorization", `Bearer ${workspaces.a.token}`);
+
+    // 404 rather than an empty page: an empty overview asserts that the
+    // account exists and has done nothing, which is itself a disclosure.
+    expect(res.status).toBe(404);
+  });
+
+  it("counts only the caller's own assignments", async () => {
+    const foreign = await foreignTechnician();
+
+    const device = await owner.device.create({
+      data: {
+        workspaceId: workspaces.b.workspaceId,
+        deviceName: "یخچال ب",
+        status: "delivered",
+      },
+      select: { id: true },
+    });
+
+    await owner.deviceAssignment.create({
+      data: {
+        workspaceId: workspaces.b.workspaceId,
+        deviceId: device.id,
+        personnelId: foreign.id,
+      },
+    });
+
+    // The caller's own super admin, who has been assigned nothing.
+    const res = await request(app)
+      .get(`/api/personnel/${workspaces.a.userId}/overview`)
+      .set("Authorization", `Bearer ${workspaces.a.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.kpi.completed_repairs).toBe(0);
+    expect(res.body.history).toEqual([]);
+    expect(res.body.status_breakdown).toEqual([]);
+  });
+
   it("cannot read another workspace's account through /auth/me", async () => {
     // The token names a real user, so this proves the lookup is scoped
     // rather than trusting the id in the payload.

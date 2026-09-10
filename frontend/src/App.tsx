@@ -6,6 +6,7 @@ import { AuthProvider } from "./context/AuthContext";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import CustomerDetail from "./pages/CustomerDetail";
+import PersonnelDetail from "./pages/PersonnelDetail";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -124,6 +125,13 @@ function App() {
 
                       <Route element={<ProtectedRoute minRole="admin" />}>
                         <Route path="personnel" element={<PersonnelList />} />
+                        {/* Same reasoning as the customer page: reached from the
+                            personnel list and from a technician's name elsewhere, and
+                            «back» has to mean the list. */}
+                        <Route
+                          path="personnel/:id"
+                          element={<PersonnelDetail />}
+                        />
                         <Route path="items" element={<ItemList />} />
                         <Route
                           path="purchase-invoices"

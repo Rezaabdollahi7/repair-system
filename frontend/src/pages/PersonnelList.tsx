@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { getPersonnel, deletePersonnel, togglePersonnelActive } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
+import { useGoToPersonnel } from "../utils/navigation";
 import ConfirmModal from "../components/ConfirmModal";
 import Pagination from "../components/Pagination";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
@@ -51,13 +52,14 @@ import {
   toolbar,
   toolbarActions,
   toolbarSearch,
-  tr,
+  trClickable,
 } from "../utils/tableClasses";
 import type { Personnel, QueryParams } from "../types/api";
 
 export default function PersonnelList() {
   const { user, isAtLeast } = useAuth();
   const { openPersonnelEdit, refreshList } = useModal();
+  const goToPersonnel = useGoToPersonnel();
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
@@ -212,7 +214,10 @@ export default function PersonnelList() {
     <div className="flex gap-1 justify-end items-center">
       {!outranks(person) && (
         <button
-          onClick={() => openPersonnelEdit(person.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            openPersonnelEdit(person.id);
+          }}
           className={actionEdit}
           title="ویرایش"
         >
@@ -221,7 +226,10 @@ export default function PersonnelList() {
       )}
       {person.id !== user?.id && !outranks(person) && (
         <button
-          onClick={() => setToggleTarget(person)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setToggleTarget(person);
+          }}
           /* The toggle wears the colour of the state it moves to, not of
              the button: switching someone off is the quiet, reversible one,
              and switching them back on is the affirmative. */
@@ -237,7 +245,10 @@ export default function PersonnelList() {
       )}
       {canDelete && person.id !== user?.id && (
         <button
-          onClick={() => setDeleteTarget(person)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteTarget(person);
+          }}
           className={actionDelete}
           title="حذف"
         >
@@ -358,7 +369,18 @@ export default function PersonnelList() {
           >
             {personnel.map((person) => (
               <motion.li key={person.id} variants={staggerItem}>
-                <div className={rowCard}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => goToPersonnel(person.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      goToPersonnel(person.id);
+                    }
+                  }}
+                  className={`${rowCard} cursor-pointer hover:border-border-strong`}
+                >
                   <div className="flex items-start gap-3">
                     {avatar(person)}
                     <div className="min-w-0 flex-1">
@@ -413,7 +435,11 @@ export default function PersonnelList() {
                 <tbody className={tbody}>
                   {personnel.map((person) => {
                     return (
-                      <tr key={person.id} className={tr}>
+                      <tr
+                        key={person.id}
+                        onClick={() => goToPersonnel(person.id)}
+                        className={trClickable}
+                      >
                         <td className={`${tdActions} whitespace-nowrap`}>
                           <div className="flex items-center justify-center gap-2.5">
                             {avatar(person)}

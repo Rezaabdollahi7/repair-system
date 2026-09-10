@@ -200,8 +200,16 @@ Jest 30 + ts-jest + supertest
 
 ```
 React 19 · Vite 8 · React Router 7 · Tailwind 4 · TypeScript 5.9
-Axios · react-hot-toast · react-to-print · jalaali-js · @heroicons/react
+Axios · framer-motion · react-hot-toast · react-to-print · jalaali-js
+@heroicons/react
 ```
+
+Colour, spacing and radius come from one token layer in `src/index.css`,
+bridged into Tailwind with `@theme inline`. Nothing outside that file carries
+a raw hex or a Tailwind palette class — those ignore the theme, which is how
+a few components used to stay light in dark mode. Tables draw their classes
+from `utils/tableClasses.ts` and charts from a validated categorical palette
+in `utils/chartSeries.ts`.
 
 ### Infrastructure
 
@@ -340,6 +348,9 @@ A new REST resource needs one line in the `resources` table in
 why.
 
 ⚠️ The frontend has no automated test infrastructure yet. TypeScript is its only gate.
+UI changes are verified by looking at them: a throwaway Vite harness stubs `src/api` and
+the four contexts, and Playwright screenshots the page at 1440 light, 1440 dark and 420
+mobile. Repeatable, but not automatic — and the harness is never committed.
 
 ---
 
@@ -355,7 +366,7 @@ All routes are prefixed `/api` and require a bearer token except where noted.
 | **Personnel** | CRUD · toggle active |
 | **Items** | CRUD · search · low-stock · transactions · quick purchase/sale |
 | **Categories · Services** | CRUD |
-| **Invoices** | `purchase-invoices` · `sale-invoices` · `repair-invoices` (+ payments, status) |
+| **Invoices** | `purchase-invoices` · `sale-invoices` · `repair-invoices` — full CRUD on all three (+ payments, status) |
 | **Reports** | dashboard · stock · purchases · sales · profit |
 | **Settings** | read · update · image upload |
 | **Exports** | request · list · download |
@@ -395,8 +406,9 @@ the reasoning behind them.
 | OTP — SMS verification | ✅ |
 | 7 — Deployment | ✅ |
 | 8 — Subscription and payments | ✅ |
-| 9 — UI consistency | ⬜ |
-| 10 — Frontend bug sweep | ⬜ |
+| 9 — UI consistency | 🔄 9.4 done |
+| 10 — Frontend bug sweep | 🔄 3 of 16 done |
+| 11 — Frontend redesign | ✅ (not yet deployed) |
 
 ---
 

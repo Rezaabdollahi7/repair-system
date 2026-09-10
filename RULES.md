@@ -30,6 +30,10 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   test run result (pass/fail summary) alongside the change summary.
 - If a task is purely frontend UI with no testable logic, say so explicitly instead of silently
   skipping tests — don't leave it ambiguous whether tests were considered.
+- **Arithmetic that touches money or stock gets a pure function and its own
+  unit test**, separate from the controller test that mocks Prisma. The
+  moving-average purchase cost was wrong for months partly because the
+  formula was inlined in three controllers with nowhere to test it.
 - Never present a task as complete if tests are failing. Fix or clearly flag failures first.
 
 - A new REST resource needs a line in the `resources` table in
@@ -57,8 +61,11 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
 
 ## 5. Branching
 
-- Continue working on `feature/multi-tenant-migration` for the SaaS migration work unless a task
-  is clearly independent and risky enough to warrant its own branch (ask if unsure).
+- The SaaS migration work was done on `feature/multi-tenant-migration`. The
+  frontend redesign and the invoice work that followed it are on
+  `claude/bold-gauss-get1gp`. Stay on whichever branch the current work
+  started on unless a task is clearly independent and risky enough to
+  warrant its own (ask if unsure).
 - Don't merge to `main`/`master` without explicit instruction — that decision belongs to Reza.
 
 ## 6. Code quality standards
@@ -73,8 +80,6 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   validate `req.body`/`req.params`/`req.query` with a Zod schema via the
   `validate()` middleware before using the data. Handlers read from `req.valid`,
   not from `req.body` directly.
-  route handler must validate `req.body`/`req.params`/`req.query` with a Zod schema before using
-  the data.
 - **Never trust the client for `workspaceId` or `role`.** These must always come from the verified
   JWT on the server side, never from a request body/query param, to prevent tenant-isolation
   bypass.
@@ -92,7 +97,38 @@ Engineering workflow rules for Claude Code on the Dofixo project. These apply on
   code stays easy to review. The exception is a large file receiving many small
   edits: there, showing each change as "from → to" is less error-prone to apply
   than re-sending six hundred lines.
-  functions or files over partial fragments, so the code stays easy to review and reason about.
+
+## 6a. Frontend: the design system is the source of colour
+
+- **No raw hex and no Tailwind palette classes outside `src/index.css`.**
+  `text-gray-500`, `bg-yellow-100` and `#3b82f6` all ignore the theme, which
+  is exactly how a handful of components used to stay light in dark mode.
+  Use the semantic tokens (`text-text-secondary`, `bg-surface-alt`,
+  `border-border`) — and if a colour you need has no token, add the token.
+- **Tables come from `utils/tableClasses.ts`.** Don't hand-roll `px-3 py-2`
+  on a `<td>`: the cell grid, the zebra striping and the row-action colours
+  are already there, and a hand-rolled cell is the one that doesn't match.
+- **Chart colours come from `utils/chartSeries.ts`**, which is validated for
+  lightness, chroma, colour-blind separation and contrast. Adding a series
+  colour means re-running that validation, not picking one that looks nice.
+- **Match the sibling screen before inventing a layout.** The three invoice
+  forms drifted into three different shapes because each was edited alone;
+  when you touch one of a set, open the other two.
+
+## 6b. Frontend: verify it by looking at it
+
+There is no visual regression testing, so "it compiles" is not verification
+of a UI change.
+
+- Stand up a throwaway Vite harness that stubs `src/api` and the four
+  contexts, mount the page or modal, and screenshot it with Playwright at
+  **1440 light, 1440 dark and 420 mobile**. Read the screenshots before
+  presenting the work.
+- **The harness is never committed.** Delete it before staging, and check
+  `git status` for it — it has been staged by accident.
+- When a screenshot looks wrong, suspect the harness's mock data first: a
+  missing `totalPages` or a `sku` where the API sends `code` produces a
+  convincing-looking bug that does not exist in the app.
 
 ## 7. Security checklist (apply throughout, not just Phase 2/3)
 

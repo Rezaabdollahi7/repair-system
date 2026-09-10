@@ -343,7 +343,7 @@ so a screen that breaks has one obvious cause rather than three.
 - [ ] 9.1 Fold the stock report into the items page as a filter and retire the separate page — it is the item list with one condition applied
 - [ ] 9.2 Move the profit summary onto the dashboard and retire the profit report page, where it currently goes unseen
 - [ ] 9.3 Let the purchase invoice form create a complete item inline. It creates a reduced one today, so the same catalogue has two entry points with different results
-- [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price. It currently returns the stock but leaves the average untouched, so it drifts — a weighted average can't be reversed from the invoice alone. Either recompute from that item's full purchase history, or stop allowing deletion and record a return invoice instead, which is what accounting practice would do.
+- [x] 9.4 Decided and done: a moving average _can_ be reversed from the invoice alone, as long as each line leaves at the price **it** came in at rather than at the blended average. That is the exact inverse, needs no history replay, and now runs on both delete and edit. `utils/avgPurchasePrice.ts` holds the two halves (`averageAfterAdding` / `averageAfterRemoving`) that the purchase-invoice lines and quick purchase had each been reimplementing. Two edge cases are deliberate: at zero remaining stock the previous figure is kept rather than zeroed (the valuation is zero either way, and the number still has to suggest a price on the next purchase form), and the remaining value is clamped at zero because the reversal cannot see sales that happened in between.
 - [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement, column choice and print styling, replacing the pile of `sale_invoice_show_*` booleans in settings. Numbering is deliberately not part of this — a number is accounting data and should stay boring; this is about what the customer actually sees.
       Also: PersianDatePicker accepts `className`, `required` and `clearable` and reads none of them, and several modals accept a `zIndex` they never apply — layout concerns that belong here rather than scattered across a bug list
 - [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8 fixed the prefixes per invoice kind. Touches the schema, the settings form and the response shape, so it belongs with the other frontend work
@@ -424,8 +424,9 @@ order.
 - [ ] 10.10 `Pagination` labels look swapped — "بعدی" sends `page - 1` and
       "قبلی" sends `page + 1` — and shows its range as `{to}–{from}`. It also
       hardcodes the word "دستگاه" while being used on every list
-- [ ] 10.11 `ProtectedRoute` uses a raw `text-gray-500` where every other
-      component uses `text-text-secondary`, so it ignores the theme
+- [x] 10.11 `ProtectedRoute` uses a raw `text-gray-500` where every other
+      component uses `text-text-secondary`, so it ignores the theme —
+      swept up with the rest of the raw palette classes in the redesign
 
 ### Wasteful
 
@@ -441,13 +442,48 @@ order.
       Router would still cut what a first visit downloads, but the real
       figure is the compressed one
 
-- [ ] 10.15 `errorText` is defined identically in five components before
+- [x] 10.15 `errorText` is defined identically in five components before
       `utils/errors.ts` existed; fold them into the shared one
 - [ ] 10.16 Add type-aware linting (`parserOptions.project`) now that the
       whole frontend is TypeScript. It was left off during the migration
       because it type-checks the entire program on every run
 
 ---
+
+## Phase 11 — Frontend redesign and invoice consistency
+
+Not planned in this roadmap — it started as "redesign the dashboard" and ran
+through every page, then into the modals, then into what the redesign
+exposed. Recorded here after the fact so the next session knows it happened.
+
+- [x] 11.1 A token layer in `src/index.css` bridged into Tailwind with
+      `@theme inline`, and every page moved onto it. Raw hex and Tailwind
+      palette classes are gone from `src/` — they were why a few components
+      stayed light in dark mode
+- [x] 11.2 The brand colour moved from yellow to blue, and the app is called
+      دوفیکسو wherever a name is shown
+- [x] 11.3 A validated categorical chart palette (`utils/chartSeries.ts`) —
+      lightness band, chroma floor, adjacent-pair CVD ΔE, 3:1 contrast
+- [x] 11.4 `utils/tableClasses.ts`: one vocabulary for every table, an
+      Excel-style cell grid, zebra rows, and coloured row actions
+- [x] 11.5 The layout shell — Jalali date centred in the header, the
+      per-page `<h1>` and count line dropped, settings moved from the
+      sidebar to a header icon, the role moved into the user menu
+- [x] 11.6 The dashboard regrouped by module, with technician workload
+      beside the device-status ring
+- [x] 11.7 The subscription page and its plan cards rebuilt
+- [x] 11.8 The modal layer brought onto the same system
+- [x] 11.9 The three invoice form modals put on one skeleton — identity band
+      on top, lines at 9/12, summary sticky at 3/12, actions full width
+- [x] 11.10 Purchase invoices became editable (`PUT /api/purchase-invoices/:id`),
+      the last of the three that could only be deleted and re-entered
+
+Real defects found and fixed along the way, none of them styling: a cancelled
+repair invoice left its outstanding balance standing; the purchase form
+printed Latin digits through its own `toLocaleString`; the required asterisk
+was rendered twice on two fields; the repair form's line row overflowed its
+grid on a phone; a selected table row was invisible because `--primary-soft`
+equalled `--surface`; eight hover states repeated their resting colour.
 
 ## How to use this with Claude Code
 

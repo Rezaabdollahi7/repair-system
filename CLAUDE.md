@@ -48,12 +48,24 @@ frontend/   React SPA (Vite)
 - `src/pages/` — one component per top-level page/route (Dashboard, DeviceList, CustomerList, etc.)
 - `src/components/` — shared/reusable components, including per-entity modals
   (`*FormModal.tsx`, `*DetailModal.tsx`) following a consistent CRUD-modal pattern
-- `src/context/` — `AuthContext`, `ModalContext`, `ThemeContext`
+- `src/context/` — `AuthContext`, `ModalContext`, `ThemeContext`,
+  `SubscriptionContext`. `ModalContext` holds the modal **stack** and its
+  `open*` openers; a new modal needs a `ModalType` string, an opener, a line
+  in the context value and a `case` in the switch — the string union makes a
+  typo a compile error rather than a modal that never opens
 - `src/api/index.ts` — centralized Axios API client
 - `src/types/api.ts` — response shapes, written from the controllers rather
   than guessed. The API is deliberately inconsistent (snake_case mostly,
   camelCase for items and categories) and these types mirror that
-- `src/utils/` — formatters and helpers (Jalali date handling included)
+- `src/utils/` — formatters and helpers (Jalali date handling included),
+  plus the shared UI vocabulary: `tableClasses.ts` (every table and row
+  action), `invoiceStatus.ts`, `deviceStatus.ts`, `lineItemType.ts`,
+  `errors.ts` (`errorText`, once — it used to be copied into five
+  components)
+- `src/index.css` — the design tokens, and the only file with raw colour
+  values in it. See **Design System** below
+- `src/motion/` — the shared framer-motion variants (`modalPanel`,
+  `staggerContainer`, `staggerItem`)
 
 ## Domain Model (current feature set)
 
@@ -74,6 +86,20 @@ Key entities:
     per kind plus a counter held on the workspace row and incremented inside
     the invoice's transaction. Per-workspace, gap-free, and safe under
     concurrency. `settings.invoice_prefix` is left in place but unused (9.6).
+  - **All three kinds are editable** (`PUT /api/{kind}-invoices/:id`). An edit
+    replaces the header and rebuilds the whole line list rather than patching
+    it: the lines are what moved stock, and reconciling a partial change
+    against what is already in the warehouse is a harder problem than
+    resending the invoice as it should now read. The invoice number is never
+    reissued — numbering is gap-free, and drawing a fresh one would burn a
+    number.
+  - **`Item.avgPurchasePrice` is a moving-average cost of the stock on hand**,
+    not a lifetime average of everything ever bought — which is why the stock
+    report multiplies it by `currentStock` to get a valuation. Selling leaves
+    it alone; buying pulls it towards the new price. Both halves live in
+    `utils/avgPurchasePrice.ts`, and a reversal (an invoice edited or deleted)
+    removes each line **at the price that line was bought at**, which is the
+    only inverse that lands back on what the surviving stock cost.
 - **Reports** — low-stock report (items below minimum threshold), profit & loss report
   (sales, purchases, net, margin).
 
@@ -87,8 +113,9 @@ converted at the application layer for display.
 express-rate-limit, Jest + ts-jest + supertest, pnpm.
 
 **Frontend:** React 19, Vite, React Router 7, Tailwind CSS 4, Axios,
-react-hot-toast, react-to-print, jalaali-js, pnpm. TypeScript throughout,
-pinned to 5.9 — typescript-eslint 8 refuses to load against TS 7.
+framer-motion, heroicons, react-hot-toast, react-to-print, jalaali-js, pnpm.
+TypeScript throughout, pinned to 5.9 — typescript-eslint 8 refuses to load
+against TS 7.
 
 ## SaaS Migration (in progress — branch `feature/multi-tenant-migration`)
 
@@ -315,6 +342,56 @@ business features**. Payment integration is the last phase and is explicitly out
 - **react-hook-form** — frontend forms
 - **Vitest** — the frontend has no automated tests at all; TypeScript is its
   only check, and it verifies shape rather than behaviour
+
+## Design System (frontend)
+
+The frontend was rebuilt onto one token layer. **Nothing outside
+`src/index.css` should carry a raw hex, and nothing should carry a Tailwind
+palette class** (`text-gray-500`, `bg-yellow-100`): those ignore the theme,
+which is how a handful of components used to stay light in dark mode.
+
+- **Tokens** live in `src/index.css`, bridged into Tailwind with
+  `@theme inline`. Semantic names, not colour names — `--surface`,
+  `--surface-alt`, `--border`, `--border-strong`, `--text-primary`,
+  `--text-secondary`, `--text-muted`, `--primary`, and the four severity
+  pairs (`--success-soft` / `--success-fg`, and the same for warning, danger
+  and info). Rules that utilities must be able to override go in
+  `@layer base`.
+- **The brand colour is blue.** It was yellow until it wasn't; if you find a
+  gold anywhere outside the chart series palette, it is a leftover.
+- **The app's display name is دوفیکسو** wherever a name is shown to a user.
+- **Charts** draw from a validated categorical series
+  (`utils/chartSeries.ts`), not from ad-hoc colours. The palette passes a lightness band, a
+  chroma floor, an adjacent-pair CVD ΔE check and a 3:1 contrast floor
+  against its surface. **Keep the validated _sequence_, not the slot
+  numbers** — two call sites deliberately read `SERIES[1]`/`SERIES[0]` out of
+  order, because swapping them put the reserved red beside gold at ΔE 3.1
+  for deuteranopes.
+- **Tables** get their classes from `utils/tableClasses.ts` — `tableCard`,
+  `th`, `td`, `tdMuted`, `tdBare`, `tdActions`, plus the four coloured row
+  actions (`actionView` / `actionEdit` / `actionDelete` / `actionConfirm`).
+  The Excel-style cell grid and zebra striping come from `.table-shell` in
+  `@layer base`, not from per-cell borders.
+- **Table text is `--text-table` (15px), not `body-md`.** 16px was tried and
+  overflowed: the widest table needs about 1200px and the content area is
+  ~1150.
+- **The three invoice form modals share one skeleton** — a full-width
+  identity band on top, line items in `lg:col-span-9`, a sticky summary in
+  `lg:col-span-3`, actions full width at the bottom, and a line row on a
+  twelve-column mapping that falls back to six on a phone. The sale form is
+  the reference; if the three ever drift again, that is the one to copy.
+- ⚠️ **One deliberate accessibility trade-off.** The resting field border
+  (`--field-border-light` / `--field-border-dark`) sits below WCAG 1.4.11's
+  3:1 — 2.04:1 light, 2.27:1 dark — because the compliant value read as an
+  error state on a dense form. The revert instructions are in the comment
+  beside it.
+
+**There is no visual regression testing.** Verifying a UI change means
+looking at it: the working method has been a throwaway Vite harness that
+stubs `src/api`, `AuthContext`, `ModalContext`, `ThemeContext` and
+`SubscriptionContext`, mounts a page or modal, and is screenshotted with
+Playwright at 1440 light, 1440 dark and 420 mobile. The harness is never
+committed.
 
 ## Working Conventions
 

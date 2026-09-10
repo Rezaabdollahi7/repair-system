@@ -3,7 +3,14 @@ import { ChartEmpty } from "./chartKit";
 import { SERIES } from "../../utils/chartSeries";
 
 export interface BarRow {
+  /** Also the row's key and what the table fallback prints. */
   label: string;
+  /**
+   * Rendered in place of `label` when the row's name is more than text —
+   * the technician workload list makes each name a link to its page.
+   * `label` stays the string, because a key and a table cell need one.
+   */
+  labelNode?: React.ReactNode;
   /** Second line under the label — a code, a share, a count. */
   meta?: string;
   value: number;
@@ -53,7 +60,7 @@ export default function BarList({
         <li key={`${row.label}-${index}`}>
           <div className="flex items-baseline justify-between gap-3 mb-1.5">
             <span className="text-body-sm text-text-primary truncate min-w-0">
-              {row.label}
+              {row.labelNode ?? row.label}
               {row.meta && (
                 <span className="text-body-xs text-text-muted ms-2">
                   {row.meta}

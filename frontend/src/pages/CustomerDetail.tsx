@@ -20,6 +20,7 @@ import { useModal } from "../context/ModalContext";
 import { usePageCrumb } from "../context/BreadcrumbContext";
 import { useAuth } from "../context/AuthContext";
 import StatusPill from "../components/StatusPill";
+import PersonnelLink from "../components/PersonnelLink";
 import { deviceStatusOf } from "../utils/deviceStatus";
 import { paymentStatusOf } from "../utils/invoiceStatus";
 import { errorText } from "../utils/errors";
@@ -542,7 +543,16 @@ export default function CustomerDetail() {
                         </td>
                         <td className={tdMuted}>
                           {device.assignees.length > 0
-                            ? device.assignees.map((a) => a.name).join("، ")
+                            ? device.assignees.map((person, index) => (
+                                <span key={person.id}>
+                                  {index > 0 && "، "}
+                                  <PersonnelLink
+                                    id={person.id}
+                                    name={person.name}
+                                    tone="inherit"
+                                  />
+                                </span>
+                              ))
                             : "—"}
                         </td>
                         <td className={tdMuted}>

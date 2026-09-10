@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PersonnelLink from "./PersonnelLink";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { getDevice, deleteDevice, getDeviceImages } from "../api";
@@ -214,7 +215,13 @@ export default function DeviceDetailModal({
                           key={person.id}
                           className="px-2 py-1 sm:px-3 sm:py-2 bg-primary-soft text-primary rounded-full text-body-xs sm:text-body-sm font-medium"
                         >
-                          {person.name || person.username}
+                          {/* The pill already wears the brand colour, so the
+                              link keeps it rather than painting over it. */}
+                          <PersonnelLink
+                            id={person.id}
+                            name={person.name || person.username}
+                            tone="inherit"
+                          />
                         </span>
                       ))}
                     </div>

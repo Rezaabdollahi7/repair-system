@@ -29,6 +29,7 @@ import { SERIES } from "../utils/chartSeries";
 import { DEVICE_STATUSES, deviceStatusOf } from "../utils/deviceStatus";
 import DonutChart from "../components/charts/DonutChart";
 import BarList from "../components/charts/BarList";
+import PersonnelLink from "../components/PersonnelLink";
 import Gauge from "../components/charts/Gauge";
 import TrendChart from "../components/charts/TrendChart";
 import type {
@@ -422,6 +423,13 @@ export default function Dashboard() {
   const workloadRows = [
     ...stats.technician_load.technicians.map((technician) => ({
       label: technician.name,
+      labelNode: (
+        <PersonnelLink
+          id={technician.id}
+          name={technician.name}
+          tone="inherit"
+        />
+      ),
       value: technician.count,
       display: `${toPersianDigits(technician.count)} دستگاه`,
     })),

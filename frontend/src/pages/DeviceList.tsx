@@ -35,6 +35,7 @@ import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
 import { useGoToCustomer } from "../utils/navigation";
+import PersonnelLink from "../components/PersonnelLink";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import { backdrop, modalPanel, staggerContainer, staggerItem } from "../motion";
 import {
@@ -196,9 +197,19 @@ function AssigneeBadge({ assignees }: { assignees: DeviceAssignee[] }) {
   }
 
   const shared = assignees.length > 1;
-  const label = shared
-    ? `مشترک — ${toPersianDigits(assignees.length)} نفر`
-    : assignees[0].name;
+  /*
+   * One name is a way to that person's page; several is a count, and the
+   * chip has no room for several links. The full list stays in the title.
+   */
+  const label = shared ? (
+    `مشترک — ${toPersianDigits(assignees.length)} نفر`
+  ) : (
+    <PersonnelLink
+      id={assignees[0].id}
+      name={assignees[0].name}
+      tone="inherit"
+    />
+  );
 
   return (
     <span

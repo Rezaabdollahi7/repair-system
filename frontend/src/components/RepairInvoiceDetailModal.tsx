@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PersonnelLink from "./PersonnelLink";
 import { AnimatePresence, motion } from "framer-motion";
 import { errorText } from "../utils/errors";
 import {
@@ -322,7 +323,17 @@ export default function RepairInvoiceDetailModal({
                           />
                           <InfoRow
                             label="تعمیرکار"
-                            value={invoice.technician_name || "—"}
+                            value={
+                              invoice.technician_id &&
+                              invoice.technician_name ? (
+                                <PersonnelLink
+                                  id={Number(invoice.technician_id)}
+                                  name={invoice.technician_name}
+                                />
+                              ) : (
+                                invoice.technician_name || "—"
+                              )
+                            }
                           />
                           <InfoRow
                             label="گارانتی"

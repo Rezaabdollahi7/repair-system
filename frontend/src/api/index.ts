@@ -7,9 +7,9 @@ import type {
   QueryParams,
   Customer,
   CustomerBody,
-  CustomerDevice,
+  CustomerNotesBody,
+  CustomerOverview,
   CustomerListRow,
-  CustomerStats,
   Paginated,
   PaginatedDevices,
   Device,
@@ -246,10 +246,11 @@ export const createCustomer = (data: CustomerBody) =>
   api.post<Customer>("/customers", data);
 export const updateCustomer = (id: Id, data: CustomerBody) =>
   api.put<Customer>(`/customers/${id}`, data);
-export const getCustomerDevices = (id: Id) =>
-  api.get<CustomerDevice[]>(`/customers/${id}/devices`);
-export const getCustomerStats = (id: Id) =>
-  api.get<CustomerStats>(`/customers/${id}/stats`);
+/** The whole customer page in one request — see `CustomerOverview`. */
+export const getCustomerOverview = (id: Id) =>
+  api.get<CustomerOverview>(`/customers/${id}/overview`);
+export const updateCustomerNotes = (id: Id, data: CustomerNotesBody) =>
+  api.put<MessageResponse & CustomerNotesBody>(`/customers/${id}/notes`, data);
 export const deleteCustomer = (id: Id) =>
   api.delete<{ success: boolean }>(`/customers/${id}`);
 export const searchCustomers = (q: string) =>

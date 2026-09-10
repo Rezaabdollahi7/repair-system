@@ -5,6 +5,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import CustomerDetail from "./pages/CustomerDetail";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -112,6 +113,14 @@ function App() {
                       />
                       <Route path="devices" element={<DeviceList />} />
                       <Route path="customers" element={<CustomerList />} />
+                      {/* A customer's details are a page, not a modal: the
+                          shop reaches one from four different lists and
+                          wants a back button that goes to the list, not a
+                          dialog that closes onto wherever they came from. */}
+                      <Route
+                        path="customers/:id"
+                        element={<CustomerDetail />}
+                      />
 
                       <Route element={<ProtectedRoute minRole="admin" />}>
                         <Route path="personnel" element={<PersonnelList />} />

@@ -311,6 +311,104 @@ describe("personnel", () => {
   });
 });
 
+// The customer page reads one aggregate endpoint that pulls devices, repair
+// invoices and sale invoices in one go, and writes a note through a nested
+// route. Neither fits the table in isolation.test.ts: the read is an
+// aggregate across four tables rather than a row, and the write is not the
+// resource's own PUT.
+describe("customer overview and notes", () => {
+  async function foreignCustomerWithHistory() {
+    const customer = await owner.customer.create({
+      data: {
+        workspaceId: workspaces.b.workspaceId,
+        name: "مشتری ب",
+        phone: "09131111111",
+        notes: "یادداشت خصوصی کارگاه ب",
+      },
+      select: { id: true },
+    });
+
+    const device = await owner.device.create({
+      data: {
+        workspaceId: workspaces.b.workspaceId,
+        customerId: customer.id,
+        deviceName: "یخچال ب",
+        status: "repairing",
+      },
+      select: { id: true },
+    });
+
+    await owner.repairInvoice.create({
+      data: {
+        workspaceId: workspaces.b.workspaceId,
+        invoiceNumber: "REP-B001",
+        deviceId: device.id,
+        customerId: customer.id,
+        totalAmount: 5_000_000,
+        paidAmount: 5_000_000,
+        paymentStatus: "paid",
+      },
+    });
+
+    return customer.id;
+  }
+
+  it("will not assemble another workspace's customer page", async () => {
+    const customerId = await foreignCustomerWithHistory();
+
+    const res = await request(app)
+      .get(`/api/customers/${customerId}/overview`)
+      .set("Authorization", `Bearer ${workspaces.a.token}`);
+
+    // 404 rather than an empty page: an empty overview would say the
+    // customer exists and has no history, which is itself a leak.
+    expect(res.status).toBe(404);
+  });
+
+  it("assembles only the caller's own rows", async () => {
+    // Two customers with the same shape, one per workspace. If any of the
+    // four reads inside the handler lost its scope, the counts would pick
+    // up the other side.
+    await foreignCustomerWithHistory();
+
+    const mine = await owner.customer.create({
+      data: { workspaceId: workspaces.a.workspaceId, name: "مشتری الف" },
+      select: { id: true },
+    });
+
+    const res = await request(app)
+      .get(`/api/customers/${mine.id}/overview`)
+      .set("Authorization", `Bearer ${workspaces.a.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.customer.name).toBe("مشتری الف");
+    expect(res.body.summary.total_devices).toBe(0);
+    expect(res.body.summary.total_paid).toBe(0);
+    expect(res.body.devices).toEqual([]);
+    expect(res.body.invoices).toEqual([]);
+    expect(res.body.timeline).toEqual([]);
+  });
+
+  it("cannot write a note onto another workspace's customer", async () => {
+    const customerId = await foreignCustomerWithHistory();
+
+    const res = await request(app)
+      .put(`/api/customers/${customerId}/notes`)
+      .set("Authorization", `Bearer ${workspaces.a.token}`)
+      .send({ notes: "نوشته‌ی مهاجم" });
+
+    const after = await owner.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { notes: true },
+    });
+
+    // updateMany with a workspace in its where clause writes nothing and
+    // reports it. A plain `update` on the id would have overwritten this.
+    expect(res.status).toBe(404);
+    expect(after.notes).toBe("یادداشت خصوصی کارگاه ب");
+  });
+});
+
 // otp_codes is here rather than in isolation.test.ts because it is not a
 // tenant-scoped resource and the table-driven suite there has nothing to say
 // about it: there is no workspace to be denied from.

@@ -9,7 +9,6 @@ import {
 } from "react";
 import DeviceDetailModal from "../components/DeviceDetailModal";
 import DeviceFormModal from "../components/DeviceFormModal";
-import CustomerDetailModal from "../components/CustomerDetailModal";
 import CustomerFormModal from "../components/CustomerFormModal";
 import PersonnelFormModal from "../components/PersonnelFormModal";
 import ItemFormModal from "../components/ItemFormModal";
@@ -29,7 +28,7 @@ import type { Id } from "../types/api";
 type ModalType =
   | "deviceDetail"
   | "deviceEdit"
-  | "customerDetail"
+  | "deviceCreateForCustomer"
   | "customerEdit"
   | "personnelEdit"
   | "itemEdit"
@@ -50,6 +49,8 @@ type ModalType =
  */
 interface ModalProps {
   onEdit?: (id: Id) => void;
+  /** For `deviceCreateForCustomer`: whose device the new one is. */
+  presetCustomer?: { id: Id; name: string };
 }
 
 interface ModalEntry {
@@ -61,7 +62,7 @@ interface ModalEntry {
 interface ModalContextValue {
   openDeviceDetail: (deviceId: Id) => void;
   openDeviceEdit: (deviceId: Id | null) => void;
-  openCustomerDetail: (customerId: Id) => void;
+  openDeviceCreateForCustomer: (customer: { id: Id; name: string }) => void;
   openCustomerEdit: (customerId: Id | null) => void;
   openPersonnelEdit: (personnelId: Id | null) => void;
   openItemEdit: (itemId: Id | null) => void;
@@ -144,10 +145,13 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     openModal("deviceEdit", deviceId);
   const openItemEdit = (itemId: Id | null) => openModal("itemEdit", itemId);
   const openItemDetail = (itemId: Id) => openModal("itemDetail", itemId);
-  const openCustomerDetail = (customerId: Id) =>
-    openModal("customerDetail", customerId, {
-      onEdit: (id) => openModal("customerEdit", id),
-    });
+  /*
+   * A customer's details are a page now, not a modal — `/customers/:id`.
+   * What is left here is the one modal that page opens on the customer's
+   * behalf: a new device that already belongs to them.
+   */
+  const openDeviceCreateForCustomer = (customer: { id: Id; name: string }) =>
+    openModal("deviceCreateForCustomer", null, { presetCustomer: customer });
   const openCustomerEdit = (customerId: Id | null) =>
     openModal("customerEdit", customerId);
   const openSaleInvoiceDetail = (invoiceId: Id) =>
@@ -172,7 +176,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
       value={{
         openDeviceDetail,
         openDeviceEdit,
-        openCustomerDetail,
+        openDeviceCreateForCustomer,
         openCustomerEdit,
         openPersonnelEdit,
         openItemEdit,
@@ -221,14 +225,15 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                 zIndex={zIndex}
               />
             );
-          case "customerDetail":
+          case "deviceCreateForCustomer":
             return (
-              <CustomerDetailModal
+              <DeviceFormModal
                 key={`${modal.type}-${modal.id}-${index}`}
-                customerId={modal.id}
+                deviceId={null}
                 isOpen={true}
                 onClose={closeModal}
-                onEdit={modal.props?.onEdit}
+                onSuccess={closeModal}
+                presetCustomer={modal.props?.presetCustomer}
                 zIndex={zIndex}
               />
             );

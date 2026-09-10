@@ -164,27 +164,88 @@ export interface CustomerBody {
   phone: string;
 }
 
-/**
- * A row of GET /customers/:id/devices.
+/* ── The customer page ─────────────────────────────────────────────────
  *
- * `status` is a plain string column, not an enum: the values in use are
- * received, pending, diagnosing, waiting_for_parts, repairing, repaired,
- * ready_for_pickup, delivered, unrepairable and not_repaired. Left as string
- * rather than narrowed, since nothing on the server constrains it.
+ * `GET /customers/:id/overview` answers the whole page in one request.
+ * The page is one screen and each separate call would pay the RLS
+ * transaction's two round trips over again.
  */
-export interface CustomerDevice {
+
+export interface CustomerSummary {
+  total_devices: number;
+  /** Still in the shop: anything but delivered, unrepairable or not_repaired. */
+  active_devices: number;
+  successful_repairs: number;
+  failed_repairs: number;
+  /** Rials actually received, cancelled invoices excluded. */
+  total_paid: number;
+  last_visit: string | null;
+}
+
+export interface CustomerDeviceRow {
   id: number;
-  customer_id: number | null;
   device_name: string;
   brand: string | null;
   model: string | null;
   serial_number: string | null;
+  status: string;
   entry_date: string | null;
   exit_date: string | null;
+  assignees: { id: number; name: string }[];
+}
+
+export type CustomerTimelineEventType =
+  "registered" | "delivered" | "invoiced" | "paid";
+
+export interface CustomerTimelineEvent {
+  type: CustomerTimelineEventType;
+  date: string;
+  /** Set on `invoiced` and `paid`. */
+  invoice_number?: string;
+  amount?: number;
+}
+
+export interface CustomerTimelineEntry {
+  device_id: number;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
   status: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
+  events: CustomerTimelineEvent[];
+}
+
+/**
+ * Repair and sale invoices in one list. Purchase invoices are absent by
+ * nature: a purchase names a supplier, not a customer, and has no
+ * `customer_id` to match on.
+ */
+export interface CustomerInvoiceRow {
+  kind: "repair" | "sale";
+  id: number;
+  invoice_number: string;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  device_id: number | null;
+}
+
+export interface CustomerOverview {
+  customer: {
+    id: number;
+    name: string;
+    phone: string | null;
+    notes: string | null;
+    created_at: string;
+  };
+  summary: CustomerSummary;
+  devices: CustomerDeviceRow[];
+  timeline: CustomerTimelineEntry[];
+  invoices: CustomerInvoiceRow[];
+}
+
+export interface CustomerNotesBody {
+  notes: string | null;
 }
 
 /**

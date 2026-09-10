@@ -3,6 +3,7 @@ import { getRepairInvoices, deleteRepairInvoice } from "../api";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
+import { useGoToCustomer } from "../utils/navigation";
 import { formatPersianCurrency, formatPersianDate } from "../utils/formatters";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
@@ -93,9 +94,9 @@ export default function RepairInvoiceList() {
     openRepairInvoiceCreate,
     openRepairInvoiceEdit,
     openDeviceDetail,
-    openCustomerDetail,
     refreshList,
   } = useModal();
+  const goToCustomer = useGoToCustomer();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -507,7 +508,7 @@ export default function RepairInvoiceList() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (invoice.customer_id)
-                                  openCustomerDetail(invoice.customer_id);
+                                  goToCustomer(invoice.customer_id);
                               }}
                               className="text-primary hover:underline font-medium"
                             >

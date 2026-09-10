@@ -7,6 +7,7 @@ import { idParamSchema } from "../schemas/common";
 import {
   customerBodySchema,
   customerListQuerySchema,
+  customerNotesSchema,
 } from "../schemas/customer";
 
 const router = express.Router();
@@ -15,17 +16,24 @@ router.use(authenticate);
 
 router.get("/", validate({ query: customerListQuerySchema }), ctrl.getAll);
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getOne);
+// Everything the customer page shows, in one request: the page is one
+// screen, and four round trips to fill it would each pay the RLS
+// transaction's two hops.
 router.get(
-  "/:id/devices",
+  "/:id/overview",
   validate({ params: idParamSchema }),
-  ctrl.getDevices,
+  ctrl.getOverview,
 );
-router.get("/:id/stats", validate({ params: idParamSchema }), ctrl.getStats);
 router.post("/", validate({ body: customerBodySchema }), ctrl.create);
 router.put(
   "/:id",
   validate({ params: idParamSchema, body: customerBodySchema }),
   ctrl.update,
+);
+router.put(
+  "/:id/notes",
+  validate({ params: idParamSchema, body: customerNotesSchema }),
+  ctrl.updateNotes,
 );
 router.delete(
   "/:id",

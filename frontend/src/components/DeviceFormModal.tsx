@@ -113,6 +113,14 @@ interface DeviceFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /**
+   * Opens a new device already belonging to this customer. Set by the
+   * customer page's «ثبت دستگاه جدید», which knows whose device it is —
+   * without it the button would drop the shop back into a search for the
+   * customer whose page they are standing on. Ignored when editing: an
+   * existing device brings its own.
+   */
+  presetCustomer?: { id: Id; name: string } | null;
   zIndex?: number;
 }
 
@@ -121,6 +129,7 @@ export default function DeviceFormModal({
   isOpen,
   onClose,
   onSuccess,
+  presetCustomer = null,
 }: DeviceFormModalProps) {
   const isEdit = Boolean(deviceId);
   const [form, setForm] = useState<DeviceForm>(INITIAL_FORM);
@@ -272,10 +281,17 @@ export default function DeviceFormModal({
   }, [debouncedBrandSearch, searchBrandsAPI]);
 
   const resetForm = () => {
-    setForm(INITIAL_FORM);
+    // The customer comes with the form when the page that opened it already
+    // knows who it is. `customerSearch` is what the field shows and
+    // `form.customer_id` is what gets submitted, so both are set.
+    setForm(
+      presetCustomer
+        ? { ...INITIAL_FORM, customer_id: Number(presetCustomer.id) }
+        : INITIAL_FORM,
+    );
     setImages([]);
     setSelectedPersonnel([]);
-    setCustomerSearch("");
+    setCustomerSearch(presetCustomer?.name ?? "");
     setDeviceNameSearch("");
     setBrandSearch("");
     setShowNewCustomer(false);

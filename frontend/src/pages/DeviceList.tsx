@@ -34,6 +34,7 @@ import { deviceInvoiceStateOf } from "../utils/invoiceStatus";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
+import { useGoToCustomer } from "../utils/navigation";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import { backdrop, modalPanel, staggerContainer, staggerItem } from "../motion";
 import {
@@ -285,11 +286,11 @@ export default function DeviceList() {
 
   const {
     openDeviceEdit,
-    openCustomerDetail,
     refreshList,
     openSaleInvoiceCreate,
     openSaleInvoiceDetail,
   } = useModal();
+  const goToCustomer = useGoToCustomer();
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -708,7 +709,7 @@ export default function DeviceList() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (device.customer_id)
-                            openCustomerDetail(device.customer_id);
+                            goToCustomer(device.customer_id);
                         }}
                         className="text-body-sm text-primary hover:underline font-medium"
                       >
@@ -799,7 +800,7 @@ export default function DeviceList() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (device.customer_id)
-                              openCustomerDetail(device.customer_id);
+                              goToCustomer(device.customer_id);
                           }}
                           className="text-primary hover:underline font-medium"
                         >

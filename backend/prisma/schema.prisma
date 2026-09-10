@@ -61,7 +61,7 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-// One expiresAt covers both the trial and a paid period: the question
+  // One expiresAt covers both the trial and a paid period: the question
   // asked of it is always "may this workspace still be written to".
   status    WorkspaceStatus @default(trial)
   expiresAt DateTime?       @map("expires_at")
@@ -226,10 +226,10 @@ model OtpCode {
   // be sent the same five digits, and lookup is by phone + purpose anyway.
   codeHash String @map("code_hash")
 
-  expiresAt DateTime @map("expires_at")
+  expiresAt  DateTime  @map("expires_at")
   // Burns the row at three. Checked alongside expiry and consumption, so a
   // code that ran out of attempts is dead even while it is still in date.
-  attempts  Int      @default(0)
+  attempts   Int       @default(0)
   // Set when the code is spent, and also when a newer code supersedes it:
   // re-sending invalidates whatever came before, so only ever one live code
   // exists per phone and purpose.
@@ -254,6 +254,10 @@ model Customer {
   workspaceId Int      @map("workspace_id")
   name        String
   phone       String?
+  // The shop's own note about this customer — «pays late, don't release the
+  // device until the money is in». Staff-facing only: it is never printed on
+  // an invoice and never leaves the workspace.
+  notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -306,9 +310,9 @@ model Device {
 }
 
 model DeviceImage {
-  id          Int      @id @default(autoincrement())
-  workspaceId Int      @map("workspace_id")
-  deviceId    Int      @map("device_id")
+  id          Int    @id @default(autoincrement())
+  workspaceId Int    @map("workspace_id")
+  deviceId    Int    @map("device_id")
   filename    String
   filepath    String
 
@@ -322,8 +326,8 @@ model DeviceImage {
   /// image, so an old row renders correctly and merely costs more bytes.
   thumbnailPath String? @map("thumbnail_path")
 
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
@@ -733,7 +737,6 @@ model Backup {
   @@map("backups")
 }
 
-
 // ── Subscriptions & billing ──────────────────────────────────
 
 // Named subscription_payment_status, not payment_status: the invoice tables
@@ -835,7 +838,7 @@ model Payment {
   /// What actually went to Zibal, and what verify must return. A mismatch
   /// means something was tampered with between here and the gateway.
   amountRials      Decimal @map("amount_rials") @db.Decimal(18, 0)
-    planDurationDays Int     @map("plan_duration_days")
+  planDurationDays Int     @map("plan_duration_days")
 
   /// Which code this attempt used, if any.
   ///
@@ -898,16 +901,16 @@ model Payment {
 ///
 /// Append-only: no UPDATE and no DELETE for the application role.
 model SubscriptionEvent {
-  id          Int                   @id @default(autoincrement())
-  workspaceId Int                   @map("workspace_id")
-  type        SubscriptionEventType
-  days        Int
+  id                Int                   @id @default(autoincrement())
+  workspaceId       Int                   @map("workspace_id")
+  type              SubscriptionEventType
+  days              Int
   /// Null for the very first event, where the workspace had no expiry yet.
-  previousExpiresAt DateTime? @map("previous_expires_at")
-  newExpiresAt      DateTime  @map("new_expires_at")
-  paymentId         Int?      @map("payment_id")
+  previousExpiresAt DateTime?             @map("previous_expires_at")
+  newExpiresAt      DateTime              @map("new_expires_at")
+  paymentId         Int?                  @map("payment_id")
   note              String?
-  createdAt         DateTime  @default(now()) @map("created_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   payment   Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
@@ -924,11 +927,11 @@ model SubscriptionEvent {
 /// counter that can drift from the rows it counts is worse than no counter:
 /// maxUses is checked against COUNT(*) on discount_code_uses.
 model DiscountCode {
-  id   Int              @id @default(autoincrement())
-  code String           @unique
-  type DiscountCodeType
+  id    Int              @id @default(autoincrement())
+  code  String           @unique
+  type  DiscountCodeType
   /// Whole percent for `percent`, rials for `fixed`.
-  value Decimal @db.Decimal(18, 0)
+  value Decimal          @db.Decimal(18, 0)
 
   expiresAt DateTime? @map("expires_at")
   /// Null means unlimited. Without it, one code shared in a Telegram group

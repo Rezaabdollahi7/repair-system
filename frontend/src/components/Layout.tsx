@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
+import { BreadcrumbProvider, type Crumb } from "../context/BreadcrumbContext";
 import { useTheme } from "../context/ThemeContext";
 import HomeIcon from "./icons/HomeIcon";
 import SubscriptionBanner from "./SubscriptionBanner";
@@ -417,6 +418,12 @@ export default function Layout() {
 
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /*
+   * What a detail page calls itself. `/customers/:id` is named after the
+   * customer, which only the page knows; it publishes the name through
+   * `usePageCrumb` and the header reads it here.
+   */
+  const [crumb, setCrumb] = useState<Crumb | null>(null);
 
   // Once per mount. See the note beside where it is rendered.
   const today = useMemo(() => jalaliToday(), []);
@@ -482,8 +489,16 @@ export default function Layout() {
    */
   const offMenu = OFF_MENU[location.pathname] ?? null;
   const onSettings = location.pathname.startsWith("/settings");
-  const title = active?.name ?? offMenu?.name ?? "دوفیکسو";
-  const section = activeSection ?? offMenu?.section ?? null;
+  /*
+   * A page's own crumb wins over the nav's guess. `/customers/5` matches the
+   * `/customers` nav entry by prefix, so without this the header would read
+   * «مشتریان» on every customer's page.
+   */
+  const title = crumb?.name || active?.name || offMenu?.name || "دوفیکسو";
+  const parent = crumb?.parent ?? null;
+  const section = parent
+    ? parent.name
+    : (activeSection ?? offMenu?.section ?? null);
 
   const isDark = resolvedTheme === "dark";
 
@@ -629,8 +644,30 @@ export default function Layout() {
             <nav aria-label="مسیر" className="min-w-0 flex-1 md:max-w-[32%]">
               <h1 className="text-title-sm text-text-secondary truncate sm:text-title-md">
                 {section && (
-                  <span className="hidden text-body-sm text-text-muted sm:inline">
-                    {section}
+                  /* A menu section is decoration and can be dropped on a
+                     phone. A parent handed up by a detail page is the way
+                     back to its list, and a phone is exactly where that
+                     matters, so that one stays. */
+                  <span
+                    className={`text-body-sm text-text-muted ${
+                      parent ? "inline" : "hidden sm:inline"
+                    }`}
+                  >
+                    {/* A menu section is a heading and goes nowhere; a
+                        parent handed up by a detail page is the way back to
+                        its list, so that one is a link. */}
+                    {parent ? (
+                      <Link
+                        to={parent.path}
+                        className="rounded-field hover:text-text-secondary
+                                   hover:underline focus-visible:outline-none
+                                   focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        {section}
+                      </Link>
+                    ) : (
+                      section
+                    )}
                     <span className="mx-1.5" aria-hidden="true">
                       ›
                     </span>
@@ -752,7 +789,9 @@ export default function Layout() {
             initial="hidden"
             animate="visible"
           >
-            <Outlet />
+            <BreadcrumbProvider value={{ crumb, setCrumb }}>
+              <Outlet />
+            </BreadcrumbProvider>
           </motion.div>
         </main>
       </div>

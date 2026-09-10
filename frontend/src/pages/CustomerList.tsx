@@ -7,6 +7,7 @@ import { useDebounce } from "../utils/helpers";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
+import { useGoToCustomer } from "../utils/navigation";
 import { motion } from "framer-motion";
 import {
   PlusIcon,
@@ -60,7 +61,8 @@ export default function CustomerList() {
   );
   const [deleting, setDeleting] = useState(false);
 
-  const { openCustomerDetail, openCustomerEdit, refreshList } = useModal();
+  const { openCustomerEdit, refreshList } = useModal();
+  const goToCustomer = useGoToCustomer();
   const { isAtLeast } = useAuth();
   const debouncedSearch = useDebounce(searchInput);
 
@@ -115,7 +117,7 @@ export default function CustomerList() {
       <button
         onClick={(e) => {
           e.stopPropagation();
-          openCustomerDetail(c.id);
+          goToCustomer(c.id);
         }}
         className={actionView}
         title="مشاهده جزئیات"
@@ -271,11 +273,11 @@ export default function CustomerList() {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => openCustomerDetail(c.id)}
+                  onClick={() => goToCustomer(c.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      openCustomerDetail(c.id);
+                      goToCustomer(c.id);
                     }
                   }}
                   className={`${rowCard} cursor-pointer hover:border-border-strong`}
@@ -319,7 +321,7 @@ export default function CustomerList() {
                   {customers.map((c) => (
                     <tr
                       key={c.id}
-                      onClick={() => openCustomerDetail(c.id)}
+                      onClick={() => goToCustomer(c.id)}
                       className={trClickable}
                     >
                       <td className={`${td} font-bold text-primary`}>

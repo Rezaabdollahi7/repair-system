@@ -533,9 +533,12 @@ tomans.
       a sum of rows — is only trustworthy if the rows cannot be edited.
 
       `SmsMessage` — every attempt, sent or not. workspace, customer, device,
-      phone, `kind`, `unitPriceRials`, `status`, provider,
-      `providerMessageId`, `errorCode`, `errorMessage`, `sentAt`, plus the
-      debit and refund transaction ids. Statuses: `pending`, `sent`,
+      phone, `kind`, `segments`, `unitPriceRials`, `costRials`, `status`,
+      provider, `providerMessageId`, `errorCode`, `errorMessage`, `sentAt`,
+      plus the debit and refund transaction ids. `segments` is there because
+      a Persian SMS is 70 characters and every one of these templates needs
+      two — see 12.2, which is now a costing question rather than a
+      formatting one. Statuses: `pending`, `sent`,
       `failed`, `insufficient_balance`, `invalid_phone`, `disabled`,
       `refunded`. The four non-failure refusals are recorded as rows rather
       than dropped — "why did my customer not get a text" is the support
@@ -547,7 +550,8 @@ tomans.
       RLS, SELECT only for the app role, priced with psql. §5 of the brief
       says not to hardcode 350; a table is what "not hardcoded" means here,
       because an env var cannot be changed without a deploy and leaves no
-      record of what the price was last month.
+      record of what the price was last month. The price is **per part**,
+      not per message — see 12.2.
 
       `Settings.smsCustomerNotificationsEnabled`, default **false**. Off
       until a shop turns it on: a workspace that upgrades and discovers it
@@ -558,11 +562,33 @@ tomans.
       `workspace_isolation` policy **in the same migration** (RULES §10), and
       `ops/restore-database.md` needs its policy count raised from 21.
 
-- [ ] 12.2 `utils/smsPricing.ts` — resolve the current unit price, copy it
-      onto the `SmsMessage` row at send time and onto the wallet transaction.
-      Same reasoning as `payments.base_price_rials`: a history that re-renders
-      at today's price is not a history. When the price moves from 350 to 450,
-      last month's messages must still read 350.
+- [ ] 12.2 `utils/smsPricing.ts` — resolve the current unit price, count the
+      message's parts, and copy both onto the `SmsMessage` row and the wallet
+      transaction. Same reasoning as `payments.base_price_rials`: a history
+      that re-renders at today's price is not a history. When the price moves,
+      last month's messages must still read what they cost.
+
+      ⚠️ **A Persian SMS is 70 characters, not 160.** Persian has no GSM-7
+      encoding, so every message is UCS-2: 70 characters in one part, 67 per
+      part once it is concatenated. All three texts in the brief run 102–130
+      characters in a typical case and up to 170 with long names, which is
+      **two parts, sometimes three**. Providers bill per part.
+
+      That is the whole margin. sms.ir costs roughly 200 toman; two parts is
+      about 400, against the 350 the brief charges the shop — the feature
+      loses money on every message as specified. Two things follow, and both
+      belong in this task:
+
+      - The texts are tightened so the worst case is exactly two parts and
+        never three, with the truncation caps in 12.5 chosen to guarantee it
+        rather than left at `sendTemplate`'s 40. The proposed texts are in
+        the note under the open questions.
+      - `costRials = unitPriceRials × segments`, so the ledger explains
+        itself and a future one-part template is automatically cheaper.
+
+      The 350 on screen then has to become 700, or the price per part has to
+      be what the shop is quoted. That is a pricing decision, not a technical
+      one — see the open questions.
 
 - [ ] 12.3 Wallet engine, `utils/smsWallet.ts`. Three operations — credit,
       debit, refund — and nothing else may write `sms_wallets`.
@@ -592,12 +618,30 @@ tomans.
 
 - [ ] 12.4 Top-up through Zibal — same gateway, separate ledger.
 
-      A top-up is not a subscription payment: `payments.plan_id` is NOT NULL,
+      **Decided: a separate `SmsTopup` table, not a widened `payments`.**
+      The obvious objection to a second table is duplication — the same
+      Zibal dance twice. The reason it wins anyway is not taste, it is four
+      existing call sites:
+
+          subscriptionController.ts:56,155,221   paidBefore = payments where verified
+          utils/referral.ts:69                   verifiedPayments > 1 → no reward
+
+      Every one of them asks "has this workspace ever paid?" by counting
+      verified rows in `payments`, and each takes the answer to mean the shop
+      has bought a subscription before. Put a wallet top-up in that table and
+      a shop that buys 20,000 toman of SMS credit **silently loses the 10%
+      referral discount on its first subscription**, and the workshop that
+      invited it silently loses its 30 days. No error, no log line, and the
+      customer's complaint would arrive as "the discount didn't work".
+
+      A `kind` column would fix it only by editing all four — and the fifth
+      one, written next year by someone who does not know this rule, breaks
+      it again. A separate table cannot be counted by accident.
+
+      The rest follows from the same reading: `payments.plan_id` is NOT NULL,
       the row means "these many days were bought", and `settlePayment()`
-      extends an expiry from it. Widening that table with a nullable plan and
-      a kind discriminator would put two different meanings behind one
-      `status = 'verified'`, and the settlement job would have to learn which
-      is which. `SmsTopup` instead, with the same shape and the same rules:
+      extends an expiry from it. `SmsTopup` gets the same shape and the same
+      rules:
       row written before Zibal is called, amount checked against what verify
       returns, `orderId` prefixed `DFXS-` so the two are distinguishable in
       Zibal's panel by eye.
@@ -623,9 +667,16 @@ tomans.
       to scan `sms_topups` too, or a customer whose browser died mid-payment
       has money at Zibal and no credit here.
 
-      ⚠️ Decide before writing the route: may a workspace whose subscription
-      has **lapsed** buy SMS credit? The 8.3 guard blocks POST for them
-      unless the path is on `OPEN_PATHS`. See the open questions below.
+      **Decided: a lapsed workspace may top up.** The 8.3 guard blocks POST
+      for them, so `/api/sms/wallet/topup` and `/api/sms/wallet/verify` join
+      `OPEN_PATHS` — and only those two. The toggle and everything else stay
+      closed, matching the list's own rule that what is open is either a way
+      to pay or a way to stay signed in long enough to.
+
+      Credit bought while lapsed simply sits there: sending rides on a device
+      write, which the guard blocks anyway, so nothing can be spent until the
+      subscription is renewed. That falls out of the design rather than
+      needing a check of its own, which is why it is safe to open.
 
 - [ ] 12.5 Three templates in `lib/sms.ts`, ids from the environment,
       alongside the five that exist. `.env.example` and `.env.prod.example`
@@ -730,11 +781,25 @@ tomans.
           GET   /api/sms/settings            the toggle
           PATCH /api/sms/settings            flip it
 
-      `atLeast("admin")` on the whole router (§23): a technician has no
+      `atLeast("admin")` on all of the above (§23): a technician has no
       business seeing what the shop spends, exactly as with `/subscription`.
       Sending is **not** a route of its own — it rides on the device write,
       so a technician who may change a status may send the message that goes
       with it, and no new permission concept is introduced.
+
+      One exception, and it exists because of that rule rather than despite
+      it:
+
+          GET /api/sms/capability   { can_send, reason }
+
+      Open to any authenticated user. A technician's device modal has to know
+      whether the checkbox works, and the wallet endpoint is the wrong way to
+      tell them: it would put a balance in a response their role is not meant
+      to see, and hiding it in the component would leave it in the network
+      tab. So the server answers the question the modal actually asks — may
+      this device send — as two booleans and a reason string, with **no
+      amount in the payload at all**. Admins get the figure from the wallet
+      endpoint they already have.
 
       Every handler validates through `validate()` and reads `req.valid`
       (RULES §6). `workspaceId` comes from the token, never the body.
@@ -760,11 +825,16 @@ tomans.
       status the form loaded with rather than the one in the select. The
       modal already imports `DEVICE_STATUSES`, so it knows both.
 
-      Three states beside it, from the wallet endpoint: enough credit
-      (checkbox live), not enough ("اعتبار کافی نیست" plus a link to the
-      wallet page), notifications off ("ارسال پیامک غیرفعال است" plus a link
-      to settings). Existing design system, no new components (§24), and the
-      modal layer 11.8 rebuilt is the shape to match.
+      Three states beside it, from `GET /api/sms/capability`: enough credit
+      (checkbox live), not enough ("اعتبار کافی نیست"), notifications off
+      ("ارسال پیامک غیرفعال است"). Existing design system, no new components
+      (§24), and the modal layer 11.8 rebuilt is the shape to match.
+
+      **The figure is never rendered here, for any role.** The endpoint does
+      not carry it. The "شارژ کیف پول" and "فعال‌سازی" links show only to
+      admins — a technician sent to a page their role cannot open is worse
+      than a technician told to ask their manager, which is what the text
+      says for them.
 
 - [ ] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
       deliberately quiet: below 10,000 toman a warning, at zero a stronger
@@ -812,33 +882,62 @@ tomans.
       policy count in `ops/restore-database.md`, and the expected table list
       in `prisma/rls-check.sql`.
 
+### The three templates, for the sms.ir panel
+
+Submitted as-is; the ids come back into `.env` as `SMS_TEMPLATE_DEVICE_*`.
+Parameter names are what `sendTemplate` passes, so they must match exactly.
+
+**پذیرش دستگاه** — `SMS_TEMPLATE_DEVICE_ACCEPTED`
+
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# در #SHOP# پذیرش شد.
+
+**آماده تحویل** — `SMS_TEMPLATE_DEVICE_READY`
+
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# آماده تحویل است. #SHOP#
+
+**تحویل دستگاه** — `SMS_TEMPLATE_DEVICE_DELIVERED`
+
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# تحویل داده شد. #SHOP#
+
+Shorter than the brief's wording, and the difference is money rather than
+style. The originals run to three parts on a long shop name; these are two
+in every case the truncation caps allow — 107, 111 and 109 characters at
+`NAME` 18 · `DEVICE` 16 · `NUMBER` 7 · `SHOP` 22, against the 134 that two
+parts buys. Those caps are the ones 12.5 enforces, and they exist to hold
+this ceiling rather than being round numbers.
+
+What was cut and why:
+
+- **The 🌱 and the closing thanks.** Roughly 25 characters, which is the
+  third part on the acceptance message on its own. A greeting the shop pays
+  200 toman for is a greeting worth losing.
+- **«لطفاً برای دریافت دستگاه ... مراجعه فرمایید»** on the ready message.
+  The shop name is still there; a customer told their device is ready knows
+  they have to come and get it.
+- The shop name moved to the end on two of them, where it reads as a
+  signature — which is what it is, since the messages go out on a shared
+  sms.ir line and the customer needs to know who is texting.
+
+⚠️ Emoji are worth avoiding in general here, not only for length: they are a
+common reason a template comes back from review, and the fallback on an old
+handset is a box.
+
 ### Open questions — answer before 12.1
 
-1. **A lapsed workspace and the wallet.** May a shop whose subscription has
-   expired top up? Refusing is the simpler code (the 8.3 guard already does
-   it) and the defensible position: renew first. Allowing it means adding
-   `/api/sms` to `OPEN_PATHS`, which also opens the toggle. Reading the
-   balance stays open either way.
-2. **`SmsTopup` versus extending `Payment`.** 12.4 argues for a separate
-   table; the alternative is a nullable `plan_id` and a `kind` column on
-   `payments`, which is less schema but two meanings in one ledger.
-3. **The 350.** Is that our price to the workshop, and what does sms.ir
-   charge us per templated message? If the margin is thin, the wallet needs
-   to charge the provider's cost rather than a fixed figure — a decision
-   that is cheap now and a migration later.
-4. **The three texts** have to be submitted to sms.ir and approved before
-   anything here can be tested end to end. Who submits them, and are they
-   exactly as written in the brief? Note the 40-character ceiling on each
-   parameter.
-5. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
-   `ready_for_pickup` only. If shops in practice treat `repaired` as the
-   moment the customer should be called, the trigger moves — but it cannot
-   be both without texting twice.
-6. **The balance in the device modal.** A technician sees "not enough
-   credit" but not the figure. Is that the right line, or should they see
-   nothing at all about money?
-
----
+1. **Is sms.ir's ~200 toman per part or per message?** This decides whether
+   the feature makes money. Persian messages are 70 characters a part and
+   these templates need two, so per-part pricing puts the real cost near 400
+   against the 350 the brief charges — a loss on every message. Either the
+   shop's price becomes 700 (two parts at 350, which is also the easiest
+   number to explain: «هر پیامک ۷۰۰ تومان»), or per-message pricing is
+   confirmed and 350 stands. Worth asking sms.ir directly rather than
+   inferring it from a tariff page.
+2. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
+   `ready_for_pickup` only, on the reasoning that a `repaired` device is one
+   the bench has finished with but nobody has checked or priced yet. If
+   shops in practice treat `repaired` as the moment to call the customer,
+   the trigger moves — but it cannot be both without texting twice for one
+   job.
 
 ## How to use this with Claude Code
 

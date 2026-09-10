@@ -448,8 +448,6 @@ order.
       whole frontend is TypeScript. It was left off during the migration
       because it type-checks the entire program on every run
 
----
-
 ## Phase 11 — Frontend redesign and invoice consistency
 
 Not planned in this roadmap — it started as "redesign the dashboard" and ran
@@ -491,6 +489,356 @@ printed Latin digits through its own `toLocaleString`; the required asterisk
 was rendered twice on two fields; the repair form's line row overflowed its
 grid on a phone; a selected table row was invisible because `--primary-soft`
 equalled `--surface`; eight hover states repeated their resting colour.
+
+## Phase 12 — SMS Wallet (customer notifications the shop pays for)
+
+Today every SMS the platform sends is ours: the OTP at sign-up, the expiry
+reminders, the payment confirmation. This phase adds the other kind — a
+message a workshop sends to its own customer — and the only sane way to pay
+for it, which is that the workshop does.
+
+The split is the whole point and has to hold everywhere in the code:
+
+    Dofixo pays    OTP · subscription reminders · payment confirmation
+    The shop pays  device accepted · ready for pickup · delivered
+
+Nothing in `utils/subscriptionJob.ts`, `utils/otp.ts` or `utils/referral.ts`
+may ever touch a wallet, and the wallet path may never send one of the five
+templates those own.
+
+Deliberately out of scope: bulk or marketing SMS, a message composer, arrears
+(a shop can never go below zero), and delivery reports. All four are how an
+SMS feature turns into an SMS product.
+
+### Money and units
+
+Rials in the database, tomans on screen — the rule `plans` and `payments`
+already follow. 350 toman is 3,500 rials, and no column anywhere holds
+tomans.
+
+- [ ] 12.1 Schema and migration. Five new models plus one column:
+
+      `SmsWallet` — one row per workspace, `balanceRials`, created by
+      `populateWorkspace()` so a seeded workspace and a registered one are
+      furnished identically (the rule 3.1 established). Not a column on
+      `Workspace`: the balance is written on a hot path with a row lock held,
+      and locking the workspace row would serialise invoice numbering behind
+      it.
+
+      `SmsWalletTransaction` — the ledger. `type` (topup · send · refund ·
+      adjustment), signed `amountRials`, `balanceBeforeRials`,
+      `balanceAfterRials`, `description`, `createdBy`, and a reference to
+      what caused it. Append-only, and like `payments` the application role
+      gets no DELETE: a balance that can be reached two ways — a column and
+      a sum of rows — is only trustworthy if the rows cannot be edited.
+
+      `SmsMessage` — every attempt, sent or not. workspace, customer, device,
+      phone, `kind`, `unitPriceRials`, `status`, provider,
+      `providerMessageId`, `errorCode`, `errorMessage`, `sentAt`, plus the
+      debit and refund transaction ids. Statuses: `pending`, `sent`,
+      `failed`, `insufficient_balance`, `invalid_phone`, `disabled`,
+      `refunded`. The four non-failure refusals are recorded as rows rather
+      than dropped — "why did my customer not get a text" is the support
+      question this table exists to answer.
+
+      `SmsTopup` — the top-up ledger. See 12.4 for why this is not `Payment`.
+
+      `SmsPrice` — reference data, following `plans` and `discount_codes`: no
+      RLS, SELECT only for the app role, priced with psql. §5 of the brief
+      says not to hardcode 350; a table is what "not hardcoded" means here,
+      because an env var cannot be changed without a deploy and leaves no
+      record of what the price was last month.
+
+      `Settings.smsCustomerNotificationsEnabled`, default **false**. Off
+      until a shop turns it on: a workspace that upgrades and discovers it
+      has been texting customers is a worse first impression than one that
+      has to find a switch.
+
+      ⚠️ Every table above carrying `workspace_id` needs RLS and its
+      `workspace_isolation` policy **in the same migration** (RULES §10), and
+      `ops/restore-database.md` needs its policy count raised from 21.
+
+- [ ] 12.2 `utils/smsPricing.ts` — resolve the current unit price, copy it
+      onto the `SmsMessage` row at send time and onto the wallet transaction.
+      Same reasoning as `payments.base_price_rials`: a history that re-renders
+      at today's price is not a history. When the price moves from 350 to 450,
+      last month's messages must still read 350.
+
+- [ ] 12.3 Wallet engine, `utils/smsWallet.ts`. Three operations — credit,
+      debit, refund — and nothing else may write `sms_wallets`.
+
+      The debit is one statement, not a read followed by a write:
+
+          UPDATE sms_wallets SET balance_rials = balance_rials - $cost
+          WHERE workspace_id = $ws AND balance_rials >= $cost
+          RETURNING balance_rials
+
+      Zero rows means insufficient funds, and the balance never goes
+      negative because the condition and the subtraction are the same
+      statement. Checking in JavaScript first is exactly the race §15 of the
+      brief describes: two users, 500 toman, two messages, −200.
+
+      Raw SQL, so it runs inside `runInWorkspaceTransaction()` (RULES §7).
+      The returned balance is `balanceAfter` on the ledger row — read back
+      separately it would be somebody else's.
+
+      Refund is idempotent by a unique index on
+      `(smsMessageId, type = refund)`, not by a flag the caller checks: a
+      second refund must be impossible, not merely unlikely.
+
+      Per RULES §3 the arithmetic is a pure function with its own unit test,
+      separate from the controller test that mocks Prisma — the same lesson
+      `utils/avgPurchasePrice.ts` came out of in 11.11.
+
+- [ ] 12.4 Top-up through Zibal — same gateway, separate ledger.
+
+      A top-up is not a subscription payment: `payments.plan_id` is NOT NULL,
+      the row means "these many days were bought", and `settlePayment()`
+      extends an expiry from it. Widening that table with a nullable plan and
+      a kind discriminator would put two different meanings behind one
+      `status = 'verified'`, and the settlement job would have to learn which
+      is which. `SmsTopup` instead, with the same shape and the same rules:
+      row written before Zibal is called, amount checked against what verify
+      returns, `orderId` prefixed `DFXS-` so the two are distinguishable in
+      Zibal's panel by eye.
+
+      Minimum 20,000 toman (§2), enforced server-side. The client sends an
+      amount and nothing else — no plan, no price — which is the one place
+      this differs from checkout, so the amount needs its own floor, ceiling
+      and integer check in the Zod schema.
+
+      Credit happens once: inside the same transaction as the status change
+      to `verified`, and only when the payment was not already verified.
+      Verify twice, refresh the return page, let the cron reach it after the
+      browser did — the balance moves once.
+
+      ⚠️ `lib/zibal.ts` has a single `CALLBACK_URL` constant, baked in at
+      import as `${APP_URL}/subscription/callback` and passed by
+      `requestPayment` itself. It needs an optional callback so a top-up
+      returns to its own page; the domain stays the same, which is all Zibal
+      checks (result 106).
+
+      ⚠️ Orphaned top-ups need settling like orphaned payments do.
+      `ops/subscription-cron.sh` already scans `payments` for `paid`; it has
+      to scan `sms_topups` too, or a customer whose browser died mid-payment
+      has money at Zibal and no credit here.
+
+      ⚠️ Decide before writing the route: may a workspace whose subscription
+      has **lapsed** buy SMS credit? The 8.3 guard blocks POST for them
+      unless the path is on `OPEN_PATHS`. See the open questions below.
+
+- [ ] 12.5 Three templates in `lib/sms.ts`, ids from the environment,
+      alongside the five that exist. `.env.example` and `.env.prod.example`
+      both gain them (RULES §7).
+
+      ⚠️ **The message text does not live in this repository.** sms.ir
+      approves each template in its panel and the body is stored there; we
+      hold an id and a parameter list. §25 of the brief asks for central
+      templates with `{{variables}}` — what we can actually centralise is the
+      parameter mapping, and that is what this task builds. The three texts
+      must be submitted and **approved in the sms.ir panel before this phase
+      can be tested at all**, which makes it the long pole: start it first.
+
+      ⚠️ `sendTemplate` refuses any parameter containing a slash or longer
+      than 40 characters, and does so as an `SmsError` at send time. A shop
+      name or a device name over 40 characters is realistic, so the mapping
+      layer truncates deliberately rather than discovering the ceiling on a
+      customer's message.
+
+      The reception number is the device id — the number the device list
+      already shows and a customer can quote on the phone.
+
+- [ ] 12.6 `utils/customerNotification.ts` — the layer the brief's §26 asks
+      for, sitting between the device controller and `lib/sms.ts`:
+
+          deviceController → customerNotification → smsWallet + lib/sms
+
+      One function, `notifyCustomer(event, device, actor)`, and it is the only
+      caller of the wallet's debit. In order: is the workspace's toggle on
+      (else `disabled`) · does the customer have a valid mobile (else
+      `invalid_phone`) · debit (else `insufficient_balance`) · send · on a
+      provider failure, refund and mark `failed`. Every branch writes an
+      `SmsMessage` row; three of the five write no transaction at all,
+      because nothing was ever taken.
+
+      No driver interface and no console driver, following OTP.2 — the tests
+      mock the module.
+
+      ⚠️ `Customer.phone` is a free-form string today (`max(20)`, no
+      validation), while `phoneSchema` normalises to `09XXXXXXXXX`. Do not
+      widen `customerBodySchema` to reject what shops have already typed —
+      normalise at send time and record `invalid_phone` when it does not come
+      out as a mobile. A landline customer is a real customer.
+
+- [ ] 12.7 Wire it into the device controller — the part with the most ways
+      to be subtly wrong.
+
+      `devices.status` is a free-form string column (`@default("received")`),
+      not an enum. The workflow's real vocabulary lives on the frontend in
+      `utils/deviceStatus.ts`, which 11.1 consolidated out of six drifting
+      copies, and it is nine states, not the five the pre-redesign screens
+      showed:
+
+          pending · diagnosing · unrepairable · waiting_for_parts ·
+          repairing · repaired · ready_for_pickup · delivered · not_repaired
+
+      Two of them matter here and the rest send nothing. «آماده تحویل» is
+      `ready_for_pickup`, **not** `repaired` — a repaired device is one the
+      bench is done with, and a shop that texts a customer at that point is
+      texting them before the job is checked and priced. `delivered` is the
+      third message. `unrepairable` and `not_repaired` are outcomes with no
+      message in this phase.
+
+      ⚠️ The trigger set therefore has to be named server-side, and the
+      server has no list to name it from — the nine live in a frontend
+      module the backend cannot import. Define the two triggering keys in
+      the notification service as constants with this reasoning written
+      down, and accept that a tenth status added to `deviceStatus.ts` will
+      not send anything until someone decides whether it should. Turning
+      the column into an enum shared by both ends is the real fix and
+      belongs in phase 9, not here.
+
+      **Acceptance fires on create only.** Not on an update that happens to
+      set a status, ever (§11).
+
+      **Ready and delivered fire on a transition, not on a value.** The
+      update handler already reads the row before writing it
+      (`deviceController.ts:264`), so the previous status is one added
+      `select` away: `repairing → ready_for_pickup` sends,
+      `ready_for_pickup → ready_for_pickup` does not (§10). A device the shop
+      moves back and forth sends once per real move, which is what a customer
+      would expect.
+
+      **After the write, never inside it** (§29). The device transaction
+      commits first; the SMS follows. A provider call can take twenty
+      seconds, and holding a row lock that long for a text message is the
+      mistake 8.10 already caught once. Failure to send never fails the
+      device write — the response carries the outcome so the UI can say so.
+
+      The request carries one boolean per event (`send_sms`). Everything
+      else — whether the transition is real, whether there is credit,
+      whether the toggle is on — is the server's decision. RULES §6: the
+      client is not trusted for anything it could lie about.
+
+- [ ] 12.8 Routes and schemas. `src/routes/sms.ts`, mounted at `/api/sms`:
+
+          GET   /api/sms/wallet              balance, unit price, ~messages left
+          POST  /api/sms/wallet/topup        amount → Zibal redirect
+          POST  /api/sms/wallet/verify       track id → credit
+          GET   /api/sms/wallet/transactions the wallet ledger
+          GET   /api/sms/messages            the send log, paginated
+          GET   /api/sms/settings            the toggle
+          PATCH /api/sms/settings            flip it
+
+      `atLeast("admin")` on the whole router (§23): a technician has no
+      business seeing what the shop spends, exactly as with `/subscription`.
+      Sending is **not** a route of its own — it rides on the device write,
+      so a technician who may change a status may send the message that goes
+      with it, and no new permission concept is introduced.
+
+      Every handler validates through `validate()` and reads `req.valid`
+      (RULES §6). `workspaceId` comes from the token, never the body.
+
+- [ ] 12.9 Frontend: `pages/SmsWallet.tsx` at `/sms-wallet`, admin-only in
+      both `App.tsx` and `Layout.tsx` — 10.8 is what happens when those two
+      disagree. Balance, unit price, approximate messages remaining, the
+      top-up amounts from §2 as presets plus a free-form field, top-up
+      history and send history.
+
+      `Subscription.tsx` as rebuilt in 11.7 is the model to follow, not the
+      pre-redesign one: its `toToman`/`toTomanRounded` helpers, the table
+      vocabulary from `utils/tableClasses.ts` (RULES §6a — no hand-rolled
+      cells), the semantic colour tokens, and `PaymentReceipt` for a top-up
+      receipt.
+
+      A callback page for the top-up return, following `PaymentCallback.tsx`:
+      it asks the backend to verify rather than trusting the query string.
+
+- [ ] 12.10 `DeviceFormModal`: one checkbox per event, shown only when that
+      event can actually fire — on create, the acceptance box; on edit, the
+      box for the transition the form is about to make, decided against the
+      status the form loaded with rather than the one in the select. The
+      modal already imports `DEVICE_STATUSES`, so it knows both.
+
+      Three states beside it, from the wallet endpoint: enough credit
+      (checkbox live), not enough ("اعتبار کافی نیست" plus a link to the
+      wallet page), notifications off ("ارسال پیامک غیرفعال است" plus a link
+      to settings). Existing design system, no new components (§24), and the
+      modal layer 11.8 rebuilt is the shape to match.
+
+- [ ] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
+      deliberately quiet: below 10,000 toman a warning, at zero a stronger
+      one, each with a link to the wallet page and each dismissible for the
+      session. Only where it is relevant — the device pages and the wallet
+      page — not on every screen.
+
+- [ ] 12.12 The toggle on the settings page, with a sentence saying plainly
+      that these messages are charged to the shop's own wallet and are not
+      part of the subscription (§21). Somebody will otherwise assume the
+      subscription covers it, and find out from an empty wallet.
+
+      ⚠️ 11.5 moved settings from the sidebar to a header icon — the entry
+      point is not where a pre-redesign screenshot would put it.
+
+- [ ] 12.13 Tests. The mocked suites cover the twenty scenarios in §30 of the
+      brief; the ones that cannot be mocked go to `src/__tests__/integration/`:
+
+      - The concurrency case is integration-only and is the reason 12.3 is
+        raw SQL. Two simultaneous debits against a balance that covers one:
+        exactly one succeeds and the balance never goes below zero. A mocked
+        test cannot fail this — it never reaches Postgres, where the
+        guarantee lives.
+      - `sms_wallets`, `sms_wallet_transactions`, `sms_messages` and
+        `sms_topups` each need a line in the `resources` table in
+        `isolation.test.ts`; the wallet is a singleton per workspace, so it
+        goes to `isolationSpecialCases.test.ts` with the reason written down
+        (RULES §3).
+      - Idempotency: verify twice, credit once. Refund twice, credit once.
+      - Transitions: `repairing → ready_for_pickup` sends,
+        `ready_for_pickup → ready_for_pickup` does not, `repaired` sends
+        nothing, and editing a device never re-sends acceptance.
+      - Price history: change `SmsPrice`, and yesterday's rows still read
+        yesterday's price.
+      - A provider failure refunds, and the refund leaves the balance where
+        it started.
+
+      The frontend still has no test runner, so 12.9–12.12 are verified by
+      looking at them, through the throwaway Vite harness RULES §6b
+      describes — "it compiles" is not verification of a UI change.
+
+- [ ] 12.14 Documentation, in the same commit as the task that makes it true
+      (RULES §8): a CLAUDE.md section on the wallet and the Dofixo/shop
+      split, the new environment variables in both `.env.example` files, the
+      policy count in `ops/restore-database.md`, and the expected table list
+      in `prisma/rls-check.sql`.
+
+### Open questions — answer before 12.1
+
+1. **A lapsed workspace and the wallet.** May a shop whose subscription has
+   expired top up? Refusing is the simpler code (the 8.3 guard already does
+   it) and the defensible position: renew first. Allowing it means adding
+   `/api/sms` to `OPEN_PATHS`, which also opens the toggle. Reading the
+   balance stays open either way.
+2. **`SmsTopup` versus extending `Payment`.** 12.4 argues for a separate
+   table; the alternative is a nullable `plan_id` and a `kind` column on
+   `payments`, which is less schema but two meanings in one ledger.
+3. **The 350.** Is that our price to the workshop, and what does sms.ir
+   charge us per templated message? If the margin is thin, the wallet needs
+   to charge the provider's cost rather than a fixed figure — a decision
+   that is cheap now and a migration later.
+4. **The three texts** have to be submitted to sms.ir and approved before
+   anything here can be tested end to end. Who submits them, and are they
+   exactly as written in the brief? Note the 40-character ceiling on each
+   parameter.
+5. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
+   `ready_for_pickup` only. If shops in practice treat `repaired` as the
+   moment the customer should be called, the trigger moves — but it cannot
+   be both without texting twice.
+6. **The balance in the device modal.** A technician sees "not enough
+   credit" but not the figure. Is that the right line, or should they see
+   nothing at all about money?
+
+---
 
 ## How to use this with Claude Code
 

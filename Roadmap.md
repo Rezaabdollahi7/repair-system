@@ -868,14 +868,20 @@ tomans.
       from §2 as presets plus a free-form field, top-up history and send
       history.
 
-      **No per-message price is rendered anywhere.** It was, on the balance
-      card and again in a «هزینه» column on every message row, and it came
-      off after review: it is a tariff a shop can do nothing about — it
-      cannot choose a cheaper message — and printing it beside a balance
-      invites arithmetic against a figure we may still change (open question
-      3). `message_price_rials` is still read, to decide when a balance is
-      low. The count of messages remaining is the same fact in the form the
-      question is actually asked in.
+      **No per-message price is rendered anywhere, and neither is a count
+      of messages remaining.** Both were, on the balance card and again in a
+      «هزینه» column on every message row, and both came off after review.
+      The price is a tariff a shop can do nothing about — it cannot choose a
+      cheaper message — and printing it beside a balance invites arithmetic
+      against a figure we may still change (open question 3). The count had
+      to go with it: «حدود N پیامک» next to a balance *is* the price, one
+      division away, so hiding the tariff while showing the two numbers it
+      falls out of would have been a pretence rather than a decision.
+
+      Both figures are still fetched and still do their work unrendered:
+      `message_price_rials` colours the balance when it is low, and
+      `approximate_messages_left` is what the header badge and
+      SmsBalanceBanner decide «low» from.
 
       **Two history tabs, not three.** A «گردش حساب» tab over
       `sms_wallet_transactions` was built and removed: every line in it is
@@ -1087,10 +1093,13 @@ mistake a type-check was never going to catch:
 - the «گردش حساب» tab came out, as a third view of what two tabs already
   showed (12.9);
 - the send checkbox became a green/red button (12.10);
-- subscription state and remaining messages went into the header as two
-  badges (`components/HeaderStatusBadges.tsx`), admin-only like the two
-  banners and for the same reason, hidden below `md`. They do not replace
-  the banners: a badge is a resting state, a banner interrupts.
+- subscription state and the SMS balance went into the header as two badges
+  (`components/HeaderStatusBadges.tsx`), admin-only like the two banners and
+  for the same reason, hidden below `md`. They do not replace the banners: a
+  badge is a resting state, a banner interrupts. The SMS badge shows the
+  balance and not the message count, for the reason in 12.9 — the count
+  would only move the same division into the header — so its colour is the
+  verdict and its tooltip puts that verdict in words.
 
 ⚠️ **«طلایی» is `warning`.** There is no gold token and one was not added:
 the brand stopped being gold, and the note in CLAUDE.md says a gold found

@@ -205,23 +205,21 @@ export default function SmsWallet() {
                 <span className="text-body-sm font-normal">تومان</span>
               </p>
               {/*
-                How many messages, never what one costs.
+                The balance, and nothing beside it.
                 --------------------------------------------------------
-                The per-message price used to sit here. It is a number a
-                shop can do nothing with — it cannot choose a cheaper
-                message — and printing a tariff beside a balance invites
-                arithmetic against a figure we may change. The count is
-                the same fact in the form the question is actually asked
-                in: «چند تا پیامک می‌تونم بفرستم».
+                Two lines used to sit here: the per-message price, then
+                «حدود N پیامک». Both are gone, and the second had to go
+                with the first — a count of remaining messages next to a
+                balance *is* the price, one division away. Hiding the
+                tariff while printing the two numbers it falls out of
+                would have been a pretence rather than a decision.
 
-                `message_price_rials` is still read, one line above, to
-                decide when the balance is low. That is the price doing
-                its job without being shown.
+                `approximate_messages_left` is still fetched and still
+                used: it is what the header badge and SmsBalanceBanner
+                decide «low» from, and `message_price_rials` is what the
+                heading colour above decides it from. Both do their work
+                without being rendered.
               */}
-              <p className="mt-1 text-body-sm text-text-secondary">
-                حدود {wallet.approximate_messages_left.toLocaleString("fa-IR")}{" "}
-                پیامک
-              </p>
             </div>
           </div>
 

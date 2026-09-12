@@ -118,9 +118,17 @@ function SubscriptionBadge() {
   );
 }
 
+/** Rials in the database, tomans on screen — the whole app works this way. */
+function toToman(rials: number): string {
+  return (rials / 10).toLocaleString("fa-IR");
+}
+
 function SmsBalanceBadge() {
   const location = useLocation();
-  const [messagesLeft, setMessagesLeft] = useState<number | null>(null);
+  const [wallet, setWallet] = useState<{
+    balanceRials: number;
+    messagesLeft: number;
+  } | null>(null);
 
   /*
    * Re-read on navigation, not on a timer.
@@ -144,10 +152,14 @@ function SmsBalanceBadge() {
     // put a figure in the header we could not actually read.
     getSmsWallet()
       .then(({ data }) => {
-        if (!cancelled) setMessagesLeft(data.approximate_messages_left);
+        if (cancelled) return;
+        setWallet({
+          balanceRials: data.balance_rials,
+          messagesLeft: data.approximate_messages_left,
+        });
       })
       .catch(() => {
-        if (!cancelled) setMessagesLeft(null);
+        if (!cancelled) setWallet(null);
       });
 
     return () => {
@@ -155,24 +167,43 @@ function SmsBalanceBadge() {
     };
   }, [location.pathname]);
 
-  if (messagesLeft === null) return null;
-
-  const tone: Tone =
-    messagesLeft <= 0 ? "bad" : messagesLeft <= WARN_AT_MESSAGES ? "warn" : "good";
+  if (!wallet) return null;
 
   /*
-   * A count, never a price and never a balance in tomans. The wallet page
-   * dropped the per-message figure for the same reason: it is a tariff a
-   * shop can do nothing about, and the header is the last place to print
-   * one. «چند تا پیامک مانده» is the whole question.
+   * The balance, never a count and never a price.
+   *
+   * `messagesLeft` decides the colour and is not printed. A count beside a
+   * balance is the per-message price one division away, which is the whole
+   * reason the wallet page stopped showing both — putting the count here
+   * instead would only move the same arithmetic into the header.
    */
-  const label =
-    messagesLeft <= 0
-      ? "اعتبار پیامکی تمام شد"
-      : `${messagesLeft.toLocaleString("fa-IR")} پیامک`;
+  const tone: Tone =
+    wallet.messagesLeft <= 0
+      ? "bad"
+      : wallet.messagesLeft <= WARN_AT_MESSAGES
+        ? "warn"
+        : "good";
+
+  /*
+   * The balance shows even when it will not buy a message. «تمام شد» over a
+   * leftover 200 toman would be a small lie, and the colour already says the
+   * thing that matters — red means nothing can be sent. The tooltip says it
+   * in words for whoever cannot see the difference.
+   */
+  const title =
+    wallet.messagesLeft <= 0
+      ? "اعتبار پیامکی کافی نیست"
+      : wallet.messagesLeft <= WARN_AT_MESSAGES
+        ? "اعتبار پیامکی رو به اتمام است"
+        : "موجودی کیف پول پیامکی";
 
   return (
-    <Badge to="/sms-wallet" tone={tone} label={label}>
+    <Badge
+      to="/sms-wallet"
+      tone={tone}
+      title={title}
+      label={`${toToman(wallet.balanceRials)} تومان`}
+    >
       <ChatBubbleLeftRightIcon className="w-4 h-4 shrink-0" />
     </Badge>
   );
@@ -182,24 +213,31 @@ function SmsBalanceBadge() {
  * The shape both wear.
  *
  * A link rather than a button: each one names a number, and the screen that
- * does something about that number is one click away. `title` carries the
- * label for the width where only the icon and the figure fit.
+ * does something about that number is one click away.
+ *
+ * `title` is what the badge means, `label` is what it shows. They differ on
+ * the SMS badge, where the figure is a balance and the colour is the verdict
+ * on it — the tooltip is where that verdict is put into words for anyone the
+ * colour does not reach.
  */
 function Badge({
   to,
   tone,
   label,
+  title,
   children,
 }: {
   to: string;
   tone: Tone;
   label: string;
+  /** Defaults to the label, which is the whole meaning on the subscription badge. */
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
     <Link
       to={to}
-      title={label}
+      title={title ?? label}
       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-pill border
                   text-body-xs font-bold whitespace-nowrap transition-colors
                   focus-visible:outline-none focus-visible:ring-2

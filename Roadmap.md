@@ -1014,11 +1014,36 @@ tomans.
         `utils/referral.ts`, and eight suites), all of them older than this
         phase and left alone rather than swept into an SMS commit.
 
-- [ ] 12.14 Documentation, in the same commit as the task that makes it true
+- [x] 12.14 Documentation, in the same commit as the task that makes it true
       (RULES §8): a CLAUDE.md section on the wallet and the Dofixo/shop
       split, the new environment variables in both `.env.example` files, the
       policy count in `ops/restore-database.md`, and the expected table list
       in `prisma/rls-check.sql`.
+
+      Three of the four were already done, each in the commit that made it
+      true — which is what §8 asks for, so this task found them rather than
+      wrote them. **All three were re-checked against a live database built
+      from the migrations**, not taken on trust:
+
+      | Claim | Where | Verified |
+      | --- | --- | --- |
+      | Three template ids | `backend/.env.example` (12.5) | present; the root `.env.example` is compose-only and the frontend has none, so phase 12 added no variable there. `WALLET_CALLBACK_URL` is derived from `APP_URL` rather than being its own variable |
+      | 33 policies, 4 `app_*` functions | `ops/restore-database.md` (12.1) | `pg_policies` returns 33, `pg_proc` returns exactly those four |
+      | `sms_prices` among the tables with no `workspace_id` | `prisma/rls-check.sql` (12.1) | Part 1 returns zero rows; Part 1b returns the eight named, no more |
+
+      ⚠️ The absence of `app_all_workspaces` from that function list is 8.11,
+      not a documentation error. The four are `app_create_workspace`,
+      `app_current_workspace_id`, `app_login_lookup`, `app_refresh_lookup`.
+
+      What was actually missing was the CLAUDE.md section, which is now
+      **SMS wallet (phase 12, implemented)**, placed after Subscriptions
+      because the first thing it has to establish is which of the two pays.
+      Three stale passages elsewhere in that file were corrected in the same
+      pass: the pages list did not mention the wallet, subscription or
+      referral screens; the reference-data tables with no `workspace_id` were
+      not written down at all, so `sms_prices` read as an omission rather
+      than a decision; and the backup section still said sms.ir's templates
+      were awaiting approval.
 
 ### ✅ Resolved: the templates were approved
 

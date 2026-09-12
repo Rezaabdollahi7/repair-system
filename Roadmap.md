@@ -779,7 +779,7 @@ tomans.
       normalise at send time and record `invalid_phone` when it does not come
       out as a mobile. A landline customer is a real customer.
 
-- [ ] 12.7 Wire it into the device controller — the part with the most ways
+- [x] 12.7 Wire it into the device controller — the part with the most ways
       to be subtly wrong.
 
       `devices.status` is a free-form string column (`@default("received")`),

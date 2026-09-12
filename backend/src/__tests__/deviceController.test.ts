@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as controller from "../controllers/deviceController";
 import prisma from "../lib/prisma";
 import { deleteDeviceImages } from "../controllers/imageController";
+import { notifyCustomer } from "../utils/customerNotification";
 
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
@@ -22,6 +23,27 @@ jest.mock("../lib/prisma", () => ({
 jest.mock("../controllers/imageController", () => ({
   deleteDeviceImages: jest.fn(),
 }));
+
+// Mocked deliberately: what this file is about is which message the
+// controller decides is owed, not what the service does with it. The wallet,
+// the refusals and the refund are covered against a real database in
+// integration/customerNotification.test.ts.
+//
+// transitionNotification is NOT mocked — it is the pure rule this controller
+// is built around, and stubbing it would leave the §10 tests below asserting
+// that a mock returns what the mock was told to return.
+jest.mock("../utils/customerNotification", () => {
+  const actual = jest.requireActual("../utils/customerNotification");
+
+  return {
+    ...actual,
+    notifyCustomer: jest.fn().mockResolvedValue({
+      smsMessageId: 9,
+      status: "sent",
+      costRials: 3_500,
+    }),
+  };
+});
 
 const db = prisma as unknown as { device: Record<string, jest.Mock> };
 
@@ -334,6 +356,163 @@ describe("deviceController.create", () => {
     expect(db.device.create.mock.calls[0][0].data).toMatchObject({
       workspaceId: WORKSPACE_ID,
       deviceName: "یخچال",
+    });
+  });
+});
+
+// ── Customer notifications (12.7) ────────────────────────────
+//
+// The rules here are §10 and §11 of the brief, and they are the part of this
+// feature with the most ways to be quietly wrong: a message that fires on a
+// value instead of a transition texts the same customer every time anybody
+// edits the row.
+
+describe("the message a device write owes its customer", () => {
+  const customer = { name: "علی رضایی", phone: "09121234567" };
+
+  function seedUpdate(previousStatus: string, nextStatus: string) {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: previousStatus });
+    db.device.update.mockResolvedValue(
+      deviceRow({ status: nextStatus, customer }),
+    );
+  }
+
+  it("texts an acceptance when a device is taken in", async () => {
+    db.device.create.mockResolvedValue(deviceRow({ customer }));
+
+    await controller.create(
+      mockRequest({
+        body: { device_name: "یخچال", status: "pending", send_sms: true },
+      }),
+      mockResponse(),
+    );
+
+    expect(jest.mocked(notifyCustomer).mock.calls[0][0]).toMatchObject({
+      kind: "device_accepted",
+      workspaceId: WORKSPACE_ID,
+      device: { id: 1, deviceName: "یخچال" },
+    });
+  });
+
+  it("says nothing when the box was not ticked", async () => {
+    db.device.create.mockResolvedValue(deviceRow({ customer }));
+
+    await controller.create(
+      mockRequest({ body: { device_name: "یخچال", status: "pending" } }),
+      mockResponse(),
+    );
+
+    expect(notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("texts on a real move to ready, and to delivered", async () => {
+    for (const [from, to, kind] of [
+      ["repairing", "ready_for_pickup", "device_ready"],
+      ["ready_for_pickup", "delivered", "device_delivered"],
+    ]) {
+      jest.mocked(notifyCustomer).mockClear();
+      seedUpdate(from, to);
+
+      await controller.update(
+        mockRequest({ params: { id: 1 }, body: { status: to, send_sms: true } }),
+        mockResponse(),
+      );
+
+      expect(jest.mocked(notifyCustomer).mock.calls[0][0]).toMatchObject({
+        kind,
+      });
+    }
+  });
+
+  it("stays quiet when the status did not actually move", async () => {
+    // §10. A device edited while already ready — a note corrected, a
+    // technician reassigned — must not tell the customer a second time.
+    seedUpdate("ready_for_pickup", "ready_for_pickup");
+
+    await controller.update(
+      mockRequest({
+        params: { id: 1 },
+        body: { description: "یادداشت تازه", send_sms: true },
+      }),
+      mockResponse(),
+    );
+
+    expect(notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("never re-sends an acceptance from an edit", async () => {
+    // §11. Whatever the status does on an update, `device_accepted` is not
+    // reachable from this handler — there is no branch that produces it.
+    for (const [from, to] of [
+      ["pending", "repairing"],
+      ["delivered", "pending"],
+      ["repairing", "ready_for_pickup"],
+    ]) {
+      jest.mocked(notifyCustomer).mockClear();
+      seedUpdate(from, to);
+
+      await controller.update(
+        mockRequest({ params: { id: 1 }, body: { status: to, send_sms: true } }),
+        mockResponse(),
+      );
+
+      const kinds = jest
+        .mocked(notifyCustomer)
+        .mock.calls.map((call) => call[0].kind);
+      expect(kinds).not.toContain("device_accepted");
+    }
+  });
+
+  it("sends nothing for a status with no message", async () => {
+    // Seven of the nine states say nothing to a customer, `repaired` among
+    // them: the bench is done, but the job has not been checked or priced.
+    for (const to of ["repaired", "unrepairable", "not_repaired", "diagnosing"]) {
+      jest.mocked(notifyCustomer).mockClear();
+      seedUpdate("repairing", to);
+
+      await controller.update(
+        mockRequest({ params: { id: 1 }, body: { status: to, send_sms: true } }),
+        mockResponse(),
+      );
+
+      expect(notifyCustomer).not.toHaveBeenCalled();
+    }
+  });
+
+  it("decides from the stored status, not from the request body", async () => {
+    // An update that leaves `status` out has not changed it. Comparing
+    // against the body would read that absence as a move to undefined, which
+    // is not equal to the old value — and would text the customer for an
+    // edit that changed a serial number.
+    seedUpdate("delivered", "delivered");
+
+    await controller.update(
+      mockRequest({
+        params: { id: 1 },
+        body: { serial_number: "SN-2", send_sms: true },
+      }),
+      mockResponse(),
+    );
+
+    expect(notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("hands the outcome back on the response", async () => {
+    // So the modal can say what became of the message. The device saved
+    // either way — this is information, not a status code.
+    db.device.create.mockResolvedValue(deviceRow({ customer }));
+    const res = mockResponse();
+
+    await controller.create(
+      mockRequest({
+        body: { device_name: "یخچال", status: "pending", send_sms: true },
+      }),
+      res,
+    );
+
+    expect(res.json.mock.calls[0][0]).toMatchObject({
+      id: 1,
+      sms: { status: "sent", costRials: 3_500 },
     });
   });
 });

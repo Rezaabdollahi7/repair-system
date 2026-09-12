@@ -12,6 +12,13 @@ import type {
   DeviceUpdateBody,
 } from "../schemas/device";
 import { workspaceIdOf } from "../utils/workspace";
+import {
+  notifyCustomer,
+  transitionNotification,
+  type NotifyOutcome,
+} from "../utils/customerNotification";
+import type { AuthenticatedRequest } from "../types/request";
+import type { DeviceSmsKind } from "../utils/smsTemplates";
 
 // One query shape reused by every handler, so the response never depends on
 // which endpoint produced it.
@@ -227,6 +234,43 @@ export const getOne = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Sends the customer notification a device write has earned, if any.
+ *
+ * ⚠️ Called **after** the write has committed, never inside it (§29 of the
+ * brief). Two reasons, and both have bitten this codebase already: a status
+ * change that fails must not text a customer about something that did not
+ * happen, and a provider call that takes twenty seconds must not be holding
+ * a row lock while it does.
+ *
+ * Its failures never reach the caller. notifyCustomer does not throw, and
+ * the outcome rides back on the response so the modal can say what became of
+ * the message — a device that saved correctly is a device that saved
+ * correctly, whatever sms.ir was doing at the time.
+ */
+async function notifyIfAsked(
+  req: Request,
+  device: DeviceWithRelations,
+  kind: DeviceSmsKind | null,
+  asked: boolean | undefined,
+): Promise<NotifyOutcome | undefined> {
+  if (!asked || kind === null) {
+    return undefined;
+  }
+
+  return notifyCustomer({
+    workspaceId: workspaceIdOf(req),
+    kind,
+    device: {
+      id: device.id,
+      deviceName: device.deviceName,
+      customerId: device.customerId,
+      customer: device.customer,
+    },
+    actorId: (req as AuthenticatedRequest).user?.id ?? null,
+  });
+}
+
 // POST /api/devices
 export const create = async (req: Request, res: Response) => {
   try {
@@ -248,7 +292,18 @@ export const create = async (req: Request, res: Response) => {
       include: deviceInclude,
     });
 
-    res.status(201).json(toDeviceResponse(device));
+    // Acceptance is the one message tied to creation rather than to a
+    // transition, and this is the only place it can be sent from. An edit
+    // must never re-send it however the status moves (§11) — which is why
+    // `update` below has no path to this kind at all.
+    const sms = await notifyIfAsked(
+      req,
+      device,
+      "device_accepted",
+      body.send_sms,
+    );
+
+    res.status(201).json({ ...toDeviceResponse(device), sms });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }
@@ -261,9 +316,12 @@ export const update = async (req: Request, res: Response) => {
     const { id } = valid.params as IdParam;
     const body = valid.body as DeviceUpdateBody;
 
+    // `status` as well as the id now: the message a change owes depends on
+    // where the device came from, not on where it ends up, and after the
+    // update that information is gone.
     const existing = await prisma.device.findFirst({
       where: { id, workspaceId: workspaceIdOf(req) },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!existing) {
       return res.status(404).json({ error: "دستگاه یافت نشد" });
@@ -298,7 +356,17 @@ export const update = async (req: Request, res: Response) => {
       include: deviceInclude,
     });
 
-    res.json(toDeviceResponse(device));
+    // Read off the row the database returned rather than off the request:
+    // an update that left `status` out has not changed it, and comparing
+    // against `body.status` would read that absence as a move to undefined.
+    const sms = await notifyIfAsked(
+      req,
+      device,
+      transitionNotification(existing.status, device.status),
+      body.send_sms,
+    );
+
+    res.json({ ...toDeviceResponse(device), sms });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }

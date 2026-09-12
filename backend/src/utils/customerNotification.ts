@@ -21,6 +21,49 @@ import type { Prisma } from "../generated/prisma/client";
 /** Derived from the generated client, so a schema change is a compile error. */
 type SmsMessageStatus = Prisma.SmsMessageUncheckedCreateInput["status"];
 
+/**
+ * Which device statuses tell a customer something, and what they tell them.
+ *
+ * ⚠️ `devices.status` is a free-form string column, and the workflow's real
+ * vocabulary lives on the frontend in utils/deviceStatus.ts — nine states
+ * since 11.1, which the backend cannot import. So the two that matter are
+ * named here, and a tenth status added over there will send nothing until
+ * somebody decides whether it should. Making the column an enum shared by
+ * both ends is the real fix and belongs in phase 9.
+ *
+ * «آماده تحویل» is `ready_for_pickup`, **not** `repaired`. A repaired device
+ * is one the bench has finished with; it has not been checked or priced yet,
+ * and a shop that texts the customer at that point is inviting them to come
+ * for something that is not ready. The other seven states are either steps
+ * nobody outside the shop cares about or outcomes with no message in this
+ * phase — `unrepairable` and `not_repaired` among them.
+ */
+const STATUS_NOTIFICATION: Record<string, DeviceSmsKind> = {
+  ready_for_pickup: "device_ready",
+  delivered: "device_delivered",
+};
+
+/**
+ * The message a status change owes the customer, if any.
+ *
+ * Pure, and the reason is §10 of the brief: this has to fire on the
+ * *transition* and not on the value. A device edited while already
+ * `ready_for_pickup` — a note corrected, a technician reassigned — must not
+ * text the customer a second time to say it is ready. Deciding from
+ * `next` alone would do exactly that, and the symptom is a customer who
+ * gets the same message three times and stops reading them.
+ */
+export function transitionNotification(
+  previousStatus: string,
+  nextStatus: string,
+): DeviceSmsKind | null {
+  if (previousStatus === nextStatus) {
+    return null;
+  }
+
+  return STATUS_NOTIFICATION[nextStatus] ?? null;
+}
+
 export interface NotifyInput {
   workspaceId: number;
   kind: DeviceSmsKind;

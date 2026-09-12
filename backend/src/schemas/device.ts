@@ -78,6 +78,15 @@ export const deviceCreateSchema = z.object({
   // schema's "received" — the controller has always won here.
   status: z.string().trim().min(1).default("pending"),
   description: optionalText,
+  /**
+   * Whether to text the customer that the device was taken in.
+   *
+   * A request, not an instruction. Whether a message actually goes depends
+   * on the workshop's toggle, the customer's number and the wallet — all
+   * decided on the server, because all three are things a client could lie
+   * about or simply not know.
+   */
+  send_sms: flexibleBoolean.optional(),
 });
 
 export type DeviceCreateBody = z.infer<typeof deviceCreateSchema>;
@@ -98,6 +107,12 @@ export const deviceUpdateSchema = z
     status: z.string().trim().min(1),
     description: optionalText,
     needs_invoice: flexibleBoolean,
+    /**
+     * Whether to text the customer about this change, if the change is one
+     * that has a message. The server decides whether it is: a status that
+     * did not actually move sends nothing, whatever this says.
+     */
+    send_sms: flexibleBoolean,
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, {

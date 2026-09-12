@@ -94,6 +94,14 @@ services:
       SMS_TEMPLATE_AFTER_EXPIRY: ${SMS_TEMPLATE_AFTER_EXPIRY:?required}
       SMS_TEMPLATE_PAYMENT_OK: ${SMS_TEMPLATE_PAYMENT_OK:?required}
       SMS_TEMPLATE_REFERRAL_REWARD: ${SMS_TEMPLATE_REFERRAL_REWARD:?required}
+      # Phase 12: the three templates a workshop sends to its own customer,
+      # charged to that workshop's SMS wallet rather than to us. Required
+      # like the five above — lib/sms resolves every id at import, so a
+      # missing one is a container that never starts rather than a feature
+      # that quietly does nothing.
+      SMS_TEMPLATE_DEVICE_ACCEPTED: ${SMS_TEMPLATE_DEVICE_ACCEPTED:?required}
+      SMS_TEMPLATE_DEVICE_READY: ${SMS_TEMPLATE_DEVICE_READY:?required}
+      SMS_TEMPLATE_DEVICE_DELIVERED: ${SMS_TEMPLATE_DEVICE_DELIVERED:?required}
       ZIBAL_MERCHANT: ${ZIBAL_MERCHANT:?required}
       # Derived from APP_DOMAIN, not set separately: Zibal rejects a callback
       # whose domain does not match the registered gateway with result 106,

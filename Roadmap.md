@@ -757,7 +757,7 @@ tomans.
       The reception number is the device id — the number the device list
       already shows and a customer can quote on the phone.
 
-- [ ] 12.6 `utils/customerNotification.ts` — the layer the brief's §26 asks
+- [x] 12.6 `utils/customerNotification.ts` — the layer the brief's §26 asks
       for, sitting between the device controller and `lib/sms.ts`:
 
           deviceController → customerNotification → smsWallet + lib/sms

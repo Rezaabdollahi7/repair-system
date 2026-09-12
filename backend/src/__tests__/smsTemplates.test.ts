@@ -85,6 +85,19 @@ describe("the approved bodies", () => {
     }
   });
 
+  it("has an environment value for every name in SMS_TEMPLATES", () => {
+    // lib/sms resolves all of them at import, so this is really a test that
+    // the suite could start at all — which it could not, twice, when a
+    // template was added and the test setup was not.
+    //
+    // Asserted rather than left to the import throw because the throw lands
+    // in whichever unrelated suite imports app.ts first, and reads as a
+    // broken invoice test rather than a missing line in providerEnv.
+    for (const name of Object.values(SMS_TEMPLATES)) {
+      expect(process.env[name]).toBeDefined();
+    }
+  });
+
   it("points each kind at its own template", () => {
     expect(DEVICE_SMS.device_accepted.template).toBe(
       SMS_TEMPLATES.DEVICE_ACCEPTED,

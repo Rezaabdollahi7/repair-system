@@ -61,7 +61,10 @@ const MESSAGE_STATUS: Record<string, { label: string; tone: string }> = {
   sent: { label: "ارسال شد", tone: "bg-success-soft text-success-fg" },
   pending: { label: "در حال ارسال", tone: "bg-info-soft text-info-fg" },
   failed: { label: "ناموفق", tone: "bg-danger-soft text-danger-fg" },
-  refunded: { label: "ناموفق — هزینه برگشت", tone: "bg-warning-soft text-warning-fg" },
+  refunded: {
+    label: "ناموفق — هزینه برگشت",
+    tone: "bg-warning-soft text-warning-fg",
+  },
   insufficient_balance: {
     label: "اعتبار کافی نبود",
     tone: "bg-warning-soft text-warning-fg",
@@ -70,7 +73,10 @@ const MESSAGE_STATUS: Record<string, { label: string; tone: string }> = {
     label: "شماره نامعتبر",
     tone: "bg-warning-soft text-warning-fg",
   },
-  disabled: { label: "غیرفعال بود", tone: "bg-surface-alt text-text-secondary" },
+  disabled: {
+    label: "غیرفعال بود",
+    tone: "bg-surface-alt text-text-secondary",
+  },
 };
 
 const TOPUP_STATUS: Record<string, { label: string; tone: string }> = {
@@ -157,7 +163,9 @@ export default function SmsWallet() {
     const tomans = Number(amount);
 
     if (!Number.isInteger(tomans) || tomans < MIN_TOMAN) {
-      toast.error(`حداقل مبلغ شارژ ${MIN_TOMAN.toLocaleString("fa-IR")} تومان است`);
+      toast.error(
+        `حداقل مبلغ شارژ ${MIN_TOMAN.toLocaleString("fa-IR")} تومان است`,
+      );
       return;
     }
 

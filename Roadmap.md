@@ -556,7 +556,7 @@ Rials in the database, tomans on screen — the rule `plans` and `payments`
 already follow. 350 toman is 3,500 rials, and no column anywhere holds
 tomans.
 
-- [ ] 12.1 Schema and migration. Five new models plus one column:
+- [x] 12.1 Schema and migration. Five new models plus one column:
 
       `SmsWallet` — one row per workspace, `balanceRials`, created by
       `populateWorkspace()` so a seeded workspace and a registered one are

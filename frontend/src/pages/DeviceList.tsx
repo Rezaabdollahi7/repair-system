@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getDevices, deleteDevice, updateDevice } from "../api";
 import FilterPanel from "../components/FilterPanel";
+import SmsBalanceBanner from "../components/SmsBalanceBanner";
 import Pagination from "../components/Pagination";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
@@ -491,6 +492,11 @@ export default function DeviceList() {
 
   return (
     <div dir="rtl">
+      {/* Here rather than in the layout: this is where a shop stands when it
+          would send a message, and a banner above every screen is one nobody
+          reads by the time it matters. */}
+      <SmsBalanceBanner />
+
       <header className="mb-5">
         {/*
           Quick status filters.

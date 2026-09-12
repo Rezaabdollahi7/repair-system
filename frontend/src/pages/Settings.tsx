@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getSettings, updateSettings, uploadSettingImage } from "../api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   BuildingOfficeIcon,
   PhotoIcon,
@@ -10,6 +10,7 @@ import {
   CheckCircleIcon,
   Cog6ToothIcon,
   InformationCircleIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/solid";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import type { SettingsForm } from "../types/api";
@@ -320,6 +321,35 @@ export default function Settings() {
         {currentTab === "ui" && (
           <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
             <ThemeSwitcher />
+          </div>
+        )}
+
+        {/*
+          A pointer, not a second switch.
+
+          The toggle itself lives on the wallet page beside the balance,
+          because the two questions a shop has about this feature — «is it
+          on» and «can I afford it» — are one question, and answering them in
+          two places is how they come to disagree. But a shop looks for
+          switches here, so here is where it is told where the switch is, and
+          what turning it on costs.
+        */}
+        {currentTab === "ui" && (
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-2 flex items-center gap-2">
+              <ChatBubbleLeftRightIcon className="w-5 h-5 text-text-secondary" />
+              پیامک به مشتریان
+            </h2>
+            <p className="text-body-sm text-text-secondary">
+              اطلاع‌رسانی پذیرش، آماده تحویل و تحویل دستگاه از اعتبار پیامکی
+              خودِ تعمیرگاه کسر می‌شود و بخشی از اشتراک دوفیکسو نیست.
+            </p>
+            <Link
+              to="/sms-wallet"
+              className="inline-block mt-3 text-body-sm font-medium text-primary"
+            >
+              تنظیم و شارژ کیف پول پیامکی
+            </Link>
           </div>
         )}
 

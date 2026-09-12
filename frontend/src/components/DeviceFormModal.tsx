@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import {
@@ -38,6 +39,32 @@ import type {
 } from "../types/api";
 import { modalPanel } from "../motion";
 import { DEVICE_STATUSES } from "../utils/deviceStatus";
+import { getSmsCapability } from "../api";
+import { useAuth } from "../context/AuthContext";
+import type { DeviceSmsOutcome, SmsCapability } from "../types/api";
+
+/**
+ * Which statuses the server will text a customer about, mirrored here so the
+ * checkbox only appears when there is something to send.
+ *
+ * ⚠️ A mirror, not the source. utils/customerNotification decides, and a
+ * disagreement costs a checkbox that does nothing rather than a message sent
+ * by accident — the server ignores `send_sms` for any other transition.
+ */
+const NOTIFYING_STATUSES: Record<string, string> = {
+  ready_for_pickup: "ارسال پیامک آماده تحویل به مشتری",
+  delivered: "ارسال پیامک تحویل دستگاه به مشتری",
+};
+
+/** What the shop is told about a message that did not go. */
+const SMS_OUTCOME_TEXT: Record<string, string> = {
+  sent: "پیامک برای مشتری ارسال شد",
+  insufficient_balance: "اعتبار پیامکی کافی نبود؛ پیامکی ارسال نشد",
+  invalid_phone: "شماره موبایل مشتری معتبر نیست؛ پیامکی ارسال نشد",
+  disabled: "ارسال پیامک به مشتریان غیرفعال است",
+  refunded: "ارسال پیامک ناموفق بود؛ هزینه به کیف پول برگشت",
+  failed: "ارسال پیامک ناموفق بود",
+};
 
 /**
  * The form holds every field as the inputs produce it. `customer_id` carries
@@ -54,6 +81,12 @@ interface DeviceForm {
   exit_date: string;
   status: string;
   description: string;
+  /**
+   * A request, not an instruction. The server decides whether a message
+   * actually goes — the toggle, the customer's number and the wallet are all
+   * things this form cannot see and should not pretend to.
+   */
+  send_sms: boolean;
 }
 
 /**
@@ -77,6 +110,9 @@ const INITIAL_FORM: DeviceForm = {
   exit_date: "",
   status: "pending",
   description: "",
+  // Default on: a shop that has switched notifications on and paid for
+  // credit means to use it, and the server refuses anyway when it should.
+  send_sms: true,
 };
 
 const INITIAL_CUSTOMER: CustomerBody = { name: "", phone: "" };
@@ -132,7 +168,10 @@ export default function DeviceFormModal({
   presetCustomer = null,
 }: DeviceFormModalProps) {
   const isEdit = Boolean(deviceId);
+  const { isAtLeast } = useAuth();
   const [form, setForm] = useState<DeviceForm>(INITIAL_FORM);
+  const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
+  const [capability, setCapability] = useState<SmsCapability | null>(null);
   const [loading, setLoading] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewDeviceName, setShowNewDeviceName] = useState(false);
@@ -248,7 +287,19 @@ export default function DeviceFormModal({
     if (isOpen) {
       loadPersonnel();
       if (isEdit) loadDevice();
-      else resetForm();
+      else {
+        resetForm();
+        setLoadedStatus(null);
+      }
+
+      // Whether the checkbox works at all. Its own endpoint rather than the
+      // wallet's, because a technician may open this modal and a balance is
+      // not theirs to see — this answer carries flags and a reason, no
+      // figure. A failure leaves it null, which reads as "no idea" and
+      // simply hides the checkbox rather than offering one that cannot work.
+      getSmsCapability()
+        .then(({ data }) => setCapability(data))
+        .catch(() => setCapability(null));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, deviceId]);
@@ -330,7 +381,14 @@ export default function DeviceFormModal({
         exit_date: deviceRes.data.exit_date || "",
         status: deviceRes.data.status || "pending",
         description: deviceRes.data.description || "",
+        send_sms: true,
       });
+
+      // The status the form opened with. The checkbox is about a change, so
+      // it must not appear when the select still holds what it started on —
+      // the same rule the server applies, mirrored so the UI does not offer
+      // something that would be ignored.
+      setLoadedStatus(deviceRes.data.status || "pending");
 
       if (deviceRes.data.customer_name) {
         setCustomerSearch(
@@ -410,13 +468,29 @@ export default function DeviceFormModal({
     setLoading(true);
     try {
       let devId: Id | null | undefined = deviceId;
+      // What the server did about the message, if it did anything. The
+      // device saved either way — this is information, not a failure.
+      let sms: DeviceSmsOutcome | undefined;
+
       if (isEdit && deviceId) {
-        await updateDevice(deviceId, form as DeviceCreateBody);
+        const res = await updateDevice(deviceId, form as DeviceCreateBody);
+        sms = (res.data as { sms?: DeviceSmsOutcome }).sms;
         toast.success("دستگاه ویرایش شد");
       } else {
         const res = await createDevice(form as DeviceCreateBody);
         devId = res.data.id;
+        sms = (res.data as { sms?: DeviceSmsOutcome }).sms;
         toast.success("دستگاه ثبت شد");
+      }
+
+      // A second toast rather than one combined line: the device saving and
+      // the message going are two different pieces of news, and a shop that
+      // sees «دستگاه ثبت شد» should not have to read past it to learn the
+      // customer was not told.
+      if (sms) {
+        const text = SMS_OUTCOME_TEXT[sms.status] ?? "وضعیت پیامک نامشخص است";
+        if (sms.status === "sent") toast.success(text);
+        else toast.error(text);
       }
       if (devId) {
         await setDeviceAssignments(
@@ -930,6 +1004,18 @@ export default function DeviceFormModal({
                     </option>
                   ))}
                 </select>
+
+                <SmsCheckbox
+                  isEdit={isEdit}
+                  loadedStatus={loadedStatus}
+                  status={form.status}
+                  checked={form.send_sms}
+                  capability={capability}
+                  isAdmin={isAtLeast("admin")}
+                  onChange={(send_sms) =>
+                    setForm((prev) => ({ ...prev, send_sms }))
+                  }
+                />
               </div>
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
@@ -988,6 +1074,94 @@ export default function DeviceFormModal({
           </div>
         </form>
       </motion.div>
+    </div>
+  );
+}
+
+/**
+ * The one checkbox, and the three things that can be wrong with it.
+ *
+ * Shown only when there is actually a message to send: on create that is
+ * always (acceptance), on edit only when the status is moving to one the
+ * server notifies about. Offering it otherwise would be offering something
+ * the server ignores, which is worse than not offering it — the shop would
+ * believe a customer had been told.
+ *
+ * ⚠️ No figure appears here for anyone, admin included. The endpoint behind
+ * `capability` does not carry one, which is the point: a technician can open
+ * this modal, and what the shop spends is not theirs to see. The links to
+ * fix either problem are shown only to an admin, because a technician sent
+ * to a page their role cannot open is worse than one told to ask.
+ */
+function SmsCheckbox({
+  isEdit,
+  loadedStatus,
+  status,
+  checked,
+  capability,
+  isAdmin,
+  onChange,
+}: {
+  isEdit: boolean;
+  loadedStatus: string | null;
+  status: string;
+  checked: boolean;
+  capability: SmsCapability | null;
+  isAdmin: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  // On edit, the message follows the transition — so a status that has not
+  // moved has nothing to announce, exactly as the server decides it.
+  const label = isEdit
+    ? status !== loadedStatus
+      ? NOTIFYING_STATUSES[status]
+      : undefined
+    : "ارسال پیامک پذیرش به مشتری";
+
+  if (!label || !capability) {
+    return null;
+  }
+
+  const blocked = !capability.can_send;
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      <label
+        className={`flex items-center gap-2 ${
+          blocked ? "opacity-60" : "cursor-pointer"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={checked && !blocked}
+          disabled={blocked}
+          onChange={(event) => onChange(event.target.checked)}
+          className="w-4 h-4 accent-[var(--primary)]"
+        />
+        <span className="text-body-sm text-text-primary">{label}</span>
+      </label>
+
+      {capability.reason === "disabled" && (
+        <p className="text-body-sm text-text-secondary">
+          ارسال پیامک غیرفعال است
+          {isAdmin && (
+            <Link to="/sms-wallet" className="text-primary mr-1.5">
+              فعال‌سازی
+            </Link>
+          )}
+        </p>
+      )}
+
+      {capability.reason === "insufficient_balance" && (
+        <p className="text-body-sm text-warning-fg">
+          اعتبار کافی نیست
+          {isAdmin && (
+            <Link to="/sms-wallet" className="text-primary mr-1.5">
+              شارژ کیف پول
+            </Link>
+          )}
+        </p>
+      )}
     </div>
   );
 }

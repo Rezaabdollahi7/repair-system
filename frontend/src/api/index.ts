@@ -77,6 +77,14 @@ import type {
   CheckoutBody,
   ReferralResponse,
   QuoteResponse,
+  SmsCapability,
+  SmsMessageRow,
+  SmsSettings,
+  SmsTopup,
+  SmsTopupStarted,
+  SmsTopupVerified,
+  SmsWalletStatus,
+  SmsWalletTransaction,
 } from "../types/api";
 
 /**
@@ -479,5 +487,26 @@ export const getReferral = () =>
   api.get<ReferralResponse>("/subscription/referral");
 export const getQuote = (data: CheckoutBody) =>
   api.post<QuoteResponse>("/subscription/quote", data);
+
+// SMS wallet (phase 12)
+export const getSmsWallet = () => api.get<SmsWalletStatus>("/sms/wallet");
+export const getSmsCapability = () =>
+  api.get<SmsCapability>("/sms/capability");
+export const startSmsTopup = (amountRials: number) =>
+  api.post<SmsTopupStarted>("/sms/wallet/topup", { amount_rials: amountRials });
+export const verifySmsTopup = (trackId: string) =>
+  api.post<SmsTopupVerified>("/sms/wallet/verify", { track_id: trackId });
+export const getSmsWalletTransactions = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<SmsWalletTransaction>>(
+    "/sms/wallet/transactions",
+    { params },
+  );
+export const getSmsTopups = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<SmsTopup>>("/sms/topups", { params });
+export const getSmsMessages = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<SmsMessageRow>>("/sms/messages", { params });
+export const getSmsSettings = () => api.get<SmsSettings>("/sms/settings");
+export const updateSmsSettings = (enabled: boolean) =>
+  api.patch<SmsSettings>("/sms/settings", { enabled });
 
 export default api;

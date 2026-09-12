@@ -27,6 +27,8 @@ import ExportList from "./pages/ExportList";
 import Subscription from "./pages/Subscription";
 import Referral from "./pages/Referral";
 import PaymentCallback from "./pages/PaymentCallback";
+import SmsWallet from "./pages/SmsWallet";
+import SmsWalletCallback from "./pages/SmsWalletCallback";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ModalProvider } from "./context/ModalContext";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
@@ -104,6 +106,13 @@ function App() {
                       path="/subscription/callback"
                       element={<PaymentCallback />}
                     />
+                    {/* Its own callback, not the subscription one: the
+                        trackId belongs to sms_topups, and verifying it
+                        against payments would find nothing. */}
+                    <Route
+                      path="/sms-wallet/callback"
+                      element={<SmsWalletCallback />}
+                    />
                   </Route>
 
                   <Route element={<ProtectedRoute />}>
@@ -148,6 +157,7 @@ function App() {
                         />
                         <Route path="exports" element={<ExportList />} />
                         <Route path="subscription" element={<Subscription />} />
+                        <Route path="sms-wallet" element={<SmsWallet />} />
                         <Route path="referral" element={<Referral />} />
                       </Route>
 

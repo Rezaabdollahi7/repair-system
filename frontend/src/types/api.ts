@@ -1188,3 +1188,127 @@ export interface QuoteResponse {
   /** Null when no code was sent; false when one was sent and refused. */
   code_accepted: boolean | null;
 }
+
+// ── SMS wallet (phase 12) ────────────────────────────────────
+//
+// Written from src/controllers/smsController.ts, like every other shape in
+// this file. Rials throughout — the pages divide by ten for display.
+
+/** GET /sms/wallet */
+export interface SmsWalletStatus {
+  balance_rials: number;
+  /** Per SMS part. A Persian message is two parts, hence the next field. */
+  unit_price_rials: number;
+  message_price_rials: number;
+  /** A floor, not an estimate: a shorter message would cost less. */
+  approximate_messages_left: number;
+}
+
+export type SmsWalletTransactionType =
+  | "topup"
+  | "send"
+  | "refund"
+  | "adjustment";
+
+/** A row of GET /sms/wallet/transactions. */
+export interface SmsWalletTransaction {
+  id: number;
+  type: SmsWalletTransactionType;
+  /** Signed: negative for a send, positive for a top-up or refund. */
+  amount_rials: number;
+  balance_before_rials: number;
+  balance_after_rials: number;
+  description: string | null;
+  sms_message_id: number | null;
+  topup_id: number | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export type SmsTopupStatus = "pending" | "paid" | "verified" | "failed";
+
+/** A row of GET /sms/topups. */
+export interface SmsTopup {
+  id: number;
+  order_id: string;
+  status: SmsTopupStatus;
+  amount_rials: number;
+  ref_number: string | null;
+  card_number: string | null;
+  paid_at: string | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export type SmsMessageKind =
+  | "device_accepted"
+  | "device_ready"
+  | "device_delivered";
+
+export type SmsMessageStatus =
+  | "pending"
+  | "sent"
+  | "failed"
+  | "insufficient_balance"
+  | "invalid_phone"
+  | "disabled"
+  | "refunded";
+
+/** A row of GET /sms/messages. */
+export interface SmsMessageRow {
+  id: number;
+  kind: SmsMessageKind;
+  status: SmsMessageStatus;
+  phone: string;
+  segments: number;
+  cost_rials: number;
+  customer_id: number | null;
+  customer_name: string | null;
+  device_id: number | null;
+  device_name: string | null;
+  error_message: string | null;
+  created_at: string;
+  sent_at: string | null;
+  created_by_name: string | null;
+}
+
+/** POST /sms/wallet/topup */
+export interface SmsTopupStarted {
+  topup_id: number;
+  amount_rials: number;
+  /** Navigate to it. Zibal refuses a request with no matching Referer. */
+  redirect_url: string;
+}
+
+/** POST /sms/wallet/verify */
+export interface SmsTopupVerified {
+  credited: boolean;
+  balance_rials: number | null;
+}
+
+/** GET /sms/settings and PATCH /sms/settings */
+export interface SmsSettings {
+  enabled: boolean;
+}
+
+/**
+ * GET /sms/capability — the only SMS route a technician may call.
+ *
+ * Carries no amount by design: a balance is money, and a technician does not
+ * see the figure. `reason` is ordered the way the server refuses, so the
+ * modal says what a send would have recorded.
+ */
+export interface SmsCapability {
+  can_send: boolean;
+  reason: "disabled" | "insufficient_balance" | null;
+  notifications_enabled: boolean;
+  /** How much of each value survives into the message.  */
+  parameter_caps: { NAME: number; DEVICE: number; NUMBER: number; SHOP: number };
+}
+
+/** What a device write reports about the message it tried to send. */
+export interface DeviceSmsOutcome {
+  sms_message_id: number | null;
+  status: SmsMessageStatus;
+  costRials: number;
+}

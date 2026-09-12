@@ -22,6 +22,7 @@ import {
   XMarkIcon,
   ArrowDownTrayIcon,
   CreditCardIcon,
+  ChatBubbleLeftRightIcon,
   GiftIcon,
   ArrowRightStartOnRectangleIcon,
   SunIcon,
@@ -134,6 +135,12 @@ const MENU: MenuSection[] = [
         name: "اشتراک",
         path: "/subscription",
         icon: CreditCardIcon,
+        adminOnly: true,
+      },
+      {
+        name: "کیف پول پیامکی",
+        path: "/sms-wallet",
+        icon: ChatBubbleLeftRightIcon,
         adminOnly: true,
       },
       {

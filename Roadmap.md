@@ -862,7 +862,7 @@ tomans.
       Every handler validates through `validate()` and reads `req.valid`
       (RULES §6). `workspaceId` comes from the token, never the body.
 
-- [ ] 12.9 Frontend: `pages/SmsWallet.tsx` at `/sms-wallet`, admin-only in
+- [~] 12.9 Frontend: `pages/SmsWallet.tsx` at `/sms-wallet`, admin-only in
       both `App.tsx` and `Layout.tsx` — 10.8 is what happens when those two
       disagree. Balance, unit price, approximate messages remaining, the
       top-up amounts from §2 as presets plus a free-form field, top-up
@@ -877,7 +877,7 @@ tomans.
       A callback page for the top-up return, following `PaymentCallback.tsx`:
       it asks the backend to verify rather than trusting the query string.
 
-- [ ] 12.10 `DeviceFormModal`: one checkbox per event, shown only when that
+- [~] 12.10 `DeviceFormModal`: one checkbox per event, shown only when that
       event can actually fire — on create, the acceptance box; on edit, the
       box for the transition the form is about to make, decided against the
       status the form loaded with rather than the one in the select. The
@@ -894,16 +894,24 @@ tomans.
       than a technician told to ask their manager, which is what the text
       says for them.
 
-- [ ] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
+- [~] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
       deliberately quiet: below 10,000 toman a warning, at zero a stronger
       one, each with a link to the wallet page and each dismissible for the
       session. Only where it is relevant — the device pages and the wallet
       page — not on every screen.
 
-- [ ] 12.12 The toggle on the settings page, with a sentence saying plainly
-      that these messages are charged to the shop's own wallet and are not
-      part of the subscription (§21). Somebody will otherwise assume the
-      subscription covers it, and find out from an empty wallet.
+- [~] 12.12 A sentence saying plainly that these messages are charged to the
+      shop's own wallet and are not part of the subscription (§21). Somebody
+      will otherwise assume the subscription covers it, and find out from an
+      empty wallet.
+
+      **Built as a pointer on the settings page rather than a second switch.**
+      The toggle itself sits on the wallet page beside the balance, because
+      the two questions a shop has about this feature — is it on, and can I
+      afford it — are one question, and answering them in two places is how
+      they come to disagree. A shop still looks for switches in settings, so
+      that is where it is told where the switch is and what turning it on
+      costs.
 
       ⚠️ 11.5 moved settings from the sidebar to a header icon — the entry
       point is not where a pre-redesign screenshot would put it.
@@ -1033,6 +1041,16 @@ thanks (about 25 characters, which is a third part on its own — a greeting
 worth 200 toman a message is a greeting worth losing, and emoji are allowed
 but not free), and «لطفاً برای دریافت دستگاه ... مراجعه فرمایید», since a
 customer told their device is ready knows to come and get it.
+
+### ⚠️ The frontend is written but not looked at
+
+12.9 through 12.12 are `[~]` rather than `[x]` deliberately. The frontend has
+no test runner, `tsc` is its only automated gate, and neither it nor the Vite
+harness RULES §6b describes can run in the sandbox these were written in —
+what was possible there is a partial type-check that cannot resolve react or
+axios, so it catches a wrong argument count but not a wrong prop.
+
+They become `[x]` when `pnpm build` passes and somebody has opened the pages.
 
 ### Open questions — answer before 12.1
 

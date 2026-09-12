@@ -101,5 +101,15 @@ export async function populateWorkspace(
   // workspace rather than something that may or may not exist yet.
   await createReferralCode(tx, workspaceId);
 
+  // An empty SMS wallet, for the same reason the settings row is created
+  // here: the debit in 12.3 is a conditional UPDATE, and an UPDATE that
+  // matches no row is indistinguishable from one refused for lack of funds.
+  // A workspace without this row would report "not enough credit" forever
+  // and no amount of topping up would change it.
+  //
+  // Zero, not a gift: an opening balance is a pricing decision and this is
+  // not the place to take it.
+  await tx.smsWallet.create({ data: { workspaceId } });
+
   return owner;
 }

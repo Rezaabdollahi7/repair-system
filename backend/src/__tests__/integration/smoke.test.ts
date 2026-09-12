@@ -97,6 +97,9 @@ describe("integration plumbing", () => {
       "plans",
       "referrals",
       "roles",
+      // Reference data like plans: the SMS unit price over time, set with
+      // psql, identical for every workspace (12.1).
+      "sms_prices",
       "workspaces",
     ]);
   });

@@ -27,6 +27,7 @@ function mockTx() {
       findUnique: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({}),
     },
+    smsWallet: { create: jest.fn().mockResolvedValue({}) },
   };
 }
 
@@ -139,5 +140,26 @@ describe("populateWorkspace", () => {
     expect(tx.referralCode.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ workspaceId: WORKSPACE_ID }),
     });
+  });
+
+  it("opens an empty SMS wallet", async () => {
+    const tx = mockTx();
+    await run(tx);
+
+    // Zero rather than a gift: an opening balance is a pricing decision.
+    expect(tx.smsWallet.create).toHaveBeenCalledWith({
+      data: { workspaceId: WORKSPACE_ID },
+    });
+  });
+
+  it("gives every new workspace a wallet, not just the ones that ask", async () => {
+    // The debit in 12.3 is a conditional UPDATE, and one that matches no row
+    // reads exactly like one refused for lack of funds. A workspace missing
+    // this row would report "not enough credit" forever, and topping up
+    // would not fix it — which is why this is asserted rather than assumed.
+    const tx = mockTx();
+    await run(tx);
+
+    expect(tx.smsWallet.create).toHaveBeenCalledTimes(1);
   });
 });

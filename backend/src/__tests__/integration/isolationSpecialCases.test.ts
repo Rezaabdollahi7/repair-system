@@ -512,3 +512,214 @@ describe("otp_codes is deliberately shared", () => {
     expect(columns).toHaveLength(0);
   });
 });
+
+// ── SMS wallet (12.1) ────────────────────────────────────────
+//
+// None of these four tables has a REST route yet, so there is nothing for
+// the table in isolation.test.ts to point at. They still carry money and a
+// customer's phone number from the moment the migration runs, which is the
+// wrong thing to leave untested until 12.8 — a policy missing here would be
+// discovered by whoever writes the controller, or by nobody.
+//
+// Asserted through the application client, which is the only one the
+// policies apply to: `owner` bypasses them by design and is used for setup.
+describe("sms wallet tables", () => {
+  beforeEach(async () => {
+    await owner.smsWallet.createMany({
+      data: [
+        { workspaceId: workspaces.a.workspaceId, balanceRials: 100_000 },
+        { workspaceId: workspaces.b.workspaceId, balanceRials: 900_000 },
+      ],
+    });
+  });
+
+  it("shows a workspace only its own wallet", async () => {
+    const seen = await runWithWorkspace(workspaces.a.workspaceId, () =>
+      prisma.smsWallet.findMany(),
+    );
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].workspaceId).toBe(workspaces.a.workspaceId);
+    expect(seen[0].balanceRials.toNumber()).toBe(100_000);
+  });
+
+  it("will not let one workspace debit another's wallet", async () => {
+    // The shape 12.3's debit takes, run against the wrong workspace. The
+    // policy makes it match no row rather than refusing loudly, which is the
+    // same answer as "not enough credit" — so this test is what separates a
+    // working isolation boundary from a wallet that silently never works.
+    const updated = await runWithWorkspace(workspaces.a.workspaceId, () =>
+      prisma.smsWallet.updateMany({
+        where: { workspaceId: workspaces.b.workspaceId },
+        data: { balanceRials: { decrement: 3_500 } },
+      }),
+    );
+
+    expect(updated.count).toBe(0);
+
+    const untouched = await owner.smsWallet.findUniqueOrThrow({
+      where: { workspaceId: workspaces.b.workspaceId },
+    });
+    expect(untouched.balanceRials.toNumber()).toBe(900_000);
+  });
+
+  it("refuses to write a ledger row into another workspace", async () => {
+    // WITH CHECK, not USING: filtering a foreign row out of a read is not
+    // the same as refusing to create one, and only the second keeps a
+    // mis-scoped write from landing.
+    await expect(
+      runWithWorkspace(workspaces.a.workspaceId, () =>
+        prisma.smsWalletTransaction.create({
+          data: {
+            workspaceId: workspaces.b.workspaceId,
+            type: "adjustment",
+            amountRials: 1_000,
+            balanceBeforeRials: 0,
+            balanceAfterRials: 1_000,
+          },
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("keeps send logs and top-ups apart", async () => {
+    await owner.smsMessage.createMany({
+      data: [
+        {
+          workspaceId: workspaces.a.workspaceId,
+          phone: "09120000011",
+          kind: "device_accepted",
+          unitPriceRials: 1_750,
+        },
+        {
+          workspaceId: workspaces.b.workspaceId,
+          phone: "09120000012",
+          kind: "device_ready",
+          unitPriceRials: 1_750,
+        },
+      ],
+    });
+
+    await owner.smsTopup.createMany({
+      data: [
+        {
+          workspaceId: workspaces.a.workspaceId,
+          orderId: "DFXS-a",
+          amountRials: 200_000,
+        },
+        {
+          workspaceId: workspaces.b.workspaceId,
+          orderId: "DFXS-b",
+          amountRials: 500_000,
+        },
+      ],
+    });
+
+    const { messages, topups } = await runWithWorkspace(
+      workspaces.a.workspaceId,
+      async () => ({
+        messages: await prisma.smsMessage.findMany(),
+        topups: await prisma.smsTopup.findMany(),
+      }),
+    );
+
+    // The phone number is the reason sms_messages is tenant data rather than
+    // ledger; seeing another workshop's would be leaking their customer.
+    expect(messages.map((row) => row.phone)).toEqual(["09120000011"]);
+    expect(topups.map((row) => row.orderId)).toEqual(["DFXS-a"]);
+  });
+
+  it("allows one refund per message and no more", async () => {
+    // The idempotency rule from 12.3, held in the database rather than in
+    // the caller. Asserted here rather than in a unit test because a unique
+    // index is not something a mock can have.
+    const message = await owner.smsMessage.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        phone: "09120000013",
+        kind: "device_delivered",
+        unitPriceRials: 1_750,
+        costRials: 3_500,
+      },
+      select: { id: true },
+    });
+
+    const refund = {
+      workspaceId: workspaces.a.workspaceId,
+      type: "refund" as const,
+      smsMessageId: message.id,
+      amountRials: 3_500,
+      balanceBeforeRials: 0,
+      balanceAfterRials: 3_500,
+    };
+
+    await runWithWorkspace(workspaces.a.workspaceId, () =>
+      prisma.smsWalletTransaction.create({ data: refund }),
+    );
+
+    await expect(
+      runWithWorkspace(workspaces.a.workspaceId, () =>
+        prisma.smsWalletTransaction.create({ data: refund }),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("keeps the money and drops the phone number when a workspace is wiped", async () => {
+    // 8.7 removes tenant data and leaves the ledger. sms_messages is on
+    // DELETION_ORDER because of its phone column; the transaction that paid
+    // for it is not, and survives with its amount and a null message.
+    const message = await owner.smsMessage.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        phone: "09120000014",
+        kind: "device_accepted",
+        unitPriceRials: 1_750,
+        costRials: 3_500,
+      },
+      select: { id: true },
+    });
+
+    await owner.smsWalletTransaction.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        type: "send",
+        smsMessageId: message.id,
+        amountRials: -3_500,
+        balanceBeforeRials: 100_000,
+        balanceAfterRials: 96_500,
+      },
+    });
+
+    await owner.smsMessage.delete({ where: { id: message.id } });
+
+    const rows = await owner.smsWalletTransaction.findMany({
+      where: { workspaceId: workspaces.a.workspaceId },
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].smsMessageId).toBeNull();
+    expect(rows[0].amountRials.toNumber()).toBe(-3_500);
+  });
+});
+
+// Reference data, like plans: the price is platform-wide, so there is no
+// policy and the application role may only read it.
+describe("sms_prices is reference data", () => {
+  it("is readable by the application role and not writable", async () => {
+    const read = await runWithWorkspace(workspaces.a.workspaceId, () =>
+      prisma.smsPrice.findMany(),
+    );
+
+    // The opening row comes from the migration, and truncateAll() removes
+    // it — so this asserts the grant rather than the contents.
+    expect(Array.isArray(read)).toBe(true);
+
+    await expect(
+      runWithWorkspace(workspaces.a.workspaceId, () =>
+        prisma.smsPrice.create({
+          data: { unitPriceRials: 1, effectiveFrom: new Date() },
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+});

@@ -22,12 +22,23 @@ import { errorMessage } from "./errors";
  * discount_code_uses and referrals. The ledger outlives the workspace, which
  * is the whole reason the row survives as a tombstone. referral_codes does
  * go — a link to a deleted workshop should stop working.
+ *
+ * The three SMS money tables — sms_wallets, sms_wallet_transactions and
+ * sms_topups — are ledger too and stay for the same reason. sms_messages
+ * does not: it carries the phone number of the workshop's customer, which is
+ * exactly the personal data this deletion exists to remove. The wallet rows
+ * that point at a deleted message keep their amounts and lose the link
+ * (SetNull), so the money history survives without the person in it.
  */
 // ⚠️ Prisma's delegates are singular — `tx.user`, not `tx.users` — and the
 // names below are those, not the table names. Getting it wrong is a compile
 // error rather than a night the cron half-deletes a workspace, which is the
 // reason this is typed against TransactionClient at all.
 export const DELETION_ORDER = [
+  // Before devices and customers: sms_messages references both, and although
+  // each is SetNull rather than Restrict, clearing them first means the rows
+  // go while they still say who they were about — which is the point.
+  "smsMessage",
   "deviceAssignment",
   "deviceImage",
   "repairInvoicePayment",

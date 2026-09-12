@@ -122,9 +122,36 @@ describe("deleteWorkspaceData", () => {
       "subscriptionEvent",
       "discountCodeUse",
       "referral",
+      // The SMS money tables, spared for the same reason (12.1).
+      "smsWallet",
+      "smsWalletTransaction",
+      "smsTopup",
     ]) {
       expect(deleted).not.toContain(spared);
     }
+  });
+
+  it("removes the send log, which is the one SMS table holding a phone number", async () => {
+    // sms_messages is tenant data rather than ledger: it carries the
+    // workshop's customer's number, which is exactly what this deletion
+    // exists to remove. Its wallet rows keep their amounts and lose the
+    // link, so the money history survives without the person in it.
+    await deleteWorkspaceData(WORKSPACE_ID);
+
+    expect(deleted).toContain("smsMessage");
+  });
+
+  it("clears the send log before the customers and devices it names", async () => {
+    // Both references are SetNull rather than Restrict, so the reverse order
+    // would not fail — it would quietly blank the two columns that say who
+    // the message was about, and the rows would go anyway a moment later
+    // carrying less than they should have.
+    expect(DELETION_ORDER.indexOf("smsMessage")).toBeLessThan(
+      DELETION_ORDER.indexOf("customer"),
+    );
+    expect(DELETION_ORDER.indexOf("smsMessage")).toBeLessThan(
+      DELETION_ORDER.indexOf("device"),
+    );
   });
 
   it("removes the objects before the rows", async () => {

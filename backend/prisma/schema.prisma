@@ -114,6 +114,11 @@ model Workspace {
   referralReceived          Referral?                  @relation("ReferralReferred")
   subscriptionNotifications SubscriptionNotification[]
 
+  smsWallet             SmsWallet?
+  smsWalletTransactions SmsWalletTransaction[]
+  smsMessages           SmsMessage[]
+  smsTopups             SmsTopup[]
+
   @@index([status])
   // The nightly job scans by expiry, not by status.
   @@index([expiresAt])
@@ -165,6 +170,9 @@ model User {
   backups                Backup[]
   refreshTokens          RefreshToken[]
   payments               Payment[]
+  smsWalletTransactions  SmsWalletTransaction[]
+  smsMessages            SmsMessage[]
+  smsTopups              SmsTopup[]
 
   @@index([workspaceId])
   @@index([roleId])
@@ -265,6 +273,7 @@ model Customer {
   devices        Device[]
   saleInvoices   SaleInvoice[]
   repairInvoices RepairInvoice[]
+  smsMessages    SmsMessage[]
 
   // Leads with workspaceId so the index serves the scoped query the
   // application always issues.
@@ -300,6 +309,7 @@ model Device {
   assignments    DeviceAssignment[]
   repairInvoices RepairInvoice[]
   saleInvoices   SaleInvoice[]
+  smsMessages    SmsMessage[]
 
   @@index([workspaceId, id(sort: Desc)])
   @@index([workspaceId, status])
@@ -680,6 +690,12 @@ model Settings {
   defaultTaxRate        Decimal @default(0) @map("default_tax_rate") @db.Decimal(5, 2)
   defaultWarrantyMonths Int     @default(3) @map("default_warranty_months")
   invoicePrefix         String  @default("INV-") @map("invoice_prefix")
+
+  /// Off until a workshop turns it on. A shop that upgrades and discovers it
+  /// has been texting its customers is a worse first impression than one
+  /// that has to find a switch.
+  smsCustomerNotificationsEnabled Boolean @default(false) @map("sms_customer_notifications_enabled")
+
   invoiceFooterText     String? @map("invoice_footer_text")
 
   saleInvoicePaperSize         String  @default("A5") @map("sale_invoice_paper_size")
@@ -1035,4 +1051,304 @@ model SubscriptionNotification {
   @@unique([workspaceId, kind, expiresAtSnapshot])
   @@index([workspaceId])
   @@map("subscription_notifications")
+}
+
+// ── SMS wallet ───────────────────────────────────────────────
+//
+// The other kind of message. Everything above this line — OTP, expiry
+// reminders, the payment confirmation — is sent by us and paid for by us.
+// These are sent by a workshop to its own customer and paid for out of that
+// workshop's own credit, which is what every table here exists to track.
+
+/// Four states, identical to SubscriptionPaymentStatus and deliberately not
+/// the same type.
+///
+/// That enum is named subscription_payment_status because the invoice tables
+/// already own the words "payment status" with a different meaning; adding a
+/// third meaning to it would undo the distinction its own comment was written
+/// to draw. Sharing would also couple the two: a value added for
+/// subscriptions would silently widen top-ups.
+enum SmsTopupStatus {
+  pending
+  paid
+  verified
+  failed
+
+  @@map("sms_topup_status")
+}
+
+enum SmsWalletTransactionType {
+  topup
+  send
+  refund
+  /// An operator correction, made with psql — the wallet's equivalent of
+  /// SubscriptionEventType.manual, and recorded like any other movement so
+  /// the balance is always the sum of its rows.
+  adjustment
+
+  @@map("sms_wallet_transaction_type")
+}
+
+/// Which event produced the message. Not the device status it came from:
+/// a status is a workflow state and this is what the customer was told.
+enum SmsMessageKind {
+  device_accepted
+  device_ready
+  device_delivered
+
+  @@map("sms_message_kind")
+}
+
+/// What became of one attempt.
+///
+/// Four of these are refusals rather than failures — the message was never
+/// handed to the provider and nothing was charged. They are rows rather than
+/// silence because "why did my customer not get a text" is the question this
+/// table answers, and "we decided not to send it" is an answer.
+enum SmsMessageStatus {
+  /// Debited and handed to the provider; no answer yet. A row left here is
+  /// the recoverable case 12.16 looks for.
+  pending
+  sent
+  /// The provider rejected or could not be reached. Refunded.
+  failed
+  insufficient_balance
+  invalid_phone
+  /// The workspace has customer notifications switched off.
+  disabled
+  /// Charged, failed, and given back.
+  refunded
+
+  @@map("sms_message_status")
+}
+
+/// One workshop's SMS credit.
+///
+/// Its own table rather than a column on Workspace: the balance is written
+/// on the send path with a row lock held, and locking the workspace row for
+/// that would serialise invoice numbering — which takes a lock on the same
+/// row — behind every text message.
+///
+/// The balance is a column AND the sum of sms_wallet_transactions. Two
+/// answers to one question is only safe because the rows cannot be edited or
+/// deleted (see the migration's grants), which makes the sum the authority
+/// and this column a cache the debit statement maintains atomically.
+model SmsWallet {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @unique @map("workspace_id")
+
+  /// Rials, like every amount in the schema. Never negative — the debit in
+  /// 12.3 is a single conditional UPDATE, so there is no window in which it
+  /// could become so.
+  balanceRials Decimal @default(0) @map("balance_rials") @db.Decimal(18, 0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Restrict, like payments: deleting a workspace with money against its
+  /// name must fail loudly. 8.7 leaves the workspace row as a tombstone and
+  /// never reaches this, so it is here for the day someone writes a delete
+  /// that forgets.
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@map("sms_wallets")
+}
+
+/// Every movement of a wallet balance, and the only explanation of why it is
+/// what it is.
+///
+/// Append-only: the application role has neither UPDATE nor DELETE. balance
+/// before and after are stored rather than derived, so a row is readable on
+/// its own without replaying the whole table.
+model SmsWalletTransaction {
+  id          Int                      @id @default(autoincrement())
+  workspaceId Int                      @map("workspace_id")
+  type        SmsWalletTransactionType
+
+  /// Signed: positive for a top-up or refund, negative for a send. Storing
+  /// the sign rather than inferring it from `type` means the balance is
+  /// literally SUM(amount_rials), which is what makes the column above
+  /// checkable.
+  amountRials        Decimal @map("amount_rials") @db.Decimal(18, 0)
+  balanceBeforeRials Decimal @map("balance_before_rials") @db.Decimal(18, 0)
+  balanceAfterRials  Decimal @map("balance_after_rials") @db.Decimal(18, 0)
+
+  /// What caused it. Two nullable typed references rather than the
+  /// `referenceId` the brief asks for: a bare id with a kind beside it
+  /// cannot be a foreign key, so nothing would stop it pointing at a row
+  /// that does not exist — and the unique below could not be written at all.
+  smsMessageId Int? @map("sms_message_id")
+  topupId      Int? @map("topup_id")
+
+  description String?
+  createdBy   Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  /// SetNull, not Restrict: sms_messages holds a customer's phone number and
+  /// is deleted with the rest of the tenant data in 8.7, while this row is
+  /// money and stays. The amount survives; the link to whose message it was
+  /// does not, which is the correct direction for personal data.
+  smsMessage SmsMessage? @relation(fields: [smsMessageId], references: [id], onDelete: SetNull)
+  topup      SmsTopup?   @relation(fields: [topupId], references: [id], onDelete: Restrict)
+  author     User?       @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  /// The refund idempotency rule, held in the database rather than in a
+  /// controller that a second code path could bypass: one debit and at most
+  /// one refund per message, ever. Running the refund twice is a constraint
+  /// violation rather than a second credit.
+  ///
+  /// Postgres treats NULLs as distinct in a unique index, so the rows left
+  /// pointing at nothing after a workspace deletion do not collide.
+  @@unique([smsMessageId, type])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([topupId])
+  @@index([createdBy])
+  @@map("sms_wallet_transactions")
+}
+
+/// Every attempt to send a customer notification, sent or refused.
+///
+/// Tenant data rather than ledger, because of one column: `phone` belongs to
+/// the workshop's customer. That is why this table is on DELETION_ORDER and
+/// the three money tables are not.
+model SmsMessage {
+  id          Int  @id @default(autoincrement())
+  workspaceId Int  @map("workspace_id")
+  customerId  Int? @map("customer_id")
+  deviceId    Int? @map("device_id")
+
+  /// Normalised at send time to 09XXXXXXXXX. Stored as it was actually used,
+  /// not as the customer row has it — the two can differ, and what matters
+  /// afterwards is where the message went.
+  phone String
+  kind  SmsMessageKind
+
+  /// How many SMS parts the rendered text came to. A Persian message is 70
+  /// characters in one part and 67 per part beyond that, so every one of
+  /// these templates is two — see 12.2. Stored because the cost depends on
+  /// it and because a future one-part template must stay cheaper in the
+  /// history rather than being re-priced.
+  segments Int @default(1)
+
+  /// The price in force when this was sent, copied on rather than read back
+  /// through sms_prices — the same reason payments carries its own
+  /// base_price_rials. A history that re-renders at today's price is not a
+  /// history.
+  unitPriceRials Decimal @map("unit_price_rials") @db.Decimal(18, 0)
+  /// What was actually taken. Derived from the two above by utils/smsPricing
+  /// rather than here, so the question "per part or per message" stays a
+  /// decision in one function instead of a shape in the schema.
+  costRials      Decimal @default(0) @map("cost_rials") @db.Decimal(18, 0)
+
+  status SmsMessageStatus @default(pending)
+
+  /// Which provider sent it, for the day there are two. A string rather than
+  /// an enum: this is a label on a historical row, not a value the code
+  /// branches on.
+  provider          String  @default("smsir")
+  providerMessageId String? @map("provider_message_id")
+  errorCode         String? @map("error_code")
+  errorMessage      String? @map("error_message")
+
+  createdBy Int?      @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// SetNull on both, matching Device's own treatment of them: the record
+  /// that a customer was told something should outlive tidying up the
+  /// customer or the job it was about.
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  device    Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  walletTransactions SmsWalletTransaction[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  /// The recovery sweep's query: anything left pending.
+  @@index([workspaceId, status])
+  @@index([customerId])
+  @@index([deviceId])
+  @@index([createdBy])
+  @@map("sms_messages")
+}
+
+/// Buying SMS credit. The subscription ledger's twin, and deliberately not
+/// the same table.
+///
+/// `payments` is counted in four places — subscriptionController's three
+/// `paidBefore` lookups and utils/referral's `verifiedPayments` — and every
+/// one of them reads a verified row as "this workshop has bought a
+/// subscription before". A top-up row in that table would silently cancel a
+/// referred workshop's discount on its first subscription, and the
+/// referrer's reward with it. A `kind` column would fix that only by editing
+/// all four, and again for the fifth written next year by someone who has
+/// not read this. A separate table cannot be counted by accident.
+model SmsTopup {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @map("workspace_id")
+
+  /// Ours, prefixed DFXS- so a top-up and a subscription payment are
+  /// distinguishable by eye in Zibal's panel.
+  orderId String  @unique @map("order_id")
+  /// Zibal's. int64 in their API, so BigInt rather than Int.
+  trackId BigInt? @unique @map("track_id")
+
+  status SmsTopupStatus @default(pending)
+
+  /// What went to Zibal, and what verify must return. The credit added to
+  /// the wallet is this figure and nothing else.
+  amountRials Decimal @map("amount_rials") @db.Decimal(18, 0)
+
+  refNumber  String? @map("ref_number")
+  /// Masked by Zibal before it reaches us (62741****44).
+  cardNumber String? @map("card_number")
+
+  paidAt        DateTime? @map("paid_at")
+  verifiedAt    DateTime? @map("verified_at")
+  failureReason String?   @map("failure_reason")
+
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  walletTransactions SmsWalletTransaction[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  /// The settlement sweep's query: everything still in `paid`.
+  @@index([status])
+  @@index([createdBy])
+  @@map("sms_topups")
+}
+
+/// What a message costs, over time.
+///
+/// Reference data like `plans`: no RLS, SELECT only for the app role, set
+/// with psql. Effective-dated rather than a single active row, so the price
+/// last month is answerable even for a month in which nothing was sent —
+/// which is the thing an environment variable could never do, and the reason
+/// this is a table at all.
+///
+/// The current price is the row with the greatest `effective_from` not in
+/// the future. There is no `is_active` flag, because a flag and a date can
+/// disagree and then nobody knows which won.
+model SmsPrice {
+  id Int @id @default(autoincrement())
+
+  /// Rials. Per SMS part — see the note on SmsMessage.segments. How this
+  /// combines with `segments` to reach a cost is utils/smsPricing's
+  /// decision, not this table's.
+  unitPriceRials Decimal @map("unit_price_rials") @db.Decimal(18, 0)
+
+  /// Unique: two prices starting at the same instant is a tie with no
+  /// tiebreaker, and "whichever the planner returned first" is not a price.
+  effectiveFrom DateTime @unique @map("effective_from")
+  note          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("sms_prices")
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { trackIdSchema } from "./common";
+import { paginationQuerySchema, trackIdSchema } from "./common";
 
 /**
  * 20,000 toman, from the brief. Below this the gateway's own fee eats the
@@ -56,3 +56,24 @@ export const walletVerifySchema = z.object({
 });
 
 export type WalletVerifyBody = z.infer<typeof walletVerifySchema>;
+
+/**
+ * The wallet ledger and the send log are both long and both only ever read
+ * newest-first, so they page like every other list in the API.
+ */
+export const smsListQuerySchema = paginationQuerySchema;
+
+export type SmsListQuery = z.infer<typeof smsListQuerySchema>;
+
+/**
+ * The one setting this feature owns.
+ *
+ * Its own endpoint rather than a field on the settings resource: that
+ * controller does a bare update of a wide row, and a toggle that costs money
+ * to switch on should not travel in the same request as an invoice footer.
+ */
+export const smsSettingsSchema = z.object({
+  enabled: z.boolean({ message: "مقدار باید درست یا نادرست باشد" }),
+});
+
+export type SmsSettingsBody = z.infer<typeof smsSettingsSchema>;

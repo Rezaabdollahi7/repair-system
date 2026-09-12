@@ -829,7 +829,7 @@ tomans.
       whether the toggle is on — is the server's decision. RULES §6: the
       client is not trusted for anything it could lie about.
 
-- [ ] 12.8 Routes and schemas. `src/routes/sms.ts`, mounted at `/api/sms`:
+- [x] 12.8 Routes and schemas. `src/routes/sms.ts`, mounted at `/api/sms`:
 
           GET   /api/sms/wallet              balance, unit price, ~messages left
           POST  /api/sms/wallet/topup        amount → Zibal redirect

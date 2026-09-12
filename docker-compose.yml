@@ -5,6 +5,26 @@
 #   docker compose logs -f backend
 #   docker compose down            stop, keep data
 #   docker compose down -v         stop and wipe the database volume
+#
+# ⚠️ AFTER ADDING OR CHANGING A DEPENDENCY, `--build` IS NOT ENOUGH:
+#
+#   docker compose up -d --build -V frontend    (or backend)
+#
+# `-V` is --renew-anon-volumes. Both app services mount an anonymous volume
+# over /app/node_modules (see the comment on the backend one below), and
+# Compose deliberately carries anonymous volumes across a container
+# recreation — so `--build` produces a new image with the new dependency and
+# then hides its node_modules behind the old volume. The container goes on
+# running the modules it installed the first time it ever started.
+#
+# This has already cost an afternoon once: framer-motion was added on
+# 2026-09-08 and the frontend container kept answering
+#
+#   [plugin:vite:import-analysis] Failed to resolve import "framer-motion"
+#
+# on 5173, while `pnpm dev` on the host worked on 5174 — because the host's
+# node_modules had it and the container's volume did not. `-V` is the fix;
+# `docker compose exec frontend pnpm install` is the fix without a rebuild.
 
 services:
   postgres:

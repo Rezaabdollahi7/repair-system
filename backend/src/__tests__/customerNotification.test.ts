@@ -31,7 +31,12 @@ describe("transitionNotification", () => {
   });
 
   it("says nothing about the outcomes that are not deliveries", () => {
-    for (const status of ["unrepairable", "not_repaired", "diagnosing", "waiting_for_parts"]) {
+    for (const status of [
+      "unrepairable",
+      "not_repaired",
+      "diagnosing",
+      "waiting_for_parts",
+    ]) {
       expect(transitionNotification("repairing", status)).toBeNull();
     }
   });

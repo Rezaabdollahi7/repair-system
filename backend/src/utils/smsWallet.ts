@@ -63,7 +63,11 @@ export function ledgerLine(
     );
   }
 
-  return { amountRials: signedAmountRials, balanceBeforeRials, balanceAfterRials };
+  return {
+    amountRials: signedAmountRials,
+    balanceBeforeRials,
+    balanceAfterRials,
+  };
 }
 
 /**

@@ -414,7 +414,10 @@ describe("the message a device write owes its customer", () => {
       seedUpdate(from, to);
 
       await controller.update(
-        mockRequest({ params: { id: 1 }, body: { status: to, send_sms: true } }),
+        mockRequest({
+          params: { id: 1 },
+          body: { status: to, send_sms: true },
+        }),
         mockResponse(),
       );
 
@@ -452,7 +455,10 @@ describe("the message a device write owes its customer", () => {
       seedUpdate(from, to);
 
       await controller.update(
-        mockRequest({ params: { id: 1 }, body: { status: to, send_sms: true } }),
+        mockRequest({
+          params: { id: 1 },
+          body: { status: to, send_sms: true },
+        }),
         mockResponse(),
       );
 
@@ -466,12 +472,20 @@ describe("the message a device write owes its customer", () => {
   it("sends nothing for a status with no message", async () => {
     // Seven of the nine states say nothing to a customer, `repaired` among
     // them: the bench is done, but the job has not been checked or priced.
-    for (const to of ["repaired", "unrepairable", "not_repaired", "diagnosing"]) {
+    for (const to of [
+      "repaired",
+      "unrepairable",
+      "not_repaired",
+      "diagnosing",
+    ]) {
       jest.mocked(notifyCustomer).mockClear();
       seedUpdate("repairing", to);
 
       await controller.update(
-        mockRequest({ params: { id: 1 }, body: { status: to, send_sms: true } }),
+        mockRequest({
+          params: { id: 1 },
+          body: { status: to, send_sms: true },
+        }),
         mockResponse(),
       );
 

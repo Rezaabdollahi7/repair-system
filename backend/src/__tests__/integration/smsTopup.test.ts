@@ -81,7 +81,9 @@ describe("startTopup", () => {
       startTopup(workspaceId, { amountRials: AMOUNT }),
     );
 
-    const row = await owner.smsTopup.findFirstOrThrow({ where: { workspaceId } });
+    const row = await owner.smsTopup.findFirstOrThrow({
+      where: { workspaceId },
+    });
 
     expect(row.status).toBe("pending");
     expect(row.amountRials.toNumber()).toBe(AMOUNT);
@@ -116,7 +118,9 @@ describe("startTopup", () => {
       ),
     ).rejects.toThrow(/gateway down/);
 
-    const row = await owner.smsTopup.findFirstOrThrow({ where: { workspaceId } });
+    const row = await owner.smsTopup.findFirstOrThrow({
+      where: { workspaceId },
+    });
     expect(row.status).toBe("failed");
     expect(row.failureReason).toMatch(/gateway down/);
     expect(await walletBalance(workspaceId)).toBe(0);
@@ -157,7 +161,9 @@ describe("settleTopup", () => {
     expect(result).toEqual({ credited: true, balanceAfterRials: AMOUNT });
     expect(await walletBalance(workspaceId)).toBe(AMOUNT);
 
-    const row = await owner.smsTopup.findFirstOrThrow({ where: { workspaceId } });
+    const row = await owner.smsTopup.findFirstOrThrow({
+      where: { workspaceId },
+    });
     expect(row.status).toBe("verified");
     expect(row.refNumber).toBe("987654");
   });
@@ -223,7 +229,9 @@ describe("settleTopup", () => {
     ).rejects.toThrow(/does not match/);
 
     expect(await walletBalance(workspaceId)).toBe(0);
-    const row = await owner.smsTopup.findFirstOrThrow({ where: { workspaceId } });
+    const row = await owner.smsTopup.findFirstOrThrow({
+      where: { workspaceId },
+    });
     expect(row.status).toBe("failed");
     expect(row.failureReason).toMatch(/amount mismatch/);
   });

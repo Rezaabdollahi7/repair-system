@@ -36,7 +36,12 @@ const UNIT_PRICE = 1_750;
 const get = (token: string, path: string) =>
   request(app).get(path).set("Authorization", `Bearer ${token}`);
 
-const send = (token: string, method: "post" | "patch", path: string, body: object) =>
+const send = (
+  token: string,
+  method: "post" | "patch",
+  path: string,
+  body: object,
+) =>
   request(app)[method](path).set("Authorization", `Bearer ${token}`).send(body);
 
 /** A technician in workspace A, for the role boundary. */
@@ -120,9 +125,11 @@ describe("who may see what the shop spends", () => {
     }
 
     expect(
-      (await send(token, "post", "/api/sms/wallet/topup", {
-        amount_rials: MIN_TOPUP_RIALS,
-      })).status,
+      (
+        await send(token, "post", "/api/sms/wallet/topup", {
+          amount_rials: MIN_TOPUP_RIALS,
+        })
+      ).status,
     ).toBe(403);
     expect(
       (await send(token, "patch", "/api/sms/settings", { enabled: false }))
@@ -201,7 +208,11 @@ describe("one workspace's screens show one workspace's rows", () => {
         },
       });
       await owner.smsTopup.create({
-        data: { workspaceId, orderId: `DFXS-${workspaceId}`, amountRials: 500_000 },
+        data: {
+          workspaceId,
+          orderId: `DFXS-${workspaceId}`,
+          amountRials: 500_000,
+        },
       });
       await owner.smsWalletTransaction.create({
         data: {
@@ -223,9 +234,9 @@ describe("one workspace's screens show one workspace's rows", () => {
     );
 
     const topups = await get(token, "/api/sms/topups");
-    expect(topups.body.data.map((r: { order_id: string }) => r.order_id)).toEqual([
-      `DFXS-${workspaces.a.workspaceId}`,
-    ]);
+    expect(
+      topups.body.data.map((r: { order_id: string }) => r.order_id),
+    ).toEqual([`DFXS-${workspaces.a.workspaceId}`]);
 
     const ledger = await get(token, "/api/sms/wallet/transactions");
     expect(ledger.body.total).toBe(1);
@@ -247,29 +258,39 @@ describe("one workspace's screens show one workspace's rows", () => {
     });
 
     expect(res.status).toBe(200);
-    expect((await get(workspaces.a.token, "/api/sms/settings")).body.enabled).toBe(
-      false,
-    );
-    expect((await get(workspaces.b.token, "/api/sms/settings")).body.enabled).toBe(
-      true,
-    );
+    expect(
+      (await get(workspaces.a.token, "/api/sms/settings")).body.enabled,
+    ).toBe(false);
+    expect(
+      (await get(workspaces.b.token, "/api/sms/settings")).body.enabled,
+    ).toBe(true);
   });
 });
 
 describe("topping up", () => {
   it("refuses an amount under the floor before reaching the gateway", async () => {
-    const res = await send(workspaces.a.token, "post", "/api/sms/wallet/topup", {
-      amount_rials: MIN_TOPUP_RIALS - 1,
-    });
+    const res = await send(
+      workspaces.a.token,
+      "post",
+      "/api/sms/wallet/topup",
+      {
+        amount_rials: MIN_TOPUP_RIALS - 1,
+      },
+    );
 
     expect(res.status).toBe(400);
     expect(await owner.smsTopup.count()).toBe(0);
   });
 
   it("hands back somewhere to send the customer", async () => {
-    const res = await send(workspaces.a.token, "post", "/api/sms/wallet/topup", {
-      amount_rials: 500_000,
-    });
+    const res = await send(
+      workspaces.a.token,
+      "post",
+      "/api/sms/wallet/topup",
+      {
+        amount_rials: 500_000,
+      },
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.redirect_url).toMatch(/gateway\.zibal\.ir\/start\/7007/);

@@ -163,7 +163,9 @@ describe("renderDeviceSms", () => {
     };
 
     for (const kind of KINDS) {
-      for (const value of Object.values(renderDeviceSms(kind, nasty).parameters)) {
+      for (const value of Object.values(
+        renderDeviceSms(kind, nasty).parameters,
+      )) {
         expect(value.length).toBeGreaterThan(0);
         expect(value.length).toBeLessThanOrEqual(MAX_PARAMETER_CHARS);
         expect(value).not.toContain("/");

@@ -270,8 +270,7 @@ export const settings = async (req: Request, res: Response) => {
 // PATCH /api/sms/settings
 export const updateSettings = async (req: Request, res: Response) => {
   try {
-    const { enabled } = (req as ValidatedRequest).valid
-      .body as SmsSettingsBody;
+    const { enabled } = (req as ValidatedRequest).valid.body as SmsSettingsBody;
 
     // updateMany rather than update: the latter needs a row to exist and
     // throws if it does not, and a workspace whose settings row is somehow
@@ -326,7 +325,11 @@ export const capability = async (req: Request, res: Response) => {
     // Ordered the way notifyCustomer orders its refusals, so the modal says
     // the same thing the send would have recorded. A shop with notifications
     // off is not also told its credit is short.
-    const reason = !enabled ? "disabled" : hasCredit ? null : "insufficient_balance";
+    const reason = !enabled
+      ? "disabled"
+      : hasCredit
+        ? null
+        : "insufficient_balance";
 
     res.json({
       can_send: enabled && hasCredit,

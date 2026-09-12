@@ -76,10 +76,16 @@ async function seedDevice(workspaceId: number, phone: string | null) {
     select: { id: true, deviceName: true, customerId: true },
   });
 
-  return { ...device, customer: { name: customer.name, phone: customer.phone } };
+  return {
+    ...device,
+    customer: { name: customer.name, phone: customer.phone },
+  };
 }
 
-function notify(workspaceId: number, device: Awaited<ReturnType<typeof seedDevice>>) {
+function notify(
+  workspaceId: number,
+  device: Awaited<ReturnType<typeof seedDevice>>,
+) {
   return runWithWorkspace(workspaceId, async () =>
     notifyCustomer({
       workspaceId,
@@ -101,9 +107,7 @@ beforeEach(async () => {
     data: { unitPriceRials: UNIT_PRICE, effectiveFrom: new Date("2026-01-01") },
   });
 
-  jest
-    .mocked(sendTemplate)
-    .mockResolvedValue({ messageId: 55_123, cost: 2 });
+  jest.mocked(sendTemplate).mockResolvedValue({ messageId: 55_123, cost: 2 });
 });
 
 afterAll(async () => {
@@ -213,7 +217,9 @@ describe("a message that is refused", () => {
     });
     expect(row.status).toBe("insufficient_balance");
     expect(row.costRials.toNumber()).toBe(0);
-    expect(await owner.smsWalletTransaction.count({ where: { workspaceId } })).toBe(0);
+    expect(
+      await owner.smsWalletTransaction.count({ where: { workspaceId } }),
+    ).toBe(0);
   });
 
   it("says nothing about the phone when notifications are off", async () => {

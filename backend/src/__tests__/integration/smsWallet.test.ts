@@ -144,7 +144,10 @@ describe("debitWallet under concurrency", () => {
     const rows = await owner.smsWalletTransaction.findMany({
       where: { workspaceId },
     });
-    const summed = rows.reduce((total, row) => total + row.amountRials.toNumber(), 0);
+    const summed = rows.reduce(
+      (total, row) => total + row.amountRials.toNumber(),
+      0,
+    );
 
     expect(summed).toBe(200_000 - COST * 4);
     expect(await walletBalance(workspaceId)).toBe(summed);

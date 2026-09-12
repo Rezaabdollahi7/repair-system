@@ -211,47 +211,44 @@ export async function notifyCustomer(
     // because the ledger line points at it, and both have to be in one
     // transaction so a charge without a message — or a message nobody paid
     // for — is not a state the database can hold.
-    const claimed = await runInWorkspaceTransaction(
-      workspaceId,
-      async (tx) => {
-        const message = await tx.smsMessage.create({
-          data: {
-            workspaceId,
-            customerId: input.device.customerId,
-            deviceId: input.device.id,
-            phone,
-            kind: input.kind,
-            segments: price.segments,
-            unitPriceRials: price.unitPriceRials,
-            costRials: price.costRials,
-            status: "pending",
-            createdBy: input.actorId ?? null,
-          },
-          select: { id: true },
-        });
-
-        const debit = await debitWallet(tx, workspaceId, {
+    const claimed = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      const message = await tx.smsMessage.create({
+        data: {
+          workspaceId,
+          customerId: input.device.customerId,
+          deviceId: input.device.id,
+          phone,
+          kind: input.kind,
+          segments: price.segments,
+          unitPriceRials: price.unitPriceRials,
           costRials: price.costRials,
-          smsMessageId: message.id,
-          description: `پیامک ${input.kind} — دستگاه ${input.device.id}`,
+          status: "pending",
           createdBy: input.actorId ?? null,
+        },
+        select: { id: true },
+      });
+
+      const debit = await debitWallet(tx, workspaceId, {
+        costRials: price.costRials,
+        smsMessageId: message.id,
+        description: `پیامک ${input.kind} — دستگاه ${input.device.id}`,
+        createdBy: input.actorId ?? null,
+      });
+
+      if (!debit.ok) {
+        // Marked inside the same transaction rather than after it: the row
+        // is already written, and leaving it `pending` would make it look
+        // like a message still in flight to the recovery sweep.
+        await tx.smsMessage.update({
+          where: { id: message.id },
+          data: { status: "insufficient_balance", costRials: 0 },
         });
 
-        if (!debit.ok) {
-          // Marked inside the same transaction rather than after it: the row
-          // is already written, and leaving it `pending` would make it look
-          // like a message still in flight to the recovery sweep.
-          await tx.smsMessage.update({
-            where: { id: message.id },
-            data: { status: "insufficient_balance", costRials: 0 },
-          });
+        return { id: message.id, funded: false as const };
+      }
 
-          return { id: message.id, funded: false as const };
-        }
-
-        return { id: message.id, funded: true as const };
-      },
-    );
+      return { id: message.id, funded: true as const };
+    });
 
     if (!claimed.funded) {
       return {
@@ -338,7 +335,8 @@ async function refundFailedSend(
   costRials: number,
   error: unknown,
 ): Promise<NotifyOutcome> {
-  const providerStatus = error instanceof SmsError ? error.providerStatus : null;
+  const providerStatus =
+    error instanceof SmsError ? error.providerStatus : null;
 
   let refunded = false;
 

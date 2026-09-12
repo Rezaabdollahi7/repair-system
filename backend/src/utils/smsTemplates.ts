@@ -110,6 +110,11 @@ function clean(
 ): string {
   const flattened = (value ?? "")
     .replace(/[/\\]/g, " ")
+    // The control characters are the point here. no-control-regex exists
+    // because one in a regex is usually a typo'd escape; this range is the
+    // class being stripped, and a device name pasted out of a spreadsheet
+    // really can carry a tab or a newline.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001F\u007F]/g, " ")
     .replace(/\s+/g, " ")
     .trim();

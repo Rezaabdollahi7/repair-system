@@ -1,6 +1,7 @@
 import express from "express";
 import * as ctrl from "../controllers/reportController";
 import { authenticate } from "../middleware/auth";
+import { atLeast } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import {
   dateRangeQuerySchema,
@@ -10,6 +11,11 @@ import {
 const router = express.Router();
 
 router.use(authenticate);
+
+// Includes /dashboard, which aggregates revenue and margin. AUTH.3 makes the
+// dashboard page admin-only to match — the two have to ship together or a
+// technician lands on an error page instead of a redirect.
+router.use(atLeast("admin"));
 
 router.get(
   "/stock",

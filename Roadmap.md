@@ -305,7 +305,7 @@ plan before that decision.
       following the InvoicePreview pattern — no new dependency, and the
       browser's own "save as PDF" does the rest
 
-- [ ] 8.10 Payment confirmation SMS. settlePayment extends the subscription
+- [x] 8.10 Payment confirmation SMS. settlePayment extends the subscription
       and rewards the referrer but never sends SMS_TEMPLATE_PAYMENT_OK —
       the template is declared in lib/sms.ts, present in every env file and
       approved in the sms.ir panel, so every signal said it was done. A
@@ -326,54 +326,54 @@ plan before that decision.
       ⚠️ The #DATE# parameter is Jalali with dashes, never slashes.
       sendTemplate refuses a slash, but as an SmsError at send time.
 
-      ⚠️ Check utils/referral.ts in the same task: the referral reward SMS
-      did not arrive either, and rewardReferrer swallows its errors. If it
-      swallows without logging, that is the RULES §6 violation that made
-      both of these silent.
+         utils/referral.ts had the same hole and not the suspected cause:
+      rewardReferrer logged its failures correctly all along — it simply
+      never sent anything either. Both are one omission, not a swallowed
+      error, and both are closed here. ownerPhone moved from
+      subscriptionJob.ts to subscription.ts alongside a new notifyOwner().
 
       A test asserting sendTemplate is called with PAYMENT_OK after a
       successful settlePayment is the point of the task — nothing else
       would have caught this.
 
-- [ ] 8.11 The nightly job sees no workspaces. `runSubscriptionJob` reads its
-      worklist with a raw query — `SELECT id, never_expires, expires_at FROM
-      workspaces WHERE deleted_at IS NULL` — and the comment above it says a
-      raw query is how a job legitimately sees every tenant. That is the half
-      that is wrong: raw SQL escapes the Prisma *extension*, which is what
-      sets the context, but not RLS, which is enforced by Postgres on every
-      statement. `workspaces` carries `workspace_self`
-      (`id = app_current_workspace_id()`), and with no context set that
-      function returns NULL and the policy denies everything.
+- [x] 8.11 The nightly job's raw query over `workspaces` returns nothing:
+      raw SQL carries no workspace context and the policy refuses every row.
+      Broken since 8.7 and invisible because an empty result reports exactly
+      like a quiet night.
+      A test that runs the job against a real database with two workspaces
+      and asserts it saw both is the point of the task — mocking `$queryRaw`
+      is what hid this.
 
-      Verified against a scratch Postgres with all sixteen migrations
-      applied: as `dofixo_app` with no context, both of the job's raw
-      queries return **zero rows** while the owner connection sees the data.
+      The fix is `app_all_workspaces()`, the fourth SECURITY DEFINER
+      aperture and the first whose reason is not authentication. The three
+      before it exist because the caller does not yet know its workspace;
+      this one because the job rightfully belongs to none — seeing every
+      tenant is its job. Migration `20260907060000_all_workspaces_lookup`.
 
-      So 8.7 has been a silent no-op wherever it runs: no expiry reminders,
-      no SMS, no read-only transitions, no deletion after 30 days, and no
-      settlement of orphaned payments. It fails in the worst possible
-      direction — zero rows is not an error, so the job finishes, reports
-      success, and every counter is zero.
+      ⚠️ `settleAbandonedPayments` deliberately did not take a second
+      aperture. With the workspace list in hand an ordinary query inside
+      each workspace's own context answers it, and RULES §7 asks a new
+      function to say why no ordinary query could. Here one can.
 
-      ⚠️ The fix already exists and was never committed. `dofixo_dev` carries
-      a fifth SECURITY DEFINER function, `app_all_workspaces`, with a
-      COMMENT that reads exactly like the answer to this problem — "the job
-      legitimately belongs to no workspace ... a raw query returns zero rows
-      without error". Neither the migration that created it nor the code that
-      would call it is in git, on any branch or in any commit. It exists only
-      in one developer's database.
+- [x] 8.12 Every open payment gets an ending (debt 41). The sweep only ever
+      acted on money that moved, so a customer who opened the gateway and
+      closed the tab left a row nothing touched again — permanently "in
+      progress" on their payment history. Zibal is asked either way now:
+      paid and recent settles as before, unpaid and older than an hour is
+      written off as `failed` with the reason on the row. The hour clears
+      Zibal's own ~20 minute session, so a customer still typing a second
+      password is never told it failed.
 
-      The task is therefore to recover it rather than design it: dump the
-      function, commit it as a real migration, point both raw queries at it
-      (the payments one needs the same treatment), and raise the counts in
-      `ops/restore-database.md` and `smoke.test.ts` from four `app_*`
-      functions to five. RULES §7 wants a COMMENT saying why no ordinary
-      query could do the job; this one already has a good one.
+      The seven-day filter came off the query. It kept the sweep bounded and
+      also kept it from seeing the rows it most needed to see; closing the
+      unpaid ones bounds it better, since each resolves on the first run
+      after its hour and never returns. A paid row past the window is logged
+      loudly rather than skipped silently.
 
-      An integration test is the point of the task, as it was for 8.10:
-      seed two workspaces, run the job with no context, and assert it saw
-      both. Every existing test of this job mocks Prisma, which is why a
-      query that cannot return a row has been green all along.
+      ⚠️ `updateMany` guards on status as well as id: the browser could
+      verify a row in the seconds since it was read, and writing `failed`
+      over a verified payment would take away a subscription somebody paid
+      for. `settleAbandonedPayments` is now `resolveOpenPayments`.
 
 ## Phase 9 — UI Consolidation (after the migration settles)
 
@@ -402,14 +402,14 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
 `exports` and `personnel` already have it. `categories`, `services` and
 `images` are deliberately open — a technician needs them.
 
-- [ ] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
+- [x] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
       and on its own: closing only the frontend would hide the gap rather
       than shut it
-- [ ] AUTH.2 Integration tests that hit each of the five with a technician's
+- [x] AUTH.2 Integration tests that hit each of the five with a technician's
       token and expect 403. Not a unit test of the middleware — the middleware
       already works, and what failed was nobody wiring it up. A route file
       without a guard has to fail the suite
-- [ ] AUTH.3 Move `dashboard` and the three report pages inside
+- [x] AUTH.3 Move `dashboard` and the three report pages inside
       `ProtectedRoute minRole="admin"` in App.tsx, matching what the sidebar
       already claims. The dashboard stays admin-only rather than being
       served a reduced payload — that is a product decision for phase 9, and
@@ -417,7 +417,7 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
       ⚠️ `/reports/transactions` has no sidebar link but does have a route,
       and it calls the dashboard endpoint. It has to move too, or a
       technician lands on an error page instead of a redirect
-- [ ] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
+- [x] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
       guards it with `minRole="admin"`, so a technician sees a link that
       redirects them away. One or the other is wrong; the route is right
 
@@ -709,13 +709,12 @@ tomans.
       returns to its own page; the domain stays the same, which is all Zibal
       checks (result 106).
 
-      ⚠️ Orphaned top-ups need settling like orphaned payments do, and that
-      half is **blocked on 8.11** rather than done. `settleAbandonedPayments`
-      enumerates with a raw query that RLS answers with zero rows, so a
-      top-up sweep written to match it would be inert from the first line —
-      and written any other way would leave two patterns where the fix has
-      to land once. `settleTopup()` itself is built and is what that sweep
-      will call; only the enumeration is waiting.
+      ⚠️ Orphaned top-ups need settling like orphaned payments do, and the
+      sweep they would ride on now works: 8.11 gave it
+      `app_all_workspaces()` and 8.12 taught it to close a payment nobody
+      came back for. `settleTopup()` is built and is what that sweep will
+      call; wiring `resolveOpenPayments` to walk `sms_topups` beside
+      `payments` is a task of its own and is not done.
 
       **Decided: a lapsed workspace may top up.** The 8.3 guard blocks POST
       for them, so `/api/sms/wallet/topup` and `/api/sms/wallet/verify` join
@@ -1028,11 +1027,11 @@ tomans.
       | Claim | Where | Verified |
       | --- | --- | --- |
       | Three template ids | `backend/.env.example` (12.5) | present; the root `.env.example` is compose-only and the frontend has none, so phase 12 added no variable there. `WALLET_CALLBACK_URL` is derived from `APP_URL` rather than being its own variable |
-      | 33 policies, 4 `app_*` functions | `ops/restore-database.md` (12.1) | `pg_policies` returns 33, `pg_proc` returns exactly those four |
+      | 33 policies, 4 `app_*` functions | `ops/restore-database.md` (12.1) | measured before 8.11 merged; it is **five** now — `app_all_workspaces` joins the four. `ops/restore-database.md` needs the count raised |
       | `sms_prices` among the tables with no `workspace_id` | `prisma/rls-check.sql` (12.1) | Part 1 returns zero rows; Part 1b returns the eight named, no more |
 
-      ⚠️ The absence of `app_all_workspaces` from that function list is 8.11,
-      not a documentation error. The four are `app_create_workspace`,
+      ⚠️ That count was taken on a database without 8.11's migration. The
+      five are `app_all_workspaces`, `app_create_workspace`,
       `app_current_workspace_id`, `app_login_lookup`, `app_refresh_lookup`.
 
       What was actually missing was the CLAUDE.md section, which is now
@@ -1051,8 +1050,8 @@ Second submission went through on 1405/06/19, with «دوفیکسو» as the fix
 organisation name and the workshop's name as an ordinary parameter — option
 1 below. The ids, which 12.5 puts in the environment:
 
-| قالب        | متغیر محیطی                     | شناسه    |
-| ----------- | ------------------------------- | -------- |
+| قالب         | متغیر محیطی                     | شناسه    |
+| ------------ | ------------------------------- | -------- |
 | پذیرش دستگاه | `SMS_TEMPLATE_DEVICE_ACCEPTED`  | `351476` |
 | آماده تحویل  | `SMS_TEMPLATE_DEVICE_READY`     | `153383` |
 | تحویل دستگاه | `SMS_TEMPLATE_DEVICE_DELIVERED` | `986773` |
@@ -1126,12 +1125,12 @@ parameter value.
 The reviewer's second objection is a submission-form matter rather than a
 wording one — each parameter needs a description saying what goes in it:
 
-| پارامتر   | توضیح                        | نمونه        |
-| --------- | ---------------------------- | ------------ |
-| `#NAME#`  | نام و نام خانوادگی مشتری     | علی رضایی    |
-| `#DEVICE#`| نام دستگاه تعمیری            | یخچال سامسونگ |
-| `#NUMBER#`| شماره پذیرش دستگاه (عددی)    | 1042         |
-| `#SHOP#`  | نام تعمیرگاه پذیرنده         | تعمیرگاه مرکزی |
+| پارامتر    | توضیح                     | نمونه          |
+| ---------- | ------------------------- | -------------- |
+| `#NAME#`   | نام و نام خانوادگی مشتری  | علی رضایی      |
+| `#DEVICE#` | نام دستگاه تعمیری         | یخچال سامسونگ  |
+| `#NUMBER#` | شماره پذیرش دستگاه (عددی) | 1042           |
+| `#SHOP#`   | نام تعمیرگاه پذیرنده      | تعمیرگاه مرکزی |
 
 What was cut from the brief's wording, and why: the 🌱 and the closing
 thanks (about 25 characters, which is a third part on its own — a greeting
@@ -1149,7 +1148,7 @@ axios, so it catches a wrong argument count but not a wrong prop.
 
 They are `[x]` now: `pnpm build` passed and the pages were opened in a
 browser. Four corrections came out of that pass, and all four were about
-what the screens *said* rather than what they did, which is the class of
+what the screens _said_ rather than what they did, which is the class of
 mistake a type-check was never going to catch:
 
 - the per-message price came off the balance card and the message table

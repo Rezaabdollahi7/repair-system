@@ -41,10 +41,17 @@ describe("verdictFor", () => {
     }
   });
 
-  it("tells them the day it runs out", () => {
+  it("tells them the day it runs out, with the grace days filled in", () => {
     const verdict = verdictFor(expiredBy(0), NOW);
 
-    expect(verdict.notify).toMatchObject({ kind: "on_expiry" });
+    expect(verdict.notify).toMatchObject({
+      kind: "on_expiry",
+      // ⚠️ The days matter, not just the kind. This test asserted only the
+      // kind until 7 September, and toMatchObject ignores what it is not
+      // told about — so the day the template's #DAYS# went unfilled, every
+      // test stayed green and a customer received "تا #DAYS# روز".
+      days: GRACE_DAYS,
+    });
     expect(verdict.status).toBe("expired");
     expect(verdict.deleteData).toBe(false);
   });
@@ -98,10 +105,7 @@ describe("verdictFor", () => {
   it("does not delete the data of a workspace with no expiry at all", () => {
     // The read-only guard reads a null expiry as expired, which is the safe
     // half. Deleting on it would be the unsafe half of the same reading.
-    const verdict = verdictFor(
-      { neverExpires: false, expiresAt: null },
-      NOW,
-    );
+    const verdict = verdictFor({ neverExpires: false, expiresAt: null }, NOW);
 
     expect(verdict.deleteData).toBe(false);
     expect(verdict.notify).toBeNull();
@@ -121,4 +125,28 @@ describe("verdictFor", () => {
       verdictFor(workspace, late).notify?.kind,
     );
   });
+
+  it("never sends a message with an unfilled parameter", () => {
+    // The guard that debt 43 needed. sendTemplate validates slashes and
+    // length but has no idea which parameters a template declares, so a
+    // missing #DAYS# is delivered as the literal text — HTTP 200, status 1,
+    // nothing in any log. The only thing that caught it was reading an SMS
+    // on a phone.
+    //
+    // Every template approved in the sms.ir panel today carries #DAYS#. If
+    // one is ever added that does not, this test has to be widened
+    // deliberately rather than a message going out broken.
+    const everyDay = [-400, -8, -7, -6, -2, -1, 0, 1, 3, 10, 23, 29];
+
+    for (const elapsed of everyDay) {
+      const verdict = verdictFor(expiredBy(elapsed), NOW);
+
+      if (verdict.notify === null) {
+        continue;
+      }
+
+      expect(verdict.notify.days).toEqual(expect.any(Number));
+    }
+  });
+  
 });

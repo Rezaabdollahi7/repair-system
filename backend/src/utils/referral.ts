@@ -1,7 +1,12 @@
 import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
+import { SMS_TEMPLATES } from "../lib/sms";
 import { errorMessage } from "./errors";
-import { extendSubscription, REFERRAL_REWARD_DAYS } from "./subscription";
+import {
+  extendSubscription,
+  notifyOwner,
+  REFERRAL_REWARD_DAYS,
+} from "./subscription";
 
 /**
  * Records who brought a new workspace, inside sign-up's own transaction.
@@ -101,14 +106,12 @@ export async function rewardReferrer(
     try {
       // The referrer's own workspace, so its own context. The id comes from
       // our row, never from anything the caller sent.
-      await runInWorkspaceTransaction(
-        referral.referrerWorkspaceId,
-        (tx) =>
-          extendSubscription(tx, referral.referrerWorkspaceId, {
-            type: "referral",
-            days: REFERRAL_REWARD_DAYS,
-            note: `referred workspace ${referredWorkspaceId}`,
-          }),
+      await runInWorkspaceTransaction(referral.referrerWorkspaceId, (tx) =>
+        extendSubscription(tx, referral.referrerWorkspaceId, {
+          type: "referral",
+          days: REFERRAL_REWARD_DAYS,
+          note: `referred workspace ${referredWorkspaceId}`,
+        }),
       );
     } catch (error) {
       // Put the claim back. Without this the referral reads as paid while
@@ -121,6 +124,19 @@ export async function rewardReferrer(
 
       throw error;
     }
+
+    // Outside the block above on purpose: the days are added and the claim
+    // is final. An SMS that does not send must not roll either back, so this
+    // cannot sit anywhere the revert can reach it.
+    //
+    // Plain digits, matching what the expiry reminders already send for
+    // #DAYS#. Only #DATE# is written in Persian numerals, because that is
+    // what toJalaliSms settled on.
+    await notifyOwner(
+      referral.referrerWorkspaceId,
+      SMS_TEMPLATES.REFERRAL_REWARD,
+      { DAYS: String(REFERRAL_REWARD_DAYS) },
+    );
   } catch (error) {
     console.error(
       `referral reward failed for workspace ${referredWorkspaceId}:`,

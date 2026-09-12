@@ -742,19 +742,34 @@ export default function Layout() {
                 controls, since a gear that looks the same on and off the
                 page it opens is a control that never tells you anything.
               */}
-              <Link
-                to="/settings"
-                aria-label="تنظیمات"
-                title="تنظیمات"
-                aria-current={onSettings ? "page" : undefined}
-                className={`p-2.5 rounded-field transition-colors cursor-pointer shrink-0 ${
-                  onSettings
-                    ? "bg-accent-soft text-accent-text"
-                    : "text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-                }`}
-              >
-                <Cog6ToothIcon className="w-5 h-5" />
-              </Link>
+              {/*
+                Admin-only, matching the route.
+                ------------------------------------------------------------
+                AUTH.4 closed this when settings was a sidebar entry with
+                `adminOnly: false` against a route guarded at admin — a
+                technician saw a link that bounced them to /devices. Moving
+                it to the header carried the gap along, since a header
+                control renders for whoever is looking at the header.
+
+                The route is the half that is right: settings holds the
+                shop's name, logo and invoice options, which is the owner's
+                business rather than the bench's.
+              */}
+              {isAtLeast("admin") && (
+                <Link
+                  to="/settings"
+                  aria-label="تنظیمات"
+                  title="تنظیمات"
+                  aria-current={onSettings ? "page" : undefined}
+                  className={`p-2.5 rounded-field transition-colors cursor-pointer shrink-0 ${
+                    onSettings
+                      ? "bg-accent-soft text-accent-text"
+                      : "text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+                  }`}
+                >
+                  <Cog6ToothIcon className="w-5 h-5" />
+                </Link>
+              )}
 
               <button
                 type="button"

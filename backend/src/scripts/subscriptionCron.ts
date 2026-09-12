@@ -21,7 +21,8 @@ async function main() {
   console.log(
     `subscription job: notified=${report.notified} ` +
       `status=${report.statusUpdated} deleted=${report.deleted} ` +
-      `settled=${report.settled} failures=${report.failures} ` +
+      `settled=${report.settled} closed=${report.closed} ` +
+      `failures=${report.failures} ` +
       `(${Math.round((Date.now() - started) / 1000)}s)`,
   );
 

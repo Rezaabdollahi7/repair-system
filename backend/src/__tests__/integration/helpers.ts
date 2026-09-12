@@ -177,3 +177,53 @@ export async function issueCode(phone: string, code = TEST_OTP_CODE) {
     },
   });
 }
+
+export interface SeededUser {
+  userId: number;
+  token: string;
+}
+
+/**
+ * A technician inside an existing workspace, with a signed token.
+ *
+ * Separate from seedTwoWorkspaces rather than folded into it: five suites
+ * already depend on that return shape, and none of them needs a technician.
+ * Must be called after it, though — the roles it upserts are gone until then,
+ * because truncateAll() empties that table too.
+ *
+ * Minted directly for the same reason the super admin's token is: the
+ * question is what a valid technician token can reach, not how it was got.
+ */
+export async function seedTechnician(
+  workspaceId: number,
+  username: string,
+): Promise<SeededUser> {
+  const technician = await owner.role.findUniqueOrThrow({
+    where: { name: "technician" },
+  });
+
+  const user = await owner.user.create({
+    data: {
+      workspaceId,
+      fullName: "تکنسین",
+      username,
+      password: await bcrypt.hash("integration-test", 10),
+      roleId: technician.id,
+    },
+    select: { id: true },
+  });
+
+  const token = jwt.sign(
+    {
+      id: user.id,
+      workspaceId,
+      username,
+      role: "technician",
+      isActive: true,
+    },
+    JWT_SECRET,
+    { expiresIn: "1h" },
+  );
+
+  return { userId: user.id, token };
+}

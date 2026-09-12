@@ -1,6 +1,7 @@
 import express from "express";
 import * as ctrl from "../controllers/purchaseInvoiceController";
 import { authenticate } from "../middleware/auth";
+import { atLeast } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import { idParamSchema } from "../schemas/common";
 import {
@@ -13,6 +14,10 @@ import {
 const router = express.Router();
 
 router.use(authenticate);
+
+// A purchase invoice is what the shop paid its suppliers. Guarded on the
+// router so a path added later inherits it.
+router.use(atLeast("admin"));
 
 router.get(
   "/",

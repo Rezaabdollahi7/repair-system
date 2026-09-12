@@ -1,4 +1,6 @@
 import { Prisma } from "../generated/prisma/client";
+import { sendTemplate, SMS_TEMPLATES } from "../lib/sms";
+import { toJalaliSms } from "../utils/jalali";
 
 jest.mock("../lib/prisma", () => ({
   __esModule: true,
@@ -14,6 +16,9 @@ jest.mock("../lib/prisma", () => ({
     discountCode: { findUnique: jest.fn() },
     discountCodeUse: { findUnique: jest.fn(), count: jest.fn() },
     workspace: { findUniqueOrThrow: jest.fn() },
+    // ownerPhone reads this now that settlePayment sends an SMS. Without it
+    // every test in the file dies in beforeEach, not just the new ones.
+    user: { findFirst: jest.fn() },
   },
   // The helper must actually call its callback, or nothing inside the
   // transaction runs and the test passes while asserting nothing.
@@ -36,6 +41,18 @@ jest.mock("../lib/zibal", () => ({
   ZIBAL_RESULT: { SUCCESS: 100, ALREADY_VERIFIED: 201, NOT_PAID: 202 },
 }));
 
+jest.mock("../lib/sms", () => ({
+  ...jest.requireActual("../lib/sms"),
+  sendTemplate: jest.fn(),
+}));
+
+jest.mock("../lib/workspaceContext", () => ({
+  ...jest.requireActual("../lib/workspaceContext"),
+  // Runs the callback rather than opening a real store: what matters here is
+  // which workspace was asked for, not AsyncLocalStorage.
+  runWithWorkspace: jest.fn((_id: number, fn: () => unknown) => fn()),
+}));
+
 jest.mock("../utils/subscription", () => ({
   ...jest.requireActual("../utils/subscription"),
   extendSubscription: jest.fn().mockResolvedValue(new Date("2026-12-01")),
@@ -52,6 +69,7 @@ import { extendSubscription } from "../utils/subscription";
 import { checkout, settlePayment } from "../controllers/subscriptionController";
 
 const WORKSPACE_ID = 5;
+const OWNER = "09120000001";
 
 const QUARTERLY = {
   id: 1,
@@ -91,6 +109,15 @@ beforeEach(() => {
   jest
     .mocked(extendSubscription)
     .mockResolvedValue(new Date("2026-12-01") as never);
+
+  jest
+    .mocked(prisma.user.findFirst)
+    .mockResolvedValue({ username: OWNER } as never);
+  // Re-set every time: clearAllMocks wipes the calls, not the implementation,
+  // so a rejection left behind by one test would leak into the next.
+  jest
+    .mocked(sendTemplate)
+    .mockResolvedValue({ messageId: 1, cost: 1 } as never);
 });
 
 describe("checkout", () => {
@@ -248,6 +275,17 @@ describe("settlePayment", () => {
     planDurationDays: 90,
   };
 
+  /** What Zibal answers for a card that went through. */
+  function paidInFull() {
+    return {
+      newlyVerified: true,
+      amountRials: 19_900_000,
+      refNumber: "357340889094",
+      cardNumber: "621986******1853",
+      paidAt: new Date(),
+    } as never;
+  }
+
   it("extends the subscription by the plan's duration", async () => {
     jest.mocked(prisma.payment.findFirst).mockResolvedValue(pending as never);
     jest.mocked(verifyPayment).mockResolvedValue({
@@ -352,5 +390,69 @@ describe("settlePayment", () => {
     await settlePayment(WORKSPACE_ID, 999n);
 
     expect(txMock.discountCodeUse.create).not.toHaveBeenCalled();
+  });
+
+  it("tells the owner the subscription was extended", async () => {
+    // The point of task 8.10. Every other signal said this was done — the
+    // template was declared, present in five env files, validated at boot
+    // and approved in the sms.ir panel — and 506 unit tests stayed green
+    // because a call that does not exist has no test that fails.
+    jest.mocked(prisma.payment.findFirst).mockResolvedValue(pending as never);
+    jest.mocked(verifyPayment).mockResolvedValue(paidInFull());
+
+    await settlePayment(WORKSPACE_ID, 999n);
+
+    expect(jest.mocked(sendTemplate).mock.calls[0]).toEqual([
+      OWNER,
+      SMS_TEMPLATES.PAYMENT_OK,
+      // The new expiry, not today: ۱۴۰۵-۰۹-۱۰ for the date the mocked
+      // extendSubscription returns.
+      { DATE: toJalaliSms(new Date("2026-12-01")) },
+    ]);
+  });
+
+  it("sends nothing for a payment already settled", async () => {
+    // A refreshed return page must not buy a second SMS.
+    jest
+      .mocked(prisma.payment.findFirst)
+      .mockResolvedValue({ ...pending, status: "verified" } as never);
+
+    await settlePayment(WORKSPACE_ID, 999n);
+
+    expect(sendTemplate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the payment settled when the SMS fails, and logs it", async () => {
+    // Swallowed like deleteObject — but logged, which is the half that was
+    // missing and the reason nobody noticed for a month.
+    jest.mocked(prisma.payment.findFirst).mockResolvedValue(pending as never);
+    jest.mocked(verifyPayment).mockResolvedValue(paidInFull());
+    jest
+      .mocked(sendTemplate)
+      .mockRejectedValue(new Error("sms.ir returned HTTP 401"));
+
+    const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await settlePayment(WORKSPACE_ID, 999n);
+
+    expect(result.extended).toBe(true);
+    expect(logged).toHaveBeenCalled();
+
+    logged.mockRestore();
+  });
+
+  it("settles normally when the workspace has no active super admin", async () => {
+    jest.mocked(prisma.payment.findFirst).mockResolvedValue(pending as never);
+    jest.mocked(verifyPayment).mockResolvedValue(paidInFull());
+    jest.mocked(prisma.user.findFirst).mockResolvedValue(null as never);
+
+    const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await settlePayment(WORKSPACE_ID, 999n);
+
+    expect(result.extended).toBe(true);
+    expect(sendTemplate).not.toHaveBeenCalled();
+
+    logged.mockRestore();
   });
 });

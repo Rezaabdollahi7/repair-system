@@ -637,7 +637,7 @@ tomans.
       be what the shop is quoted. That is a pricing decision, not a technical
       one — see the open questions.
 
-- [ ] 12.3 Wallet engine, `utils/smsWallet.ts`. Three operations — credit,
+- [x] 12.3 Wallet engine, `utils/smsWallet.ts`. Three operations — credit,
       debit, refund — and nothing else may write `sms_wallets`.
 
       The debit is one statement, not a read followed by a write:
@@ -663,7 +663,7 @@ tomans.
       separate from the controller test that mocks Prisma — the same lesson
       `utils/avgPurchasePrice.ts` came out of in 11.11.
 
-- [ ] 12.4 Top-up through Zibal — same gateway, separate ledger.
+- [x] 12.4 Top-up through Zibal — same gateway, separate ledger.
 
       **Decided: a separate `SmsTopup` table, not a widened `payments`.**
       The obvious objection to a second table is duplication — the same

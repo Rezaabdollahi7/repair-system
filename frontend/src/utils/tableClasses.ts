@@ -22,12 +22,12 @@
  * keep their own quieter treatment.
  */
 export const tableCard =
-  "table-shell bg-surface border border-border rounded-panel shadow-sm overflow-hidden";
+  "table-shell bg-surface border border-border rounded-card shadow-sm overflow-hidden";
 
 /** Wide tables scroll here, inside the card, rather than widening the page. */
 export const tableScroll = "overflow-x-auto";
 
-export const thead = "bg-surface-alt";
+export const thead = "bg-accent";
 
 /*
  * A step up from `text-body-xs`/`text-body-sm`, which is where these started.
@@ -47,7 +47,7 @@ export const thead = "bg-surface-alt";
  * devices list fitting a laptop and scrolling.
  */
 export const th =
-  "px-2.5 py-3.5 text-center text-table font-bold text-text-secondary whitespace-nowrap";
+  "px-2.5 py-3.5 text-center text-table font-bold text-white bg-brand-deep whitespace-nowrap";
 
 export const tbody = "divide-y divide-border";
 

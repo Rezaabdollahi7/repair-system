@@ -21,3 +21,16 @@ export const paginationQuerySchema = z.object({
   // their dropdowns, and 100 silently rejected those requests.
   limit: z.coerce.number().int().positive().max(1000).default(10),
 });
+
+/**
+ * Zibal's trackId, which is int64 — past what a JS number holds exactly, so
+ * it travels as a string and is parsed to BigInt here.
+ *
+ * Shared by the subscription verify and the SMS wallet verify: it is the same
+ * value from the same gateway, and two copies would be two places to get the
+ * bigint conversion wrong.
+ */
+export const trackIdSchema = z
+  .string()
+  .regex(/^\d+$/, "شناسه پرداخت نامعتبر است")
+  .transform((value) => BigInt(value));

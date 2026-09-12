@@ -1201,6 +1201,12 @@ model SmsWalletTransaction {
   /// Postgres treats NULLs as distinct in a unique index, so the rows left
   /// pointing at nothing after a workspace deletion do not collide.
   @@unique([smsMessageId, type])
+  /// The same rule for the other direction: one credit per top-up, ever.
+  /// settleTopup already gates on the status transition, which is what makes
+  /// two simultaneous callbacks credit once — but that is application logic,
+  /// and a second settle path written later would not inherit it. This is
+  /// the database saying no regardless of who asks.
+  @@unique([topupId, type])
   @@index([workspaceId, createdAt(sort: Desc)])
   @@index([topupId])
   @@index([createdBy])

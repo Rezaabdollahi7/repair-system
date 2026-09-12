@@ -9,7 +9,7 @@ import {
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
-import { generateOrderId } from "../utils/orderId";
+import { generateOrderId, ORDER_PREFIX } from "../utils/orderId";
 import { quotePrice } from "../utils/pricing";
 import { rewardReferrer } from "../utils/referral";
 import {
@@ -244,7 +244,7 @@ export const checkout = async (req: Request, res: Response) => {
         : undefined,
     });
 
-    const orderId = generateOrderId(workspaceId);
+    const orderId = generateOrderId(workspaceId, ORDER_PREFIX.SUBSCRIPTION);
 
     // Written before Zibal is called, so a gateway that answers slowly or
     // not at all still leaves a row explaining what was attempted. A payment

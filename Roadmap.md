@@ -709,10 +709,13 @@ tomans.
       returns to its own page; the domain stays the same, which is all Zibal
       checks (result 106).
 
-      ⚠️ Orphaned top-ups need settling like orphaned payments do.
-      `ops/subscription-cron.sh` already scans `payments` for `paid`; it has
-      to scan `sms_topups` too, or a customer whose browser died mid-payment
-      has money at Zibal and no credit here.
+      ⚠️ Orphaned top-ups need settling like orphaned payments do, and that
+      half is **blocked on 8.11** rather than done. `settleAbandonedPayments`
+      enumerates with a raw query that RLS answers with zero rows, so a
+      top-up sweep written to match it would be inert from the first line —
+      and written any other way would leave two patterns where the fix has
+      to land once. `settleTopup()` itself is built and is what that sweep
+      will call; only the enumeration is waiting.
 
       **Decided: a lapsed workspace may top up.** The 8.3 guard blocks POST
       for them, so `/api/sms/wallet/topup` and `/api/sms/wallet/verify` join

@@ -11,6 +11,18 @@ import { randomBytes } from "node:crypto";
  * invoice numbers do, and unlike an invoice number this is not accounting
  * data that has to be gap-free. Nothing reads it but us and Zibal's reports.
  */
-export function generateOrderId(workspaceId: number): string {
-  return `DFX-${workspaceId}-${randomBytes(6).toString("hex")}`;
+export function generateOrderId(workspaceId: number, prefix = "DFX"): string {
+  return `${prefix}-${workspaceId}-${randomBytes(6).toString("hex")}`;
 }
+
+/**
+ * The prefixes in use, so the two kinds of purchase are tellable apart at a
+ * glance in Zibal's panel — which is the only place somebody matches a
+ * transaction back to a workshop by hand.
+ */
+export const ORDER_PREFIX = {
+  /** A subscription payment. */
+  SUBSCRIPTION: "DFX",
+  /** An SMS wallet top-up. */
+  SMS_TOPUP: "DFXS",
+} as const;

@@ -54,8 +54,16 @@ const MERCHANT = requireEnv("ZIBAL_MERCHANT");
  */
 const APP_URL = requireEnv("APP_URL").replace(/\/$/, "");
 
-/** Where Zibal returns the customer once they are done. */
+/**
+ * Where Zibal returns the customer once they are done — one per thing that
+ * can be bought, because the two land on different pages and ask the backend
+ * to verify against different tables.
+ *
+ * Both sit under the same registered domain, which is all Zibal checks
+ * (a mismatch is result 106). The path is ours to choose.
+ */
 export const CALLBACK_URL = `${APP_URL}/subscription/callback`;
+export const WALLET_CALLBACK_URL = `${APP_URL}/sms-wallet/callback`;
 
 /**
  * Zibal's shared test account. Every capability works against it and no money
@@ -187,6 +195,13 @@ export interface PaymentRequest {
   description: string;
   /** Lets the gateway offer the customer their saved cards. */
   mobile?: string;
+  /**
+   * Defaults to the subscription page. Passed explicitly by anything else
+   * that takes money — an SMS wallet top-up returns to its own page, and
+   * sending it to the subscription callback would have that page verify a
+   * trackId it cannot find in `payments`.
+   */
+  callbackUrl?: string;
 }
 
 /**
@@ -204,7 +219,7 @@ export async function requestPayment(
 ): Promise<{ trackId: bigint }> {
   const body = await callZibal("/v1/request", {
     amount: input.amountRials,
-    callbackUrl: CALLBACK_URL,
+    callbackUrl: input.callbackUrl ?? CALLBACK_URL,
     orderId: input.orderId,
     description: input.description,
     ...(input.mobile ? { mobile: input.mobile } : {}),

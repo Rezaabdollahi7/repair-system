@@ -862,11 +862,29 @@ tomans.
       Every handler validates through `validate()` and reads `req.valid`
       (RULES §6). `workspaceId` comes from the token, never the body.
 
-- [~] 12.9 Frontend: `pages/SmsWallet.tsx` at `/sms-wallet`, admin-only in
+- [x] 12.9 Frontend: `pages/SmsWallet.tsx` at `/sms-wallet`, admin-only in
       both `App.tsx` and `Layout.tsx` — 10.8 is what happens when those two
-      disagree. Balance, unit price, approximate messages remaining, the
-      top-up amounts from §2 as presets plus a free-form field, top-up
-      history and send history.
+      disagree. Balance, approximate messages remaining, the top-up amounts
+      from §2 as presets plus a free-form field, top-up history and send
+      history.
+
+      **No per-message price is rendered anywhere.** It was, on the balance
+      card and again in a «هزینه» column on every message row, and it came
+      off after review: it is a tariff a shop can do nothing about — it
+      cannot choose a cheaper message — and printing it beside a balance
+      invites arithmetic against a figure we may still change (open question
+      3). `message_price_rials` is still read, to decide when a balance is
+      low. The count of messages remaining is the same fact in the form the
+      question is actually asked in.
+
+      **Two history tabs, not three.** A «گردش حساب» tab over
+      `sms_wallet_transactions` was built and removed: every line in it is
+      either a top-up or a message restated as a signed amount, both of
+      which have their own tab. The ledger is still written on every debit
+      and credit — it is what makes the balance auditable and what a
+      duplicate refund is caught by — and `GET /sms/wallet/transactions`
+      and `getSmsWalletTransactions` stay for support to read. It is not a
+      screen.
 
       `Subscription.tsx` as rebuilt in 11.7 is the model to follow, not the
       pre-redesign one: its `toToman`/`toTomanRounded` helpers, the table
@@ -877,16 +895,25 @@ tomans.
       A callback page for the top-up return, following `PaymentCallback.tsx`:
       it asks the backend to verify rather than trusting the query string.
 
-- [~] 12.10 `DeviceFormModal`: one checkbox per event, shown only when that
+- [x] 12.10 `DeviceFormModal`: one switch per event, shown only when that
       event can actually fire — on create, the acceptance box; on edit, the
       box for the transition the form is about to make, decided against the
       status the form loaded with rather than the one in the select. The
       modal already imports `DEVICE_STATUSES`, so it knows both.
 
       Three states beside it, from `GET /api/sms/capability`: enough credit
-      (checkbox live), not enough ("اعتبار کافی نیست"), notifications off
+      (switch live), not enough ("اعتبار کافی نیست"), notifications off
       ("ارسال پیامک غیرفعال است"). Existing design system, no new components
       (§24), and the modal layer 11.8 rebuilt is the shape to match.
+
+      **A coloured button rather than a checkbox**, after review — green
+      while the message will go, red while it will not, with the state in
+      words too («ارسال می‌شود» / «ارسال نمی‌شود») so it reads without
+      the colour. This is the last moment before a customer is texted and
+      the shop is charged, and a 16px tick beside a sentence is the easiest
+      thing on a crowded form to skim past. Blocked renders as red, because
+      red is what will happen. The master switch on the wallet page is the
+      same control in the same two colours.
 
       **The figure is never rendered here, for any role.** The endpoint does
       not carry it. The "شارژ کیف پول" and "فعال‌سازی" links show only to
@@ -894,13 +921,13 @@ tomans.
       than a technician told to ask their manager, which is what the text
       says for them.
 
-- [~] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
+- [x] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
       deliberately quiet: below 10,000 toman a warning, at zero a stronger
       one, each with a link to the wallet page and each dismissible for the
       session. Only where it is relevant — the device pages and the wallet
       page — not on every screen.
 
-- [~] 12.12 A sentence saying plainly that these messages are charged to the
+- [x] 12.12 A sentence saying plainly that these messages are charged to the
       shop's own wallet and are not part of the subscription (§21). Somebody
       will otherwise assume the subscription covers it, and find out from an
       empty wallet.
@@ -1042,15 +1069,33 @@ worth 200 toman a message is a greeting worth losing, and emoji are allowed
 but not free), and «لطفاً برای دریافت دستگاه ... مراجعه فرمایید», since a
 customer told their device is ready knows to come and get it.
 
-### ⚠️ The frontend is written but not looked at
+### The frontend was written blind, then looked at
 
-12.9 through 12.12 are `[~]` rather than `[x]` deliberately. The frontend has
-no test runner, `tsc` is its only automated gate, and neither it nor the Vite
-harness RULES §6b describes can run in the sandbox these were written in —
+12.9 through 12.12 were `[~]` while they were written: the frontend has no
+test runner, `tsc` is its only automated gate, and neither it nor the Vite
+harness RULES §6b describes can run in the sandbox they were written in —
 what was possible there is a partial type-check that cannot resolve react or
 axios, so it catches a wrong argument count but not a wrong prop.
 
-They become `[x]` when `pnpm build` passes and somebody has opened the pages.
+They are `[x]` now: `pnpm build` passed and the pages were opened in a
+browser. Four corrections came out of that pass, and all four were about
+what the screens *said* rather than what they did, which is the class of
+mistake a type-check was never going to catch:
+
+- the per-message price came off the balance card and the message table
+  (12.9);
+- the «گردش حساب» tab came out, as a third view of what two tabs already
+  showed (12.9);
+- the send checkbox became a green/red button (12.10);
+- subscription state and remaining messages went into the header as two
+  badges (`components/HeaderStatusBadges.tsx`), admin-only like the two
+  banners and for the same reason, hidden below `md`. They do not replace
+  the banners: a badge is a resting state, a banner interrupts.
+
+⚠️ **«طلایی» is `warning`.** There is no gold token and one was not added:
+the brand stopped being gold, and the note in CLAUDE.md says a gold found
+outside the chart palette is a leftover. `--warning` is the amber the app
+already spends on «running out», which is the gold this wanted.
 
 ### Open questions — answer before 12.1
 

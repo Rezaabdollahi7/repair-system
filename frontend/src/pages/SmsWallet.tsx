@@ -4,12 +4,12 @@ import {
   ChatBubbleLeftRightIcon,
   WalletIcon,
 } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import {
   getSmsMessages,
   getSmsSettings,
   getSmsTopups,
   getSmsWallet,
-  getSmsWalletTransactions,
   startSmsTopup,
   updateSmsSettings,
 } from "../api";
@@ -24,12 +24,7 @@ import {
   thead,
   tr,
 } from "../utils/tableClasses";
-import type {
-  SmsMessageRow,
-  SmsTopup,
-  SmsWalletStatus,
-  SmsWalletTransaction,
-} from "../types/api";
+import type { SmsMessageRow, SmsTopup, SmsWalletStatus } from "../types/api";
 
 /** Rials in the database, tomans on screen — the whole app works this way. */
 function toToman(rials: number): string {
@@ -85,14 +80,18 @@ const TOPUP_STATUS: Record<string, { label: string; tone: string }> = {
   failed: { label: "ناموفق", tone: "bg-danger-soft text-danger-fg" },
 };
 
-const LEDGER_LABELS: Record<string, string> = {
-  topup: "شارژ کیف پول",
-  send: "ارسال پیامک",
-  refund: "بازگشت هزینه",
-  adjustment: "اصلاح دستی",
-};
-
-type Tab = "topups" | "messages" | "ledger";
+/*
+ * Two tabs, not three.
+ *
+ * There was a «گردش حساب» tab over `sms_wallet_transactions`, and it said
+ * nothing the other two do not: every line in it is either a top-up (first
+ * tab) or a message (second), restated as a signed amount. The ledger is
+ * still written on every debit and credit — it is what makes the balance
+ * auditable and what a refund is proved against — it just is not a screen.
+ * `GET /sms/wallet/transactions` and `getSmsWalletTransactions` stay for
+ * that reason: support reads them, a shop does not.
+ */
+type Tab = "topups" | "messages";
 
 export default function SmsWallet() {
   const [wallet, setWallet] = useState<SmsWalletStatus | null>(null);
@@ -105,7 +104,6 @@ export default function SmsWallet() {
   const [tab, setTab] = useState<Tab>("topups");
   const [topups, setTopups] = useState<SmsTopup[]>([]);
   const [messages, setMessages] = useState<SmsMessageRow[]>([]);
-  const [ledger, setLedger] = useState<SmsWalletTransaction[]>([]);
 
   const load = useCallback(async () => {
     const [walletRes, settingsRes] = await Promise.all([
@@ -128,8 +126,6 @@ export default function SmsWallet() {
       topups: () => getSmsTopups().then(({ data }) => setTopups(data.data)),
       messages: () =>
         getSmsMessages().then(({ data }) => setMessages(data.data)),
-      ledger: () =>
-        getSmsWalletTransactions().then(({ data }) => setLedger(data.data)),
     };
 
     const fetcher = fetchers[tab];
@@ -208,8 +204,21 @@ export default function SmsWallet() {
                 {toToman(wallet.balance_rials)}{" "}
                 <span className="text-body-sm font-normal">تومان</span>
               </p>
+              {/*
+                How many messages, never what one costs.
+                --------------------------------------------------------
+                The per-message price used to sit here. It is a number a
+                shop can do nothing with — it cannot choose a cheaper
+                message — and printing a tariff beside a balance invites
+                arithmetic against a figure we may change. The count is
+                the same fact in the form the question is actually asked
+                in: «چند تا پیامک می‌تونم بفرستم».
+
+                `message_price_rials` is still read, one line above, to
+                decide when the balance is low. That is the price doing
+                its job without being shown.
+              */}
               <p className="mt-1 text-body-sm text-text-secondary">
-                هزینه هر پیامک {toToman(wallet.message_price_rials)} تومان —
                 حدود {wallet.approximate_messages_left.toLocaleString("fa-IR")}{" "}
                 پیامک
               </p>
@@ -219,18 +228,11 @@ export default function SmsWallet() {
           {/* The toggle sits beside the balance rather than on the settings
               page, because the two questions a shop has about this feature —
               "is it on" and "can I afford it" — are the same question. */}
-          <label className="flex items-center gap-2 cursor-pointer shrink-0">
-            <input
-              type="checkbox"
-              checked={enabled}
-              disabled={savingToggle}
-              onChange={handleToggle}
-              className="w-4 h-4 accent-[var(--primary)] cursor-pointer"
-            />
-            <span className="text-body-sm text-text-primary">
-              ارسال پیامک به مشتریان
-            </span>
-          </label>
+          <SmsToggleButton
+            enabled={enabled}
+            saving={savingToggle}
+            onToggle={handleToggle}
+          />
         </div>
 
         {!enabled && (
@@ -303,7 +305,6 @@ export default function SmsWallet() {
             [
               ["topups", "تاریخچه شارژ"],
               ["messages", "پیامک‌های ارسالی"],
-              ["ledger", "گردش حساب"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -351,6 +352,13 @@ export default function SmsWallet() {
           </div>
         )}
 
+        {/*
+          No «هزینه» column. It printed the same per-message price on every
+          row — the figure the balance card no longer carries either — so
+          leaving it here would put back, once per message, exactly what was
+          taken off the card. What a shop asks of this table is who was
+          told and whether it went.
+        */}
         {tab === "messages" && (
           <div className={tableCard}>
             <div className={tableScroll}>
@@ -361,7 +369,6 @@ export default function SmsWallet() {
                     <th className={th}>مشتری</th>
                     <th className={th}>دستگاه</th>
                     <th className={th}>نوع پیام</th>
-                    <th className={th}>هزینه</th>
                     <th className={th}>وضعیت</th>
                   </tr>
                 </thead>
@@ -373,11 +380,6 @@ export default function SmsWallet() {
                       <td className={td}>{row.device_name ?? "—"}</td>
                       <td className={td}>
                         {KIND_LABELS[row.kind] ?? row.kind}
-                      </td>
-                      <td className={td}>
-                        {row.cost_rials === 0
-                          ? "—"
-                          : `${toToman(row.cost_rials)} تومان`}
                       </td>
                       <td className={td}>
                         <StatusBadge map={MESSAGE_STATUS} value={row.status} />
@@ -392,49 +394,51 @@ export default function SmsWallet() {
             )}
           </div>
         )}
-
-        {tab === "ledger" && (
-          <div className={tableCard}>
-            <div className={tableScroll}>
-              <table className="w-full table-shell">
-                <thead className={thead}>
-                  <tr>
-                    <th className={th}>تاریخ</th>
-                    <th className={th}>نوع</th>
-                    <th className={th}>مبلغ</th>
-                    <th className={th}>مانده پس از تراکنش</th>
-                  </tr>
-                </thead>
-                <tbody className={tbody}>
-                  {ledger.map((row) => (
-                    <tr key={row.id} className={tr}>
-                      <td className={tdMuted}>{jalali(row.created_at)}</td>
-                      <td className={td}>
-                        {LEDGER_LABELS[row.type] ?? row.type}
-                      </td>
-                      <td
-                        className={`${td} ${
-                          row.amount_rials < 0 ? "text-danger-fg" : "text-success-fg"
-                        }`}
-                      >
-                        {row.amount_rials < 0 ? "−" : "+"}
-                        {toToman(Math.abs(row.amount_rials))} تومان
-                      </td>
-                      <td className={tdMuted}>
-                        {toToman(row.balance_after_rials)} تومان
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {ledger.length === 0 && (
-              <Empty text="هنوز تراکنشی ثبت نشده است." />
-            )}
-          </div>
-        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The master switch, as a button rather than a checkbox.
+ *
+ * A checkbox states a fact and leaves you to read the label for what the
+ * fact is. This is the one setting in the app that spends the shop's money
+ * without anyone pressing anything afterwards, so it says its own state in
+ * colour: green while it is on, red while it is off. The wording moves with
+ * it — «فعال است» / «غیرفعال است» — so the control is legible without the
+ * colour too, which is the part a colour-blind owner relies on.
+ */
+function SmsToggleButton({
+  enabled,
+  saving,
+  onToggle,
+}: {
+  enabled: boolean;
+  saving: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={saving}
+      aria-pressed={enabled}
+      className={`shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl
+                  border text-body-sm font-bold transition-colors cursor-pointer
+                  disabled:opacity-60 disabled:cursor-not-allowed ${
+                    enabled
+                      ? "bg-success-soft text-success-fg border-success/25 hover:bg-success-soft-hover"
+                      : "bg-danger-soft text-danger-fg border-danger/25 hover:bg-danger-soft-hover"
+                  }`}
+    >
+      {enabled ? (
+        <CheckCircleIcon className="w-5 h-5 shrink-0" />
+      ) : (
+        <XCircleIcon className="w-5 h-5 shrink-0" />
+      )}
+      ارسال پیامک به مشتریان {enabled ? "فعال است" : "غیرفعال است"}
+    </button>
   );
 }
 

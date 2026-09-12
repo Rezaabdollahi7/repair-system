@@ -26,6 +26,8 @@ import {
   CalendarIcon,
   PhotoIcon,
   CheckBadgeIcon,
+  CheckCircleIcon,
+  XCircleIcon,
 } from "@heroicons/react/24/solid";
 import { useDebounce } from "../utils/helpers";
 import type {
@@ -1005,7 +1007,7 @@ export default function DeviceFormModal({
                   ))}
                 </select>
 
-                <SmsCheckbox
+                <SmsSendButton
                   isEdit={isEdit}
                   loadedStatus={loadedStatus}
                   status={form.status}
@@ -1079,7 +1081,7 @@ export default function DeviceFormModal({
 }
 
 /**
- * The one checkbox, and the three things that can be wrong with it.
+ * The one switch, and the three things that can be wrong with it.
  *
  * Shown only when there is actually a message to send: on create that is
  * always (acceptance), on edit only when the status is moving to one the
@@ -1087,13 +1089,20 @@ export default function DeviceFormModal({
  * the server ignores, which is worse than not offering it — the shop would
  * believe a customer had been told.
  *
+ * A button rather than a checkbox, and coloured: green while the message
+ * will go, red while it will not. This is the last moment before a customer
+ * is texted and the shop is charged, and a 16px tick beside a sentence is
+ * the easiest thing on a crowded form to skim past. The label says the state
+ * in words as well — «ارسال می‌شود» / «ارسال نمی‌شود» — so the control still
+ * reads without the colour.
+ *
  * ⚠️ No figure appears here for anyone, admin included. The endpoint behind
  * `capability` does not carry one, which is the point: a technician can open
  * this modal, and what the shop spends is not theirs to see. The links to
  * fix either problem are shown only to an admin, because a technician sent
  * to a page their role cannot open is worse than one told to ask.
  */
-function SmsCheckbox({
+function SmsSendButton({
   isEdit,
   loadedStatus,
   status,
@@ -1123,23 +1132,35 @@ function SmsCheckbox({
   }
 
   const blocked = !capability.can_send;
+  // Blocked reads as off, because off is what will happen. The server
+  // refuses the send either way; showing it green would promise otherwise.
+  const on = checked && !blocked;
 
   return (
     <div className="mt-3 space-y-1.5">
-      <label
-        className={`flex items-center gap-2 ${
-          blocked ? "opacity-60" : "cursor-pointer"
-        }`}
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        disabled={blocked}
+        aria-pressed={on}
+        className={`w-full inline-flex items-center gap-2 px-3.5 py-2.5 rounded-card
+                    border text-body-sm font-bold transition-colors ${
+                      blocked
+                        ? "cursor-not-allowed opacity-60 bg-surface-alt text-text-secondary border-border"
+                        : on
+                          ? "cursor-pointer bg-success-soft text-success-fg border-success/25 hover:bg-success-soft-hover"
+                          : "cursor-pointer bg-danger-soft text-danger-fg border-danger/25 hover:bg-danger-soft-hover"
+                    }`}
       >
-        <input
-          type="checkbox"
-          checked={checked && !blocked}
-          disabled={blocked}
-          onChange={(event) => onChange(event.target.checked)}
-          className="w-4 h-4 accent-[var(--primary)]"
-        />
-        <span className="text-body-sm text-text-primary">{label}</span>
-      </label>
+        {on ? (
+          <CheckCircleIcon className="w-5 h-5 shrink-0" />
+        ) : (
+          <XCircleIcon className="w-5 h-5 shrink-0" />
+        )}
+        <span className="text-start">
+          {label} — {on ? "ارسال می‌شود" : "ارسال نمی‌شود"}
+        </span>
+      </button>
 
       {capability.reason === "disabled" && (
         <p className="text-body-sm text-text-secondary">

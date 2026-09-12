@@ -6,6 +6,7 @@ import { BreadcrumbProvider, type Crumb } from "../context/BreadcrumbContext";
 import { useTheme } from "../context/ThemeContext";
 import HomeIcon from "./icons/HomeIcon";
 import SubscriptionBanner from "./SubscriptionBanner";
+import HeaderStatusBadges from "./HeaderStatusBadges";
 import {
   Bars3Icon,
   WrenchScrewdriverIcon,
@@ -721,6 +722,17 @@ export default function Layout() {
               unreadable.
             */}
             <div className="ms-auto flex items-center gap-1 shrink-0">
+              {/*
+                Where the shop stands, on every screen.
+                ------------------------------------------------------------
+                Two facts that are true of the workspace rather than of the
+                page — how long the subscription has left, and how many
+                messages the credit is worth — so the shell is where they
+                belong. Admin-only, and they draw nothing until they have
+                loaded; see HeaderStatusBadges.
+              */}
+              <HeaderStatusBadges />
+
               {/*
                 Settings, where the sidebar's «سیستم» section used to be.
                 ------------------------------------------------------------

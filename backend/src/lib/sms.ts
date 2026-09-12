@@ -31,9 +31,31 @@ export const SMS_TEMPLATES = {
   PAYMENT_OK: "SMS_TEMPLATE_PAYMENT_OK",
   /** #DAYS# — days added to the referrer. */
   REFERRAL_REWARD: "SMS_TEMPLATE_REFERRAL_REWARD",
+
+  // The three a workshop sends to its own customer, charged to that
+  // workshop's SMS wallet rather than to us (12.5). Every one above this
+  // line is ours to pay for; every one below is theirs, and nothing in
+  // utils/subscriptionJob or utils/otp may ever reach for these.
+  //
+  // All three take #NAME# #DEVICE# #NUMBER# #SHOP#. The parameter map and
+  // the approved wording live in utils/smsTemplates.
+  /** A device was taken in. */
+  DEVICE_ACCEPTED: "SMS_TEMPLATE_DEVICE_ACCEPTED",
+  /** A device is ready to be collected. */
+  DEVICE_READY: "SMS_TEMPLATE_DEVICE_READY",
+  /** A device was handed back. */
+  DEVICE_DELIVERED: "SMS_TEMPLATE_DEVICE_DELIVERED",
 } as const;
 
 export type SmsTemplate = (typeof SMS_TEMPLATES)[keyof typeof SMS_TEMPLATES];
+
+/**
+ * How long a single parameter value may be, per sms.ir support.
+ *
+ * Exported so callers can truncate to it rather than discovering it as a
+ * rejected message on somebody's real phone number.
+ */
+export const MAX_PARAMETER_CHARS = 25;
 
 /**
  * A user is waiting behind this request, and fetch on its own waits forever.
@@ -241,11 +263,18 @@ export function sendTemplate(
       throw new SmsError(`Parameter ${name} must not contain a slash`, null);
     }
 
-    // The panel's own ceiling. Longer values come back as status 114, which
-    // is a rejected message rather than an error worth waking anyone for.
-    if (value.length > 40) {
+    // The panel's own ceiling, confirmed by sms.ir support: 25, not the 40
+    // this used to guess at. The comment here said the number was never
+    // established, and it was a third too high — anything between 26 and 40
+    // would have come back as status 114, a rejected message, for reasons
+    // nothing in the logs would explain.
+    //
+    // Support says it can be raised on request. Until it is, callers
+    // truncate to their own caps (see PARAM_CAPS in utils/smsTemplates) and
+    // this is the backstop rather than the thing doing the work.
+    if (value.length > MAX_PARAMETER_CHARS) {
       throw new SmsError(
-        `Parameter ${name} is longer than 40 characters`,
+        `Parameter ${name} is longer than ${MAX_PARAMETER_CHARS} characters`,
         null,
       );
     }

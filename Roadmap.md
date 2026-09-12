@@ -608,7 +608,7 @@ tomans.
       `workspace_isolation` policy **in the same migration** (RULES §10), and
       `ops/restore-database.md` needs its policy count raised from 21.
 
-- [ ] 12.2 `utils/smsPricing.ts` — resolve the current unit price, count the
+- [x] 12.2 `utils/smsPricing.ts` — resolve the current unit price, count the
       message's parts, and copy both onto the `SmsMessage` row and the wallet
       transaction. Same reasoning as `payments.base_price_rials`: a history
       that re-renders at today's price is not a history. When the price moves,
@@ -728,7 +728,7 @@ tomans.
       subscription is renewed. That falls out of the design rather than
       needing a check of its own, which is why it is safe to open.
 
-- [ ] 12.5 Three templates in `lib/sms.ts`, ids from the environment,
+- [x] 12.5 Three templates in `lib/sms.ts`, ids from the environment,
       alongside the five that exist. `.env.example` and `.env.prod.example`
       both gain them (RULES §7).
 

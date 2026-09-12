@@ -42,3 +42,12 @@ process.env.SMS_TEMPLATE_ON_EXPIRY ??= "764207";
 process.env.SMS_TEMPLATE_AFTER_EXPIRY ??= "450597";
 process.env.SMS_TEMPLATE_PAYMENT_OK ??= "344895";
 process.env.SMS_TEMPLATE_REFERRAL_REWARD ??= "549585";
+
+// The three customer templates (12.5). Same reason as the five above:
+// lib/sms resolves every id in SMS_TEMPLATES at import, so a name added
+// there without a line here stops every suite that mounts the app, with
+// an error naming an SMS variable in suites that have nothing to do with
+// SMS.
+process.env.SMS_TEMPLATE_DEVICE_ACCEPTED ??= "351476";
+process.env.SMS_TEMPLATE_DEVICE_READY ??= "153383";
+process.env.SMS_TEMPLATE_DEVICE_DELIVERED ??= "986773";

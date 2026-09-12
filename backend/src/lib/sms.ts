@@ -9,14 +9,19 @@
  * justify a dependency.
  */
 
-import { SMS_TEMPLATES } from "./smsTemplateNames";
+import { SMS_TEMPLATES, type SmsTemplate } from "./smsTemplateNames";
 
 const SMS_ENDPOINT = "https://api.sms.ir/v1/send/verify";
 
 // The names live in their own module because that one has no side effects,
 // and the test setup has to read the list without importing this file — see
 // the note there. Re-exported so every call site still says `from "lib/sms"`.
-export { SMS_TEMPLATES, type SmsTemplate } from "./smsTemplateNames";
+//
+// Re-exported from the local import rather than with `export ... from`: that
+// form creates no local binding, so `SmsTemplate` would not be in scope in
+// this file even while being exported from it — which is exactly how the
+// first version of this broke every suite that imports lib/sms.
+export { SMS_TEMPLATES, type SmsTemplate };
 
 /**
  * How long a single parameter value may be, per sms.ir support.

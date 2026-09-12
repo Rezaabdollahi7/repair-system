@@ -198,6 +198,94 @@ const resources: Resource[] = [
     updatePath: (id) => `/api/repair-invoices/${id}/status`,
     updateBody: { status: "issued" },
   },
+  /*
+   * The three SMS lists (12.13).
+   *
+   * List-only, all three: a message, a top-up and a ledger row are written
+   * by the application and read back as history — there is no GET /:id, no
+   * PUT and no DELETE on any of them, which is why each carries all three
+   * skips. That leaves one test apiece, and it is the one that matters: a
+   * shop must not see another shop's customers' phone numbers, another
+   * shop's payments, or another shop's spending.
+   *
+   * Registered here rather than left to smsRoutes.test.ts, which asserts the
+   * same thing directly. This table is the registry RULES §3 describes — a
+   * resource that is absent from it is a resource whose isolation nobody is
+   * obliged to check — and being covered twice is the cheaper mistake.
+   *
+   * `sms_wallets` is deliberately not here: it is one row per workspace
+   * reached at GET /api/sms/wallet with no id at all, so none of these four
+   * tests has anything to address. It is in isolationSpecialCases.test.ts
+   * with the reason written down.
+   */
+  {
+    name: "sms-messages",
+    path: "/api/sms/messages",
+    create: async (workspaceId) => {
+      const row = await owner.smsMessage.create({
+        data: {
+          workspaceId,
+          // Distinct per workspace so a leak is visible as the wrong number
+          // rather than as an off-by-one count.
+          phone: `0912000${String(workspaceId).padStart(4, "0")}`,
+          kind: "device_ready",
+          unitPriceRials: 1_750,
+        },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.smsMessage.count({ where: { id } })) === 1,
+    skipGetOne: true,
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
+    name: "sms-topups",
+    path: "/api/sms/topups",
+    create: async (workspaceId) => {
+      const row = await owner.smsTopup.create({
+        // orderId is unique platform-wide — it is what Zibal echoes back —
+        // so the two sides of a test cannot share one.
+        data: {
+          workspaceId,
+          orderId: `DFXS-ISO-${workspaceId}`,
+          amountRials: 500_000,
+        },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) => (await owner.smsTopup.count({ where: { id } })) === 1,
+    skipGetOne: true,
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
+    name: "sms-wallet-transactions",
+    path: "/api/sms/wallet/transactions",
+    create: async (workspaceId) => {
+      // `adjustment` rather than `send` or `topup`: those two carry a unique
+      // index against the row they pay for, and this fixture has neither.
+      const row = await owner.smsWalletTransaction.create({
+        data: {
+          workspaceId,
+          type: "adjustment",
+          amountRials: 1_000,
+          balanceBeforeRials: 0,
+          balanceAfterRials: 1_000,
+        },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.smsWalletTransaction.count({ where: { id } })) === 1,
+    skipGetOne: true,
+    skipUpdate: true,
+    skipDelete: true,
+  },
   {
     name: "exports",
     path: "/api/exports",

@@ -949,7 +949,7 @@ tomans.
       ⚠️ 11.5 moved settings from the sidebar to a header icon — the entry
       point is not where a pre-redesign screenshot would put it.
 
-- [ ] 12.13 Tests. The mocked suites cover the twenty scenarios in §30 of the
+- [x] 12.13 Tests. The mocked suites cover the twenty scenarios in §30 of the
       brief; the ones that cannot be mocked go to `src/__tests__/integration/`:
 
       - The concurrency case is integration-only and is the reason 12.3 is
@@ -974,6 +974,45 @@ tomans.
       The frontend still has no test runner, so 12.9–12.12 are verified by
       looking at them, through the throwaway Vite harness RULES §6b
       describes — "it compiles" is not verification of a UI change.
+
+      **Where each of those six lives, now that they all do:**
+
+      | Scenario | Suite |
+      | --- | --- |
+      | Two simultaneous debits, one wins, never below zero | `integration/smsWallet.test.ts` |
+      | The four SMS tables in the isolation registry | `integration/isolation.test.ts` (the three lists) and `integration/isolationSpecialCases.test.ts` (the wallet) |
+      | Verify twice, credit once | `integration/smsTopup.test.ts` |
+      | Refund twice, credit once | `integration/smsWallet.test.ts` and the unique index in `isolationSpecialCases` |
+      | The four transitions, and an edit that re-sends nothing | `customerNotification.test.ts` (the decision) and `deviceController.test.ts` (the wiring) |
+      | A price change does not reach into the past | `integration/smsPricing.test.ts` |
+      | A provider failure refunds, and the balance lands where it started | `integration/customerNotification.test.ts` |
+
+      ⚠️ **The three SMS lines in `isolation.test.ts` carry all three skips.**
+      A message, a top-up and a ledger row are written by the application and
+      read back as history: there is no `GET /:id`, no `PUT` and no `DELETE`
+      on any of them, so only the list test has anything to address. That
+      test was mutation-checked rather than assumed — with both the
+      application filter and the `sms_messages` policy removed, exactly
+      `sms-messages › lists only the caller's own rows` failed and nothing
+      else did.
+
+      `sms_wallets` is deliberately not in that table: one row per workspace,
+      reached at `GET /api/sms/wallet` with no id at all, so none of the four
+      tests fits. It is in `isolationSpecialCases.test.ts` with the reason
+      written down, per RULES §3.
+
+      **Two things the suite found once it could finally be run.** Phase 12
+      was written in a sandbox with no `node_modules`, so `pnpm lint` and
+      `pnpm format:check` had never executed against any of it:
+
+      - `utils/smsTemplates.ts` failed `no-control-regex`. A false positive —
+        the `[\u0000-\u001F\u007F]` range is the class being stripped, not
+        a typo'd escape — so it carries a targeted disable with that reason
+        rather than a changed regex.
+      - Ten phase 12 files were unformatted and are now run through Prettier.
+        Eleven others still are (`routes/exports.ts`, `utils/pricing.ts`,
+        `utils/referral.ts`, and eight suites), all of them older than this
+        phase and left alone rather than swept into an SMS commit.
 
 - [ ] 12.14 Documentation, in the same commit as the task that makes it true
       (RULES §8): a CLAUDE.md section on the wallet and the Dofixo/shop

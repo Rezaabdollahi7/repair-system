@@ -897,7 +897,28 @@ tomans.
       policy count in `ops/restore-database.md`, and the expected table list
       in `prisma/rls-check.sql`.
 
-### ⚠️ The unresolved one: whose name is on the message
+### ✅ Resolved: the templates were approved
+
+Second submission went through on 1405/06/19, with «دوفیکسو» as the fixed
+organisation name and the workshop's name as an ordinary parameter — option
+1 below. The ids, which 12.5 puts in the environment:
+
+| قالب        | متغیر محیطی                     | شناسه    |
+| ----------- | ------------------------------- | -------- |
+| پذیرش دستگاه | `SMS_TEMPLATE_DEVICE_ACCEPTED`  | `351476` |
+| آماده تحویل  | `SMS_TEMPLATE_DEVICE_READY`     | `153383` |
+| تحویل دستگاه | `SMS_TEMPLATE_DEVICE_DELIVERED` | `986773` |
+
+⚠️ 12.5 must read the approved bodies out of the sms.ir panel before writing
+the parameter map. `sendTemplate` sends parameters by name, and a template
+approved with `#CUSTOMER#` where the code sends `#NAME#` fails at send time
+as a rejected message — not at boot, and not in any test that mocks the
+provider.
+
+The history below is kept because the rule it ran into still shapes the
+design, and because option 2 is what a second provider would need.
+
+### The rule it ran into: whose name is on the message
 
 The first submission was rejected, and one of the two reasons is not a
 wording problem:
@@ -925,10 +946,9 @@ Three ways out, in the order they should be tried:
    customer who cannot tell which of the two repair shops in town is texting
    them. The feature still works; it is just worth less.
 
-Until support answers, 12.5 cannot be finished and the wording below is a
-proposal rather than a plan. Nothing else in the phase is blocked by it —
-12.1 through 12.4 are schema, wallet and payment work that does not care
-what the message says.
+Option 1 was accepted, so the wording below is what was approved rather than
+a proposal. Option 2 stays on record: it is what a workshop wanting its own
+sender line would need, and what a second provider would have to offer.
 
 ### The three templates, for the sms.ir panel
 

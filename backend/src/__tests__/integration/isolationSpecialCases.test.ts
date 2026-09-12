@@ -523,6 +523,14 @@ describe("otp_codes is deliberately shared", () => {
 //
 // Asserted through the application client, which is the only one the
 // policies apply to: `owner` bypasses them by design and is used for setup.
+//
+// ⚠️ Every callback below is `async` and awaits inside itself, which is not
+// stylistic. A Prisma call builds a lazy PrismaPromise: nothing is sent
+// until something calls `.then`. Handed to runWithWorkspace as
+// `() => prisma.x.findMany()`, the promise is created inside the store and
+// dispatched after the store has closed, so the extension sees no workspace
+// and throws — which is how these tests failed the first time they ran. The
+// suite's other callers are async functions already and never noticed.
 describe("sms wallet tables", () => {
   beforeEach(async () => {
     await owner.smsWallet.createMany({
@@ -534,8 +542,9 @@ describe("sms wallet tables", () => {
   });
 
   it("shows a workspace only its own wallet", async () => {
-    const seen = await runWithWorkspace(workspaces.a.workspaceId, () =>
-      prisma.smsWallet.findMany(),
+    const seen = await runWithWorkspace(
+      workspaces.a.workspaceId,
+      async () => await prisma.smsWallet.findMany(),
     );
 
     expect(seen).toHaveLength(1);
@@ -548,11 +557,13 @@ describe("sms wallet tables", () => {
     // policy makes it match no row rather than refusing loudly, which is the
     // same answer as "not enough credit" — so this test is what separates a
     // working isolation boundary from a wallet that silently never works.
-    const updated = await runWithWorkspace(workspaces.a.workspaceId, () =>
-      prisma.smsWallet.updateMany({
-        where: { workspaceId: workspaces.b.workspaceId },
-        data: { balanceRials: { decrement: 3_500 } },
-      }),
+    const updated = await runWithWorkspace(
+      workspaces.a.workspaceId,
+      async () =>
+        await prisma.smsWallet.updateMany({
+          where: { workspaceId: workspaces.b.workspaceId },
+          data: { balanceRials: { decrement: 3_500 } },
+        }),
     );
 
     expect(updated.count).toBe(0);
@@ -567,19 +578,25 @@ describe("sms wallet tables", () => {
     // WITH CHECK, not USING: filtering a foreign row out of a read is not
     // the same as refusing to create one, and only the second keeps a
     // mis-scoped write from landing.
+    // Matched on the message, not on "it threw". Before the await above was
+    // added this passed while never reaching Postgres at all: the rejection
+    // was the extension's missing-context error, which would have gone on
+    // being green if the policy were dropped tomorrow.
     await expect(
-      runWithWorkspace(workspaces.a.workspaceId, () =>
-        prisma.smsWalletTransaction.create({
-          data: {
-            workspaceId: workspaces.b.workspaceId,
-            type: "adjustment",
-            amountRials: 1_000,
-            balanceBeforeRials: 0,
-            balanceAfterRials: 1_000,
-          },
-        }),
+      runWithWorkspace(
+        workspaces.a.workspaceId,
+        async () =>
+          await prisma.smsWalletTransaction.create({
+            data: {
+              workspaceId: workspaces.b.workspaceId,
+              type: "adjustment",
+              amountRials: 1_000,
+              balanceBeforeRials: 0,
+              balanceAfterRials: 1_000,
+            },
+          }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/row-level security/i);
   });
 
   it("keeps send logs and top-ups apart", async () => {
@@ -653,15 +670,17 @@ describe("sms wallet tables", () => {
       balanceAfterRials: 3_500,
     };
 
-    await runWithWorkspace(workspaces.a.workspaceId, () =>
-      prisma.smsWalletTransaction.create({ data: refund }),
+    await runWithWorkspace(
+      workspaces.a.workspaceId,
+      async () => await prisma.smsWalletTransaction.create({ data: refund }),
     );
 
     await expect(
-      runWithWorkspace(workspaces.a.workspaceId, () =>
-        prisma.smsWalletTransaction.create({ data: refund }),
+      runWithWorkspace(
+        workspaces.a.workspaceId,
+        async () => await prisma.smsWalletTransaction.create({ data: refund }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/[Uu]nique constraint/);
   });
 
   it("keeps the money and drops the phone number when a workspace is wiped", async () => {
@@ -706,8 +725,9 @@ describe("sms wallet tables", () => {
 // policy and the application role may only read it.
 describe("sms_prices is reference data", () => {
   it("is readable by the application role and not writable", async () => {
-    const read = await runWithWorkspace(workspaces.a.workspaceId, () =>
-      prisma.smsPrice.findMany(),
+    const read = await runWithWorkspace(
+      workspaces.a.workspaceId,
+      async () => await prisma.smsPrice.findMany(),
     );
 
     // The opening row comes from the migration, and truncateAll() removes
@@ -715,11 +735,13 @@ describe("sms_prices is reference data", () => {
     expect(Array.isArray(read)).toBe(true);
 
     await expect(
-      runWithWorkspace(workspaces.a.workspaceId, () =>
-        prisma.smsPrice.create({
-          data: { unitPriceRials: 1, effectiveFrom: new Date() },
-        }),
+      runWithWorkspace(
+        workspaces.a.workspaceId,
+        async () =>
+          await prisma.smsPrice.create({
+            data: { unitPriceRials: 1, effectiveFrom: new Date() },
+          }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/permission denied/i);
   });
 });

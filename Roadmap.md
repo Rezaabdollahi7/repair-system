@@ -546,6 +546,12 @@ tomans.
 
       `SmsTopup` — the top-up ledger. See 12.4 for why this is not `Payment`.
 
+      ⚠️ Platform credit is watched from sms.ir's own panel, not from our
+      code: پروفایل › تنظیمات حساب کاربری › آگاه‌سازی از کمبود اعتبار, which
+      texts us below a threshold (default 500 messages). There is nothing to
+      build, but the number it alerts has to belong to somebody who acts on
+      it — our account running dry stops every workshop at once.
+
       `SmsPrice` — reference data, following `plans` and `discount_codes`: no
       RLS, SELECT only for the app role, priced with psql. §5 of the brief
       says not to hardcode 350; a table is what "not hardcoded" means here,
@@ -574,10 +580,11 @@ tomans.
       characters in a typical case and up to 170 with long names, which is
       **two parts, sometimes three**. Providers bill per part.
 
-      That is the whole margin. sms.ir costs roughly 200 toman; two parts is
-      about 400, against the 350 the brief charges the shop — the feature
-      loses money on every message as specified. Two things follow, and both
-      belong in this task:
+      That is the whole margin. sms.ir quotes **130–250 toman per پیامک on
+      the silver plan, the rate improving with the size of the top-up**. At
+      two parts that is 260 at the best tier and 500 at the worst, against
+      the 350 the brief charges — profitable only if we buy in volume, and a
+      loss otherwise. Two things follow, and both belong in this task:
 
       - The texts are tightened so the worst case is exactly two parts and
         never three, with the truncation caps in 12.5 chosen to guarantee it
@@ -690,11 +697,19 @@ tomans.
       must be submitted and **approved in the sms.ir panel before this phase
       can be tested at all**, which makes it the long pole: start it first.
 
-      ⚠️ `sendTemplate` refuses any parameter containing a slash or longer
-      than 40 characters, and does so as an `SmsError` at send time. A shop
-      name or a device name over 40 characters is realistic, so the mapping
-      layer truncates deliberately rather than discovering the ceiling on a
-      customer's message.
+      ⚠️ **The 40-character ceiling in `sendTemplate` is wrong — sms.ir's
+      real limit on a parameter value is 25**, confirmed by support, and
+      extendable on request. The comment beside it says the number was never
+      established; it has been now, and it is a third lower than the guess.
+      Anything longer comes back as status 114, a rejected message. Change
+      the constant to 25 and set the truncation caps under it
+      (`NAME` 18 · `DEVICE` 16 · `NUMBER` 7 · `SHOP` 22), which is also what
+      holds the two-part ceiling in 12.2. The slash rule stays: support did
+      not address it and a guess that costs nothing is worth keeping.
+
+      Also confirmed: a template's text can be edited later **under the same
+      id**, so tightening wording is not a re-plumb of env vars; emoji are
+      allowed; and there is no limit on the number of parameters.
 
       The reception number is the device id — the number the device list
       already shows and a customer can quote on the phone.
@@ -882,6 +897,39 @@ tomans.
       policy count in `ops/restore-database.md`, and the expected table list
       in `prisma/rls-check.sql`.
 
+### ⚠️ The unresolved one: whose name is on the message
+
+The first submission was rejected, and one of the two reasons is not a
+wording problem:
+
+> نام مجموعه باید ثابت باشد
+
+The sending organisation's name has to be **fixed text in the template**,
+not a parameter. That is a rule written for one company texting its own
+customers, and this feature is the other shape: one platform account, 500
+workshops, each needing its own name on a message to a stranger. `#SHOP#`
+as a variable is exactly what the reviewer refused.
+
+Three ways out, in the order they should be tried:
+
+1. **Fixed «دوفیکسو» plus the shop as an ordinary data field.** The
+   organisation is us — we hold the account — and the workshop's name is
+   then just another value in the body, like the device or the reception
+   number. The templates below are written this way. This is a question for
+   support before resubmitting, not something to infer from a rejection
+   notice.
+2. **A dedicated line per workshop.** Support says خط اختصاصی is available.
+   It solves the naming question completely and is unthinkable at 500
+   tenants — one line, one approval, one invoice each.
+3. **Drop the shop name.** One part instead of two, so half the cost, and a
+   customer who cannot tell which of the two repair shops in town is texting
+   them. The feature still works; it is just worth less.
+
+Until support answers, 12.5 cannot be finished and the wording below is a
+proposal rather than a plan. Nothing else in the phase is blocked by it —
+12.1 through 12.4 are schema, wallet and payment work that does not care
+what the message says.
+
 ### The three templates, for the sms.ir panel
 
 Submitted as-is; the ids come back into `.env` as `SMS_TEMPLATE_DEVICE_*`.
@@ -889,50 +937,58 @@ Parameter names are what `sendTemplate` passes, so they must match exactly.
 
 **پذیرش دستگاه** — `SMS_TEMPLATE_DEVICE_ACCEPTED`
 
-    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# در #SHOP# پذیرش شد.
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# در تعمیرگاه #SHOP# پذیرش شد.
+    دوفیکسو
 
 **آماده تحویل** — `SMS_TEMPLATE_DEVICE_READY`
 
-    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# آماده تحویل است. #SHOP#
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# در تعمیرگاه #SHOP# آماده تحویل است.
+    دوفیکسو
 
 **تحویل دستگاه** — `SMS_TEMPLATE_DEVICE_DELIVERED`
 
-    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# تحویل داده شد. #SHOP#
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# تحویل داده شد.
+    تعمیرگاه #SHOP# | دوفیکسو
 
-Shorter than the brief's wording, and the difference is money rather than
-style. The originals run to three parts on a long shop name; these are two
-in every case the truncation caps allow — 107, 111 and 109 characters at
-`NAME` 18 · `DEVICE` 16 · `NUMBER` 7 · `SHOP` 22, against the 134 that two
-parts buys. Those caps are the ones 12.5 enforces, and they exist to hold
-this ceiling rather than being round numbers.
+124, 131 and 128 characters at the truncation caps — two parts in every
+case the caps allow, never three. The caps are `NAME` 18 · `DEVICE` 16 ·
+`NUMBER` 7 · `SHOP` 22, each inside sms.ir's 25-character limit on a
+parameter value.
 
-What was cut and why:
+The reviewer's second objection is a submission-form matter rather than a
+wording one — each parameter needs a description saying what goes in it:
 
-- **The 🌱 and the closing thanks.** Roughly 25 characters, which is the
-  third part on the acceptance message on its own. A greeting the shop pays
-  200 toman for is a greeting worth losing.
-- **«لطفاً برای دریافت دستگاه ... مراجعه فرمایید»** on the ready message.
-  The shop name is still there; a customer told their device is ready knows
-  they have to come and get it.
-- The shop name moved to the end on two of them, where it reads as a
-  signature — which is what it is, since the messages go out on a shared
-  sms.ir line and the customer needs to know who is texting.
+| پارامتر   | توضیح                        | نمونه        |
+| --------- | ---------------------------- | ------------ |
+| `#NAME#`  | نام و نام خانوادگی مشتری     | علی رضایی    |
+| `#DEVICE#`| نام دستگاه تعمیری            | یخچال سامسونگ |
+| `#NUMBER#`| شماره پذیرش دستگاه (عددی)    | 1042         |
+| `#SHOP#`  | نام تعمیرگاه پذیرنده         | تعمیرگاه مرکزی |
 
-⚠️ Emoji are worth avoiding in general here, not only for length: they are a
-common reason a template comes back from review, and the fallback on an old
-handset is a box.
+What was cut from the brief's wording, and why: the 🌱 and the closing
+thanks (about 25 characters, which is a third part on its own — a greeting
+worth 200 toman a message is a greeting worth losing, and emoji are allowed
+but not free), and «لطفاً برای دریافت دستگاه ... مراجعه فرمایید», since a
+customer told their device is ready knows to come and get it.
 
 ### Open questions — answer before 12.1
 
-1. **Is sms.ir's ~200 toman per part or per message?** This decides whether
-   the feature makes money. Persian messages are 70 characters a part and
-   these templates need two, so per-part pricing puts the real cost near 400
-   against the 350 the brief charges — a loss on every message. Either the
-   shop's price becomes 700 (two parts at 350, which is also the easiest
-   number to explain: «هر پیامک ۷۰۰ تومان»), or per-message pricing is
-   confirmed and 350 stands. Worth asking sms.ir directly rather than
-   inferring it from a tariff page.
-2. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
+1. **May the workshop's name be a parameter if «دوفیکسو» is the fixed
+   organisation name?** The blocker above. Everything in 12.5 waits on it,
+   and the answer decides whether these messages carry a shop's identity at
+   all.
+2. **Is the 130–250 toman quoted per part or per message?** Support answered
+   the tariff but not this, and it is the difference between 260 and 130 a
+   message. Cheaper to settle empirically than by ticket: send one short
+   (one-part) and one long (two-part) template to a test number and compare
+   the `cost` in each response against the credit the panel actually
+   deducts. That also settles what `cost` means and in what unit — which we
+   want anyway, because recording the provider's real figure on each
+   `SmsMessage` beats charging a number we assumed.
+3. **What does the shop pay?** At the best tier two parts cost 260, so 350
+   leaves 90 — real but thin, and negative at the worst tier. 500 is the
+   comfortable number and still reads as a round price. Depends on 2.
+4. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
    `ready_for_pickup` only, on the reasoning that a `repaired` device is one
    the bench has finished with but nobody has checked or priced yet. If
    shops in practice treat `repaired` as the moment to call the customer,

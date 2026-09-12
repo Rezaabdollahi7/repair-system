@@ -335,6 +335,46 @@ plan before that decision.
       successful settlePayment is the point of the task — nothing else
       would have caught this.
 
+- [ ] 8.11 The nightly job sees no workspaces. `runSubscriptionJob` reads its
+      worklist with a raw query — `SELECT id, never_expires, expires_at FROM
+      workspaces WHERE deleted_at IS NULL` — and the comment above it says a
+      raw query is how a job legitimately sees every tenant. That is the half
+      that is wrong: raw SQL escapes the Prisma *extension*, which is what
+      sets the context, but not RLS, which is enforced by Postgres on every
+      statement. `workspaces` carries `workspace_self`
+      (`id = app_current_workspace_id()`), and with no context set that
+      function returns NULL and the policy denies everything.
+
+      Verified against a scratch Postgres with all sixteen migrations
+      applied: as `dofixo_app` with no context, both of the job's raw
+      queries return **zero rows** while the owner connection sees the data.
+
+      So 8.7 has been a silent no-op wherever it runs: no expiry reminders,
+      no SMS, no read-only transitions, no deletion after 30 days, and no
+      settlement of orphaned payments. It fails in the worst possible
+      direction — zero rows is not an error, so the job finishes, reports
+      success, and every counter is zero.
+
+      ⚠️ The fix already exists and was never committed. `dofixo_dev` carries
+      a fifth SECURITY DEFINER function, `app_all_workspaces`, with a
+      COMMENT that reads exactly like the answer to this problem — "the job
+      legitimately belongs to no workspace ... a raw query returns zero rows
+      without error". Neither the migration that created it nor the code that
+      would call it is in git, on any branch or in any commit. It exists only
+      in one developer's database.
+
+      The task is therefore to recover it rather than design it: dump the
+      function, commit it as a real migration, point both raw queries at it
+      (the payments one needs the same treatment), and raise the counts in
+      `ops/restore-database.md` and `smoke.test.ts` from four `app_*`
+      functions to five. RULES §7 wants a COMMENT saying why no ordinary
+      query could do the job; this one already has a good one.
+
+      An integration test is the point of the task, as it was for 8.10:
+      seed two workspaces, run the job with no context, and assert it saw
+      both. Every existing test of this job mocks Prisma, which is why a
+      query that cannot return a row has been green all along.
+
 ## Phase 9 — UI Consolidation (after the migration settles)
 
 Product changes deliberately held until the data model and auth stop moving,

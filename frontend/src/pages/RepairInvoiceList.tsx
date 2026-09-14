@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getRepairInvoices, deleteRepairInvoice } from "../api";
-import Pagination from "../components/Pagination";
+import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
 import { useGoToCustomer } from "../utils/navigation";
@@ -98,7 +98,7 @@ export default function RepairInvoiceList() {
   } = useModal();
   const goToCustomer = useGoToCustomer();
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<RepairInvoice | null>(null);

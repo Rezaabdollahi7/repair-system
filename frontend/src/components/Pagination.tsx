@@ -6,6 +6,20 @@ import {
   ChevronDoubleRightIcon,
 } from "@heroicons/react/24/solid";
 
+/**
+ * Rows a list shows before it pages.
+ *
+ * Twenty rather than ten: ten filled about half the height of a laptop
+ * screen, so the most common thing a shop did on every list was press
+ * "next" — and the page it went to was as short as the one it left. Twenty
+ * fills the viewport without reaching the point where the server's query
+ * or the row-card fallback on a phone start to cost anything.
+ *
+ * Lives here rather than in each page so the seven lists cannot drift apart —
+ * they were seven hand-written copies of the same number until now.
+ */
+export const DEFAULT_PAGE_SIZE = 20;
+
 interface PaginationProps {
   page: number;
   totalPages: number;

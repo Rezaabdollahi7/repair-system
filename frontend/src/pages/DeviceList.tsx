@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { getDevices, deleteDevice, updateDevice } from "../api";
 import FilterPanel from "../components/FilterPanel";
 import SmsBalanceBanner from "../components/SmsBalanceBanner";
-import Pagination from "../components/Pagination";
+import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
@@ -284,7 +284,7 @@ export default function DeviceList() {
   const { isAtLeast } = useAuth();
 
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getCustomers, deleteCustomer } from "../api";
-import Pagination from "../components/Pagination";
+import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { formatPersianPhone } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
@@ -52,7 +52,7 @@ export default function CustomerList() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 

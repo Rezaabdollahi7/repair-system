@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
 import { useGoToPersonnel } from "../utils/navigation";
 import ConfirmModal from "../components/ConfirmModal";
-import Pagination from "../components/Pagination";
+import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
@@ -64,7 +64,7 @@ export default function PersonnelList() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<Personnel | null>(null);

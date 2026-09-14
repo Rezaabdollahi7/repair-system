@@ -9,7 +9,7 @@ import {
   formatPersianCurrency,
   toPersianDigits,
 } from "../utils/formatters";
-import { ChartCard, ChartTable } from "../components/charts/chartKit";
+import { ChartCard } from "../components/charts/chartKit";
 import BarList from "../components/charts/BarList";
 import StockStatusBadge from "../components/StockStatusBadge";
 import { stockStatusOfKey } from "../utils/stockStatus";
@@ -300,14 +300,6 @@ export default function StockReport() {
               className="mb-4 lg:max-w-3xl"
             >
               <BarList rows={byCategory} emptyMessage="ارزشی برای نمایش نیست" />
-              <ChartTable
-                caption="نمایش اعداد به‌صورت جدول"
-                columns={["دسته‌بندی", "ارزش موجودی (ریال)"]}
-                rows={byCategory.map((row) => [
-                  row.label,
-                  formatPersianCurrency(row.value),
-                ])}
-              />
             </ChartCard>
           )}
 

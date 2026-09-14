@@ -194,7 +194,10 @@
    * Validated in the ring's own order, wrap included: light passes every
    * check; dark passes with the adjacent pair to its teal neighbour in the
    * 6–8 floor band (7.8), which is legal here because the ring ships 2px gaps
-   * between segments, a labelled legend and a table view.
+   * between segments and a legend that names every slice and carries its
+   * count — so no slice is ever identified by its colour alone. (The
+   * collapsible number table that used to be the third mitigation is gone;
+   * the legend is doing that work now.)
    */
   --device-dead: #ef4444;
 }
@@ -770,9 +773,8 @@ body {
    * ── The list tables: a grid, and alternating rows ────────────────────
    *
    * Scoped to `.table-shell`, the marker on `tableCard`, so every one of the
-   * twelve list tables gets this and nothing else does — the collapsed
-   * relief tables inside the chart cards and the print sheets are outside it
-   * and keep their own quieter treatment.
+   * twelve list tables gets this and nothing else does — the print sheets
+   * are outside it and keep their own quieter treatment.
    *
    * Written here rather than as utilities on `th`/`td` for one reason: a
    * third of the cells in these tables carry hand-written classes rather

@@ -24,7 +24,7 @@ import {
   toPersianDigits,
 } from "../utils/formatters";
 import { staggerContainer, staggerItem, transition } from "../motion";
-import { ChartCard, ChartTable } from "../components/charts/chartKit";
+import { ChartCard } from "../components/charts/chartKit";
 import { SERIES } from "../utils/chartSeries";
 import { DEVICE_STATUSES, deviceStatusOf } from "../utils/deviceStatus";
 import DonutChart from "../components/charts/DonutChart";
@@ -581,14 +581,6 @@ export default function Dashboard() {
               centreLabel="کل دستگاه‌ها"
               emptyMessage="هنوز دستگاهی ثبت نشده"
             />
-            <ChartTable
-              caption="نمایش اعداد به‌صورت جدول"
-              columns={["وضعیت", "تعداد"]}
-              rows={statusSlices.map((slice) => [
-                slice.label,
-                toPersianDigits(slice.value),
-              ])}
-            />
           </ChartCard>
 
           <ChartCard
@@ -604,13 +596,6 @@ export default function Dashboard() {
             }
           >
             <BarList rows={workloadRows} emptyMessage="دستگاهی در جریان نیست" />
-            {workloadRows.length > 0 && (
-              <ChartTable
-                caption="نمایش اعداد به‌صورت جدول"
-                columns={["تعمیرکار", "دستگاه در جریان"]}
-                rows={workloadRows.map((row) => [row.label, row.display])}
-              />
-            )}
           </ChartCard>
         </div>
       </Section>
@@ -802,17 +787,6 @@ export default function Dashboard() {
             }
           >
             <BarList rows={topItemRows} emptyMessage="هنوز فروشی ثبت نشده" />
-            {stats.top_items.length > 0 && (
-              <ChartTable
-                caption="نمایش اعداد به‌صورت جدول"
-                columns={["کالا", "مبلغ فروش (ریال)", "تعداد فروش"]}
-                rows={stats.top_items.map((item) => [
-                  item.name ?? "—",
-                  formatPersianCurrency(item.revenue),
-                  toPersianDigits(item.sold_quantity),
-                ])}
-              />
-            )}
           </ChartCard>
           <ChartCard
             title="آخرین تراکنش‌های انبار"

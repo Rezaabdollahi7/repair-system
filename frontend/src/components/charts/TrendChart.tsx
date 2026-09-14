@@ -8,7 +8,6 @@ import {
 import { jalaliDayAndMonth, jalaliDayOf } from "../../utils/jalali";
 import {
   ChartEmpty,
-  ChartTable,
   ChartTooltip,
   Legend,
   type TooltipState,
@@ -201,7 +200,7 @@ export default function TrendChart({ series }: { series: TrendPoint[] }) {
             width={width}
             height={HEIGHT}
             role="img"
-            aria-label={`روند درآمد روزانه؛ جمع تعمیر ${formatPersianCompact(totals.repair)} ریال و جمع فروش ${formatPersianCompact(totals.sale)} ریال. جدول اعداد پایین نمودار است.`}
+            aria-label={`روند درآمد روزانه؛ جمع تعمیر ${formatPersianCompact(totals.repair)} ریال و جمع فروش ${formatPersianCompact(totals.sale)} ریال.`}
             className="block overflow-visible"
             /*
              * LTR inside the SVG, even though the page is RTL.
@@ -365,18 +364,6 @@ export default function TrendChart({ series }: { series: TrendPoint[] }) {
         )}
         <ChartTooltip state={tooltip} />
       </div>
-
-      <ChartTable
-        caption="نمایش اعداد به‌صورت جدول"
-        columns={["روز", "تعمیر (ریال)", "فروش (ریال)"]}
-        rows={[...series]
-          .reverse()
-          .map((point) => [
-            jalaliDayAndMonth(point.date),
-            formatPersianCurrency(point.repair),
-            formatPersianCurrency(point.sale),
-          ])}
-      />
     </div>
   );
 }

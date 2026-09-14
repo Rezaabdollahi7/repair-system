@@ -105,61 +105,6 @@ export function Legend({ entries }: { entries: LegendEntry[] }) {
   );
 }
 
-/* ── Table fallback ─────────────────────────────────────────────────── */
-
-/**
- * The same numbers as a real table, collapsed behind a <details>.
- *
- * Not a nicety: it is the relief channel the palette's contrast check
- * requires, the answer for a screen reader that cannot walk an SVG, and the
- * only way to read an exact value on a touch screen with no hover. Closed by
- * default so it costs no space.
- */
-export function ChartTable({
-  caption,
-  columns,
-  rows,
-}: {
-  caption: string;
-  columns: string[];
-  rows: (string | number)[][];
-}) {
-  return (
-    <details className="mt-4 group">
-      <summary className="text-body-xs text-text-muted cursor-pointer hover:text-text-secondary transition-colors w-fit">
-        {caption}
-      </summary>
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full text-body-xs">
-          <thead>
-            <tr className="text-text-muted">
-              {columns.map((column) => (
-                <th key={column} className="text-right font-medium py-1 px-2">
-                  {column}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={index} className="border-t border-border-subtle">
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    className="py-1 px-2 text-text-secondary tabular-nums"
-                  >
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </details>
-  );
-}
-
 /* ── Tooltip ────────────────────────────────────────────────────────── */
 
 export interface TooltipState {

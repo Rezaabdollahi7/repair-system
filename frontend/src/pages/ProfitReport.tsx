@@ -15,7 +15,7 @@ import {
   formatPersianPercent,
   toPersianDigits,
 } from "../utils/formatters";
-import { ChartCard, ChartTable } from "../components/charts/chartKit";
+import { ChartCard } from "../components/charts/chartKit";
 import DivergingBarList from "../components/charts/DivergingBarList";
 import { staggerContainer, staggerItem } from "../motion";
 import {
@@ -292,14 +292,6 @@ export default function ProfitReport() {
               <DivergingBarList
                 rows={byProfit}
                 emptyMessage="سودی برای نمایش نیست"
-              />
-              <ChartTable
-                caption="نمایش اعداد به‌صورت جدول"
-                columns={["کالا", "سود (ریال)"]}
-                rows={byProfit.map((row) => [
-                  row.label,
-                  formatPersianCurrency(row.value),
-                ])}
               />
             </ChartCard>
           )}

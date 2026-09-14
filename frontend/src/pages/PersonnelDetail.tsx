@@ -22,7 +22,6 @@ import ConfirmModal from "../components/ConfirmModal";
 import StatusPill from "../components/StatusPill";
 import DonutChart from "../components/charts/DonutChart";
 import ColumnChart from "../components/charts/ColumnChart";
-import { ChartTable } from "../components/charts/chartKit";
 import { DEVICE_STATUSES, deviceStatusOf } from "../utils/deviceStatus";
 import { roleStyleOf } from "../utils/roleStatus";
 import { errorText } from "../utils/errors";
@@ -408,16 +407,6 @@ export default function PersonnelDetail() {
           }))}
           unit="دستگاه"
           emptyMessage="در دوازده ماه گذشته دستگاهی تکمیل نشده است."
-        />
-        {/* The relief channel the palette's contrast check requires, and the
-            only way to read an exact month on a touch screen. */}
-        <ChartTable
-          caption="نمایش جدول اعداد"
-          columns={["ماه", "دستگاه"]}
-          rows={monthly.map((point) => [
-            point.label,
-            toPersianDigits(point.count),
-          ])}
         />
       </Section>
 

@@ -18,8 +18,8 @@
  * `table-shell` is a marker, not a style: index.css hangs the cell grid and
  * the alternating rows off it. It lives on the card rather than on the
  * <table> so all twelve lists get both from the class they already use, and
- * so the relief tables inside the chart cards — which are not in a card —
- * keep their own quieter treatment.
+ * so the print sheets — which are not in a card — keep their own quieter
+ * treatment.
  */
 export const tableCard =
   "table-shell bg-surface border border-border rounded-card shadow-sm overflow-hidden";

@@ -1,21 +1,18 @@
 /**
  * فرمت شماره تماس فارسی
- * 09330020020 → ۰۹۳۳ ۰۰۲ ۰۰۲۰
+ * 09219811980 → ۰۹۲۱۹۸۱۱۹۸۰
+ *
+ * One unbroken run of digits, deliberately. The grouped form — ۰۹۲۱-۹۸۱-۱۹۸۰
+ * — was assembled right-to-left from three slices, which meant the number a
+ * shop read off the screen was not the number it would dial, and a number
+ * copied out of a table came with separators the next field would reject.
+ * A mobile number is an identifier here, not prose: it is searched for,
+ * compared against another one, and read aloud. All three want it whole.
  */
 export function formatPersianPhone(phone: string | null | undefined): string {
   if (!phone) return "—";
 
-  const digits = phone.replace(/\D/g, "");
-
-  if (digits.length === 11) {
-    // 09123456789 → ۰۹۱۲ ۳۴۵ ۶۷۸۹
-    return `${toPersianDigits(digits.slice(7))} - ${toPersianDigits(digits.slice(4, 7))} - ${toPersianDigits(digits.slice(0, 4))} `;
-  } else if (digits.length === 10 && digits.startsWith("0")) {
-    // 02112345678 → ۰۲۱ ۱۲۳۴ ۵۶۷۸
-    return `${toPersianDigits(digits.slice(7))} - ${toPersianDigits(digits.slice(3, 7))} -  ${toPersianDigits(digits.slice(0, 3))}`;
-  }
-
-  return toPersianDigits(digits);
+  return toPersianDigits(phone.replace(/\D/g, ""));
 }
 
 /**

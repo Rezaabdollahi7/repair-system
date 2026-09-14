@@ -790,6 +790,20 @@ body {
     border-inline-start: 1px solid var(--border);
   }
 
+  /*
+   * ⚠️ `border-inline-start` resolves against the **cell's own** direction,
+   * not the table's. A cell carrying `dir="ltr"` — which several of these
+   * tables used to do, to hold a phone number or a part code — therefore
+   * drew its rule down the left edge instead of the right, so the grid lost
+   * the line beside it and doubled the one on its far side. The devices and
+   * customers lists both showed it as a missing rule next to the customer
+   * name.
+   *
+   * The fix is in the markup and has to stay there: put `dir="ltr"` on a
+   * span **inside** the cell, never on the cell. Nothing here can undo it —
+   * a rule cannot reach a value the element resolved for itself.
+   */
+
   /* The first cell of each row is the outer edge — in RTL the right one —
      and the card already draws a border there. */
   .table-shell table :is(th, td):first-child {

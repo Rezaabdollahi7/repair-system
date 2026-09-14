@@ -446,7 +446,6 @@ export default function ProfitReport() {
                         >
                           <td
                             className={`${td} tabular-nums`}
-                            dir="ltr"
                             style={{
                               boxShadow: `inset -3px 0 0 0 ${
                                 item.profit >= 0
@@ -455,7 +454,9 @@ export default function ProfitReport() {
                               }`,
                             }}
                           >
-                            {item.item_code ?? "—"}
+                            <span dir="ltr" className="inline-block">
+                              {item.item_code ?? "—"}
+                            </span>
                           </td>
                           <td className={`${td} font-bold text-primary`}>
                             {item.item_name ?? "—"}

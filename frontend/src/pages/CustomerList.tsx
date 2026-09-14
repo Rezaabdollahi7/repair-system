@@ -327,8 +327,10 @@ export default function CustomerList() {
                       <td className={`${td} font-bold text-primary`}>
                         {c.name}
                       </td>
-                      <td className={`${tdMuted} tabular-nums`} dir="ltr">
-                        {formatPersianPhone(c.phone)}
+                      <td className={`${tdMuted} tabular-nums`}>
+                        <span dir="ltr" className="inline-block">
+                          {formatPersianPhone(c.phone)}
+                        </span>
                       </td>
                       <td className={tdBare}>
                         {deviceChip(c.device_count ?? 0)}

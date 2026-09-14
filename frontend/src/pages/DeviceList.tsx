@@ -1058,8 +1058,10 @@ export default function DeviceList() {
                           {device.customer_name ?? "مشتری"}
                         </button>
                       </td>
-                      <td className={`${tdMuted} tabular-nums`} dir="ltr">
-                        {formatPersianPhone(device.customer_phone)}
+                      <td className={`${tdMuted} tabular-nums`}>
+                        <span dir="ltr" className="inline-block">
+                          {formatPersianPhone(device.customer_phone)}
+                        </span>
                       </td>
                       <td className={td}>{device.device_name}</td>
                       <td className={td}>{device.brand ?? "—"}</td>

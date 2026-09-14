@@ -421,12 +421,13 @@ export default function StockReport() {
                           >
                             <td
                               className={`${td} tabular-nums`}
-                              dir="ltr"
                               style={{
                                 boxShadow: `inset -3px 0 0 0 ${status.color}`,
                               }}
                             >
-                              {item.code}
+                              <span dir="ltr" className="inline-block">
+                                {item.code}
+                              </span>
                             </td>
                             <td className={`${td} font-bold text-primary`}>
                               {item.name}

@@ -450,16 +450,18 @@ export default function PersonnelList() {
                         </td>
                         <td
                           className={`${tdMuted} whitespace-nowrap tabular-nums`}
-                          dir="ltr"
                         >
-                          {toPersianDigits(person.username)}
+                          <span dir="ltr" className="inline-block">
+                            {toPersianDigits(person.username)}
+                          </span>
                         </td>
                         <td className={tdBare}>{roleBadge(person)}</td>
                         <td
                           className={`${tdMuted} whitespace-nowrap tabular-nums`}
-                          dir="ltr"
                         >
-                          {formatPersianPhone(person.phone)}
+                          <span dir="ltr" className="inline-block">
+                            {formatPersianPhone(person.phone)}
+                          </span>
                         </td>
                         <td className={tdBare}>{activeBadge(person)}</td>
                         {canManage && (

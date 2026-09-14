@@ -42,6 +42,7 @@ import type {
 import { modalPanel } from "../motion";
 import { DEVICE_STATUSES } from "../utils/deviceStatus";
 import { getSmsCapability } from "../api";
+import { smsOutcomeText } from "../utils/smsOutcome";
 import { useAuth } from "../context/AuthContext";
 import type { DeviceSmsOutcome, SmsCapability } from "../types/api";
 
@@ -56,16 +57,6 @@ import type { DeviceSmsOutcome, SmsCapability } from "../types/api";
 const NOTIFYING_STATUSES: Record<string, string> = {
   ready_for_pickup: "ارسال پیامک آماده تحویل به مشتری",
   delivered: "ارسال پیامک تحویل دستگاه به مشتری",
-};
-
-/** What the shop is told about a message that did not go. */
-const SMS_OUTCOME_TEXT: Record<string, string> = {
-  sent: "پیامک برای مشتری ارسال شد",
-  insufficient_balance: "اعتبار پیامکی کافی نبود؛ پیامکی ارسال نشد",
-  invalid_phone: "شماره موبایل مشتری معتبر نیست؛ پیامکی ارسال نشد",
-  disabled: "ارسال پیامک به مشتریان غیرفعال است",
-  refunded: "ارسال پیامک ناموفق بود؛ هزینه به کیف پول برگشت",
-  failed: "ارسال پیامک ناموفق بود",
 };
 
 /**
@@ -476,12 +467,12 @@ export default function DeviceFormModal({
 
       if (isEdit && deviceId) {
         const res = await updateDevice(deviceId, form as DeviceCreateBody);
-        sms = (res.data as { sms?: DeviceSmsOutcome }).sms;
+        sms = res.data.sms;
         toast.success("دستگاه ویرایش شد");
       } else {
         const res = await createDevice(form as DeviceCreateBody);
         devId = res.data.id;
-        sms = (res.data as { sms?: DeviceSmsOutcome }).sms;
+        sms = res.data.sms;
         toast.success("دستگاه ثبت شد");
       }
 
@@ -490,7 +481,7 @@ export default function DeviceFormModal({
       // sees «دستگاه ثبت شد» should not have to read past it to learn the
       // customer was not told.
       if (sms) {
-        const text = SMS_OUTCOME_TEXT[sms.status] ?? "وضعیت پیامک نامشخص است";
+        const text = smsOutcomeText(sms);
         if (sms.status === "sent") toast.success(text);
         else toast.error(text);
       }

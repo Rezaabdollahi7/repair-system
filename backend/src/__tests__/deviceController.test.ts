@@ -288,6 +288,67 @@ describe("deviceController.update", () => {
     });
   });
 
+  it("stamps today's date when a device is handed back", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "repaired" });
+    db.device.update.mockResolvedValue(deviceRow({ status: "delivered" }));
+
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { status: "delivered" } }),
+      mockResponse(),
+    );
+
+    const { exitDate } = db.device.update.mock.calls[0][0].data;
+    const now = new Date();
+
+    expect(exitDate).toEqual(
+      new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+    );
+  });
+
+  it("does not move the exit date of a device already delivered", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "delivered" });
+    db.device.update.mockResolvedValue(deviceRow({ status: "delivered" }));
+
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { status: "delivered" } }),
+      mockResponse(),
+    );
+
+    expect(db.device.update.mock.calls[0][0].data).toEqual({
+      status: "delivered",
+    });
+  });
+
+  it("keeps an exit date the request set for itself", async () => {
+    const backdated = new Date("2026-02-03T00:00:00.000Z");
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "repaired" });
+    db.device.update.mockResolvedValue(deviceRow({ status: "delivered" }));
+
+    await controller.update(
+      mockRequest({
+        params: { id: 1 },
+        body: { status: "delivered", exit_date: backdated },
+      }),
+      mockResponse(),
+    );
+
+    expect(db.device.update.mock.calls[0][0].data.exitDate).toEqual(backdated);
+  });
+
+  it("leaves the exit date alone for every other status", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "pending" });
+    db.device.update.mockResolvedValue(deviceRow());
+
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { status: "repairing" } }),
+      mockResponse(),
+    );
+
+    expect(db.device.update.mock.calls[0][0].data).toEqual({
+      status: "repairing",
+    });
+  });
+
   it("returns 404 without attempting the update", async () => {
     db.device.findFirst.mockResolvedValue(null);
 

@@ -19,6 +19,7 @@ import type {
   ListedDeviceImage,
   UploadedDeviceImage,
   DeviceUpdateBody,
+  DeviceWriteResponse,
   DeviceAssignment,
   Category,
   CategoryBody,
@@ -241,9 +242,9 @@ export const getDevices = (params?: QueryParams) =>
   api.get<PaginatedDevices>("/devices", { params });
 export const getDevice = (id: Id) => api.get<Device>(`/devices/${id}`);
 export const createDevice = (data: DeviceCreateBody) =>
-  api.post<Device>("/devices", data);
+  api.post<DeviceWriteResponse>("/devices", data);
 export const updateDevice = (id: Id, data: DeviceUpdateBody) =>
-  api.put<Device>(`/devices/${id}`, data);
+  api.put<DeviceWriteResponse>(`/devices/${id}`, data);
 export const deleteDevice = (id: Id) =>
   api.delete<MessageResponse>(`/devices/${id}`);
 
@@ -490,8 +491,7 @@ export const getQuote = (data: CheckoutBody) =>
 
 // SMS wallet (phase 12)
 export const getSmsWallet = () => api.get<SmsWalletStatus>("/sms/wallet");
-export const getSmsCapability = () =>
-  api.get<SmsCapability>("/sms/capability");
+export const getSmsCapability = () => api.get<SmsCapability>("/sms/capability");
 export const startSmsTopup = (amountRials: number) =>
   api.post<SmsTopupStarted>("/sms/wallet/topup", { amount_rials: amountRials });
 export const verifySmsTopup = (trackId: string) =>

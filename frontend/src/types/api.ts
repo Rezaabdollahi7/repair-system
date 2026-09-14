@@ -315,6 +315,15 @@ export interface DeviceCreateBody {
   exit_date?: string | null;
   status?: string;
   description?: string | null;
+  /**
+   * A request that the customer be texted, not an instruction.
+   *
+   * The server decides whether a message actually goes: the workshop's
+   * toggle, the customer's number and the wallet balance are all things a
+   * client cannot see, and a status that did not move earns no message
+   * whatever this says.
+   */
+  send_sms?: boolean;
 }
 
 /**
@@ -1205,10 +1214,7 @@ export interface SmsWalletStatus {
 }
 
 export type SmsWalletTransactionType =
-  | "topup"
-  | "send"
-  | "refund"
-  | "adjustment";
+  "topup" | "send" | "refund" | "adjustment";
 
 /** A row of GET /sms/wallet/transactions. */
 export interface SmsWalletTransaction {
@@ -1241,9 +1247,7 @@ export interface SmsTopup {
 }
 
 export type SmsMessageKind =
-  | "device_accepted"
-  | "device_ready"
-  | "device_delivered";
+  "device_accepted" | "device_ready" | "device_delivered";
 
 export type SmsMessageStatus =
   | "pending"
@@ -1303,7 +1307,12 @@ export interface SmsCapability {
   reason: "disabled" | "insufficient_balance" | null;
   notifications_enabled: boolean;
   /** How much of each value survives into the message.  */
-  parameter_caps: { NAME: number; DEVICE: number; NUMBER: number; SHOP: number };
+  parameter_caps: {
+    NAME: number;
+    DEVICE: number;
+    NUMBER: number;
+    SHOP: number;
+  };
 }
 
 /** What a device write reports about the message it tried to send. */
@@ -1312,3 +1321,13 @@ export interface DeviceSmsOutcome {
   status: SmsMessageStatus;
   costRials: number;
 }
+
+/**
+ * What POST /devices and PUT /devices/:id answer with.
+ *
+ * The device, plus what became of the notification the write may have
+ * earned. `sms` is absent whenever nothing was attempted — which is most
+ * writes — and its presence is not a claim that a message went: read
+ * `sms.status` for that.
+ */
+export type DeviceWriteResponse = Device & { sms?: DeviceSmsOutcome };

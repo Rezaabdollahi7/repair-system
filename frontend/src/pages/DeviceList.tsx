@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getDevices, deleteDevice, updateDevice } from "../api";
+import {
+  getDevices,
+  deleteDevice,
+  updateDevice,
+  getSmsCapability,
+} from "../api";
 import FilterPanel from "../components/FilterPanel";
 import SmsBalanceBanner from "../components/SmsBalanceBanner";
 import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
@@ -26,6 +31,7 @@ import {
   DocumentCurrencyDollarIcon,
   XCircleIcon,
   CheckCircleIcon,
+  ChatBubbleLeftRightIcon,
   DocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import ConfirmModal from "../components/ConfirmModal";
@@ -65,7 +71,13 @@ import {
 } from "../utils/tableClasses";
 import { DEVICE_STATUSES, deviceStatusOf } from "../utils/deviceStatus";
 import type { DeviceFilters } from "../components/FilterPanel";
-import type { Device, DeviceAssignee, QueryParams } from "../types/api";
+import { smsOutcomeText } from "../utils/smsOutcome";
+import type {
+  Device,
+  DeviceAssignee,
+  QueryParams,
+  SmsCapability,
+} from "../types/api";
 
 /**
  * Whether this device has been invoiced, and if so whether it was paid.
@@ -176,6 +188,144 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/**
+ * Asked when a device is marked as handed back, before anything is saved.
+ *
+ * The delivery message is the one notification a shop decides on per
+ * device rather than once in its settings: a customer standing at the
+ * counter collecting their own device does not need a text about it, and
+ * one collected by a relative or a courier very much does. The device form
+ * asks the same question with a toggle; the status picker in this list had
+ * no way to ask at all, so it quietly sent nothing.
+ *
+ * Three buttons rather than two, because "no" and "not now" are different
+ * answers: both of the first two change the status, and only انصراف leaves
+ * the device alone.
+ */
+function DeliverySmsPrompt({
+  device,
+  saving,
+  onAnswer,
+  onCancel,
+}: {
+  device: Device | null;
+  saving: boolean;
+  onAnswer: (sendSms: boolean) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {device && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+        >
+          <motion.div
+            variants={backdrop}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={saving ? undefined : onCancel}
+            className="absolute inset-0 bg-scrim/50"
+          />
+          <motion.div
+            variants={modalPanel}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="relative bg-surface border border-border rounded-panel
+                       shadow-xl w-full max-w-md overflow-hidden"
+            dir="rtl"
+          >
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-title-sm font-bold text-text-primary">
+                تحویل دستگاه
+              </h3>
+            </div>
+
+            <div className="p-5 flex items-start gap-4">
+              <span
+                className="shrink-0 w-11 h-11 rounded-field bg-primary-soft
+                           text-primary flex items-center justify-center"
+              >
+                <ChatBubbleLeftRightIcon className="w-6 h-6" />
+              </span>
+              <div className="text-body-sm text-text-primary space-y-1.5">
+                <p>
+                  پیامک تحویل دستگاه برای{" "}
+                  <span className="font-bold">
+                    {device.customer_name ?? "مشتری"}
+                  </span>{" "}
+                  ارسال شود؟
+                </p>
+                {/* The number, because the shop is about to spend a message
+                    on it and a device with the wrong one attached is worth
+                    catching here rather than in the sms log. */}
+                <p className="text-text-secondary tabular-nums">
+                  <span dir="ltr" className="inline-block">
+                    {formatPersianPhone(device.customer_phone)}
+                  </span>
+                </p>
+                <p className="text-text-secondary">
+                  تاریخ خروج دستگاه در هر صورت روی امروز ثبت می‌شود.
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="flex flex-wrap gap-3 justify-end px-5 py-4
+                         border-t border-border bg-surface-alt"
+            >
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-field border border-border bg-surface
+                           text-body-sm font-bold text-text-primary
+                           hover:border-border-strong transition-colors cursor-pointer
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={() => onAnswer(false)}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-field border border-border bg-surface
+                           text-body-sm font-bold text-text-primary
+                           hover:border-border-strong transition-colors cursor-pointer
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                خیر، بدون پیامک
+              </button>
+              <button
+                type="button"
+                onClick={() => onAnswer(true)}
+                disabled={saving}
+                aria-busy={saving}
+                className="px-4 py-2.5 rounded-field bg-primary text-primary-fg
+                           text-body-sm font-bold hover:bg-primary-hover
+                           transition-colors flex items-center gap-2 cursor-pointer
+                           disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {saving && (
+                  <span
+                    aria-hidden
+                    className="w-4 h-4 rounded-full border-2 border-current/30
+                               border-t-current animate-spin"
+                  />
+                )}
+                بله، ارسال کن
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -291,6 +441,21 @@ export default function DeviceList() {
   const [deleteTarget, setDeleteTarget] = useState<Device | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  /*
+   * The device waiting on an answer about its delivery message, and whether
+   * that answer is currently being saved.
+   *
+   * `smsCapability` is what the server says this workshop can do —
+   * notifications switched on, wallet funded. Asking a shop that cannot send
+   * whether it would like to send is a dialog with one real answer, so when
+   * it says no the status change goes straight through as it always did.
+   */
+  const [deliveryPrompt, setDeliveryPrompt] = useState<Device | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [smsCapability, setSmsCapability] = useState<SmsCapability | null>(
+    null,
+  );
+
   const activeFilterCount = Object.values(filters).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v !== "",
   ).length;
@@ -369,14 +534,83 @@ export default function DeviceList() {
     });
   }, [refreshList, fetchDevices, debouncedSearch, filters, page, limit]);
 
-  const handleStatusChange = async (deviceId: number, newStatus: string) => {
+  /*
+   * Read once, when the page opens. It answers can-I-send as two flags and
+   * a reason with no balance in it, which is why a technician may call it —
+   * and a technician is exactly who marks a device as delivered.
+   *
+   * A failure leaves it null, which reads as "cannot send" and costs the
+   * shop a dialog rather than a message: the server is the one that decides
+   * either way, so guessing optimistically here would only produce a
+   * question whose answer is then ignored.
+   */
+  useEffect(() => {
+    getSmsCapability()
+      .then(({ data }) => setSmsCapability(data))
+      .catch(() => setSmsCapability(null));
+  }, []);
+
+  /**
+   * Writes the new status, and reports what became of any message it earned.
+   *
+   * `send_sms` is only ever sent when the shop was actually asked. Leaving
+   * it out is not the same as sending false — it is the absence the server
+   * already reads as "no message", and it keeps this call identical to what
+   * it was for the eight statuses that have nothing to announce.
+   */
+  const applyStatusChange = async (
+    deviceId: number,
+    newStatus: string,
+    sendSms?: boolean,
+  ) => {
+    setStatusSaving(true);
     try {
-      await updateDevice(deviceId, { status: newStatus });
+      const res = await updateDevice(deviceId, {
+        status: newStatus,
+        ...(sendSms === undefined ? {} : { send_sms: sendSms }),
+      });
       toast.success("وضعیت دستگاه بروز شد");
+
+      // A second toast, not a combined line: the device saved either way,
+      // and a shop reading «وضعیت دستگاه بروز شد» should not have to read
+      // past it to learn the customer was never told.
+      const sms = res.data.sms;
+      if (sms) {
+        const text = smsOutcomeText(sms);
+        if (sms.status === "sent") toast.success(text);
+        else toast.error(text);
+      }
+
+      setDeliveryPrompt(null);
       void fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
+    } finally {
+      setStatusSaving(false);
     }
+  };
+
+  /**
+   * What the picker calls. Every status but one goes straight through.
+   *
+   * «تحویل داده شده» stops to ask, because it is the only change in this
+   * list that can put a message on a customer's phone and the shop is the
+   * only one who knows whether that customer is standing in front of them.
+   * Asked on the transition, so re-picking the status a device already has
+   * neither asks nor sends — the same rule the server applies.
+   */
+  const handleStatusChange = (device: Device, newStatus: string) => {
+    const asksAboutSms =
+      newStatus === "delivered" &&
+      device.status !== "delivered" &&
+      Boolean(smsCapability?.can_send);
+
+    if (asksAboutSms) {
+      setDeliveryPrompt(device);
+      return;
+    }
+
+    void applyStatusChange(device.id, newStatus);
   };
 
   /**
@@ -748,7 +982,7 @@ export default function DeviceList() {
                     <StatusBadge
                       status={device.status}
                       onStatusChange={(newStatus) =>
-                        handleStatusChange(device.id, newStatus)
+                        handleStatusChange(device, newStatus)
                       }
                     />
                     {isAtLeast("admin") && (
@@ -833,7 +1067,7 @@ export default function DeviceList() {
                         <StatusBadge
                           status={device.status}
                           onStatusChange={(newStatus) =>
-                            handleStatusChange(device.id, newStatus)
+                            handleStatusChange(device, newStatus)
                           }
                         />
                       </td>
@@ -878,6 +1112,17 @@ export default function DeviceList() {
           }}
         />
       </div>
+
+      <DeliverySmsPrompt
+        device={deliveryPrompt}
+        saving={statusSaving}
+        onAnswer={(sendSms) => {
+          if (deliveryPrompt) {
+            void applyStatusChange(deliveryPrompt.id, "delivered", sendSms);
+          }
+        }}
+        onCancel={() => setDeliveryPrompt(null)}
+      />
 
       <ConfirmModal
         isOpen={!!deleteTarget}

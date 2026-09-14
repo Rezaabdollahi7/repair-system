@@ -271,6 +271,21 @@ async function notifyIfAsked(
   });
 }
 
+/**
+ * Today, as a date input would have produced it.
+ *
+ * Midnight UTC built from the *local* calendar day, which is the shape every
+ * other date in this table already has: the pickers submit "۱۴۰۵-۰۶-۲۳",
+ * zod coerces that to midnight UTC, and the exports and the list read the
+ * day back through the local timezone. Stamping `new Date()` instead would
+ * put a time of day in a column where nothing else has one, and an evening
+ * hand-over in Tehran would read back as the following day.
+ */
+function todayAsDateOnly(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+}
+
 // POST /api/devices
 export const create = async (req: Request, res: Response) => {
   try {
@@ -348,6 +363,25 @@ export const update = async (req: Request, res: Response) => {
     if (body.description !== undefined) data.description = body.description;
     if (body.needs_invoice !== undefined) {
       data.needsInvoice = body.needs_invoice;
+    }
+
+    /*
+     * A device that has just been handed back left the shop today, and the
+     * exit date is the one field nobody remembers to fill in — the status
+     * picker in the list does not even show it.
+     *
+     * Stamped on the *transition* rather than on the value, for the same
+     * reason the notification is: re-saving a device that was already
+     * delivered must not move the date it was delivered on. And only when
+     * the request did not set the field itself, so a shop correcting the
+     * date of a hand-over it is recording late still wins.
+     */
+    if (
+      body.status === "delivered" &&
+      existing.status !== "delivered" &&
+      body.exit_date === undefined
+    ) {
+      data.exitDate = todayAsDateOnly();
     }
 
     const device = await prisma.device.update({

@@ -93,6 +93,19 @@ interface SelectedPerson {
   username?: string;
 }
 
+/**
+ * What to call a member of staff on screen.
+ *
+ * Their name, falling back to the username only for a row that somehow has
+ * no name at all. The username is a mobile number here — sign-up and
+ * personnel creation share phoneSchema — so it is a last resort, not a
+ * label: a list of «۰۹۱۲…» is a list of account identifiers, and nobody
+ * assigns a repair to one of those.
+ */
+function personName(person: Personnel): string {
+  return person.full_name || person.username;
+}
+
 const INITIAL_FORM: DeviceForm = {
   customer_id: "",
   device_name: "",
@@ -206,12 +219,24 @@ export default function DeviceFormModal({
   const debouncedDeviceNameSearch = useDebounce(deviceNameSearch, 300);
   const debouncedBrandSearch = useDebounce(brandSearch, 300);
 
-  const filteredPersonnel = personnelList.filter((p) => {
-    const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
-    // A personnel row has no `name`: the old `p.name ?? p.full_name` always
-    // fell through to the second.
-    return !alreadySelected && p.full_name.includes(personnelSearch);
-  });
+  /**
+   * The people this device can still be assigned to, by name.
+   *
+   * Sorted, and that is the point of the sort key rather than the filter:
+   * the endpoint answers in `createdAt desc`, so the picker listed the shop
+   * in the order its accounts happened to be created — newest first, which
+   * from the counter reads as no order at all. `localeCompare` with "fa"
+   * puts Persian names in Persian alphabetical order; the browser's default
+   * collation sorts by code point and scatters ا، آ and ئ.
+   */
+  const filteredPersonnel = personnelList
+    .filter((p) => {
+      const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
+      // A personnel row has no `name`: the old `p.name ?? p.full_name` always
+      // fell through to the second.
+      return !alreadySelected && personName(p).includes(personnelSearch);
+    })
+    .sort((a, b) => personName(a).localeCompare(personName(b), "fa"));
 
   const searchCustomersAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
@@ -446,7 +471,7 @@ export default function DeviceFormModal({
   const handleSelectPersonnel = (person: Personnel) => {
     setSelectedPersonnel((prev) => [
       ...prev,
-      { id: person.id, name: person.full_name, username: person.username },
+      { id: person.id, name: personName(person), username: person.username },
     ]);
     setPersonnelSearch("");
     setShowPersonnelDropdown(false);
@@ -692,10 +717,15 @@ export default function DeviceFormModal({
                             onMouseDown={() => handleSelectPersonnel(person)}
                             className="px-3 py-2.5 text-body-sm hover:bg-primary-soft cursor-pointer flex items-center justify-between text-text-primary"
                           >
-                            <span>{person.full_name}</span>
-                            {person.username && (
+                            <span>{personName(person)}</span>
+                            {/* The role, not the username. The username is
+                                the person's mobile number, and a column of
+                                «@۰۹۱۲…» beside the names told the shop
+                                nothing it was choosing between — where
+                                «تکنسین» does. */}
+                            {person.role_label && (
                               <span className="text-body-xs text-text-secondary">
-                                @{person.username}
+                                {person.role_label}
                               </span>
                             )}
                           </div>
@@ -711,7 +741,7 @@ export default function DeviceFormModal({
                         key={person.id}
                         className="inline-flex items-center gap-1 px-3 py-1 bg-primary-soft text-primary text-body-sm rounded-full"
                       >
-                        {person.name}
+                        {person.name || person.username}
                         <button
                           type="button"
                           onClick={() => handleRemovePersonnel(person.id)}

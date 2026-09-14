@@ -53,18 +53,46 @@ export const tbody = "divide-y divide-border";
 
 /**
  * Rows used to invert to a solid --primary on hover, which turned every soft
- * status badge inside them into a stain. A tint of the row's own surface says
- * "this one" just as clearly and leaves the contents readable.
+ * status badge inside them into a stain. A wash says "this one" just as
+ * clearly and leaves the contents readable.
+ *
+ * The wash is `--accent-tint` — the blue the palette defines for exactly
+ * this, "the softest wash that still reads as blue on the page ground (a
+ * selected row, a bar's empty track)". It replaces `--surface-alt/70`, which
+ * landed within a hair of the even-row stripe below it: hovering an odd row
+ * turned it into something indistinguishable from its neighbour, which is
+ * the opposite of what a hover is for.
+ *
+ * `group` so the cells can follow the background. Nothing inside a row
+ * claims that class, so it is free to mean "the hovered row" here.
  */
-export const tr = "transition-colors hover:bg-surface-alt/70";
+export const tr = "group transition-colors hover:bg-accent-tint";
 
 /** Clickable rows say so, and keep a visible focus ring for the keyboard. */
 export const trClickable = `${tr} cursor-pointer`;
 
-export const td = "px-2.5 py-3.5 text-table text-center text-text-primary";
+/*
+ * The two text cells take the brand's own text step while their row is
+ * hovered, so the row reads as one thing under the cursor rather than as a
+ * blue band with the page's ordinary grey still sitting on it.
+ *
+ * Measured, not guessed: `--accent-text` on `--accent-tint` is 6.07:1 in the
+ * light theme and 7.59:1 in the dark one. It raises the muted cells rather
+ * than lowering anything — `--text-secondary` on that wash is 6.08:1, and
+ * the hierarchy between the two cell kinds is carried by the resting state,
+ * which is where a reader is actually comparing rows.
+ *
+ * `tdBare` and `tdActions` are deliberately left out. Their colour is the
+ * caller's — a paid amount in green, a badge, a row of tinted buttons — and
+ * overriding it on hover would erase the one thing those cells are for.
+ */
+export const td =
+  "px-2.5 py-3.5 text-table text-center text-text-primary " +
+  "group-hover:text-accent-text";
 
 export const tdMuted =
-  "px-2.5 py-3.5 text-table text-center text-text-secondary";
+  "px-2.5 py-3.5 text-table text-center text-text-secondary " +
+  "group-hover:text-accent-text";
 
 /**
  * A cell whose text colour the caller sets.

@@ -263,6 +263,16 @@ export interface CustomerNotesBody {
  */
 export interface Device {
   id: number;
+  /**
+   * What the shop calls this device: the number on the intake slip, quoted
+   * over the phone, printed on the invoice and sent in every customer
+   * notification. Per-workspace and starting at 1.
+   *
+   * Not `id`, which is a platform-wide key used for routes and modals. The
+   * two were the same value until 2.9, which meant a new shop's first device
+   * could be numbered 4,812.
+   */
+  reception_number: number;
   customer_id: number | null;
   device_name: string;
   brand: string | null;
@@ -506,6 +516,8 @@ export interface PersonnelStatusCount {
 
 export interface PersonnelHistoryRow {
   device_id: number;
+  /** Shown in the «پذیرش» column; `device_id` is what the row click opens. */
+  reception_number: number;
   device_name: string;
   brand: string | null;
   model: string | null;
@@ -627,6 +639,7 @@ export interface PaymentUpdateResponse {
 export interface SaleInvoice {
   id: number;
   invoice_number: string;
+  reception_number?: number;
   customer_id: number | null;
   customer_name: string;
   customer_phone: string | null;
@@ -747,6 +760,7 @@ export interface RepairInvoice {
   id: number;
   invoice_number: string;
   device_id: number;
+  reception_number: number;
   customer_id: number | null;
   customer_name: string;
   customer_phone: string | null;

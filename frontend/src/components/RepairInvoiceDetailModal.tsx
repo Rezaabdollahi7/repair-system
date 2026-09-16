@@ -249,7 +249,7 @@ export default function RepairInvoiceDetailModal({
                             }}
                             className="text-primary hover:underline"
                           >
-                            {toPersianDigits(invoice.device_id)}
+                            {toPersianDigits(invoice.reception_number)}
                           </button>
                         }
                       />

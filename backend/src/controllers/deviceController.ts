@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../lib/prisma";
+import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { errorMessage } from "../utils/errors";
@@ -12,6 +12,7 @@ import type {
   DeviceUpdateBody,
 } from "../schemas/device";
 import { workspaceIdOf } from "../utils/workspace";
+import { nextReceptionNumber } from "../utils/deviceNumber";
 import {
   notifyCustomer,
   transitionNotification,
@@ -55,6 +56,10 @@ function toDeviceResponse(device: DeviceWithRelations) {
 
   return {
     id: device.id,
+    // Both, and each does a different job: `id` is what the frontend opens
+    // modals and builds routes with, `reception_number` is what the shop and
+    // its customer call this device. They were the same value until 2.9.
+    reception_number: device.receptionNumber,
     customer_id: device.customerId,
     device_name: device.deviceName,
     brand: device.brand,
@@ -91,12 +96,18 @@ function buildSearchFilter(search: string): Prisma.DeviceWhereInput[] {
     { customer: { phone: { contains: term, mode: "insensitive" } } },
   ];
 
-  // The old query cast the id to text and used LIKE, so searching "12" also
-  // matched 120 and 512. An exact match is both what a user typing an id
-  // means and the only thing Prisma can express against an Int column.
+  /*
+   * A number typed into the search box is a reception number, not a primary
+   * key: it is what the shop wrote on the slip and what the customer quotes
+   * over the phone. Before 2.9 the two were the same value, so this matched
+   * `id` and nobody could tell the difference.
+   *
+   * Exact rather than a LIKE against the digits, which is what the sql.js
+   * version did — searching "12" also matched 120 and 512.
+   */
   const asNumber = Number(term);
   if (Number.isInteger(asNumber) && asNumber > 0) {
-    filters.push({ id: asNumber });
+    filters.push({ receptionNumber: asNumber });
   }
 
   return filters;
@@ -263,6 +274,7 @@ async function notifyIfAsked(
     kind,
     device: {
       id: device.id,
+      receptionNumber: device.receptionNumber,
       deviceName: device.deviceName,
       customerId: device.customerId,
       customer: device.customer,
@@ -291,21 +303,35 @@ export const create = async (req: Request, res: Response) => {
   try {
     const body = (req as ValidatedRequest).valid.body as DeviceCreateBody;
 
-    const device = await prisma.device.create({
-      data: {
-        workspaceId: workspaceIdOf(req),
-        customerId: body.customer_id ?? null,
-        deviceName: body.device_name,
-        brand: body.brand,
-        model: body.model,
-        serialNumber: body.serial_number,
-        entryDate: body.entry_date ?? null,
-        exitDate: body.exit_date ?? null,
-        status: body.status,
-        description: body.description,
-      },
-      include: deviceInclude,
-    });
+    const workspaceId = workspaceIdOf(req);
+
+    /*
+     * In a transaction now, which it did not need to be before 2.9.
+     *
+     * The counter and the device have to move together: if the insert fails
+     * after the number is drawn, the number has to come back rather than
+     * leaving a hole in a series a shop reads as continuous. Same reasoning
+     * as invoice numbering, and the same helper — a bare $transaction would
+     * run outside the workspace context the extension sets.
+     */
+    const device = await runInWorkspaceTransaction(workspaceId, async (tx) =>
+      tx.device.create({
+        data: {
+          workspaceId,
+          receptionNumber: await nextReceptionNumber(tx, workspaceId),
+          customerId: body.customer_id ?? null,
+          deviceName: body.device_name,
+          brand: body.brand,
+          model: body.model,
+          serialNumber: body.serial_number,
+          entryDate: body.entry_date ?? null,
+          exitDate: body.exit_date ?? null,
+          status: body.status,
+          description: body.description,
+        },
+        include: deviceInclude,
+      }),
+    );
 
     // Acceptance is the one message tied to creation rather than to a
     // transition, and this is the only place it can be sent from. An edit

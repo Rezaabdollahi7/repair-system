@@ -177,6 +177,15 @@ export default function DeviceFormModal({
   const { isAtLeast } = useAuth();
   const [form, setForm] = useState<DeviceForm>(INITIAL_FORM);
   const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
+  /*
+   * Shown in the title, and deliberately not taken from `deviceId`.
+   *
+   * That prop is the primary key — what getDevice and updateDevice are
+   * called with — while the number on the intake slip is the workspace's own
+   * since 2.9. They coincided until then, which is why one value was doing
+   * both jobs here.
+   */
+  const [receptionNumber, setReceptionNumber] = useState<number | null>(null);
   const [capability, setCapability] = useState<SmsCapability | null>(null);
   const [loading, setLoading] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -304,6 +313,12 @@ export default function DeviceFormModal({
   useEffect(() => {
     if (isOpen) {
       loadPersonnel();
+
+      // Cleared on every open, not only when creating: two edits in a row
+      // would otherwise show the first device's number in the second one's
+      // title for as long as the fetch takes. loadDevice fills it back in.
+      setReceptionNumber(null);
+
       if (isEdit) loadDevice();
       else {
         resetForm();
@@ -401,6 +416,8 @@ export default function DeviceFormModal({
         description: deviceRes.data.description || "",
         send_sms: true,
       });
+
+      setReceptionNumber(deviceRes.data.reception_number);
 
       // The status the form opened with. The checkbox is about a change, so
       // it must not appear when the select still holds what it started on —
@@ -548,7 +565,11 @@ export default function DeviceFormModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-text-primary">
-                {isEdit ? `ویرایش دستگاه #${deviceId}` : "ثبت دستگاه جدید"}
+                {isEdit
+                  ? receptionNumber === null
+                    ? "ویرایش دستگاه"
+                    : `ویرایش دستگاه #${receptionNumber}`
+                  : "ثبت دستگاه جدید"}
               </h2>
             </div>
           </div>

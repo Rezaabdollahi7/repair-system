@@ -112,6 +112,7 @@ export const getOverview = async (req: Request, res: Response) => {
         device: {
           select: {
             id: true,
+            receptionNumber: true,
             deviceName: true,
             brand: true,
             model: true,
@@ -188,6 +189,9 @@ export const getOverview = async (req: Request, res: Response) => {
       })),
       history: assignments.map(({ assignedAt, device }) => ({
         device_id: device.id,
+        // Alongside the id rather than instead of it: the column shows this,
+        // the row click opens that. They were one value until 2.9.
+        reception_number: device.receptionNumber,
         device_name: device.deviceName,
         brand: device.brand,
         model: device.model,

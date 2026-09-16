@@ -4,24 +4,51 @@ import prisma from "../lib/prisma";
 import { deleteDeviceImages } from "../controllers/imageController";
 import { notifyCustomer } from "../utils/customerNotification";
 
-jest.mock("../lib/prisma", () => ({
-  __esModule: true,
-  default: {
-    device: {
-      count: jest.fn(),
-      findMany: jest.fn(),
-      // findFirst rather than findUnique: the controller pairs id with
-      // workspaceId now, which findUnique can't express.
-      findFirst: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-  },
-}));
+jest.mock("../lib/prisma", () => {
+  const device = {
+    count: jest.fn(),
+    findMany: jest.fn(),
+    // findFirst rather than findUnique: the controller pairs id with
+    // workspaceId now, which findUnique can't express.
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  return {
+    __esModule: true,
+    default: { device },
+    /*
+     * `create` draws a reception number and writes the device in one
+     * transaction since 2.9, so the module's second export has to exist here
+     * too — and it has to actually run the callback. A jest.fn() that
+     * resolves to undefined would leave every create silently returning
+     * nothing, which reads as a controller bug rather than a missing mock.
+     *
+     * The same `device` object is handed in as `tx`, so an assertion can
+     * reach the call whether the controller writes through the client or
+     * through the transaction.
+     */
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (tx: unknown) => unknown) =>
+        fn({ device, workspace: { update: jest.fn() } }),
+    ),
+  };
+});
 
 jest.mock("../controllers/imageController", () => ({
   deleteDeviceImages: jest.fn(),
+}));
+
+/*
+ * Mocked because what this file is about is what the controller does with a
+ * number, not how the counter is moved — that is deviceNumber.test.ts, and
+ * the row lock it depends on is proved against a real database in
+ * integration/deviceNumbering.test.ts.
+ */
+jest.mock("../utils/deviceNumber", () => ({
+  nextReceptionNumber: jest.fn().mockResolvedValue(1),
 }));
 
 // Mocked deliberately: what this file is about is which message the
@@ -146,7 +173,9 @@ describe("deviceController.getAll", () => {
 
     // AND[0] is the workspace condition now; the search alternatives follow.
     const where = db.device.findMany.mock.calls[0][0].where;
-    expect(where.AND[1].OR).toContainEqual({ id: 12 });
+    // A number in the search box is a reception number since 2.9, not the
+    // primary key — the two were the same value until then.
+    expect(where.AND[1].OR).toContainEqual({ receptionNumber: 12 });
   });
 
   it("omits the id filter for a non-numeric search term", async () => {
@@ -417,6 +446,10 @@ describe("deviceController.create", () => {
     expect(db.device.create.mock.calls[0][0].data).toMatchObject({
       workspaceId: WORKSPACE_ID,
       deviceName: "یخچال",
+      // Drawn from the workspace's counter rather than left to the primary
+      // key. Without this line the transaction could be removed and the test
+      // would stay green.
+      receptionNumber: 1,
     });
   });
 });

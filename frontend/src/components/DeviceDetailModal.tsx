@@ -145,7 +145,7 @@ export default function DeviceDetailModal({
               </h2>
               {device && (
                 <p className="text-body-xs text-text-secondary mt-0.5 hidden sm:block">
-                  شماره پذیرش: {device.id}
+                  شماره پذیرش: {device.reception_number}
                 </p>
               )}
             </div>
@@ -174,7 +174,7 @@ export default function DeviceDetailModal({
                       شماره پذیرش
                     </p>
                     <p className="text-lg sm:text-xl font-bold text-primary font-mono">
-                      {device.id}
+                      {device.reception_number}
                     </p>
                   </div>
                   <div>

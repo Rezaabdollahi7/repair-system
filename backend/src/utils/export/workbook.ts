@@ -139,7 +139,9 @@ export async function buildWorkbook(): Promise<Buffer> {
   const repairInvoices = await prisma.repairInvoice.findMany({
     orderBy: { invoiceDate: "desc" },
     include: {
-      device: { select: { deviceName: true, brand: true } },
+      device: {
+        select: { receptionNumber: true, deviceName: true, brand: true },
+      },
       items: true,
     },
   });
@@ -165,7 +167,7 @@ export async function buildWorkbook(): Promise<Buffer> {
     book,
     "دستگاه‌ها",
     [
-      { header: "شماره پذیرش", key: "id", width: 14 },
+      { header: "شماره پذیرش", key: "receptionNumber", width: 14 },
       { header: "مشتری", key: "customer", width: 24 },
       { header: "شماره تماس", key: "phone", width: 16 },
       { header: "نوع دستگاه", key: "deviceName", width: 20 },
@@ -178,7 +180,10 @@ export async function buildWorkbook(): Promise<Buffer> {
       { header: "توضیحات", key: "description", width: 40 },
     ],
     devices.map((device) => ({
-      id: device.id,
+      // The shop's own number, not the primary key — what is written on the
+      // intake slip and quoted over the phone. The two were the same value
+      // until 2.9.
+      receptionNumber: device.receptionNumber,
       customer: device.customer?.name ?? "",
       phone: device.customer?.phone ?? "",
       deviceName: device.deviceName,
@@ -279,7 +284,7 @@ export async function buildWorkbook(): Promise<Buffer> {
     "فاکتور تعمیر",
     [
       { header: "شماره فاکتور", key: "number", width: 16 },
-      { header: "شماره پذیرش", key: "deviceId", width: 14 },
+      { header: "شماره پذیرش", key: "receptionNumber", width: 14 },
       { header: "دستگاه", key: "device", width: 24 },
       { header: "مشتری", key: "customer", width: 24 },
       { header: "تاریخ", key: "date", width: 14 },
@@ -294,7 +299,7 @@ export async function buildWorkbook(): Promise<Buffer> {
     ],
     repairInvoices.map((invoice) => ({
       number: invoice.invoiceNumber,
-      deviceId: invoice.deviceId,
+      receptionNumber: invoice.device.receptionNumber,
       device: invoice.device.deviceName,
       customer: invoice.customerName,
       date: toJalali(invoice.invoiceDate),

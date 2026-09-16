@@ -69,6 +69,8 @@ export interface NotifyInput {
   kind: DeviceSmsKind;
   device: {
     id: number;
+    /** What the customer is told. Not `id` — see utils/deviceNumber. */
+    receptionNumber: number;
     deviceName: string;
     customerId: number | null;
     customer: { name: string; phone: string | null } | null;
@@ -197,7 +199,7 @@ export async function notifyCustomer(
     const rendered = renderDeviceSms(input.kind, {
       customerName: input.device.customer?.name ?? null,
       deviceName: input.device.deviceName,
-      receptionNumber: input.device.id,
+      receptionNumber: input.device.receptionNumber,
       workspaceName: shopName,
     });
 

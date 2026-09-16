@@ -46,6 +46,34 @@ Goal: introduce `Workspace` as a first-class concept and isolate all tenant data
 - [x] 2.6 Add composite indexes leading with `workspaceId` on hot tables (Device, Invoices) for query performance at the ~500 tenants / ~1,000 devices each scale
 - [x] 2.7 Write unit tests confirming cross-tenant data access is impossible (e.g. workspace A's token cannot read workspace B's devices)
 - [x] 2.8 Unify invoice numbering across all three invoice types, with the counter held on the Workspace row rather than derived from COUNT — atomic, per-workspace, and free of the race the current daily count has. Prefix comes from settings, as repair invoices already do. (Moved from 1.7: it needs Workspace to exist first.)
+- [x] 2.9 Reception numbers, per workspace. `devices.id` was doing two jobs:
+      a surrogate key for foreign keys and routes, and the number a shop
+      writes on the intake slip, quotes on the phone, prints on the invoice
+      and sends as `#NUMBER#` in every customer notification. The key comes
+      from a sequence shared by the whole platform, so the numbers a shop saw
+      depended on how many devices every _other_ shop had taken in — a new
+      workshop's first device could be numbered 4,812, and no two shops could
+      both have a device «۱».
+
+      `Device.receptionNumber` and `Workspace.deviceSeq`, following 2.8
+      exactly: `seq = seq + 1` inside the writing transaction, so it takes a
+      row lock and a failed intake returns the number rather than leaving a
+      gap. `create` moved into `runInWorkspaceTransaction` for that, with the
+      notification still outside it — a twenty-second provider call must not
+      hold a row lock (12.7).
+
+      The migration numbers existing devices per workspace by id ascending
+      and sets each counter past them, so no data moves and no key changes.
+
+      ⚠️ A number typed into the device search box now means a reception
+      number rather than a primary key. The two were the same value until
+      now, so nobody could tell the difference.
+
+      Every place the number reaches a person moved with it: the device list
+      and detail modal, the printed invoice (`InvoicePreview`), the repair
+      invoice detail and its device picker, and both «شماره پذیرش» columns in
+      the Excel export. Both invoice controllers return `reception_number`
+      beside `device_id` — display and link are different values now.
 
 ## Phase 3 — Auth Rework (Sign-up, Login, Sessions)
 

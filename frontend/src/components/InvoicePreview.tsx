@@ -171,7 +171,7 @@ export default function InvoicePreview({
             <div className="space-y-1 text-sm">
               <Field
                 label="شماره پذیرش"
-                value={toPersianDigits(invoice.device_id)}
+                value={toPersianDigits(invoice.reception_number)}
               />
               <Field label="دستگاه" value={invoice.device_name} />
               <Field label="برند" value={invoice.brand || ""} />

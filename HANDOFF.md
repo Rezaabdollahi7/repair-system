@@ -815,6 +815,27 @@ application-consistent، بازیابی‌شان همه‌یا‌هیچ است،
 
 پیشوند از تنظیمات نمی‌آید: شماره داده‌ی حسابداری است و باید خسته‌کننده بماند.
 
+### شماره پذیرش دستگاه (۲.۹)
+
+`devices.id` دو کار می‌کرد: کلید جانشین برای کلیدهای خارجی و مسیرها، و
+شماره‌ای که روی برگه‌ی پذیرش نوشته و به مشتری گفته می‌شود. کلید از
+sequence مشترکِ کل پلتفرم می‌آید، پس شماره‌ای که یک کارگاه می‌دید به تعداد
+دستگاه‌های **بقیه‌ی** کارگاه‌ها بستگی داشت.
+
+`Device.receptionNumber` + `Workspace.deviceSeq`، دقیقاً هم‌شکل ۲.۸.
+`utils/deviceNumber.ts` تنها جایی است که شمارنده حرکت می‌کند.
+
+⚠️ **`create` حالا داخل تراکنش است** — قبلاً تک‌کوئری بود. شمارنده باید با
+دستگاه یک‌جا commit شود وگرنه یک ثبت ناموفق یک شماره می‌سوزاند.
+`notifyIfAsked` عمداً بیرون ماند (۱۲.۷).
+
+⚠️ **جست‌وجوی عددی معنایش عوض شد**: از `id` به `receptionNumber`.
+
+⚠️ **کلیدهای خارجی، مسیرها و `key` ری‌اکت هنوز `id` اند.** آنچه دیده
+می‌شود و آنچه لینک می‌کند از این به بعد دو چیزند — در
+`RepairInvoiceDetailModal` دکمه شماره‌ی پذیرش را نشان می‌دهد و `device_id`
+را باز می‌کند.
+
 ### مجوزهای نقش اپ
 
 | جدول                 | مجوز                          | چرا                       |
@@ -2385,24 +2406,25 @@ grep -rn "runWithWorkspace(" src/ --include="*.ts" | grep -v __tests__
 ~۱۰ فایل · ~۱۲۸ تست (۳ skip) · دیتابیس واقعی dofixo_test
 ```
 
-| فایل                            | پوشش                                                    |
-| ------------------------------- | ------------------------------------------------------- |
-| `smoke.test.ts`                 | اتصال با `dofixo_app`، شمارش policy، دو کارگاه          |
-| `isolation.test.ts`             | جدول‌محور: ۹ منبع × (فهرست، خواندن، ویرایش، حذف)        |
-| `isolationSpecialCases.test.ts` | `settings`، ۱۷ کوئری داشبورد، `personnel`، صفحه‌ی مشتری |
-| `invoiceNumbering.test.ts`      | شمارنده، استقلال کارگاه‌ها، ۱۰ درخواست همزمان           |
-| `register.test.ts`              | ثبت‌نام، کارگاه یتیم، ایزوله بودن کارگاه تازه           |
-| `refreshToken.test.ts`          | کوکی، چرخش، تشخیص سرقت، logout تک‌session               |
-| `resetPassword.test.ts`         | مصرف کد، حذف همه‌ی session ها، عدم صدور session         |
-| `subscription.test.ts`          | ۴۰۲، مهلت ارفاق، مسیرهای باز، `neverExpires`            |
-| `subscriptionPayment.test.ts`   | checkout تا verify، کد تخفیف، نقش، کارگاه منقضی         |
-| `referral.test.ts`              | ثبت رابطه، تخفیف ۱۰٪، پاداش روی کارگاه دیگر             |
-| `adminOnlyRoutes.test.ts`       | پنج روتر admin-only، پیمایش‌شده از خود روتر             |
-| `subscriptionJob.test.ts`       | جاب شبانه روی دیتابیس واقعی — دو کارگاه دیده می‌شوند    |
-| `smsWallet.test.ts`             | دو برداشت همزمان، عدم منفی شدن، refund تکراری           |
-| `smsTopup.test.ts`              | verify دوباره، اعتبار یک بار                            |
-| `smsPricing.test.ts`            | تغییر قیمت، ردیف‌های دیروز با قیمت دیروز                |
-| `customerNotification.test.ts`  | شکست provider، برگشت اعتبار                             |
+| فایل                            | پوشش                                                           |
+| ------------------------------- | -------------------------------------------------------------- |
+| `smoke.test.ts`                 | اتصال با `dofixo_app`، شمارش policy، دو کارگاه                 |
+| `isolation.test.ts`             | جدول‌محور: ۹ منبع × (فهرست، خواندن، ویرایش، حذف)               |
+| `isolationSpecialCases.test.ts` | `settings`، ۱۷ کوئری داشبورد، `personnel`، صفحه‌ی مشتری        |
+| `invoiceNumbering.test.ts`      | شمارنده، استقلال کارگاه‌ها، ۱۰ درخواست همزمان                  |
+| `register.test.ts`              | ثبت‌نام، کارگاه یتیم، ایزوله بودن کارگاه تازه                  |
+| `refreshToken.test.ts`          | کوکی، چرخش، تشخیص سرقت، logout تک‌session                      |
+| `resetPassword.test.ts`         | مصرف کد، حذف همه‌ی session ها، عدم صدور session                |
+| `subscription.test.ts`          | ۴۰۲، مهلت ارفاق، مسیرهای باز، `neverExpires`                   |
+| `subscriptionPayment.test.ts`   | checkout تا verify، کد تخفیف، نقش، کارگاه منقضی                |
+| `referral.test.ts`              | ثبت رابطه، تخفیف ۱۰٪، پاداش روی کارگاه دیگر                    |
+| `adminOnlyRoutes.test.ts`       | پنج روتر admin-only، پیمایش‌شده از خود روتر                    |
+| `subscriptionJob.test.ts`       | جاب شبانه روی دیتابیس واقعی — دو کارگاه دیده می‌شوند           |
+| `smsWallet.test.ts`             | دو برداشت همزمان، عدم منفی شدن، refund تکراری                  |
+| `smsTopup.test.ts`              | verify دوباره، اعتبار یک بار                                   |
+| `smsPricing.test.ts`            | تغییر قیمت، ردیف‌های دیروز با قیمت دیروز                       |
+| `customerNotification.test.ts`  | شکست provider، برگشت اعتبار                                    |
+| `deviceNumbering.test.ts`       | شماره‌ی پذیرش: استقلال کارگاه‌ها، ۱۰ ثبت همزمان، برگشت در شکست |
 
 ⚠️ تست‌های یکپارچگی **به Arvan و زیبال واقعی نمی‌خورند** — `lib/storage` و
 `lib/zibal` mock اند.

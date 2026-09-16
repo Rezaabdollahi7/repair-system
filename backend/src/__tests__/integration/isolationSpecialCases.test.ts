@@ -4,6 +4,7 @@ import prisma from "../../lib/prisma";
 import {
   disconnectOwner,
   owner,
+  seedDevice,
   seedTwoWorkspaces,
   truncateAll,
   type TwoWorkspaces,
@@ -211,12 +212,9 @@ describe("dashboard", () => {
       data: { workspaceId: other, name: "مشتری ب" },
       select: { id: true },
     });
-    await owner.device.create({
-      data: {
-        workspaceId: other,
-        deviceName: "یخچال",
-        customerId: customer.id,
-      },
+    await seedDevice(other, {
+      deviceName: "یخچال",
+      customerId: customer.id,
     });
     await owner.item.create({
       data: { workspaceId: other, name: "خازن", currentStock: 5, minStock: 10 },
@@ -315,13 +313,9 @@ describe("personnel", () => {
   it("counts only the caller's own assignments", async () => {
     const foreign = await foreignTechnician();
 
-    const device = await owner.device.create({
-      data: {
-        workspaceId: workspaces.b.workspaceId,
-        deviceName: "یخچال ب",
-        status: "delivered",
-      },
-      select: { id: true },
+    const device = await seedDevice(workspaces.b.workspaceId, {
+      deviceName: "یخچال ب",
+      status: "delivered",
     });
 
     await owner.deviceAssignment.create({
@@ -373,14 +367,10 @@ describe("customer overview and notes", () => {
       select: { id: true },
     });
 
-    const device = await owner.device.create({
-      data: {
-        workspaceId: workspaces.b.workspaceId,
-        customerId: customer.id,
-        deviceName: "یخچال ب",
-        status: "repairing",
-      },
-      select: { id: true },
+    const device = await seedDevice(workspaces.b.workspaceId, {
+      customerId: customer.id,
+      deviceName: "یخچال ب",
+      status: "repairing",
     });
 
     await owner.repairInvoice.create({

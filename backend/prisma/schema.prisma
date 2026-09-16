@@ -86,6 +86,14 @@ model Workspace {
   saleSeq     Int @default(0) @map("sale_seq")
   repairSeq   Int @default(0) @map("repair_seq")
 
+  /// The reception-number counter, alongside the three invoice counters and
+  /// for the same reason: a number a customer reads back over the phone has
+  /// to belong to the shop that issued it. Until 2.9 the device's primary
+  /// key stood in for this, and that key comes from a sequence shared by
+  /// every workspace — so the first device a new shop took in could be
+  /// numbered 4,812, and no two shops could both have a device «۱».
+  deviceSeq   Int @default(0) @map("device_seq")
+
   users                 User[]
   customers             Customer[]
   devices               Device[]
@@ -285,6 +293,16 @@ model Customer {
 model Device {
   id           Int       @id @default(autoincrement())
   workspaceId  Int       @map("workspace_id")
+   /// What the shop calls this device: the number on the intake slip, quoted
+  /// on the phone, printed on the invoice and sent in the #NUMBER# parameter
+  /// of every customer notification.
+  ///
+  /// Separate from `id` deliberately. The primary key is a surrogate shared
+  /// across the whole platform — fine for foreign keys and URLs, wrong for
+  /// anything a customer sees. Drawn from Workspace.deviceSeq inside the
+  /// device's own transaction, so it is per-workspace, sequential and
+  /// gap-free, exactly as invoice numbers are since 2.8.
+  receptionNumber Int    @map("reception_number")
   customerId   Int?      @map("customer_id")
   personnelId  Int?      @map("personnel_id")
   deviceName   String    @map("device_name")
@@ -311,6 +329,9 @@ model Device {
   saleInvoices   SaleInvoice[]
   smsMessages    SmsMessage[]
 
+  /// The rule itself, not a convention: one number per shop, held by the
+  /// database rather than by whichever controller happens to write next.
+  @@unique([workspaceId, receptionNumber])
   @@index([workspaceId, id(sort: Desc)])
   @@index([workspaceId, status])
   @@index([workspaceId, entryDate])

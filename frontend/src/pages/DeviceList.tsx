@@ -974,7 +974,7 @@ export default function DeviceList() {
                       </p>
                     </div>
                     <span className="text-body-xs text-text-muted shrink-0 tabular-nums">
-                      #{toPersianDigits(device.id)}
+                      #{toPersianDigits(device.reception_number)}
                     </span>
                   </div>
 
@@ -1044,7 +1044,7 @@ export default function DeviceList() {
                           boxShadow: `inset -3px 0 0 0 ${deviceStatusOf(device.status).color}`,
                         }}
                       >
-                        {toPersianDigits(device.id)}
+                        {toPersianDigits(device.reception_number)}
                       </td>
                       <td className={td}>
                         <button

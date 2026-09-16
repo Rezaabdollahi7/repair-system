@@ -24,18 +24,19 @@ const deviceSelect = {
       brand: true,
       model: true,
       serialNumber: true,
+      receptionNumber: true,
     },
   },
 } satisfies Prisma.SaleInvoiceInclude;
 
-type InvoiceWithDevice = SaleInvoice & {
-  device?: {
-    deviceName: string;
-    brand: string | null;
-    model: string | null;
-    serialNumber: string | null;
-  } | null;
-};
+/**
+ * Derived from deviceSelect rather than written out, so adding a column to
+ * that select is enough — a hand-written copy went out of date the first
+ * time one was, and the error pointed at the mapper rather than at the shape
+ * that had drifted.
+ */
+type InvoiceWithDevice = SaleInvoice &
+  Partial<Prisma.SaleInvoiceGetPayload<{ include: typeof deviceSelect }>>;
 
 /**
  * Device details are spread onto the invoice itself rather than nested, which
@@ -67,6 +68,7 @@ function toInvoiceResponse(
 
   return {
     ...base,
+    reception_number: invoice.device.receptionNumber,
     device_name: invoice.device.deviceName,
     brand: invoice.device.brand,
     model: invoice.device.model,

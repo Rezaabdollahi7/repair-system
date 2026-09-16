@@ -1,7 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "../../generated/prisma/client";
+import { PrismaClient, type Prisma } from "../../generated/prisma/client";
 import { JWT_SECRET } from "../../middleware/auth";
 import { hashOtpCode } from "../../utils/otp";
 import { TRIAL_DAYS } from "../../utils/subscription";
@@ -226,4 +226,39 @@ export async function seedTechnician(
   );
 
   return { userId: user.id, token };
+}
+
+
+/**
+ * A device inside an existing workspace, numbered the way the controller
+ * numbers one.
+ *
+ * Exists because `receptionNumber` became required in 2.9 and six fixtures
+ * were each writing a device directly. Hard-coding a number in each would
+ * work until two devices landed in one workspace and hit the unique index —
+ * and it would mean no fixture ever exercised the numbering at all.
+ *
+ * Draws from the workspace's own counter, so the numbers a test sees are the
+ * numbers a shop would see: per-workspace, starting at 1.
+ *
+ * On the owner connection, so it writes into whichever workspace it is
+ * given — which is what a fixture is for and what the application path may
+ * never do.
+ */
+export async function seedDevice(
+  workspaceId: number,
+  data: Omit<
+    Prisma.DeviceUncheckedCreateInput,
+    "workspaceId" | "receptionNumber"
+  >,
+) {
+  const workspace = await owner.workspace.update({
+    where: { id: workspaceId },
+    data: { deviceSeq: { increment: 1 } },
+    select: { deviceSeq: true },
+  });
+
+  return owner.device.create({
+    data: { ...data, workspaceId, receptionNumber: workspace.deviceSeq },
+  });
 }

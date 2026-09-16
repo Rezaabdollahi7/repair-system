@@ -69,9 +69,12 @@ export const PARAM_CAPS = {
    *
    * Cutting a name short is cosmetic; cutting digits off a reception number
    * produces a different number, which the customer then reads back over the
-   * phone and nobody can find. So this is set well past any id the platform
-   * will issue — ten digits is ten billion devices — rather than trimmed to
-   * what looks tidy.
+   * phone and nobody can find. So this is set well past any number a shop
+   * will reach — ten digits is ten billion devices in one workshop — rather
+   * than trimmed to what looks tidy.
+   *
+   * The margin got wider in 2.9: this counts a single workshop's devices now
+   * rather than every device on the platform.
    *
    * Ten is also the ceiling: at eleven the `ready` template reaches 135
    * characters, one past the 134 that two parts buys, and every message of
@@ -129,7 +132,8 @@ function clean(
 export interface DeviceSmsInput {
   customerName: string | null;
   deviceName: string | null;
-  /** The device id, which is the reception number the shop quotes. */
+  /** The shop's own number for this device — Device.receptionNumber, not the
+   *  primary key. The two were the same value until 2.9. */
   receptionNumber: number;
   workspaceName: string | null;
 }

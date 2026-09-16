@@ -6,6 +6,7 @@ import {
   owner,
   seedTwoWorkspaces,
   truncateAll,
+  seedDevice,
   type TwoWorkspaces,
 } from "./helpers";
 
@@ -59,9 +60,8 @@ const resources: Resource[] = [
     name: "devices",
     path: "/api/devices",
     create: async (workspaceId) => {
-      const row = await owner.device.create({
-        data: { workspaceId, deviceName: `یخچال ${workspaceId}` },
-        select: { id: true },
+      const row = await seedDevice(workspaceId, {
+        deviceName: `یخچال ${workspaceId}`,
       });
       return row.id;
     },
@@ -178,10 +178,7 @@ const resources: Resource[] = [
     create: async (workspaceId) => {
       // deviceId is NOT NULL on this model: a repair invoice without its
       // device would be meaningless, so the fixture makes one first.
-      const device = await owner.device.create({
-        data: { workspaceId, deviceName: "یخچال" },
-        select: { id: true },
-      });
+      const device = await seedDevice(workspaceId, { deviceName: "یخچال" });
 
       const row = await owner.repairInvoice.create({
         data: {

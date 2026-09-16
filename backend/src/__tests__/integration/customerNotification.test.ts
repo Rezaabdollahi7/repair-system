@@ -28,6 +28,7 @@ import { notifyCustomer } from "../../utils/customerNotification";
 import {
   disconnectOwner,
   owner,
+  seedDevice as seedDeviceRow,
   seedTwoWorkspaces,
   truncateAll,
   type TwoWorkspaces,
@@ -71,9 +72,9 @@ async function seedDevice(workspaceId: number, phone: string | null) {
     select: { id: true, name: true, phone: true },
   });
 
-  const device = await owner.device.create({
-    data: { workspaceId, customerId: customer.id, deviceName: "یخچال" },
-    select: { id: true, deviceName: true, customerId: true },
+  const device = await seedDeviceRow(workspaceId, {
+    customerId: customer.id,
+    deviceName: "یخچال",
   });
 
   return {

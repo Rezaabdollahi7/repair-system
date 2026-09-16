@@ -448,7 +448,7 @@ export default function PersonnelDetail() {
                         className={trClickable}
                       >
                         <td className={`${td} tabular-nums`}>
-                          {toPersianDigits(row.device_id)}
+                          {toPersianDigits(row.reception_number)}
                         </td>
                         <td className={td}>{row.device_name}</td>
                         <td className={tdMuted}>

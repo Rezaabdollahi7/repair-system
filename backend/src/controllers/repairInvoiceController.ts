@@ -22,6 +22,7 @@ type LineInput = RepairInvoiceCreateBody["items"][number];
 const invoiceInclude = {
   device: {
     select: {
+      receptionNumber: true,
       deviceName: true,
       brand: true,
       model: true,
@@ -39,6 +40,10 @@ function toInvoiceResponse(invoice: InvoiceRow) {
   return {
     id: invoice.id,
     invoice_number: invoice.invoiceNumber,
+    // Alongside device_id rather than instead of it: the printed invoice and
+    // the detail panel show this, while the link to the device itself still
+    // needs the key. They were the same value until 2.9.
+    reception_number: invoice.device.receptionNumber,
     device_id: invoice.deviceId,
     customer_id: invoice.customerId,
     customer_name: invoice.customerName,

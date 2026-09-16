@@ -248,7 +248,7 @@ export default function RepairInvoiceFormModal({
 
   const deviceOptions: DeviceOption[] = devices.map((d) => ({
     value: d.id,
-    label: `${d.id} - ${d.device_name} ${d.brand ? `(${d.brand})` : ""}`,
+    label: `${d.reception_number} - ${d.device_name} ${d.brand ? `(${d.brand})` : ""}`,
     subLabel: `مشتری: ${d.customer_name || "—"} | مدل: ${d.model || "—"} | تلفن: ${d.customer_phone || "—"}`,
     customer_name: d.customer_name,
     customer_phone: d.customer_phone,

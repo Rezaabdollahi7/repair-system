@@ -173,6 +173,23 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       DATABASE_URL_APP: postgresql://dofixo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      # The 5.8 import script uploads device photographs, and lib/storage
+      # reads these four at import time and throws without them — the script
+      # would not start at all. Less sensitive than the DATABASE_URL above:
+      # that one is the owner role and bypasses RLS, while these reach the
+      # same bucket the backend already writes to.
+      #
+      # S3_REGION is optional (storage defaults it) and is here only so the
+      # two services cannot silently diverge if the region ever changes.
+      #
+      # Plain ${} rather than :?required, matching backend: compose
+      # interpolates this whole file on every command, so a :? here would
+      # break backup-database.sh as well.
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION:-default}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
 
 volumes:
   dofixo_pgdata:

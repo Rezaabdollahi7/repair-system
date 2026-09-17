@@ -37,7 +37,12 @@ describe("the Prisma client extension", () => {
   it("takes the workspace as an argument rather than from the context", () => {
     // The helper runs on the unextended client, so it can't read the async
     // context — the caller passes the workspace from the verified token.
-    expect(runInWorkspaceTransaction).toHaveLength(2);
+    //
+    // Three: the workspace, the callback, and the optional Prisma timing
+    // options. The count is a proxy for "the workspace arrives as an
+    // argument", which is what this guards; it is not a freeze on the
+    // signature.
+    expect(runInWorkspaceTransaction).toHaveLength(3);
   });
 
   // OtpCode is the one model exempt from the guard: a verification code is

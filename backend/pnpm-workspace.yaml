@@ -1,5 +1,12 @@
+# Which packages may run their install scripts. better-sqlite3 was here and
+# is deliberately not: prisma declares it as an optional peer, so pnpm still
+# unpacks it and the lockfile still names it, but without this entry node-gyp
+# is never invoked and the build needs no python3 or compiler.
+#
+# Removing it from package.json alone was not enough — the image still ran
+# node-gyp and still failed to find Python, silently now rather than fatally,
+# because an optional peer's install failure is ignored.
 onlyBuiltDependencies:
   - '@prisma/engines'
-  - better-sqlite3
   - esbuild
   - prisma

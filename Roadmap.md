@@ -798,9 +798,11 @@ tomans.
       - `costRials = unitPriceRials × segments`, so the ledger explains
         itself and a future one-part template is automatically cheaper.
 
-      The 350 on screen then has to become 700, or the price per part has to
-      be what the shop is quoted. That is a pricing decision, not a technical
-      one — see the open questions.
+      ✅ **Settled 17 September 2026.** The price per part is what the shop
+      is quoted, and it is 340 toman — so a two-part message reads as 680.
+      Measured, not guessed: sms.ir charges 2,400 rials per part, and the
+      opening 1,750 was below cost by 1,300 rials on every two-part message.
+      The `sms_prices` row for 3,400 carries the measurement in its note.
 
 - [x] 12.3 Wallet engine, `utils/smsWallet.ts`. Three operations — credit,
       debit, refund — and nothing else may write `sms_wallets`.
@@ -1340,17 +1342,29 @@ already spends on «running out», which is the gold this wanted.
    organisation name?** The blocker above. Everything in 12.5 waits on it,
    and the answer decides whether these messages carry a shop's identity at
    all.
-2. **Is the 130–250 toman quoted per part or per message?** Support answered
-   the tariff but not this, and it is the difference between 260 and 130 a
-   message. Cheaper to settle empirically than by ticket: send one short
-   (one-part) and one long (two-part) template to a test number and compare
-   the `cost` in each response against the credit the panel actually
-   deducts. That also settles what `cost` means and in what unit — which we
-   want anyway, because recording the provider's real figure on each
-   `SmsMessage` beats charging a number we assumed.
-3. **What does the shop pay?** At the best tier two parts cost 260, so 350
-   leaves 90 — real but thin, and negative at the worst tier. 500 is the
-   comfortable number and still reads as a round price. Depends on 2.
+2. ✅ **Per part — measured 17 September 2026.** `scripts/sms-cost-probe.ts`
+   sent one 65-character message and one 127-character message to a real
+   handset from the server. sms.ir returned `cost=1` and `cost=2`, and the
+   panel's credit fell 7,200 rials across the three parts. So **2,400 rials
+   per part**, `cost` is a count of parts rather than a sum of money, and
+   `priceFor` needed no change.
+
+   It also settled the 67-versus-70 question the support answer left open:
+   our `countSegments` predicted 1 and 2 and was right both times, so the
+   134-character ceiling really is two parts.
+
+   ⚠️ The margin is four characters. The longest combination the caps allow
+   renders 131, and a template whose wording grows in the sms.ir panel would
+   cross into a third part with nothing in this repository changing.
+
+3. ✅ **340 toman per part — 680 for a two-part message.** Measured cost is
+   240, so this leaves 42%. The margin is not only profit: sms.ir can raise
+   its tariff, and the alternative is renegotiating with every workshop each
+   time it does.
+
+   The `sms_prices` row is dated `2026-09-17` and the opening 1,750 row stays
+   for history — messages sent last month are still costed at last month's
+   price, which is the whole reason that table exists rather than a constant.
 4. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
    `ready_for_pickup` only, on the reasoning that a `repaired` device is one
    the bench has finished with but nobody has checked or priced yet. If

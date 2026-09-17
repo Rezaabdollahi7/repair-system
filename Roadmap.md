@@ -202,9 +202,62 @@ workspace.
       counted and named rather than skipped silently, and the devices they
       belong to arrive without them.
 
-      ⚠️ **`better-sqlite3` is a devDependency**, so it is absent from the
-      production image. Running `apply` on the server means the `migrate`
-      service, which carries the full `node_modules`, rather than `backend`.
+      ⚠️ **The source is read through the `sqlite3` CLI, not a driver.**
+      There was a driver — `better-sqlite3` — and it was removed. It is a
+      native module, so `pnpm install` inside the Docker build needed
+      python3 and a compiler, and the `migrate` image stopped building
+      altogether the day it was added: a permanent cost on every build of
+      the project, for one operator script that runs twice.
+      `sqlite3 -readonly -json` returns the same rows from a binary the
+      workstation already has, and the server needs no sqlite3 at all since
+      production reads the JSON it produces. `execFileSync` needs a 64MB
+      `maxBuffer`: the default 1MB truncates the devices table silently into
+      a parse error that names nothing.
+
+      ⚠️ **Removing it from `package.json` was not enough.** Prisma 7
+      declares `better-sqlite3` as an optional peer, so pnpm kept unpacking
+      it, kept running node-gyp and kept failing to find Python — silently
+      now rather than fatally, because an optional peer's install failure is
+      ignored. What actually invoked the compiler was its entry in
+      `pnpm-workspace.yaml`'s `onlyBuiltDependencies`; off that list,
+      node-gyp is never called and a successful build says
+      `Ignored build scripts: better-sqlite3` instead. The lockfile still
+      names the package inside Prisma's own resolved key, which is cosmetic:
+      regenerating it to drop ten lines would re-resolve 421 packages for
+      nothing, and `archiver` is pinned to v7 on purpose.
+
+      ⚠️ **`runInWorkspaceTransaction` ignored its third argument.** The
+      helper took two parameters and called `$transaction` with no options,
+      so every transaction in the codebase ran on Prisma's five-second
+      default. This script had been passing `{ timeout: 600_000 }` since it
+      was written and JavaScript discarded it. It surfaced only here and
+      only on the server: the same six thousand inserts took one to two
+      seconds on the workstation, under the default, and 5,005ms on the VPS,
+      where the transaction expired mid-import with P2028 and rolled back
+      cleanly. `lib/prisma.ts` now accepts `timeout` and `maxWait` — not
+      `isolationLevel`, which under RLS is not a per-call-site decision.
+
+      ⚠️ **2.9 was committed but had never reached production.** Neither its
+      migration nor the seven display sites: the `migrate` image had not
+      been built since the day `better-sqlite3` was added, so the migration
+      had no way across, and `backend` and `frontend` were older still. The
+      import itself ran correctly and the browser then showed reception
+      numbers 1,367 to 3,420 — `devices.id`, the exact bug 2.9 fixed — until
+      all three images were rebuilt and shipped. Committed is not deployed.
+
+      Running `apply` on the server means the `migrate` service rather than
+      `backend`: it is the only container carrying `scripts/`, tsx and
+      `DATABASE_URL`, which the username check needs. Its compose entry
+      gained the `S3_*` variables for the upload phase — less sensitive than
+      the owner credential already sitting there, and it serves no requests
+      and runs under `run --rm`.
+
+      **Imported 17 September 2026** into workspace 5: 6 users, 299
+      customers, 2,054 devices, 3,658 photographs, 70 assignments. Reception
+      numbers 1..2,054 with no gaps and no duplicates, `deviceSeq` at 2,054.
+      The rows landed in under a second; the 3,658 uploads took 220 seconds
+      from the VPS, against an estimate that had ranged from fifteen minutes
+      to three hours.
 
 ## Frontend TypeScript Migration (done, outside the phase numbering)
 

@@ -44,9 +44,9 @@ import { config } from "dotenv";
  */
 config({ path: resolve(__dirname, "..", ".env") });
 
-import { existsSync, statSync } from "fs";
+import { execFileSync } from "child_process";
+import { existsSync, readFileSync, statSync } from "fs";
 import { basename, resolve } from "path";
-import Database from "better-sqlite3";
 
 // ── Source shapes ────────────────────────────────────────────
 //
@@ -107,6 +107,26 @@ interface LegacySettings {
   company_website: string | null;
 }
 
+/**
+ * What both readers produce.
+ *
+ * The JSON files are written by `sqlite3 -json`, so their keys are SQLite's
+ * own column names and the two paths are identical in shape. Nothing past
+ * this point can tell which one it was given, which is the whole point:
+ * `apply` runs on the workstation against the database and on the server
+ * against the files, with one code path.
+ *
+ * `settings` is optional because the source table holds at most one row and
+ * an empty one is a source worth importing anyway.
+ */
+interface LegacySource {
+  customers: LegacyCustomer[];
+  devices: LegacyDevice[];
+  images: LegacyImage[];
+  assignments: LegacyAssignment[];
+  settings: LegacySettings | undefined;
+}
+
 /** One line of the users file — see the note on `apply` below. */
 export interface UserMapping {
   oldId: number;
@@ -128,14 +148,106 @@ export interface UserMapping {
 
 // ── Reading ──────────────────────────────────────────────────
 
-export function openLegacy(path: string) {
-  if (!existsSync(path)) {
-    throw new Error(`SQLite file not found: ${path}`);
+/**
+ * Runs one query against the source database and parses the rows.
+ *
+ * Shells out to `sqlite3 -json` rather than binding a driver. There was a
+ * driver here — better-sqlite3 — and it was removed: it is a native module,
+ * so `pnpm install` inside the Docker build needed python3 and a compiler,
+ * and adding it broke the tooling image outright. That is a permanent cost
+ * on every build of the project, for one operator script that runs twice.
+ *
+ * The sqlite3 binary is on the workstation already and is not needed on the
+ * server at all, since production reads the JSON this produces.
+ */
+function sqliteQuery(dbPath: string, sql: string): unknown[] {
+  if (!existsSync(dbPath)) {
+    throw new Error(`SQLite file not found: ${dbPath}`);
   }
-  // Read-only, and not merely as a precaution: the source database is the
-  // only copy of a working shop's history, and a script that can write to it
-  // is a script that can damage it.
-  return new Database(path, { readonly: true, fileMustExist: true });
+
+  // -readonly is not a precaution: the source database is the only copy of a
+  // working shop's history, and a command that can write to it is a command
+  // that can damage it.
+  const out = execFileSync(
+    "sqlite3",
+    ["-readonly", "-json", dbPath, sql],
+    // 64MB: the devices table alone is nearly a megabyte of JSON and the
+    // default buffer is 1MB, which truncates silently into a parse error
+    // that names nothing.
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+
+  // sqlite3 prints nothing at all for an empty result, which JSON.parse
+  // rejects.
+  const trimmed = out.trim();
+  return trimmed === "" ? [] : (JSON.parse(trimmed) as unknown[]);
+}
+
+/** Straight from the SQLite file. Used on the workstation. */
+export function readFromSqlite(dbPath: string): LegacySource {
+  const settings = sqliteQuery(
+    dbPath,
+    `SELECT company_name, company_address, company_phone,
+            company_email, company_website FROM settings LIMIT 1`,
+  ) as LegacySettings[];
+
+  return {
+    customers: sqliteQuery(
+      dbPath,
+      "SELECT id, name, phone, created_at FROM customers ORDER BY id",
+    ) as LegacyCustomer[],
+    devices: sqliteQuery(
+      dbPath,
+      `SELECT id, customer_id, device_name, brand, model, serial_number,
+              entry_date, exit_date, status, description, needs_invoice,
+              created_at, updated_at
+       FROM devices ORDER BY id`,
+    ) as LegacyDevice[],
+    images: sqliteQuery(
+      dbPath,
+      `SELECT id, device_id, filename, sort_order, created_at
+       FROM device_images ORDER BY id`,
+    ) as LegacyImage[],
+    assignments: sqliteQuery(
+      dbPath,
+      "SELECT device_id, personnel_id, assigned_at FROM device_assignments",
+    ) as LegacyAssignment[],
+    settings: settings[0],
+  };
+}
+
+/** The users table, which only plan() reads. */
+export function readUsers(dbPath: string): LegacyUser[] {
+  return sqliteQuery(
+    dbPath,
+    "SELECT id, full_name, username, role_id, is_active FROM users",
+  ) as LegacyUser[];
+}
+
+/**
+ * From the files `sqlite3 -json` wrote. Used on the server.
+ *
+ * The column names are SQLite's own, so the shapes are identical to what
+ * readFromSqlite returns and nothing downstream can tell which was used.
+ */
+export function readFromJson(dir: string): LegacySource {
+  function load(name: string): unknown[] {
+    const path = resolve(dir, `${name}.json`);
+    if (!existsSync(path)) {
+      throw new Error(`فایل ${name}.json در ${dir} نیست`);
+    }
+    return JSON.parse(readFileSync(path, "utf8")) as unknown[];
+  }
+
+  const settings = load("settings") as LegacySettings[];
+
+  return {
+    customers: load("customers") as LegacyCustomer[],
+    devices: load("devices") as LegacyDevice[],
+    images: load("images") as LegacyImage[],
+    assignments: load("assignments") as LegacyAssignment[],
+    settings: settings[0],
+  };
 }
 
 /**
@@ -171,34 +283,14 @@ interface PlanOptions {
 }
 
 export function plan(options: PlanOptions): void {
-  const db = openLegacy(options.dbPath);
-
-  try {
-    const users = db
-      .prepare("SELECT id, full_name, username, role_id, is_active FROM users")
-      .all() as LegacyUser[];
-    const customers = db
-      .prepare("SELECT COUNT(*) AS n FROM customers")
-      .get() as { n: number };
-    const devices = db
-      .prepare(
-        "SELECT id, exit_date, needs_invoice, status, customer_id FROM devices ORDER BY id",
-      )
-      .all() as Pick<
-      LegacyDevice,
-      "id" | "exit_date" | "needs_invoice" | "status" | "customer_id"
-    >[];
-    const images = db
-      .prepare("SELECT id, device_id, filename FROM device_images")
-      .all() as Pick<LegacyImage, "id" | "device_id" | "filename">[];
-    const assignments = db
-      .prepare("SELECT device_id, personnel_id FROM device_assignments")
-      .all() as Pick<LegacyAssignment, "device_id" | "personnel_id">[];
-    const settings = db
-      .prepare(
-        "SELECT company_name, company_phone, company_address, company_website FROM settings LIMIT 1",
-      )
-      .get() as LegacySettings | undefined;
+  {
+    const users = readUsers(options.dbPath);
+    const source = readFromSqlite(options.dbPath);
+    const customers = { n: source.customers.length };
+    const devices = source.devices;
+    const images = source.images;
+    const assignments = source.assignments;
+    const settings = source.settings;
 
     const mapped = new Map(options.users.map((u) => [u.oldId, u]));
 
@@ -319,8 +411,6 @@ export function plan(options: PlanOptions): void {
     console.log("فاکتورها، انبار، دسته‌بندی (داده‌ی آزمایشی)");
     console.log("خدمات (populateWorkspace همان چهارتا را می‌سازد)");
     console.log("لوگو و بکاپ‌ها\n");
-  } finally {
-    db.close();
   }
 }
 
@@ -356,14 +446,8 @@ export async function media(options: MediaOptions): Promise<void> {
   const { mkdirSync, readFileSync, writeFileSync } = await import("fs");
   const { processDeviceImage } = await import("../src/lib/imageProfile");
 
-  const db = openLegacy(options.dbPath);
-
-  try {
-    const allImages = db
-      .prepare(
-        "SELECT id, device_id, filename, sort_order, created_at FROM device_images ORDER BY id",
-      )
-      .all() as LegacyImage[];
+  {
+    const allImages = readFromSqlite(options.dbPath).images;
 
     // A trial run looks at the first few and stops. Worth having as a flag
     // rather than a temporary edit: the first thing to check is whether the
@@ -439,15 +523,15 @@ export async function media(options: MediaOptions): Promise<void> {
       for (const line of failures) console.log(`   ${line}`);
       process.exitCode = 1;
     }
-  } finally {
-    db.close();
   }
 }
 
 // ── apply ────────────────────────────────────────────────────
 
 interface ApplyOptions {
-  dbPath: string;
+  /** The SQLite file, or a directory of JSON — exactly one of the two. */
+  dbPath?: string;
+  jsonDir?: string;
   stagingDir: string;
   workspaceId: number;
   users: UserMapping[];
@@ -478,7 +562,9 @@ export async function apply(options: ApplyOptions): Promise<void> {
   const { default: prisma, runInWorkspaceTransaction } =
     await import("../src/lib/prisma");
 
-  const db = openLegacy(options.dbPath);
+  const source = options.jsonDir
+    ? readFromJson(options.jsonDir)
+    : readFromSqlite(options.dbPath!);
 
   try {
     // ── Preconditions ────────────────────────────────────────
@@ -536,31 +622,13 @@ export async function apply(options: ApplyOptions): Promise<void> {
 
     // ── Read the source ──────────────────────────────────────
 
-    const legacyCustomers = db
-      .prepare("SELECT id, name, phone, created_at FROM customers ORDER BY id")
-      .all() as LegacyCustomer[];
-
-    const legacyDevices = db
-      .prepare(
-        `SELECT id, customer_id, device_name, brand, model, serial_number,
-                entry_date, exit_date, status, description, needs_invoice,
-                created_at, updated_at
-         FROM devices ORDER BY id`,
-      )
-      .all() as LegacyDevice[];
-
-    const legacyAssignments = db
-      .prepare(
-        "SELECT device_id, personnel_id, assigned_at FROM device_assignments",
-      )
-      .all() as LegacyAssignment[];
-
-    const legacySettings = db
-      .prepare(
-        `SELECT company_name, company_address, company_phone,
-                company_email, company_website FROM settings LIMIT 1`,
-      )
-      .get() as LegacySettings | undefined;
+    const {
+      customers: legacyCustomers,
+      devices: legacyDevices,
+      assignments: legacyAssignments,
+      settings: legacySettings,
+      images: legacyImages,
+    } = source;
 
     console.log(
       `مبدأ: ${toCreate.length} کاربر · ${legacyCustomers.length} مشتری · ` +
@@ -761,13 +829,6 @@ export async function apply(options: ApplyOptions): Promise<void> {
     // takes. Each image is its own upload and its own row, so an interrupted
     // run leaves what it managed and repeating the command continues.
 
-    const legacyImages = db
-      .prepare(
-        `SELECT id, device_id, filename, sort_order, created_at
-         FROM device_images ORDER BY id`,
-      )
-      .all() as LegacyImage[];
-
     const { randomUUID } = await import("crypto");
     const { readFileSync } = await import("fs");
     const { deviceImageKey, deviceThumbnailKey, putObject } =
@@ -888,7 +949,6 @@ export async function apply(options: ApplyOptions): Promise<void> {
       console.log("  ⚠️ جا افتاده‌ها: media را دوباره بزن و بعد همین دستور را");
     }
   } finally {
-    db.close();
     await prisma.$disconnect();
   }
 }
@@ -989,8 +1049,11 @@ async function main() {
       readFileSync(required("users"), "utf8"),
     ) as UserMapping[];
 
+    const jsonDir = arg("json");
+
     await apply({
-      dbPath: resolve(required("db")),
+      dbPath: jsonDir ? undefined : resolve(required("db")),
+      jsonDir: jsonDir ? resolve(jsonDir) : undefined,
       stagingDir: resolve(required("staging")),
       workspaceId: Number(required("workspace-id")),
       users,

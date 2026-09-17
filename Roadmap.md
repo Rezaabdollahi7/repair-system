@@ -121,6 +121,90 @@ workspace.
 - [x] 5.5 Write an operator runbook for restoring a single workspace from a platform dump. A manual, support-mediated procedure rather than a feature — selectively replacing one tenant's rows in a shared schema while others are live is too dangerous to expose.
 - [~] 5.6 Fineti import: give `importFromExcel` and `importDeviceImages` a `--workspace-id` parameter so they can onboard a customer migrating from Fineti. Stays an operator-run script; wrap it in an admin UI only if it turns out to be frequent.
 - [x] 5.7 Operator recovery: a documented procedure for restoring access to a workspace whose owner is locked out — a runbook plus, if it proves frequent, a script keyed on workspaceId. The old resetAdmin script is not the basis for this: it only ever knew one hardcoded username, which stops existing once each workspace has its own super admin. Password self-service for customers is task 8.6 (SMS OTP).
+- [x] 5.8 Import from the single-tenant Dofixo. Separate from 5.6, which is
+      about a Fineti export: this source is our own old schema, so the
+      mapping is mostly "the same columns plus workspaceId" rather than a
+      translation, and the entities line up one for one.
+
+      `backend/scripts/import-legacy.ts`, three commands rather than one.
+      `plan` reads and reports and writes nothing anywhere, which makes it
+      the only one safe to point at live data while still thinking. `media`
+      turns every photograph into the two sizes 7.0 measured, into a staging
+      directory — pure CPU, no database and no network. `apply` writes the
+      rows and uploads the staged objects.
+
+      The split is not tidiness. `media` is twenty minutes of CPU on 3,678
+      photographs and `apply` talks to a database and an object store; one
+      command that failed two thirds of the way through would leave no way
+      to continue except starting over.
+
+      **Every photograph goes through `processDeviceImage`**, not a file
+      copy. `.rotate()` is the reason: most phone photographs carry a
+      non-default EXIF orientation and sharp neither applies the tag nor
+      preserves it, so copying them across would store a thousand pictures
+      sideways — the finding 7.0 came out of. It also means an imported
+      photograph is byte-for-byte what an uploaded one would have been,
+      thumbnail included. 11GB of source becomes 1.2GB.
+
+      **`media` is resumable and `apply` is resumable separately.** Staged
+      files are named after the source row id, so the same input always
+      produces the same path and a file already written is skipped. `apply`
+      writes a `legacy-{id}.webp` marker into `filename`, so a second pass
+      uploads nothing twice. `--images-only` skips the row phase entirely
+      and rebuilds the device mapping from `receptionNumber` — which is the
+      source id by design, so the relationship between the two databases can
+      be recovered from the destination alone at any time.
+
+      **Rows in one transaction, uploads outside it.** Six thousand inserts
+      either all arrive or none do, because a half-imported workshop is
+      worse than an unimported one and there is no undo. The 3,678 uploads
+      that follow are outside, six at a time: holding those locks for as
+      long as a network takes is the mistake 8.10 caught once and 12.7
+      wrote down.
+
+      **Reception numbers come from the source id, not from the counter.**
+      These are historical records and the numbers are already written on
+      slips customers are holding. `Workspace.deviceSeq` is set past the
+      imported range at the end, so the next real intake continues the
+      series. This is what 2.9 was done first for.
+
+      **The owner is not created by the script.** They sign up through the
+      app so `populateWorkspace` runs — the settings row, the four default
+      services, the trial, the referral code and the SMS wallet all come
+      from there, and a second definition of "what a new workspace looks
+      like" is exactly what that function exists to prevent. The users file
+      still carries their line, because device assignments reference the old
+      id.
+
+      ⚠️ **Usernames are checked on the owner connection.** A username is
+      unique across the whole platform, so "is this number already taken" is
+      a question no workspace-scoped query can answer: RLS would narrow it
+      to the destination and report a number free that belongs to somebody
+      else, and the insert would then fail thousands of rows into a
+      transaction naming nothing useful. An operator script legitimately
+      holds that credential; the API never does.
+
+      ⚠️ **The old app stored `""` rather than NULL for an empty date.**
+      `new Date("")` is an Invalid Date and Postgres refuses it — the same
+      trap `schemas/device.ts` already works around for the date pickers.
+      1,996 of 2,054 devices have one, so this is the normal case rather
+      than an edge case.
+
+      Not imported, and each for its own reason: invoices, stock and
+      categories (the source workshop never used them — two of each, all
+      test data), services (`populateWorkspace` seeds the same four), the
+      company logo (settings images have their own profile and it was easier
+      to re-upload), and `backups`.
+
+      ⚠️ **Twenty source photographs are corrupt** and cannot be recovered —
+      they do not open in an image viewer either. Eighteen of them are
+      consecutive, which suggests one bad transfer years ago. They are
+      counted and named rather than skipped silently, and the devices they
+      belong to arrive without them.
+
+      ⚠️ **`better-sqlite3` is a devDependency**, so it is absent from the
+      production image. Running `apply` on the server means the `migrate`
+      service, which carries the full `node_modules`, rather than `backend`.
 
 ## Frontend TypeScript Migration (done, outside the phase numbering)
 

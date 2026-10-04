@@ -1,0 +1,79 @@
+@font-face { font-family: "Peyda"; src: url("Peyda-Regular.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Peyda"; src: url("Peyda-Medium.woff2") format("woff2"); font-weight: 500; }
+@font-face { font-family: "Peyda"; src: url("Peyda-Bold.woff2") format("woff2"); font-weight: 700; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1200px; overflow: clip; }
+body { position: relative; }
+body { font-family: "Peyda", sans-serif; direction: rtl; -webkit-font-smoothing: antialiased; }
+
+/* ── Laptop ─────────────────────────────────────────── */
+.laptop { position: absolute; }
+.laptop .lid {
+  background: linear-gradient(180deg, #2b2f36, #16191e);
+  border-radius: 26px 26px 0 0;
+  padding: 18px 18px 22px;
+  box-shadow: inset 0 0 0 2px #3a3f47, inset 0 0 0 3px #0b0d10;
+  position: relative;
+}
+.laptop .lid::before { /* camera */
+  content: ""; position: absolute; top: 7px; left: 50%; width: 6px; height: 6px;
+  margin-left: -3px; border-radius: 50%; background: #0b0d10; box-shadow: 0 0 0 1px #444a53;
+}
+.laptop .screen { display: block; width: 100%; border-radius: 6px; overflow: hidden; background: #fff; }
+.laptop .screen img { display: block; width: 100%; }
+.laptop .base {
+  height: 26px; margin: 0 -7%;
+  background: linear-gradient(180deg, #d7dbe1 0%, #b9bec7 45%, #8d939d 100%);
+  border-radius: 0 0 22px 22px / 0 0 18px 18px;
+  position: relative;
+  box-shadow: 0 40px 60px -20px rgba(4, 12, 40, .55);
+}
+.laptop .base::before {
+  content: ""; position: absolute; top: 0; left: 50%; width: 16%; height: 10px; margin-left: -8%;
+  background: linear-gradient(180deg, #9aa0a9, #c4c8cf); border-radius: 0 0 12px 12px;
+}
+
+/* ── Phone ──────────────────────────────────────────── */
+.phone {
+  position: absolute; padding: 11px; border-radius: 58px;
+  background: linear-gradient(145deg, #3b3f46, #121418);
+  box-shadow: inset 0 0 0 2px #50555e, 0 50px 90px -25px rgba(4, 12, 40, .6), 0 18px 30px -12px rgba(4,12,40,.35);
+}
+.phone .scr { border-radius: 48px; overflow: hidden; position: relative; background: #fff; padding-top: 50px; }
+.phone .scr.dark { background: #111418; }
+.phone .scr img { display: block; width: 100%; }
+.phone .scr::after { /* dynamic island */
+  content: ""; position: absolute; top: 12px; left: 50%; width: 30%; height: 28px; margin-left: -15%;
+  background: #0b0c0f; border-radius: 20px;
+}
+.phone .scr .status {
+  position: absolute; top: 0; left: 0; right: 0; height: 52px; background: inherit;
+}
+
+/* ── Browser window ─────────────────────────────────── */
+.browser { position: absolute; border-radius: 16px; overflow: hidden; background: #fff;
+  box-shadow: 0 0 0 1px rgba(15,23,42,.08), 0 40px 80px -20px rgba(15,23,42,.35), 0 12px 24px -8px rgba(15,23,42,.18); }
+.browser .bar { height: 46px; display: flex; align-items: center; gap: 16px; padding: 0 18px;
+  background: #f1f3f6; border-bottom: 1px solid #e3e6eb; direction: ltr; }
+.browser.dark { background: #0f1217; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 40px 90px -20px rgba(0,0,0,.7); }
+.browser.dark .bar { background: #1b1f26; border-bottom-color: #2a2f38; }
+.dots { display: flex; gap: 8px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.dots i:nth-child(1) { background: #ff5f57; } .dots i:nth-child(2) { background: #febc2e; } .dots i:nth-child(3) { background: #28c840; }
+.url { flex: 1; max-width: 420px; margin: 0 auto; height: 28px; border-radius: 8px; background: #fff;
+  color: #5b6472; font: 500 14px/28px "Peyda", system-ui; text-align: center; letter-spacing: .2px;
+  box-shadow: 0 0 0 1px #e1e4ea; }
+.url b { color: #16a34a; font-weight: 500; margin-right: 6px; }
+.browser.dark .url { background: #262b33; color: #aab2bf; box-shadow: none; }
+.browser img { display: block; width: 100%; }
+
+/* ── Floating glass card ───────────────────────────── */
+.chip { position: absolute; display: flex; align-items: center; gap: 14px; padding: 16px 22px 16px 18px;
+  border-radius: 20px; background: rgba(255,255,255,.92); color: #0f172a;
+  box-shadow: 0 24px 48px -16px rgba(4,12,40,.45), 0 0 0 1px rgba(255,255,255,.6);
+  backdrop-filter: blur(12px); }
+.chip .ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; flex: none; }
+.chip .ic svg { width: 26px; height: 26px; }
+.chip .k { font-size: 15px; color: #64748b; font-weight: 500; }
+.chip .v { font-size: 24px; font-weight: 700; line-height: 1.25; }

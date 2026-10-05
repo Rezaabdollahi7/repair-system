@@ -65,12 +65,16 @@
 pnpm images                       # همه: اسکرین‌شات‌ها و بعد کاورها
 pnpm shots device-intake          # فقط یک آموزش
 pnpm covers tutorials/device-intake
+pnpm downloads                    # فرم‌های قابل دانلود: HTML ← PDF
 ```
 
 - اسکرین‌شات‌ها: `out/shots/<آموزش>/<nn-name>.webp` — ۱۴۴۰ پیکسل، تم روشن،
   با کادر و شماره‌ی نارنجی روی جایی که باید کلیک کرد.
 - کاورها: `out/covers/<section>/<slug>/cover.webp` — ۱۲۰۰×۶۳۰، همان تصویر
   اشتراک‌گذاری. همان مسیری است که مقاله در لندینگ دارد.
+- فرم‌ها: `downloads/<name>.html` ← `out/downloads/<name>.pdf`، که در لندینگ به
+  `public/downloads/` می‌رود، و پیش‌نمایشش `out/shots/downloads/<name>.webp`
+  (تصویر مقاله و کاور).
 - `out/` در گیت نیست؛ تصویرها در ریپوی لندینگ، کنار مقاله، کامیت می‌شوند.
 
 کاورها فونت و لوگو را از ریپوی لندینگ برمی‌دارند. اگر آن ریپو کنار این ریپو

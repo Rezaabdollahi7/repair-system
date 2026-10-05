@@ -15,7 +15,8 @@
     "slug": "guide/phone-intake-form",
     "section": "راهنمای مدیریت تعمیرگاه",
     "title": "رسید پذیرش تعمیرات موبایل: چه چیزهایی باید داشته باشد",
-    "screenshot": "device-intake/02-new-device-form"
+    "screenshot": "downloads/phone-intake-form",
+    "position": "center top"
   },
   {
     "slug": "tutorials/getting-started",

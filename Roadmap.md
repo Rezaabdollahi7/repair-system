@@ -1416,9 +1416,12 @@ own experience before an article goes out, which is what makes the byline true.
 ⚠️ زیمنس پارت is written as the business's own name only, never in a way
 that suggests an official Siemens affiliation.
 
-⚠️ No article claims a feature the app does not have. The app has no
-warranty field and no device passcode field; articles on those give general
-advice only. The old warranty post broke this rule (13.3).
+⚠️ No article claims a feature the app does not have. The reference is
+`docs/academy/product-facts.md` in the landing repo, checked against this
+repository's code, with a list of what the app does not do. Correction to
+the first draft of this phase: the app **does** have warranty — months on
+the repair invoice, an end date computed from them and printed — so the
+warranty article can point at it. It has no device passcode field.
 
 ### Audit of the current landing (5 October 2026)
 
@@ -1440,20 +1443,27 @@ The diagnosis is the content, not the technical base, which is sound
 Thirty new articles on top of 35 thin ones would inherit the same verdict,
 so the old posts are consolidated rather than kept beside the new ones.
 
-### Article plan and keyword map (draft — finalised in 13.6)
+### Article plan and keyword map
 
-One primary keyword per article, owned by no other article.
+One primary keyword per article, owned by no other article. The final map,
+with secondary keywords, authors and the evidence behind each choice, is
+`docs/academy/keyword-map.md` in the landing repo; the table below is its
+summary. Two changes from the first draft came out of 13.6: «نرم افزار
+تعمیرات موبایل» returns phone-fixing tools (Dr.Fone, 3uTools), not shop
+software, so the software article targets the comparison query instead; and
+the head commercial terms («نرم افزار مدیریت تعمیرگاه») belong to the home
+page, not to any article.
 
 **راهنمای مدیریت تعمیرگاه** — `/academy/guide/`
 
 | Slug | Article | Primary keyword |
 |---|---|---|
 | `mobile-repair-shop-management` | ⭐ Pillar: راهنمای جامع مدیریت تعمیرگاه موبایل | مدیریت تعمیرگاه موبایل |
-| `mobile-repair-software` | نرم‌افزار تعمیرات موبایل: چطور انتخاب کنیم | نرم افزار تعمیرات موبایل |
+| `mobile-repair-software` | بهترین نرم‌افزار مدیریت تعمیرگاه موبایل | بهترین نرم افزار مدیریت تعمیرگاه موبایل |
 | `start-mobile-repair-shop` | راه‌اندازی تعمیرگاه موبایل | راه اندازی تعمیرگاه موبایل |
-| `phone-intake-form` | فرم پذیرش گوشی (+ downloadable) | فرم پذیرش تعمیرات موبایل |
+| `phone-intake-form` | رسید پذیرش گوشی (+ downloadable) | رسید پذیرش تعمیرات موبایل |
 | `mobile-repair-invoice` | فاکتور تعمیر موبایل (+ downloadable) | فاکتور تعمیرات موبایل |
-| `mobile-parts-inventory` | انبارداری قطعات موبایل | انبارداری قطعات موبایل |
+| `mobile-parts-inventory` | انبارداری قطعات موبایل | مدیریت انبار قطعات یدکی |
 | `repair-shop-accounting` | حساب و کتاب و سود تعمیرگاه | حسابداری تعمیرگاه موبایل |
 | `repair-shop-customer-management` | مدیریت مشتریان تعمیرگاه | مدیریت مشتریان تعمیرگاه |
 | `technician-management` | مدیریت تعمیرکاران و تقسیم کار | مدیریت تعمیرکاران |
@@ -1522,15 +1532,15 @@ All 35 are accounted for.
 
 ### Sprint 13A — Foundations and urgent fixes (week 1)
 
-- [ ] 13.1 Trailing slash: `trailingSlash: "always"` in `astro.config.mjs`, `"trailingSlash": true` in `vercel.json` so `/about` 308s to `/about/`, and every internal link in the slashed form
-- [ ] 13.2 Remove the 31 `[تصویر: …]` placeholders
-- [ ] 13.3 Remove the false warranty claim from `modiriat-garanti-tamirat-mafixo`, and check every other post for claims the app does not back
-- [ ] 13.4 Fix the 3 broken internal links (`-dofixo` slugs that do not exist)
-- [ ] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console
-- [ ] 13.6 Final keyword map, from Search Console's own queries, Google autocomplete and the current first page for each candidate keyword
-- [ ] 13.7 Writing guide: tone, a template per article type (pillar, cluster, tutorial, experience), screenshot conventions, CTA blocks, internal-linking rules
-- [ ] 13.8 Bios for the four authors, confirmed by each of them
-- [ ] 13.9 A short Academy section in the landing repo's `CLAUDE.md`, pointing back here
+- [x] 13.1 Trailing slash: `trailingSlash: "always"` in `astro.config.mjs`, `"trailingSlash": true` in `vercel.json` so `/about` 308s to `/about/`, and every internal link in the slashed form
+- [x] 13.2 Remove the 31 `[تصویر: …]` placeholders
+- [x] 13.3 Remove the false warranty claim from `modiriat-garanti-tamirat-mafixo`, and check every other post for claims the app does not back. Extended to the features, pricing and FAQ pages, which listed QR labels, customer tags, an activity log, instalments and multi-branch management. The home page's figures (100+ shops, 1,800+ devices, 98%, 4.8 from 200+ reviews) are left until their source is confirmed
+- [x] 13.4 Fix the 3 broken internal links (`-dofixo` slugs that do not exist)
+- [~] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console. Code done; the resubmission waits for the merge and deploy
+- [x] 13.6 Final keyword map, from Search Console's own queries, Google autocomplete and the current first page for each candidate keyword
+- [x] 13.7 Writing guide: tone, a template per article type (pillar, cluster, tutorial, experience), screenshot conventions, CTA blocks, internal-linking rules
+- [~] 13.8 Bios for the four authors, confirmed by each of them. Drafted in `docs/academy/authors.md`; waiting on photos, the `[؟ …]` facts only each author can give, and their approval
+- [x] 13.9 A short Academy section in the landing repo's `CLAUDE.md`, pointing back here
 
 ### Sprint 13B — Academy infrastructure in the landing repo (week 2)
 

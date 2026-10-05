@@ -1591,7 +1591,7 @@ it rather than starting again.
       both (`StatusSmsPrompt` in `DeviceList.tsx`). The landing's launch PR
       describes the new prompt, so **this fix must reach production before
       that PR merges**
-- [~] 13.22 Redirect the old posts each new article absorbs, on its publishing day. The Academy opens with four articles (agreed 14 Mehr): the three tutorials above and the pillar. Landing PR #6 is the launch — three tutorials out of draft, three old posts redirected — held open as a draft PR for Reza's review on the Vercel preview and for Davood's answers, after which the pillar joins it with its five redirects. `pnpm redirects` now also rewrites internal links to a moved post
+- [~] 13.22 Redirect the old posts each new article absorbs, on its publishing day. The Academy opens with four articles (agreed 14 Mehr): the three tutorials above and the pillar. Landing PR #6 is the launch — all four out of draft, eight old posts redirected — held open as a draft PR until the picker fix is in production, Reza approves the tutorials on the Vercel preview and Davood reads the pillar with his answers in place. `pnpm redirects` now also rewrites internal links to a moved post
 
 ### Sprint 13E — Content wave 2 (weeks 5–6)
 

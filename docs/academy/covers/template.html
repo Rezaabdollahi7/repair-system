@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  قالب کاور مقاله‌های مرکز آموزش، ۱۲۰۰×۶۳۰ — همان تصویر اشتراک‌گذاری (OG).
+  render.mjs این فایل را با عنوان، بخش و یک اسکرین‌شات پر می‌کند. رنگ‌ها و
+  فونت‌ها همان لندینگ‌اند (سرمه‌ای #110e2d، نارنجی #EE5D38، Rokh و IRANYekanX).
+-->
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face { font-family: Rokh; src: url("{{FONTS}}/Rokh/Rokh-ExtraBold.woff2"); font-weight: 800; }
+  @font-face { font-family: Yekan; src: url("{{FONTS}}/IranYekanX/IRANYekanXFaNum-Bold.woff2"); font-weight: 700; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #110e2d;
+    background-image: radial-gradient(circle at 15% 110%, #ee5d3833 0, transparent 45%),
+                      radial-gradient(circle at 100% 0%, #3b3a8a55 0, transparent 40%);
+    font-family: Yekan, sans-serif; color: #fff; position: relative;
+  }
+  .text { position: absolute; right: 64px; top: 64px; width: 560px; height: 502px; display: flex; flex-direction: column; }
+  .chip { align-self: flex-start; background: #ee5d38; color: #fff; font-size: 22px; font-weight: 700; padding: 8px 22px; border-radius: 999px; }
+  h1 { font-family: Rokh, sans-serif; font-weight: 800; font-size: {{SIZE}}px; line-height: 1.45; margin-top: 30px; }
+  .brand { margin-top: auto; display: flex; align-items: center; gap: 14px; font-size: 22px; color: #ffffffb3; }
+  .brand img { width: 44px; height: 44px; border-radius: 10px; }
+  .shot {
+    position: absolute; left: -40px; top: 88px; width: 600px;
+    border-radius: 18px; overflow: hidden; background: #fff;
+    box-shadow: 0 30px 80px #0009, 0 0 0 8px #ffffff14;
+    transform: perspective(1400px) rotateY(14deg);
+    transform-origin: left center;
+  }
+  .shot .bar { height: 30px; background: #eef0f4; display: flex; gap: 8px; align-items: center; padding: 0 14px; direction: ltr; }
+  .shot .bar i { width: 11px; height: 11px; border-radius: 50%; background: #c9ced8; display: block; }
+  .shot img { display: block; width: 100%; height: 480px; object-fit: cover; object-position: {{POSITION}}; }
+</style>
+</head>
+<body>
+  <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="{{SHOT}}" alt="" /></div>
+  <div class="text">
+    <span class="chip">{{SECTION}}</span>
+    <h1>{{TITLE}}</h1>
+    <div class="brand"><img src="{{LOGO}}" alt="" />مرکز آموزش دوفیکسو</div>
+  </div>
+</body>
+</html>

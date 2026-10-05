@@ -558,6 +558,14 @@ stubs `src/api`, `AuthContext`, `ModalContext`, `ThemeContext` and
 Playwright at 1440 light, 1440 dark and 420 mobile. The harness is never
 committed.
 
+`docs/academy/` is a different thing and is committed: the scripts that
+produce the landing site's Academy images (phase 13). It runs the real app
+on a fictional mobile shop's data, imported through the API, and takes the
+step-by-step tutorial screenshots and the article covers. Its own README
+has the setup. When a UI label it selects by changes, the script fails —
+which also means a published tutorial now names a button that no longer
+exists.
+
 ## Working Conventions
 
 - Preserve existing business logic and UI/UX patterns; this migration is about the underlying

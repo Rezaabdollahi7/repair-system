@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "guide/mobile-repair-shop-management",
+    "section": "راهنمای مدیریت تعمیرگاه",
+    "title": "راهنمای جامع مدیریت تعمیرگاه موبایل",
+    "screenshot": "overview/dashboard"
+  },
+  {
+    "slug": "guide/mobile-repair-software",
+    "section": "راهنمای مدیریت تعمیرگاه",
+    "title": "بهترین نرم‌افزار مدیریت تعمیرگاه موبایل: چطور انتخاب کنیم",
+    "screenshot": "overview/devices"
+  },
+  {
+    "slug": "guide/phone-intake-form",
+    "section": "راهنمای مدیریت تعمیرگاه",
+    "title": "رسید پذیرش تعمیرات موبایل: چه چیزهایی باید داشته باشد",
+    "screenshot": "device-intake/02-new-device-form"
+  },
+  {
+    "slug": "tutorials/getting-started",
+    "section": "آموزش دوفیکسو",
+    "title": "شروع سریع دوفیکسو: راه‌اندازی در ده دقیقه",
+    "screenshot": "overview/dashboard"
+  },
+  {
+    "slug": "tutorials/device-intake",
+    "section": "آموزش دوفیکسو",
+    "title": "پذیرش دستگاه در دوفیکسو",
+    "screenshot": "overview/devices"
+  }
+]

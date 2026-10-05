@@ -1564,14 +1564,21 @@ records is a service the team performs by hand, not an in-app import;
 
 ### Sprint 13C — Demo workspace and image pipeline, in this repo (week 2, in parallel)
 
+Done 5 October 2026, in `docs/academy/` (its README has the setup). The
+demo shop is «موبایل‌کده نگین», phones and tablets only, with deliberately
+sequential fake phone numbers so no real person's number can appear in a
+published screenshot. Still missing: real photos of a phone for the intake
+tutorial and the intake-photos article — a generated picture there would
+mislead.
+
 `docs/showcase/` already runs the app locally, injects fake data through the
 real API and screenshots every page with Playwright. This sprint builds on
 it rather than starting again.
 
-- [ ] 13.16 Make the demo shop mobile-only (the showcase shop is «موبایل و لپ‌تاپ آرین»): phones such as Galaxy A54, iPhone 13, Redmi Note 13; faults such as a broken LCD, battery, charging port; parts such as LCD, battery, glass, flex. Fake phone numbers only
-- [ ] 13.17 Per-step tutorial shots: a script per tutorial that walks the flow and captures each step with numbered callouts and a highlight box; 1440 light plus 420 mobile; WebP; English file names, Persian alt text
-- [ ] 13.18 Cover template, 1200×630, one consistent design for every article (also the OG image)
-- [ ] 13.19 One command regenerates everything, so a UI change means re-running a script, not retaking 150 screenshots by hand
+- [x] 13.16 Make the demo shop mobile-only (the showcase shop is «موبایل و لپ‌تاپ آرین»): phones such as Galaxy A54, iPhone 13, Redmi Note 13; faults such as a broken LCD, battery, charging port; parts such as LCD, battery, glass, flex. Fake phone numbers only
+- [~] 13.17 Per-step tutorial shots: a script per tutorial that walks the flow and captures each step with numbered callouts and a highlight box; 1440 light plus 420 mobile; WebP; English file names, Persian alt text. The machinery and `device-intake` are done, plus an `overview` of every main page; each further tutorial's script is written with the tutorial itself in 13.21 and 13.23
+- [x] 13.18 Cover template, 1200×630, one consistent design for every article (also the OG image)
+- [x] 13.19 One command regenerates everything, so a UI change means re-running a script, not retaking 150 screenshots by hand
 
 ### Sprint 13D — Content wave 1 (weeks 3–4)
 

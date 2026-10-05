@@ -191,34 +191,57 @@ function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
   );
 }
 
+/** The two statuses this list stops to ask about: each can text the customer. */
+type SmsStatus = "ready_for_pickup" | "delivered";
+
+const SMS_PROMPT_TEXT: Record<
+  SmsStatus,
+  { title: string; message: string; note: string }
+> = {
+  ready_for_pickup: {
+    title: "آماده تحویل",
+    message: "پیامک آماده تحویل برای",
+    note: "مشتری با این پیامک می‌فهمد دستگاهش آماده است و می‌تواند بیاید.",
+  },
+  delivered: {
+    title: "تحویل دستگاه",
+    message: "پیامک تحویل دستگاه برای",
+    note: "تاریخ خروج دستگاه در هر صورت روی امروز ثبت می‌شود.",
+  },
+};
+
 /**
- * Asked when a device is marked as handed back, before anything is saved.
+ * Asked when a device moves to a status that has a message for the
+ * customer, before anything is saved.
  *
- * The delivery message is the one notification a shop decides on per
- * device rather than once in its settings: a customer standing at the
- * counter collecting their own device does not need a text about it, and
- * one collected by a relative or a courier very much does. The device form
- * asks the same question with a toggle; the status picker in this list had
- * no way to ask at all, so it quietly sent nothing.
+ * Both are per-device decisions rather than settings. A customer standing
+ * at the counter collecting their own device does not need a text about
+ * it, and one collected by a relative or a courier very much does; a
+ * device marked ready while its owner is on the phone has already been
+ * announced. The device form asks the same question with a toggle. This
+ * picker used to ask only on delivery, so a device marked ready from the
+ * list quietly told nobody — the message a shop most wants sent.
  *
  * Three buttons rather than two, because "no" and "not now" are different
  * answers: both of the first two change the status, and only انصراف leaves
  * the device alone.
  */
-function DeliverySmsPrompt({
-  device,
+function StatusSmsPrompt({
+  prompt,
   saving,
   onAnswer,
   onCancel,
 }: {
-  device: Device | null;
+  prompt: { device: Device; status: SmsStatus } | null;
   saving: boolean;
   onAnswer: (sendSms: boolean) => void;
   onCancel: () => void;
 }) {
+  const device = prompt?.device;
+  const text = prompt ? SMS_PROMPT_TEXT[prompt.status] : null;
   return (
     <AnimatePresence>
-      {device && (
+      {device && text && (
         <div
           role="dialog"
           aria-modal="true"
@@ -243,7 +266,7 @@ function DeliverySmsPrompt({
           >
             <div className="px-5 py-4 border-b border-border">
               <h3 className="text-title-sm font-bold text-text-primary">
-                تحویل دستگاه
+                {text.title}
               </h3>
             </div>
 
@@ -256,7 +279,7 @@ function DeliverySmsPrompt({
               </span>
               <div className="text-body-sm text-text-primary space-y-1.5">
                 <p>
-                  پیامک تحویل دستگاه برای{" "}
+                  {text.message}{" "}
                   <span className="font-bold">
                     {device.customer_name ?? "مشتری"}
                   </span>{" "}
@@ -270,9 +293,7 @@ function DeliverySmsPrompt({
                     {formatPersianPhone(device.customer_phone)}
                   </span>
                 </p>
-                <p className="text-text-secondary">
-                  تاریخ خروج دستگاه در هر صورت روی امروز ثبت می‌شود.
-                </p>
+                <p className="text-text-secondary">{text.note}</p>
               </div>
             </div>
 
@@ -450,7 +471,10 @@ export default function DeviceList() {
    * whether it would like to send is a dialog with one real answer, so when
    * it says no the status change goes straight through as it always did.
    */
-  const [deliveryPrompt, setDeliveryPrompt] = useState<Device | null>(null);
+  const [smsPrompt, setSmsPrompt] = useState<{
+    device: Device;
+    status: SmsStatus;
+  } | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [smsCapability, setSmsCapability] = useState<SmsCapability | null>(
     null,
@@ -556,7 +580,7 @@ export default function DeviceList() {
    * `send_sms` is only ever sent when the shop was actually asked. Leaving
    * it out is not the same as sending false — it is the absence the server
    * already reads as "no message", and it keeps this call identical to what
-   * it was for the eight statuses that have nothing to announce.
+   * it was for the seven statuses that have nothing to announce.
    */
   const applyStatusChange = async (
     deviceId: number,
@@ -581,7 +605,7 @@ export default function DeviceList() {
         else toast.error(text);
       }
 
-      setDeliveryPrompt(null);
+      setSmsPrompt(null);
       void fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
@@ -591,22 +615,23 @@ export default function DeviceList() {
   };
 
   /**
-   * What the picker calls. Every status but one goes straight through.
+   * What the picker calls. Every status but two goes straight through.
    *
-   * «تحویل داده شده» stops to ask, because it is the only change in this
-   * list that can put a message on a customer's phone and the shop is the
-   * only one who knows whether that customer is standing in front of them.
+   * «آماده تحویل» and «تحویل داده شده» stop to ask, because they are the
+   * changes in this list that can put a message on a customer's phone, and
+   * the shop is the only one who knows whether that customer already knows.
    * Asked on the transition, so re-picking the status a device already has
-   * neither asks nor sends — the same rule the server applies.
+   * neither asks nor sends — the same rule the server applies
+   * (`transitionNotification`).
    */
   const handleStatusChange = (device: Device, newStatus: string) => {
     const asksAboutSms =
-      newStatus === "delivered" &&
-      device.status !== "delivered" &&
+      (newStatus === "ready_for_pickup" || newStatus === "delivered") &&
+      device.status !== newStatus &&
       Boolean(smsCapability?.can_send);
 
     if (asksAboutSms) {
-      setDeliveryPrompt(device);
+      setSmsPrompt({ device, status: newStatus as SmsStatus });
       return;
     }
 
@@ -1115,15 +1140,19 @@ export default function DeviceList() {
         />
       </div>
 
-      <DeliverySmsPrompt
-        device={deliveryPrompt}
+      <StatusSmsPrompt
+        prompt={smsPrompt}
         saving={statusSaving}
         onAnswer={(sendSms) => {
-          if (deliveryPrompt) {
-            void applyStatusChange(deliveryPrompt.id, "delivered", sendSms);
+          if (smsPrompt) {
+            void applyStatusChange(
+              smsPrompt.device.id,
+              smsPrompt.status,
+              sendSms,
+            );
           }
         }}
-        onCancel={() => setDeliveryPrompt(null)}
+        onCancel={() => setSmsPrompt(null)}
       />
 
       <ConfirmModal

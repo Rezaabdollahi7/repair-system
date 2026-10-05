@@ -48,5 +48,52 @@ export default async function run(browser) {
   await shot(page, `${T}/04-device-details`);
   await clear(page);
 
+  // ۵. پر کردن مشخصات و سپردن به تعمیرکار
+  await name.fill("گوشی موبایل");
+  await brand.fill("Samsung");
+  await model.fill("Galaxy A54");
+  await page.locator("body").click({ position: { x: 5, y: 5 } }).catch(() => {});
+  await settle(page, 300);
+  const tech = page.getByPlaceholder("جستجو و انتخاب مسئول...");
+  await tech.click();
+  await tech.fill("علی");
+  await settle(page, 500);
+  await page.locator(".absolute.z-20").getByText("علی رضایی").first().dispatchEvent("mousedown");
+  await page.locator(".absolute.z-20").getByText("علی رضایی").first().click().catch(() => {});
+  await settle(page, 400);
+  await mark(page, [{ target: tech, n: 1 }]);
+  await shot(page, `${T}/05-assign-technician`);
+  await clear(page);
+
+  // ۶. ایراد، وضعیت و پیامک پذیرش
+  const description = page.getByPlaceholder("توضیحات تعمیرکار ...");
+  await description.fill("صفحه شکسته، تاچ قسمت پایین کار نمی‌کند. قاب و دکمه‌ها سالم.");
+  // فقط select داخل فرم: جدول پشت فرم هم یک select برای تعداد ردیف دارد
+  const status = page.locator("select").filter({ has: page.locator("option", { hasText: "در انتظار بررسی" }) }).first();
+  const sms = page.getByText("ارسال پیامک پذیرش به مشتری", { exact: false }).first();
+  await mark(page, [
+    { target: description, n: 1 },
+    { target: status, n: 2 },
+    { target: sms, n: 3 },
+  ]);
+  await shot(page, `${T}/06-description-status-sms`);
+  await clear(page);
+
+  // ۷. دکمه‌ی ثبت. عمداً کلیک نمی‌شود: ثبت واقعی داده‌ی دمو را عوض می‌کند و
+  // اجرای بعدی شماره‌های دیگری می‌گرفت.
+  const submit = page.getByRole("button", { name: "ثبت دستگاه", exact: true });
+  await mark(page, [{ target: submit, n: 1 }]);
+  await shot(page, `${T}/07-submit`);
+  await clear(page);
+
+  // ۸. دستگاه در فهرست، با شماره‌ی پذیرش
+  await page.getByRole("button", { name: "انصراف" }).last().click();
+  await settle(page, 500);
+  await page.mouse.move(700, 880); // نشانگر روی هیچ ردیفی نماند
+  const firstRow = page.locator("tbody tr").first();
+  await mark(page, [{ target: firstRow.locator("td").first(), n: 1 }]);
+  await shot(page, `${T}/08-in-the-list`);
+  await clear(page);
+
   await context.close();
 }

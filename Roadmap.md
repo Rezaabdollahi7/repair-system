@@ -1536,20 +1536,31 @@ All 35 are accounted for.
 - [x] 13.2 Remove the 31 `[تصویر: …]` placeholders
 - [x] 13.3 Remove the false warranty claim from `modiriat-garanti-tamirat-mafixo`, and check every other post for claims the app does not back. Extended to the features, pricing and FAQ pages, which listed QR labels, customer tags, an activity log, instalments and multi-branch management. The home page's figures (100+ shops, 1,800+ devices, 98%, 4.8 from 200+ reviews) are left until their source is confirmed
 - [x] 13.4 Fix the 3 broken internal links (`-dofixo` slugs that do not exist)
-- [~] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console. Code done; the resubmission waits for the merge and deploy
+- [x] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console. Merged and deployed; sitemap resubmitted by Reza
 - [x] 13.6 Final keyword map, from Search Console's own queries, Google autocomplete and the current first page for each candidate keyword
 - [x] 13.7 Writing guide: tone, a template per article type (pillar, cluster, tutorial, experience), screenshot conventions, CTA blocks, internal-linking rules
-- [~] 13.8 Bios for the four authors, confirmed by each of them. Drafted in `docs/academy/authors.md`; waiting on photos, the `[؟ …]` facts only each author can give, and their approval
+- [~] 13.8 Bios for the four authors, confirmed by each of them. Drafted in `docs/academy/authors.md`; the site carries placeholder avatars (kept out of the Person schema) until real photos arrive. Still waiting on the `[؟ …]` facts only each author can give, and their approval
 - [x] 13.9 A short Academy section in the landing repo's `CLAUDE.md`, pointing back here
 
 ### Sprint 13B — Academy infrastructure in the landing repo (week 2)
 
-- [ ] 13.10 `/academy/` with its three sections and the course page; extend the content collection schema (section, author reference, pillar, video, related articles, tutorial order)
-- [ ] 13.11 Article template: table of contents, breadcrumb, author box, related articles, previous/next for tutorials, CTA blocks, zoomable screenshots
-- [ ] 13.12 Structured data: `Article`, `BreadcrumbList`, `VideoObject`, `Person`. Not counting on `HowTo` or `FAQPage` — Google stopped showing them for ordinary sites in 2023
-- [ ] 13.13 Aparat embed that loads only on click (a facade), so a video costs nothing until it is wanted
-- [ ] 13.14 Author pages
-- [ ] 13.15 301 mechanism in `vercel.json`, driven from the map above
+Done 5 October 2026. Nothing under `/academy/` is built until it has a
+published article, so the infrastructure is live and invisible: the menu
+switches from the blog to the Academy with the first article. Astro moved
+to 7.3 (MDX 8 requires it) and `sharp` was added explicitly.
+
+Also done in this sprint, outside its tasks: the home page's invented
+figures (100+ shops, 1,800+ devices, 98%, 4.8 from 200+ reviews, 24/7) were
+replaced with numbers the product backs. Data migration from a shop's old
+records is a service the team performs by hand, not an in-app import;
+`product-facts.md` says so.
+
+- [x] 13.10 `/academy/` with its three sections and the course page; extend the content collection schema (section, author reference, pillar, video, related articles, tutorial order)
+- [x] 13.11 Article template: table of contents, breadcrumb, author box, related articles, previous/next for tutorials, CTA blocks, zoomable screenshots
+- [x] 13.12 Structured data: `Article`, `BreadcrumbList`, `VideoObject`, `Person`. Not counting on `HowTo` or `FAQPage` — Google stopped showing them for ordinary sites in 2023
+- [x] 13.13 Aparat embed that loads only on click (a facade), so a video costs nothing until it is wanted
+- [x] 13.14 Author pages
+- [x] 13.15 301 mechanism in `vercel.json`, driven from the map above: `src/data/blog-redirects.json` plus `pnpm redirects`. `pnpm build` now ends with `scripts/check-site.mjs`, which fails the deploy on slashless or broken links, placeholder text, or redirects out of step with what is published
 
 ### Sprint 13C — Demo workspace and image pipeline, in this repo (week 2, in parallel)
 

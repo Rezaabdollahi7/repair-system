@@ -1536,7 +1536,7 @@ All 35 are accounted for.
 - [x] 13.2 Remove the 31 `[تصویر: …]` placeholders
 - [x] 13.3 Remove the false warranty claim from `modiriat-garanti-tamirat-mafixo`, and check every other post for claims the app does not back. Extended to the features, pricing and FAQ pages, which listed QR labels, customer tags, an activity log, instalments and multi-branch management. The home page's figures (100+ shops, 1,800+ devices, 98%, 4.8 from 200+ reviews) are left until their source is confirmed
 - [x] 13.4 Fix the 3 broken internal links (`-dofixo` slugs that do not exist)
-- [x] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console. Merged and deployed; sitemap resubmitted by Reza
+- [~] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console. Merged and deployed; the sitemap (`sitemap-index.xml`) is for Reza to resubmit in Search Console
 - [x] 13.6 Final keyword map, from Search Console's own queries, Google autocomplete and the current first page for each candidate keyword
 - [x] 13.7 Writing guide: tone, a template per article type (pillar, cluster, tutorial, experience), screenshot conventions, CTA blocks, internal-linking rules
 - [~] 13.8 Bios for the four authors, confirmed by each of them. Drafted in `docs/academy/authors.md`; the site carries placeholder avatars (kept out of the Person schema) until real photos arrive. Still waiting on the `[؟ …]` facts only each author can give, and their approval

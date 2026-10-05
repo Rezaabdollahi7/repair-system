@@ -1372,6 +1372,224 @@ already spends on «running out», which is the gold this wanted.
    the trigger moves — but it cannot be both without texting twice for one
    job.
 
+## Phase 13 — Academy: مرکز آموزش دوفیکسو (content hub on the landing site)
+
+Not a migration phase and not in this repository's code: the hub is built in
+the landing repo (`Rezaabdollahi7/Dofixo-landing`, Astro 7 on Vercel, served
+at `www.dofixo.ir`). It is tracked here because this is the project's one
+roadmap, and because the demo workspace and every screenshot are produced
+from this repository (sprint 13C).
+
+The goal is a specialised content hub rather than a blog: three sections
+with distinct search intent, each built as a pillar article with a cluster
+of articles around it, step-by-step product tutorials with two-minute videos,
+and a complete video course. Main audience: **mobile repair shops**.
+
+### Decisions (agreed 5 October 2026)
+
+| Topic | Decision |
+|---|---|
+| Name | مرکز آموزش دوفیکسو, under `/academy/` |
+| Sections | راهنمای مدیریت تعمیرگاه (`/academy/guide/`) — acquisition from Google · آموزش دوفیکسو (`/academy/tutorials/`) — activation · تجربه‌های تعمیرگاه (`/academy/experience/`) — authority · دوره‌ی کامل (`/academy/course/`) |
+| Focus | Mobile repair shops: keywords, demo data and examples |
+| URLs | English slugs, trailing slash, host `www.dofixo.ir` |
+| Primary CTA | «شروع ۳۰ روز رایگان» → `app.dofixo.ir` sign-up. Not «بدون کارت» — meaningless in Iran |
+| Cadence | One article a day; Reza reviews, edits and publishes each |
+| Old blog | Pruned and consolidated: every `/blog/*` post 301s to its new article (table below) |
+| Old brand «مافیکسو / mafixo» | Removed everywhere it still appears |
+| Video hosting | Aparat embedded on the site (YouTube is filtered in Iran); YouTube as well, for Google Video and backlinks |
+| Videos | Screen only, no face. Voice: یگانه جعفری. Recorded by Reza with OBS |
+| Templates | Downloadable intake form and invoice sample, free and ungated |
+| In-app links to tutorials | Deferred until the hub is finished |
+
+**Authors** — real names, each with an author page (`Person` schema). Claude
+drafts; the named author reads, approves and adds at least one line of their
+own experience before an article goes out, which is what makes the byline true.
+
+| Author | Role | Writes |
+|---|---|---|
+| رضا عبدالهی | Founder, lead developer | Tutorials, choosing software |
+| مهدی باقری | Developer | Some tutorials: SMS, reports, exports |
+| یگانه جعفری | Mobile repair technician (also the video voice) | Mobile-specific: intake, parts inventory, part cost, starting a shop |
+| مهندس داوود جعفری | Manager of the زیمنس پارت repair centre, 25+ years repairing CNC machines, a Dofixo customer | Management pillars, technicians, accounting, warranty, customer retention, and the case study |
+
+⚠️ زیمنس پارت is written as the business's own name only, never in a way
+that suggests an official Siemens affiliation.
+
+⚠️ No article claims a feature the app does not have. The app has no
+warranty field and no device passcode field; articles on those give general
+advice only. The old warranty post broke this rule (13.3).
+
+### Audit of the current landing (5 October 2026)
+
+Search Console, three months: 18 clicks, 113 impressions, average position
+30. «نرم افزار تعمیرگاه» had 20 impressions and no clicks. 54 pages indexed,
+48 not — 33 of them «Discovered – currently not indexed».
+
+The diagnosis is the content, not the technical base, which is sound
+(canonical, sitemap, robots, `BlogPosting`, breadcrumbs):
+
+- 35 posts, all published 18–24 July, 13 of them on one day, all by «تیم دوفیکسو»
+- Median about 430 words
+- 31 of 35 show a literal placeholder such as `[تصویر: ثبت گارانتی در فاکتور دوفیکسو]`; no post has a real image
+- 16 slugs still contain `mafixo`; 3 internal links point to `-dofixo` slugs that do not exist (404)
+- The warranty post claims warranty terms attach to the invoice — the app has no such feature
+- Every CTA leads to `/contact` and «درخواست دموی رایگان» rather than the trial
+- `dofixo.ir` → `www` redirects correctly (Vercel, 308). But **`/about` and `/about/` both answer 200**, and the nav and footer link to the slashless form while canonical and the sitemap name the slashed one. That is the «Alternate page with proper canonical tag» row
+
+Thirty new articles on top of 35 thin ones would inherit the same verdict,
+so the old posts are consolidated rather than kept beside the new ones.
+
+### Article plan and keyword map (draft — finalised in 13.6)
+
+One primary keyword per article, owned by no other article.
+
+**راهنمای مدیریت تعمیرگاه** — `/academy/guide/`
+
+| Slug | Article | Primary keyword |
+|---|---|---|
+| `mobile-repair-shop-management` | ⭐ Pillar: راهنمای جامع مدیریت تعمیرگاه موبایل | مدیریت تعمیرگاه موبایل |
+| `mobile-repair-software` | نرم‌افزار تعمیرات موبایل: چطور انتخاب کنیم | نرم افزار تعمیرات موبایل |
+| `start-mobile-repair-shop` | راه‌اندازی تعمیرگاه موبایل | راه اندازی تعمیرگاه موبایل |
+| `phone-intake-form` | فرم پذیرش گوشی (+ downloadable) | فرم پذیرش تعمیرات موبایل |
+| `mobile-repair-invoice` | فاکتور تعمیر موبایل (+ downloadable) | فاکتور تعمیرات موبایل |
+| `mobile-parts-inventory` | انبارداری قطعات موبایل | انبارداری قطعات موبایل |
+| `repair-shop-accounting` | حساب و کتاب و سود تعمیرگاه | حسابداری تعمیرگاه موبایل |
+| `repair-shop-customer-management` | مدیریت مشتریان تعمیرگاه | مدیریت مشتریان تعمیرگاه |
+| `technician-management` | مدیریت تعمیرکاران و تقسیم کار | مدیریت تعمیرکاران |
+| `paper-to-software` | از دفتر و اکسل به نرم‌افزار | دفتر تعمیرات |
+
+**آموزش دوفیکسو** — `/academy/tutorials/`, in onboarding order with
+previous/next links; each with a two-minute video and step-by-step screenshots.
+
+| # | Slug | Tutorial |
+|---|---|---|
+| 0 | `getting-started` | شروع سریع: راه‌اندازی در ۱۰ دقیقه (index of the path) |
+| 1 | `sign-up` | ثبت‌نام و تأیید شماره |
+| 2 | `settings` | اطلاعات شرکت، تصاویر، قالب فاکتور |
+| 3 | `personnel` | پرسنل و نقش‌ها |
+| 4 | `customers` | ثبت مشتری و صفحه‌ی مشتری |
+| 5 | `device-intake` | پذیرش دستگاه با عکس |
+| 6 | `device-statuses` | وضعیت‌های دستگاه |
+| 7 | `inventory` | کالا، دسته‌بندی، حداقل موجودی |
+| 8 | `purchase-invoice` | فاکتور خرید |
+| 9 | `repair-invoice` | فاکتور تعمیر: قطعه، خدمات، پرداخت‌ها |
+| 10 | `sale-invoice` | فاکتور فروش و چاپ |
+| 11 | `customer-sms` | پیامک خودکار به مشتری و کیف پول پیامکی |
+| 12 | `reports` | داشبورد، گزارش موجودی، سود و زیان |
+| 13 | `exports-and-subscription` | خروجی اطلاعات، اشتراک، دعوت از دوستان |
+
+**تجربه‌های تعمیرگاه** — `/academy/experience/`
+
+| Slug | Article |
+|---|---|
+| `common-mistakes` | ⭐ Pillar: اشتباه‌های رایج در اداره‌ی تعمیرگاه |
+| `uncollected-devices` | دستگاهی که صاحبش برای تحویل نمی‌آید |
+| `intake-photos` | عکس هنگام پذیرش، برای جلوگیری از اختلاف |
+| `part-cost-and-pricing` | قیمت تمام‌شده‌ی قطعه وقتی دلار هر هفته عوض می‌شود (moving average) |
+| `customer-notifications` | خبر دادن به مشتری: کی و با چه متنی |
+| `slow-moving-parts` | قطعات کم‌گردش و نقطه‌ی سفارش |
+| `repair-warranty` | گارانتی تعمیر — general advice, no feature claim |
+| `repair-shop-kpis` | عددهایی که هر هفته باید دید |
+| `customer-retention` | رضایت و برگشت مشتری |
+| `siemens-part-case-study` | داستان مشتری: زیمنس پارت |
+
+### Old post → new article (301 map)
+
+Each old post stays live until its target is published, then redirects the
+same day — never a redirect to a page that does not exist yet. `/blog/`
+itself redirects to `/academy/` once the last post has moved.
+
+| New article | Old `/blog/` slugs |
+|---|---|
+| `guide/mobile-repair-shop-management` | `checklist-modiriat-tamirgah-mobile`, `estandard-herfei-tamirgah-mafixo`, `kahesh-estress-modiran-tamirgah`, `ayande-modiriat-tamirat`, `kahesh-hazine-panhan-tamirgah` |
+| `guide/mobile-repair-software` | `rahnamaye-entekhab-narmafzar-tamirgah`, `moghayese-narmafzar-modiriat-tamirgah`, `chera-narmafzar-modiriat-tamirgah-sarmayegozari-ast`, `che-tamirgahayi-niaz-be-sistem-daran`, `5-dalil-niaz-be-mafixo`, `mafixo-baraye-tamirgah-laptop`, `mafixo-baraye-tamirgah-console` |
+| `guide/start-mobile-repair-shop` | `raahandazi-tamirgah-mobile-az-sefr` |
+| `guide/mobile-repair-invoice` | `sodoor-fakture-herfei-tamirgah` |
+| `guide/mobile-parts-inventory` | `modiriat-anbar-ghataat-tamirgah`, `amoozesh-amali-kontorol-anbar-mafixo` |
+| `guide/repair-shop-accounting` | `modiriat-mali-tamirgah-mafixo`, `dashboard-modiriati-hooshmand-tamirgah`, `gozaresh-giri-hooshmand-mafixo` |
+| `guide/technician-management` | `modiriat-tim-teknesian-mafixo`, `sazmandehi-tim-tamirgah`, `tajrobe-teknesian-ba-sistem-mafixo`, `afzayesh-sorat-tamirat-mafixo` |
+| `guide/repair-shop-customer-management` | `modiriat-hooshmand-moshtarian-mafixo` |
+| `experience/common-mistakes` | `7-eshtebah-modiriat-tamirat` |
+| `experience/part-cost-and-pricing` | `mohasebeh-gheymat-tamir-mobile` |
+| `experience/customer-retention` | `hefz-va-vafadari-moshtari-tamirgah`, `jalb-eatemad-moshtari-tamirgah`, `jazbe-moshtari-jadid-tamirgah`, `barandsazi-tamirgah-ba-mafixo` |
+| `experience/customer-notifications` | `etela-resani-lahzei-moshtari-tamirgah` |
+| `experience/repair-warranty` | `modiriat-garanti-tamirat-mafixo` |
+| `tutorials/device-statuses` | `safar-shafaf-dastgah-mafixo` |
+| `tutorials/getting-started` | `rahnamaye-tanzimat-avalie-mafixo`, `vizhegihaye-kamshenakhte-mafixo` |
+
+All 35 are accounted for.
+
+### Sprint 13A — Foundations and urgent fixes (week 1)
+
+- [ ] 13.1 Trailing slash: `trailingSlash: "always"` in `astro.config.mjs`, `"trailingSlash": true` in `vercel.json` so `/about` 308s to `/about/`, and every internal link in the slashed form
+- [ ] 13.2 Remove the 31 `[تصویر: …]` placeholders
+- [ ] 13.3 Remove the false warranty claim from `modiriat-garanti-tamirat-mafixo`, and check every other post for claims the app does not back
+- [ ] 13.4 Fix the 3 broken internal links (`-dofixo` slugs that do not exist)
+- [ ] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console
+- [ ] 13.6 Final keyword map, from Search Console's own queries, Google autocomplete and the current first page for each candidate keyword
+- [ ] 13.7 Writing guide: tone, a template per article type (pillar, cluster, tutorial, experience), screenshot conventions, CTA blocks, internal-linking rules
+- [ ] 13.8 Bios for the four authors, confirmed by each of them
+- [ ] 13.9 A short Academy section in the landing repo's `CLAUDE.md`, pointing back here
+
+### Sprint 13B — Academy infrastructure in the landing repo (week 2)
+
+- [ ] 13.10 `/academy/` with its three sections and the course page; extend the content collection schema (section, author reference, pillar, video, related articles, tutorial order)
+- [ ] 13.11 Article template: table of contents, breadcrumb, author box, related articles, previous/next for tutorials, CTA blocks, zoomable screenshots
+- [ ] 13.12 Structured data: `Article`, `BreadcrumbList`, `VideoObject`, `Person`. Not counting on `HowTo` or `FAQPage` — Google stopped showing them for ordinary sites in 2023
+- [ ] 13.13 Aparat embed that loads only on click (a facade), so a video costs nothing until it is wanted
+- [ ] 13.14 Author pages
+- [ ] 13.15 301 mechanism in `vercel.json`, driven from the map above
+
+### Sprint 13C — Demo workspace and image pipeline, in this repo (week 2, in parallel)
+
+`docs/showcase/` already runs the app locally, injects fake data through the
+real API and screenshots every page with Playwright. This sprint builds on
+it rather than starting again.
+
+- [ ] 13.16 Make the demo shop mobile-only (the showcase shop is «موبایل و لپ‌تاپ آرین»): phones such as Galaxy A54, iPhone 13, Redmi Note 13; faults such as a broken LCD, battery, charging port; parts such as LCD, battery, glass, flex. Fake phone numbers only
+- [ ] 13.17 Per-step tutorial shots: a script per tutorial that walks the flow and captures each step with numbered callouts and a highlight box; 1440 light plus 420 mobile; WebP; English file names, Persian alt text
+- [ ] 13.18 Cover template, 1200×630, one consistent design for every article (also the OG image)
+- [ ] 13.19 One command regenerates everything, so a UI change means re-running a script, not retaking 150 screenshots by hand
+
+### Sprint 13D — Content wave 1 (weeks 3–4)
+
+- [ ] 13.20 `guide/mobile-repair-shop-management` (pillar), `guide/mobile-repair-software`, `guide/phone-intake-form` with its downloadable form
+- [ ] 13.21 Tutorials 0–5, with video scripts and Persian subtitles (SRT)
+- [ ] 13.22 Redirect the old posts each new article absorbs, on its publishing day
+
+### Sprint 13E — Content wave 2 (weeks 5–6)
+
+- [ ] 13.23 Tutorials 6–13 with their video scripts and subtitles
+- [ ] 13.24 The rest of the guide section
+
+### Sprint 13F — Content wave 3 (weeks 7–8)
+
+- [ ] 13.25 The experience section
+- [ ] 13.26 Siemens Part case study: a 30-minute interview with مهندس داوود جعفری, questions prepared beforehand
+
+### Sprint 13G — The full course (weeks 8–9)
+
+Last on purpose: by then the tutorials and their scripts exist to build on,
+and the UI has settled, so an hour of video does not go stale in a month.
+
+- [ ] 13.27 Scripts for the 12 chapters, 4–7 minutes each: start and dashboard · settings · personnel · customers · device intake and tracking · inventory · purchase invoice · repair invoice · sale invoice and printing · SMS · reports · exports, subscription, referral
+- [ ] 13.28 Course page; a playlist on Aparat and on YouTube, plus one full-length YouTube upload with chapter timestamps; titles, descriptions, thumbnails and subtitles for both platforms
+
+### Sprint 13H — Measurement (ongoing)
+
+- [ ] 13.29 Check each new article is indexed within a week (URL Inspection); watch «Discovered – currently not indexed» fall
+- [ ] 13.30 Track each article's primary keyword; rework articles that reach page two
+- [ ] 13.31 Monthly internal-link audit: every cluster links to its pillar, every pillar to all its clusters, no orphans
+
+### Video production
+
+- **Script:** two columns — «کار روی صفحه» (exact clicks, for Reza) and «گفتار» (for خانم جعفری), with a duration per scene and a hook in the first five seconds
+- **Order:** voice first, then the screen. Yeganeh records each scene's narration as its own file; Reza plays it and records the screen to it. Trimming video to fit a voice is easy, re-recording a voice to fit a video is not
+- **OBS:** 1920×1080, 30 fps, browser zoom about 125% so text is readable on a phone, a clean browser profile, system notifications off, light theme, the same demo workspace as the screenshots
+- **Editing:** DaVinci Resolve (free) or CapCut — OBS only records
+- **Every video:** Persian subtitles generated from the script, and a five-second closing frame with «شروع ۳۰ روز رایگان»
+
 ## How to use this with Claude Code
 
 - Point Claude Code at one task at a time (e.g. "Read CLAUDE.md and ROADMAP.md, then do task 1.3").
@@ -1379,5 +1597,7 @@ already spends on «running out», which is the gold this wanted.
   (Postgres/Prisma) being done; Phase 3 (auth) depends on Phase 2 (`workspaceId` existing).
   Phases 4–6 can be interleaved once Phase 3 is stable. Phase 7 can start in parallel once there's
   something worth deploying. Phase 8 stays last.
+- Phase 13 depends on none of the others: its work happens in the landing repo, and it borrows
+  only the demo workspace and screenshot scripts from this one.
 - After finishing a task, update this file: flip `[ ]` to `[x]` (or `[~]` if partially done) so the
   roadmap always reflects real progress.

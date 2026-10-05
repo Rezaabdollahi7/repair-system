@@ -28,5 +28,12 @@
     "section": "آموزش دوفیکسو",
     "title": "پذیرش دستگاه در دوفیکسو",
     "screenshot": "overview/devices"
+  },
+  {
+    "slug": "tutorials/device-statuses",
+    "section": "آموزش دوفیکسو",
+    "title": "وضعیت دستگاه در دوفیکسو: پیگیری تعمیر تا تحویل",
+    "screenshot": "device-statuses/04-status-picker",
+    "position": "center top"
   }
 ]

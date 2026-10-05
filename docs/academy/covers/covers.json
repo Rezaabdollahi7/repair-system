@@ -3,7 +3,7 @@
     "slug": "guide/mobile-repair-shop-management",
     "section": "راهنمای مدیریت تعمیرگاه",
     "title": "راهنمای جامع مدیریت تعمیرگاه موبایل",
-    "screenshot": "overview/dashboard"
+    "screenshot": "overview/customer-page"
   },
   {
     "slug": "guide/mobile-repair-software",
@@ -20,7 +20,7 @@
   {
     "slug": "tutorials/getting-started",
     "section": "آموزش دوفیکسو",
-    "title": "شروع سریع دوفیکسو: راه‌اندازی در ده دقیقه",
+    "title": "آموزش دوفیکسو: شروع سریع در ده دقیقه",
     "screenshot": "overview/dashboard"
   },
   {

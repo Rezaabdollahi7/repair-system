@@ -1582,15 +1582,15 @@ it rather than starting again.
 
 ### Sprint 13D — Content wave 1 (weeks 3–4)
 
-- [ ] 13.20 `guide/mobile-repair-shop-management` (pillar), `guide/mobile-repair-software`, `guide/phone-intake-form` with its downloadable form
-- [~] 13.21 Tutorials 0–5, with video scripts and Persian subtitles (SRT). `device-intake` (5) and `device-statuses` (6, pulled forward because intake leads straight into it) are written as drafts with their video scripts; the article template gained a `learn` box, image captions, «چرا مهم است» benefit notes, numbered H2 steps and a closing `<NextStep>` from Reza's review of the first one. Subtitles follow the recordings
+- [~] 13.20 `guide/mobile-repair-shop-management` (pillar), `guide/mobile-repair-software`, `guide/phone-intake-form` with its downloadable form. The pillar is drafted (landing PR #5) under Davood Jafari's name, with nine questions for his own experience in `docs/academy/author-questions/` of the landing repo — his experience is asked for, not written for him, and the build refuses to publish an article that still has an unanswered marker
+- [~] 13.21 Tutorials 0–5, with video scripts and Persian subtitles (SRT). `getting-started` (0), `device-intake` (5) and `device-statuses` (6, pulled forward because intake leads straight into it) are written with their video scripts; the article template gained a `learn` box, image captions, «چرا مهم است» benefit notes, numbered H2 steps and a closing `<NextStep>` from Reza's review of the first one. Subtitles follow the recordings
 
       ⚠️ Found while writing `device-statuses`: the device list's quick status
       picker asks about the SMS only for «تحویل داده شده» (b3d0976). Moving a
       device to «آماده تحویل» there sends nothing — the ready message goes out
       only from the edit form. The tutorial documents today's behaviour; if
       the picker should ask for «آماده تحویل» too, the tutorial changes with it
-- [ ] 13.22 Redirect the old posts each new article absorbs, on its publishing day
+- [~] 13.22 Redirect the old posts each new article absorbs, on its publishing day. The Academy opens with four articles (agreed 14 Mehr): the three tutorials above and the pillar. Landing PR #6 is the launch — three tutorials out of draft, three old posts redirected — held open as a draft PR for Reza's review on the Vercel preview and for Davood's answers, after which the pillar joins it with its five redirects. `pnpm redirects` now also rewrites internal links to a moved post
 
 ### Sprint 13E — Content wave 2 (weeks 5–6)
 

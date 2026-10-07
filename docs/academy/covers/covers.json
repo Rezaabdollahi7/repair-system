@@ -36,5 +36,32 @@
     "title": "وضعیت دستگاه در دوفیکسو: پیگیری تعمیر تا تحویل",
     "screenshot": "device-statuses/04-status-picker",
     "position": "center top"
+  },
+  {
+    "slug": "tutorials/sign-up",
+    "section": "آموزش دوفیکسو",
+    "title": "ثبت نام در دوفیکسو",
+    "screenshot": "sign-up/02-otp"
+  },
+  {
+    "slug": "tutorials/settings",
+    "section": "آموزش دوفیکسو",
+    "title": "تنظیمات دوفیکسو: اطلاعات تعمیرگاه، لوگو و فاکتور",
+    "screenshot": "settings/03-images",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/personnel",
+    "section": "آموزش دوفیکسو",
+    "title": "تعریف تعمیرکار در دوفیکسو",
+    "screenshot": "personnel/06-technician-page",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/customers",
+    "section": "آموزش دوفیکسو",
+    "title": "ثبت مشتری در دوفیکسو",
+    "screenshot": "customers/05-history-invoices",
+    "position": "center top"
   }
 ]

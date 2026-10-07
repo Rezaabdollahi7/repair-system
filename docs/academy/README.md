@@ -88,7 +88,7 @@ pnpm downloads                    # فرم‌های قابل دانلود: HTML 
 به نظم» و تصویر hero. با تراکم دو برابر (۲۸۸۰ پیکسل)، چون در لایت‌باکس
 تمام‌صفحه باز می‌شوند، و بدون کادر و شماره.
 
-- `out/shots/site/*.webp` ← لندینگ `src/assets/site/` (فهرست و توضیح هر تصویر:
+- `out/shots/site/*.webp` (جز `*-mobile` که فقط در hero به کار می‌روند) ← لندینگ `src/assets/site/` (فهرست و توضیح هر تصویر:
   `src/data/appScreens.ts`)
 - `out/shots/site/hero.webp` ← لندینگ `public/images/hero-img.webp`. ترکیبش در
   `site/hero.html` است: فهرست دستگاه‌ها در قاب مرورگر و داشبورد در قاب گوشی،

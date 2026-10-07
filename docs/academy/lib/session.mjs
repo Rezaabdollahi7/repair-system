@@ -13,6 +13,9 @@ const ADMIN = { username: "09121234567", password: "Demo@12345" };
 export const VIEWPORTS = {
   desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
   mobile: { viewport: { width: 420, height: 860 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  // همان دسکتاپ با تراکم دو برابر، برای صفحه‌ی اول سایت: آنجا عکس در لایت‌باکس
+  // تمام‌صفحه باز می‌شود و ۱۴۴۰ پیکسل روی صفحه‌ی رتینا تار است.
+  retina: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
 };
 
 export async function launch() {

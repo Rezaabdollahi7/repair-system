@@ -1,4 +1,4 @@
-// تصویرهای صفحه‌ی اول سایت (نه یک آموزش): گالری «اسکرین‌شات‌ها»، تصویر هر
+// تصویرهای صفحه‌ی اول و صفحه‌ی امکانات سایت (نه یک آموزش): گالری «اسکرین‌شات‌ها»، تصویر هر
 // ماژول در بخش «از پراکندگی به نظم» و تصویر hero.
 //
 // خروجی out/shots/site/ است و در لندینگ به src/assets/site/ می‌رود. دسکتاپ با
@@ -59,12 +59,32 @@ export default async function run(browser) {
     await page.waitForURL(/\/personnel\/\d+/);
     await settle(page);
     await shot(page, `${S}/technician`, { quality: 85 });
+
+    // تغییر وضعیت به «آماده تحویل» و پرسش پیامک — از یک دستگاه «در حال تعمیر»،
+    // تا انتخاب واقعاً تغییر وضعیت باشد. با «انصراف» بسته می‌شود؛ چیزی ذخیره نمی‌شود.
+    await page.goto(`${APP}/devices`);
+    await settle(page);
+    await page.getByRole("button", { name: "در حال تعمیر", exact: true }).first().click();
+    await settle(page, 700);
+    await page.getByRole("button", { name: "تغییر وضعیت دستگاه" }).first().click();
+    await settle(page, 500);
+    await page.getByRole("button", { name: /آماده تحویل/ }).last().click();
+    await settle(page, 600);
+    // بریده دور پنجره، با کمی از جدول پشتش: در اندازه‌ی کارت سایت، تمام صفحه
+    // پنجره را ریز و ناخوانا می‌کرد. نسبت ۱۶:۱۰ مثل بقیه.
+    const dialog = await page.getByRole("button", { name: "بله، ارسال کن" }).locator("xpath=ancestor::div[contains(@class,'rounded')][last()]").boundingBox();
+    const cx = dialog ? dialog.x + dialog.width / 2 : 720;
+    const cy = dialog ? dialog.y + dialog.height / 2 : 450;
+    const w = 880, h = 550;
+    const clip = { x: Math.max(0, Math.min(1440 - w, cx - w / 2)), y: Math.max(0, Math.min(900 - h, cy - h / 2)), width: w, height: h };
+    await shot(page, `${S}/status-sms`, { quality: 85, clip });
+    await page.getByRole("button", { name: "انصراف" }).last().click().catch(() => {});
     await context.close();
   }
 
   {
     const { context, page } = await session(browser, "mobile");
-    for (const [name, path] of [["devices-mobile", "/devices"], ["dashboard-mobile", "/dashboard"]]) {
+    for (const [name, path] of [["devices-mobile", "/devices"], ["dashboard-mobile", "/dashboard"], ["customer-page-mobile", "/customers/1"]]) {
       await page.goto(`${APP}${path}`);
       await settle(page);
       await shot(page, `${S}/${name}`, { quality: 85 });

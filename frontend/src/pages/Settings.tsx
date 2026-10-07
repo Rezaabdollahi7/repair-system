@@ -508,7 +508,7 @@ export default function Settings() {
                 <input
                   type="number"
                   name="default_warranty_months"
-                  value={settings.default_warranty_months || 3}
+                  value={settings.default_warranty_months ?? 3}
                   onChange={handleChange}
                   min="0"
                   className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"

@@ -131,8 +131,8 @@ export default function RepairInvoiceFormModal({
         setSettings(res.data);
         setFormData((prev) => ({
           ...prev,
-          tax_rate: res.data.default_tax_rate || 9,
-          warranty_months: res.data.default_warranty_months || 3,
+          tax_rate: res.data.default_tax_rate ?? 9,
+          warranty_months: res.data.default_warranty_months ?? 3,
         }));
       })
       .catch(() => {});
@@ -234,8 +234,8 @@ export default function RepairInvoiceFormModal({
   const resetForm = () => {
     setFormData({
       ...emptyForm(),
-      warranty_months: settings?.default_warranty_months || 3,
-      tax_rate: settings?.default_tax_rate || 9,
+      warranty_months: settings?.default_warranty_months ?? 3,
+      tax_rate: settings?.default_tax_rate ?? 9,
     });
     setSelectedItems([]);
     setErrors({});

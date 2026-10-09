@@ -28,6 +28,7 @@ import {
   formatPersianCurrency,
   formatPersianPhone,
   toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import type {
   Id,
@@ -461,7 +462,7 @@ export default function RepairInvoiceDetailModal({
                                   )}
                                 </td>
                                 <td className="px-4 py-3 text-body-sm text-text-primary">
-                                  {toPersianDigits(item.quantity)}
+                                  {formatQuantity(item.quantity)}
                                 </td>
                                 <td className="px-4 py-3 text-body-sm text-text-secondary">
                                   {item.unit}

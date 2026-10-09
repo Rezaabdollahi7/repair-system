@@ -23,7 +23,10 @@ import {
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
+import QuantityInput from "./QuantityInput";
+import WarehouseSelect from "./WarehouseSelect";
+import { useWarehouses } from "../utils/warehouses";
 import ItemFormModal from "./ItemFormModal";
 import type { SelectOption, SelectValue } from "./SearchableSelect";
 import type {
@@ -68,6 +71,8 @@ interface SaleForm {
   paid_amount: number;
   note: string;
   device_id?: Id | null;
+  /** null until chosen: the server then issues from the default warehouse. */
+  warehouse_id: number | null;
 }
 
 interface CustomerOption extends SelectOption {
@@ -79,6 +84,7 @@ interface ItemOption extends SelectOption {
   stock: number;
   unit: string;
   avgPrice: number;
+  fractional: boolean;
 }
 
 const EMPTY_FORM = (): SaleForm => ({
@@ -88,6 +94,7 @@ const EMPTY_FORM = (): SaleForm => ({
   invoice_date: new Date().toISOString().split("T")[0],
   paid_amount: 0,
   note: "",
+  warehouse_id: null,
 });
 
 interface QuickCustomerModalProps {
@@ -250,6 +257,7 @@ export default function SaleInvoiceFormModal({
   const [formData, setFormData] = useState<SaleForm>(EMPTY_FORM);
 
   const [selectedItems, setSelectedItems] = useState<FormLine[]>([]);
+  const warehouses = useWarehouses(formData.warehouse_id, isOpen);
 
   const loadDeviceInfo = async (id: Id | null | undefined) => {
     if (!id) return;
@@ -291,6 +299,7 @@ export default function SaleInvoiceFormModal({
         paid_amount: invoice.paid_amount || 0,
         note: invoice.note || "",
         device_id: invoice.device_id || null,
+        warehouse_id: invoice.warehouse_id,
       });
 
       if (invoice.device_id) {
@@ -398,10 +407,15 @@ export default function SaleInvoiceFormModal({
   const itemOptions: ItemOption[] = items.map((item) => ({
     value: item.id,
     label: `[${item.code}] ${item.name}`,
-    subLabel: `موجودی: ${item.currentStock} ${item.unit} | میانگین قیمت خرید: ${Number(item.avgPurchasePrice || 0).toLocaleString()} ریال`,
+    subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | ${
+      item.sellPrice > 0
+        ? `قیمت فروش: ${formatPersianCurrency(item.sellPrice)} ریال`
+        : `میانگین قیمت خرید: ${formatPersianCurrency(item.avgPurchasePrice || 0)} ریال`
+    }`,
     stock: item.currentStock,
     unit: item.unit,
     avgPrice: item.avgPurchasePrice || 0,
+    fractional: item.isFractional,
   }));
 
   const calculateItemTotal = (qty: number, price: number) =>
@@ -476,12 +490,17 @@ export default function SaleInvoiceFormModal({
         const updated = { ...item, [field]: value };
         if (field === "item_id" && value) {
           const selectedItem = items.find((it) => it.id === value);
-          // Prefilled at a twenty percent markup on the average purchase
-          // price, which the seller is free to overwrite.
-          if (selectedItem)
-            updated.unit_price = Math.round(
-              (selectedItem.avgPurchasePrice || 0) * 1.2,
-            );
+          // Prefilled with the item's sell price (agreed 9 October, 14.11),
+          // which the seller is free to overwrite. An item with no sell price
+          // yet falls back to its average cost, as a quick sale does — a
+          // number to start from, not a suggestion to sell at cost.
+          if (selectedItem) {
+            updated.unit_price =
+              selectedItem.sellPrice > 0
+                ? selectedItem.sellPrice
+                : Math.round(selectedItem.avgPurchasePrice || 0);
+            updated.unit = selectedItem.unit;
+          }
         }
         return updated;
       }),
@@ -504,9 +523,17 @@ export default function SaleInvoiceFormModal({
 
       if (item.item_type === "inventory") {
         const selectedItem = items.find((it) => it.id === item.item_id);
+        // Against the total across warehouses: a first, friendly check. The
+        // server checks the chosen warehouse itself and says which item.
         if (selectedItem && item.quantity > selectedItem.currentStock)
           newErrors[`quantity_${index}`] =
-            `موجودی کافی نیست (موجودی: ${selectedItem.currentStock})`;
+            `موجودی کافی نیست (موجودی: ${formatQuantity(selectedItem.currentStock)})`;
+        else if (
+          selectedItem &&
+          !selectedItem.isFractional &&
+          !Number.isInteger(item.quantity)
+        )
+          newErrors[`quantity_${index}`] = "این کالا فقط عدد صحیح می‌پذیرد";
       }
 
       if (!item.quantity || item.quantity <= 0)
@@ -548,6 +575,7 @@ export default function SaleInvoiceFormModal({
         invoice_date: formData.invoice_date,
         paid_amount: formData.paid_amount,
         note: formData.note?.trim() || null,
+        warehouse_id: formData.warehouse_id,
         items: selectedItems.map((item) => ({
           item_type: item.item_type || "inventory",
           item_id: item.item_type === "inventory" ? Number(item.item_id) : null,
@@ -627,7 +655,9 @@ export default function SaleInvoiceFormModal({
                 اطلاعات مشتری
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div
+                className={`grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 ${warehouses.showPicker ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+              >
                 {/* انتخاب مشتری */}
                 <div>
                   <label className="block text-body-sm font-medium text-text-primary mb-1.5">
@@ -704,6 +734,20 @@ export default function SaleInvoiceFormModal({
                     placeholder="انتخاب تاریخ"
                   />
                 </div>
+
+                {/* انبار — only once the shop has a second one */}
+                {warehouses.showPicker && (
+                  <WarehouseSelect
+                    id="sale-warehouse"
+                    label="خروج از انبار"
+                    options={warehouses.options}
+                    value={formData.warehouse_id}
+                    defaultWarehouse={warehouses.defaultWarehouse}
+                    onChange={(id) =>
+                      setFormData((prev) => ({ ...prev, warehouse_id: id }))
+                    }
+                  />
+                )}
               </div>
 
               {/* توضیحات در پایین بخش اطلاعات مشتری */}
@@ -839,7 +883,8 @@ export default function SaleInvoiceFormModal({
                                 )}
                                 {selectedItem && (
                                   <p className="mt-0.5 text-[10px] text-text-secondary">
-                                    موجودی: {selectedItem.currentStock}{" "}
+                                    موجودی:{" "}
+                                    {formatQuantity(selectedItem.currentStock)}{" "}
                                     {selectedItem.unit}
                                   </p>
                                 )}
@@ -850,19 +895,18 @@ export default function SaleInvoiceFormModal({
                                 <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   تعداد
                                 </label>
-                                <input
-                                  type="number"
+                                <QuantityInput
                                   value={item.quantity}
-                                  onChange={(e) =>
-                                    handleItemChange(
-                                      index,
-                                      "quantity",
-                                      parseInt(e.target.value) || 1,
-                                    )
+                                  fractional={
+                                    // A custom line touches no stock, so any
+                                    // quantity a person can sell is fine.
+                                    item.item_type === "custom" ||
+                                    (selectedItem?.isFractional ?? false)
                                   }
-                                  min="1"
-                                  step="1"
-                                  max={selectedItem?.currentStock}
+                                  onChange={(value) =>
+                                    handleItemChange(index, "quantity", value)
+                                  }
+                                  aria-label="تعداد"
                                   className="w-full border border-border-field rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 />
                                 <p className="mt-0.5 text-[10px] text-text-secondary opacity-0">

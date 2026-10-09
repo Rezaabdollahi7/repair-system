@@ -22,7 +22,10 @@ import {
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
+import QuantityInput from "./QuantityInput";
+import WarehouseSelect from "./WarehouseSelect";
+import { useWarehouses } from "../utils/warehouses";
 import ItemFormModal from "./ItemFormModal";
 import type { SelectOption, SelectValue } from "./SearchableSelect";
 import type {
@@ -63,6 +66,11 @@ interface RepairForm {
   discount_type: DiscountType | "";
   discount_value: number;
   notes: string;
+  /**
+   * Where the parts will come from when the invoice is issued. null until
+   * chosen: the server then uses the default warehouse.
+   */
+  warehouse_id: number | null;
 }
 
 interface DeviceOption extends SelectOption {
@@ -74,6 +82,7 @@ interface DeviceOption extends SelectOption {
 interface ItemOption extends SelectOption {
   sell_price: number;
   unit: string;
+  fractional: boolean;
 }
 
 interface RepairInvoiceFormModalProps {
@@ -111,9 +120,11 @@ export default function RepairInvoiceFormModal({
     discount_type: "",
     discount_value: 0,
     notes: "",
+    warehouse_id: null,
   });
 
   const [formData, setFormData] = useState<RepairForm>(emptyForm);
+  const warehouses = useWarehouses(formData.warehouse_id, isOpen);
 
   const [selectedItems, setSelectedItems] = useState<FormLine[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -187,6 +198,7 @@ export default function RepairInvoiceFormModal({
             discount_type: invoice.discount_type || "",
             discount_value: invoice.discount_value || 0,
             notes: invoice.notes || "",
+            warehouse_id: invoice.warehouse_id,
           });
 
           // Named `lines` rather than `items`, which would shadow the
@@ -258,10 +270,17 @@ export default function RepairInvoiceFormModal({
   const itemOptions: ItemOption[] = items.map((i) => ({
     value: i.id,
     label: `[${i.code}] ${i.name}`,
-    subLabel: `موجودی: ${i.current_stock} ${i.unit} | قیمت فروش: ${Number(i.sell_price || 0).toLocaleString()} ریال`,
+    subLabel: `موجودی: ${formatQuantity(i.current_stock)} ${i.unit} | قیمت فروش: ${formatPersianCurrency(i.sell_price || 0)} ریال`,
     sell_price: i.sell_price,
     unit: i.unit,
+    fractional: i.is_fractional,
   }));
+
+  // A service or a custom line moves no stock, so its quantity is the
+  // shop's business; an inventory line follows its item (14.11).
+  const isFractionalLine = (line: FormLine) =>
+    line.item_type !== "inventory" ||
+    (items.find((i) => i.id === line.item_id)?.is_fractional ?? false);
 
   const technicianOptions = technicians.map((t) => ({
     value: t.id,
@@ -421,6 +440,8 @@ export default function RepairInvoiceFormModal({
           (items.find((i) => i.id === item.item_id)?.current_stock || 0)
       ) {
         newErrors[`item_${index}_quantity`] = "موجودی کافی نیست";
+      } else if (!isFractionalLine(item) && !Number.isInteger(item.quantity)) {
+        newErrors[`item_${index}_quantity`] = "این کالا فقط عدد صحیح می‌پذیرد";
       }
     });
 
@@ -450,6 +471,7 @@ export default function RepairInvoiceFormModal({
         discount_type: formData.discount_type || null,
         discount_value: formData.discount_value,
         notes: formData.notes,
+        warehouse_id: formData.warehouse_id,
         items: selectedItems.map((item) => ({
           item_type: item.item_type,
           item_id: item.item_id ? Number(item.item_id) : null,
@@ -639,6 +661,20 @@ export default function RepairInvoiceFormModal({
                     className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   />
                 </div>
+
+                {/* Only once the shop has a second warehouse. */}
+                {warehouses.showPicker && (
+                  <WarehouseSelect
+                    id="repair-warehouse"
+                    label="برداشت قطعات از انبار"
+                    options={warehouses.options}
+                    value={formData.warehouse_id}
+                    defaultWarehouse={warehouses.defaultWarehouse}
+                    onChange={(id) =>
+                      setFormData((prev) => ({ ...prev, warehouse_id: id }))
+                    }
+                  />
+                )}
               </div>
 
               <div className="mt-3 sm:mt-4">
@@ -799,18 +835,13 @@ export default function RepairInvoiceFormModal({
                               <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                 تعداد
                               </label>
-                              <input
-                                type="number"
+                              <QuantityInput
                                 value={item.quantity}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "quantity",
-                                    parseFloat(e.target.value) || 1,
-                                  )
+                                fractional={isFractionalLine(item)}
+                                onChange={(value) =>
+                                  handleItemChange(index, "quantity", value)
                                 }
-                                min="0.01"
-                                step="0.01"
+                                aria-label="تعداد"
                                 className="w-full border border-border-field rounded-field px-1 sm:px-2 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                               />
                             </div>

@@ -125,6 +125,7 @@ function itemRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-02T00:00:00.000Z"),
     sellPrice: decimal(1500),
+    isFractional: false,
     category: { name: "قطعات" },
     ...overrides,
   };
@@ -165,6 +166,7 @@ describe("itemController.getAll", () => {
       updatedAt: "2026-01-02T00:00:00.000Z",
       sellPrice: 1500,
       categoryName: "قطعات",
+      isFractional: false,
     });
   });
 
@@ -357,6 +359,7 @@ describe("itemController.searchForInvoice", () => {
         avg_purchase_price: 1000,
         sell_price: 1500,
         category_name: "قطعات",
+        is_fractional: false,
       },
     ]);
   });

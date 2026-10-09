@@ -1,5 +1,5 @@
 import StatusPill from "./StatusPill";
-import { toPersianDigits } from "../utils/formatters";
+import { formatQuantity } from "../utils/formatters";
 import type { StockStatus } from "../utils/stockStatus";
 
 /**
@@ -29,7 +29,7 @@ export default function StockStatusBadge({
    */
   const extra =
     quantity !== undefined && status.key !== "out"
-      ? `${toPersianDigits(quantity)}${unit ? ` ${unit}` : ""}`
+      ? `${formatQuantity(quantity)}${unit ? ` ${unit}` : ""}`
       : undefined;
 
   return (

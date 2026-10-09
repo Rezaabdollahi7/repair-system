@@ -8,6 +8,7 @@ import {
   formatPersianCompact,
   formatPersianCurrency,
   toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import { ChartCard } from "../components/charts/chartKit";
 import BarList from "../components/charts/BarList";
@@ -31,12 +32,31 @@ import type {
   Category,
   QueryParams,
   StockReport as StockReportData,
+  StockReportRow,
 } from "../types/api";
+import { useWarehouses } from "../utils/warehouses";
 
 interface StockFilters {
   categoryId: string;
   lowStockOnly: boolean;
+  /** "" for every warehouse (14.9 / 14.11). */
+  warehouseId: string;
 }
+
+/**
+ * What a row holds in the warehouse the report is filtered by, or in all of
+ * them. The status beside it still reads the item's total against its
+ * minimum, which is set for the item as a whole (14.9).
+ */
+function heldHere(row: StockReportRow): number {
+  return row.warehouse_stock ?? row.current_stock;
+}
+
+const NO_FILTERS: StockFilters = {
+  categoryId: "",
+  lowStockOnly: false,
+  warehouseId: "",
+};
 
 /**
  * One of the four figures above the table.
@@ -121,9 +141,12 @@ export default function StockReport() {
     new URLSearchParams(window.location.search).get("lowStock") === "true";
 
   const [filters, setFilters] = useState<StockFilters>({
-    categoryId: "",
+    ...NO_FILTERS,
     lowStockOnly: lowStockParam,
   });
+  // The warehouse filter appears only once there is a second warehouse to
+  // choose between; until then every figure here is the one warehouse's.
+  const warehouses = useWarehouses();
 
   const { openItemDetail } = useModal();
 
@@ -138,6 +161,7 @@ export default function StockReport() {
     const params: QueryParams = {};
     if (active.categoryId) params.categoryId = active.categoryId;
     if (active.lowStockOnly) params.lowStockOnly = true;
+    if (active.warehouseId) params.warehouseId = active.warehouseId;
 
     getStockReport(params)
       .then((res) => setReport(res.data))
@@ -160,6 +184,8 @@ export default function StockReport() {
   // `report?.data ?? []` builds a fresh array each time and would invalidate it.
   const rows = useMemo(() => report?.data ?? [], [report]);
 
+  const byWarehouse = filters.warehouseId !== "";
+
   /**
    * Inventory value per category, largest first.
    *
@@ -172,7 +198,7 @@ export default function StockReport() {
     const totals = new Map<string, number>();
     for (const row of rows) {
       const key = row.category_name || "بدون دسته‌بندی";
-      const value = row.current_stock * row.avg_purchase_price;
+      const value = heldHere(row) * row.avg_purchase_price;
       totals.set(key, (totals.get(key) ?? 0) + value);
     }
     return [...totals.entries()]
@@ -185,7 +211,8 @@ export default function StockReport() {
       .slice(0, 8);
   }, [rows]);
 
-  const filtering = filters.categoryId !== "" || filters.lowStockOnly;
+  const filtering =
+    filters.categoryId !== "" || filters.lowStockOnly || byWarehouse;
 
   return (
     <div dir="rtl">
@@ -209,6 +236,27 @@ export default function StockReport() {
               </option>
             ))}
           </select>
+
+          {warehouses.showPicker && (
+            <select
+              value={filters.warehouseId}
+              onChange={(e) =>
+                setFilters((current) => ({
+                  ...current,
+                  warehouseId: e.target.value,
+                }))
+              }
+              aria-label="انبار"
+              className={toolbarSelect}
+            >
+              <option value="">همه انبارها</option>
+              {warehouses.options.map((warehouse) => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/*
             Kept as one control rather than split into the items list's three
@@ -236,9 +284,7 @@ export default function StockReport() {
 
           {filtering && (
             <button
-              onClick={() =>
-                setFilters({ categoryId: "", lowStockOnly: false })
-              }
+              onClick={() => setFilters(NO_FILTERS)}
               className="text-body-sm text-text-secondary hover:text-text-primary
                          transition-colors cursor-pointer"
             >
@@ -317,9 +363,11 @@ export default function StockReport() {
               <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
                 {filters.lowStockOnly
                   ? "هیچ کالایی به حداقل موجودی نرسیده — چیزی برای سفارش نیست."
-                  : filtering
-                    ? "دستهٔ دیگری را انتخاب کنید."
-                    : "پس از افزودن کالا، موجودی هر کدام اینجا گزارش می‌شود."}
+                  : byWarehouse && filters.categoryId === ""
+                    ? "در این انبار کالایی با موجودی نیست."
+                    : filtering
+                      ? "دستهٔ دیگری را انتخاب کنید."
+                      : "پس از افزودن کالا، موجودی هر کدام اینجا گزارش می‌شود."}
               </p>
             </div>
           ) : (
@@ -378,15 +426,21 @@ export default function StockReport() {
                             unit={item.unit}
                           />
                           <span className="text-body-xs text-text-muted tabular-nums">
-                            حداقل {toPersianDigits(item.min_stock)} {item.unit}
+                            حداقل {formatQuantity(item.min_stock)} {item.unit}
                           </span>
+                          {byWarehouse && (
+                            <span className="text-body-xs font-bold text-text-primary tabular-nums">
+                              در این انبار {formatQuantity(heldHere(item))}{" "}
+                              {item.unit}
+                            </span>
+                          )}
                         </div>
 
                         <div className="mt-3 pt-3 border-t border-border-subtle">
                           <span className="text-body-xs text-text-muted tabular-nums">
                             ارزش{" "}
                             {formatPersianCurrency(
-                              item.current_stock * item.avg_purchase_price,
+                              heldHere(item) * item.avg_purchase_price,
                             )}{" "}
                             ریال
                           </span>
@@ -405,7 +459,10 @@ export default function StockReport() {
                         <th className={th}>کد</th>
                         <th className={th}>نام کالا</th>
                         <th className={th}>دسته‌بندی</th>
-                        <th className={th}>موجودی</th>
+                        <th className={th}>
+                          {byWarehouse ? "موجودی کل" : "موجودی"}
+                        </th>
+                        {byWarehouse && <th className={th}>در این انبار</th>}
                         <th className={th}>حداقل</th>
                         <th className={th}>ارزش موجودی (ریال)</th>
                       </tr>
@@ -442,12 +499,17 @@ export default function StockReport() {
                                 unit={item.unit}
                               />
                             </td>
+                            {byWarehouse && (
+                              <td className={`${td} font-bold tabular-nums`}>
+                                {formatQuantity(heldHere(item))} {item.unit}
+                              </td>
+                            )}
                             <td className={`${tdMuted} tabular-nums`}>
-                              {toPersianDigits(item.min_stock)} {item.unit}
+                              {formatQuantity(item.min_stock)} {item.unit}
                             </td>
                             <td className={`${td} tabular-nums`}>
                               {formatPersianCurrency(
-                                item.current_stock * item.avg_purchase_price,
+                                heldHere(item) * item.avg_purchase_price,
                               )}
                             </td>
                           </tr>

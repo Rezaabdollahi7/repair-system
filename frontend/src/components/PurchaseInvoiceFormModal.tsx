@@ -33,12 +33,17 @@ import { modalPanel } from "../motion";
  * locale — so the purchase form was the one screen in the app printing
  * «18,400,000» while every other amount read «۱۸٬۴۰۰٬۰۰۰».
  */
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
+import QuantityInput from "./QuantityInput";
+import WarehouseSelect from "./WarehouseSelect";
+import { useWarehouses } from "../utils/warehouses";
+import { isFractionalByDefault } from "../utils/units";
 
 /** An option carrying the item's own price, so picking one prefills it. */
 interface ItemOption extends SelectOption {
   avgPrice: number;
   unit: string;
+  fractional: boolean;
 }
 
 /** A line as the form holds it: item_id is "" until one is chosen. */
@@ -53,6 +58,8 @@ interface PurchaseForm {
   invoice_date: string;
   paid_amount: number;
   note: string;
+  /** null until chosen: the server then files it in the default warehouse. */
+  warehouse_id: number | null;
 }
 
 interface QuickItemModalProps {
@@ -98,7 +105,12 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
     if (!validate()) return;
     setLoading(true);
     try {
-      const res = await createItem(formData);
+      // Measured units default to fractional here as in the full item form;
+      // the full form is where the choice can be changed.
+      const res = await createItem({
+        ...formData,
+        isFractional: isFractionalByDefault(formData.unit),
+      });
       toast.success("کالا با موفقیت تعریف شد");
       onSuccess(res.data);
       onClose();
@@ -226,16 +238,19 @@ export default function PurchaseInvoiceFormModal({
     invoice_date: new Date().toISOString().split("T")[0],
     paid_amount: 0,
     note: "",
+    warehouse_id: null,
   });
 
   const [selectedItems, setSelectedItems] = useState<InvoiceLine[]>([]);
+  const warehouses = useWarehouses(formData.warehouse_id, isOpen);
 
   const itemOptions: ItemOption[] = items.map((item) => ({
     value: item.id,
     label: `[${item.code}] ${item.name}`,
-    subLabel: `موجودی: ${item.currentStock} ${item.unit} | میانگین قیمت: ${Number(item.avgPurchasePrice).toLocaleString()} ریال`,
+    subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | میانگین قیمت: ${formatPersianCurrency(item.avgPurchasePrice)} ریال`,
     avgPrice: item.avgPurchasePrice,
     unit: item.unit,
+    fractional: item.isFractional,
   }));
 
   const fetchItems = async () => {
@@ -263,6 +278,7 @@ export default function PurchaseInvoiceFormModal({
           new Date().toISOString().split("T")[0],
         paid_amount: invoice.paid_amount || 0,
         note: invoice.note || "",
+        warehouse_id: invoice.warehouse_id,
       });
 
       // Named `lines`, not `items`: that name already holds the catalogue
@@ -351,6 +367,11 @@ export default function PurchaseInvoiceFormModal({
       if (!item.item_id) newErrors[`item_${index}`] = "کالا را انتخاب کنید";
       if (!item.quantity || item.quantity <= 0)
         newErrors[`quantity_${index}`] = "تعداد باید بیشتر از صفر باشد";
+      else if (
+        !Number.isInteger(item.quantity) &&
+        !itemOptions.find((opt) => opt.value === item.item_id)?.fractional
+      )
+        newErrors[`quantity_${index}`] = "این کالا فقط عدد صحیح می‌پذیرد";
       if (!item.unit_price || item.unit_price < 0)
         newErrors[`price_${index}`] = "قیمت باید مثبت باشد";
     });
@@ -375,6 +396,7 @@ export default function PurchaseInvoiceFormModal({
         invoice_date: formData.invoice_date,
         paid_amount: formData.paid_amount,
         note: formData.note?.trim() || null,
+        warehouse_id: formData.warehouse_id,
         items: selectedItems.map((item) => ({
           item_id: Number(item.item_id),
           quantity: item.quantity,
@@ -442,10 +464,10 @@ export default function PurchaseInvoiceFormModal({
             </h2>
 
             {/*
-              Two fields across rather than the sales form's four: this form
-              has two, and stretching them over four columns would leave half
-              the band empty. The grid is the same one, filled as far as the
-              content goes.
+              Two fields across rather than the sales form's four — three
+              once the shop has a second warehouse: stretching them over four
+              columns would leave the band half empty. The grid is the same
+              one, filled as far as the content goes.
             */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
@@ -473,6 +495,18 @@ export default function PurchaseInvoiceFormModal({
                   placeholder="انتخاب تاریخ"
                 />
               </div>
+              {warehouses.showPicker && (
+                <WarehouseSelect
+                  id="purchase-warehouse"
+                  label="ورود به انبار"
+                  options={warehouses.options}
+                  value={formData.warehouse_id}
+                  defaultWarehouse={warehouses.defaultWarehouse}
+                  onChange={(id) =>
+                    setFormData((prev) => ({ ...prev, warehouse_id: id }))
+                  }
+                />
+              )}
             </div>
 
             <div className="mt-3 sm:mt-4">
@@ -571,17 +605,17 @@ export default function PurchaseInvoiceFormModal({
                             <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                               تعداد
                             </label>
-                            <input
-                              type="number"
+                            <QuantityInput
                               value={item.quantity}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "quantity",
-                                  parseInt(e.target.value) || 0,
-                                )
+                              fractional={
+                                itemOptions.find(
+                                  (opt) => opt.value === item.item_id,
+                                )?.fractional ?? false
                               }
-                              min="1"
+                              onChange={(value) =>
+                                handleItemChange(index, "quantity", value)
+                              }
+                              aria-label="تعداد"
                               className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`quantity_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`quantity_${index}`] && (

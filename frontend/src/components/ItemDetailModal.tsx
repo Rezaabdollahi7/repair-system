@@ -19,8 +19,12 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import type { Id, InventoryTransaction, Item } from "../types/api";
+import QuantityInput from "./QuantityInput";
+import WarehouseSelect from "./WarehouseSelect";
+import { useWarehouses } from "../utils/warehouses";
+import { movementTypeOf } from "../utils/movementType";
 import { modalPanel } from "../motion";
 import { stockStatusOf } from "../utils/stockStatus";
 import InfoRow from "./InfoRow";
@@ -41,16 +45,23 @@ function QuickPurchaseModal({
 }: QuickModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(item?.avgPurchasePrice || 0);
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const warehouses = useWarehouses(warehouseId, isOpen);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!item) return;
+    if (!(quantity > 0)) {
+      toast.error("تعداد باید بیشتر از صفر باشد");
+      return;
+    }
     setLoading(true);
     try {
       await quickPurchase(item.id, {
         quantity,
         unit_price: price,
+        warehouse_id: warehouseId,
       });
       toast.success("خرید سریع با موفقیت ثبت شد");
       onSuccess();
@@ -92,15 +103,24 @@ function QuickPurchaseModal({
               <label className="block text-body-sm font-medium text-text-primary mb-1">
                 تعداد
               </label>
-              <input
-                type="number"
-                min="1"
+              <QuantityInput
                 value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                fractional={item?.isFractional ?? false}
+                onChange={setQuantity}
+                aria-label="تعداد"
                 className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-                required
               />
             </div>
+            {warehouses.showPicker && (
+              <WarehouseSelect
+                id="quick-purchase-warehouse"
+                label="ورود به انبار"
+                options={warehouses.options}
+                value={warehouseId}
+                defaultWarehouse={warehouses.defaultWarehouse}
+                onChange={setWarehouseId}
+              />
+            )}
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
                 قیمت واحد (ریال)
@@ -118,7 +138,7 @@ function QuickPurchaseModal({
               <div className="flex justify-between text-body-sm text-text-primary">
                 <span>جمع کل:</span>
                 <span className="font-medium">
-                  {(quantity * price).toLocaleString()} ریال
+                  {formatPersianCurrency(quantity * price)} ریال
                 </span>
               </div>
             </div>
@@ -149,15 +169,18 @@ function QuickPurchaseModal({
 function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [customerName, setCustomerName] = useState("");
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ quantity?: string }>({});
+  const warehouses = useWarehouses(warehouseId, isOpen);
 
   const validate = () => {
     const newErrors: { quantity?: string } = {};
     if (!quantity || quantity <= 0)
       newErrors.quantity = "تعداد باید بیشتر از صفر باشد";
+    // The total across warehouses; the server checks the chosen one.
     if (quantity > (item?.currentStock || 0))
-      newErrors.quantity = `موجودی کافی نیست (موجودی: ${item?.currentStock})`;
+      newErrors.quantity = `موجودی کافی نیست (موجودی: ${formatQuantity(item?.currentStock ?? 0)})`;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -171,6 +194,7 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
       await quickSale(item.id, {
         quantity,
         customer_name: customerName?.trim() || "مشتری متفرقه",
+        warehouse_id: warehouseId,
       });
       toast.success("فروش سریع با موفقیت ثبت شد");
       onSuccess();
@@ -208,7 +232,8 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                 [{item?.code}] {item?.name}
               </div>
               <p className="text-body-xs text-text-secondary mt-1">
-                موجودی فعلی: {item?.currentStock} {item?.unit}
+                موجودی فعلی: {formatQuantity(item?.currentStock ?? 0)}{" "}
+                {item?.unit}
               </p>
             </div>
             <div>
@@ -221,14 +246,12 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                   *
                 </span>
               </label>
-              <input
-                type="number"
-                min="1"
-                max={item?.currentStock}
+              <QuantityInput
                 value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                fractional={item?.isFractional ?? false}
+                onChange={setQuantity}
+                aria-label="تعداد"
                 className={`w-full border rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.quantity ? "border-danger" : "border-border"}`}
-                required
               />
               {errors.quantity && (
                 <p className="text-body-xs text-danger-fg mt-1">
@@ -236,6 +259,16 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                 </p>
               )}
             </div>
+            {warehouses.showPicker && (
+              <WarehouseSelect
+                id="quick-sale-warehouse"
+                label="خروج از انبار"
+                options={warehouses.options}
+                value={warehouseId}
+                defaultWarehouse={warehouses.defaultWarehouse}
+                onChange={setWarehouseId}
+              />
+            )}
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
                 نام مشتری
@@ -252,7 +285,8 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
               <div className="flex justify-between text-body-sm text-text-primary">
                 <span>موجودی بعد از فروش:</span>
                 <span className="font-medium">
-                  {(item?.currentStock || 0) - quantity} {item?.unit}
+                  {formatQuantity((item?.currentStock || 0) - quantity)}{" "}
+                  {item?.unit}
                 </span>
               </div>
             </div>
@@ -317,13 +351,13 @@ function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
             {status.label}
           </p>
           <p className="text-3xl font-bold text-text-primary tabular-nums">
-            {toPersianDigits(current)}{" "}
+            {formatQuantity(current)}{" "}
             <span className="text-lg font-normal text-text-secondary">
               {unit}
             </span>
           </p>
           <p className="text-body-sm text-text-secondary mt-2 tabular-nums">
-            حداقل موجودی: {toPersianDigits(min)} {unit}
+            حداقل موجودی: {formatQuantity(min)} {unit}
           </p>
         </div>
         <div className="p-3 bg-surface rounded-full shadow-sm">
@@ -335,7 +369,7 @@ function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
           <p className="text-body-sm">
             {status.key === "out"
               ? "موجودی این کالا به اتمام رسیده است."
-              : `موجودی این کالا به زیر حداقل (${toPersianDigits(min)}) رسیده است.`}
+              : `موجودی این کالا به زیر حداقل (${formatQuantity(min)}) رسیده است.`}
           </p>
         </div>
       )}
@@ -482,7 +516,25 @@ export default function ItemDetailModal({
                     <InfoRow label="واحد شمارش" value={item.unit} />
                     <InfoRow
                       label="حداقل موجودی"
-                      value={`${item.minStock || 0} ${item.unit}`}
+                      value={`${formatQuantity(item.minStock || 0)} ${item.unit}`}
+                    />
+                    {/* Only where it says something: one warehouse would
+                        repeat the figure on the card beside it. */}
+                    {(item.stocks?.length ?? 0) > 1 &&
+                      item.stocks!.map((stock) => (
+                        <InfoRow
+                          key={stock.warehouseId}
+                          label={`موجودی در ${stock.warehouseName}`}
+                          value={`${formatQuantity(stock.quantity)} ${item.unit}`}
+                        />
+                      ))}
+                    <InfoRow
+                      label="قیمت فروش"
+                      value={
+                        item.sellPrice
+                          ? `${formatPersianCurrency(item.sellPrice)} ریال`
+                          : "—"
+                      }
                     />
                     <InfoRow
                       label="میانگین قیمت خرید"
@@ -555,15 +607,7 @@ export default function ItemDetailModal({
                               )}
                             </td>
                             <td className="px-4 py-2 text-body-sm">
-                              {tx.type === "purchase" ? (
-                                <span className="text-success-fg">خرید</span>
-                              ) : tx.type === "sale" ? (
-                                <span className="text-danger-fg">فروش</span>
-                              ) : (
-                                <span className="text-text-secondary">
-                                  تنظیم موجودی
-                                </span>
-                              )}
+                              {movementTypeOf(tx.type).label}
                             </td>
                             <td className="px-4 py-2 text-body-sm">
                               <span
@@ -573,13 +617,18 @@ export default function ItemDetailModal({
                                     : "text-danger-fg"
                                 }
                               >
-                                {tx.quantity > 0 ? "+" : ""}
-                                {tx.quantity}
+                                {tx.quantity > 0 ? "+" : "−"}
+                                {formatQuantity(Math.abs(tx.quantity))}
                               </span>
                             </td>
                             <td className="px-4 py-2 text-body-sm text-text-primary">
-                              {tx.unit_price
-                                ? formatPersianCurrency(tx.unit_price)
+                              {/* The sale price where there is one, else
+                                  what the unit cost — opening stock and
+                                  reversals carry only a cost. */}
+                              {tx.unit_price || tx.unit_cost
+                                ? formatPersianCurrency(
+                                    tx.unit_price || tx.unit_cost,
+                                  )
                                 : "—"}
                             </td>
                             <td className="px-4 py-2 text-body-sm text-text-secondary">

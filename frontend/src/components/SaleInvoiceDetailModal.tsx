@@ -24,7 +24,7 @@ import {
 import {
   formatPersianCurrency,
   formatPersianPhone,
-  toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import type { Id, SaleInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
@@ -345,7 +345,7 @@ export default function SaleInvoiceDetailModal({
                                   )}
                                 </td>
                                 <td className="border border-border px-3 py-2 text-body-sm text-center text-text-primary">
-                                  {toPersianDigits(item.quantity)}
+                                  {formatQuantity(item.quantity)}
                                 </td>
                                 <td className="border border-border px-3 py-2 text-body-sm text-center text-text-secondary">
                                   {item.item_unit || "—"}

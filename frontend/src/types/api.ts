@@ -424,6 +424,18 @@ export interface Item {
   updatedAt: string;
   sellPrice: number;
   categoryName: string | null;
+  /** Moves by fractions — metres, kilos, litres (14.1). */
+  isFractional: boolean;
+  /** GET /items/:id only: the stock in each warehouse that has held it. */
+  stocks?: ItemWarehouseStock[];
+}
+
+export interface ItemWarehouseStock {
+  warehouseId: number;
+  warehouseName: string;
+  warehouseActive: boolean;
+  quantity: number;
+  location: string | null;
 }
 
 export interface ItemCreateBody {
@@ -435,6 +447,15 @@ export interface ItemCreateBody {
   description?: string | null;
   /** snake_case where the rest of the body is camelCase. */
   sell_price?: number;
+  isFractional?: boolean;
+  /**
+   * Create only (14.8): stock already on the shelf, posted as an opening
+   * movement in the same request. `openingCost` is required when it is
+   * above zero; `warehouseId` defaults to the workspace's default.
+   */
+  openingStock?: number;
+  openingCost?: number | null;
+  warehouseId?: number | null;
 }
 
 export type ItemUpdateBody = Partial<ItemCreateBody>;
@@ -457,6 +478,13 @@ export interface InventoryTransaction {
   created_by: number | null;
   created_at: string;
   purchase_invoice_number: string | null;
+  /** From 14.8: the ledger's own fields. */
+  unit_cost: number | null;
+  warehouse_id: number;
+  before_quantity: number | null;
+  after_quantity: number | null;
+  reason: string | null;
+  occurred_at: string;
 }
 
 /** GET /items/search/for-invoice — snake_case, also unlike its neighbours. */
@@ -469,6 +497,7 @@ export interface ItemForInvoice {
   avg_purchase_price: number;
   sell_price: number;
   category_name: string | null;
+  is_fractional: boolean;
 }
 
 export interface QuickStockResponse {
@@ -481,11 +510,13 @@ export interface QuickPurchaseBody {
   quantity: number;
   unit_price: number;
   note?: string;
+  warehouse_id?: number | null;
 }
 
 export interface QuickSaleBody {
   quantity: number;
   customer_name?: string;
+  warehouse_id?: number | null;
 }
 
 /**
@@ -608,6 +639,8 @@ export interface PurchaseInvoice {
   paid_amount: number;
   payment_status: PaymentStatus;
   note: string | null;
+  /** Where the goods went in (14.1). */
+  warehouse_id: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -630,6 +663,7 @@ export interface PurchaseInvoiceLine {
 /** GET /purchase-invoices/:id — the invoice plus its lines. */
 export interface PurchaseInvoiceDetail extends PurchaseInvoice {
   items: PurchaseInvoiceLine[];
+  warehouse_name: string;
 }
 
 export interface PurchaseInvoiceCreateBody {
@@ -637,6 +671,8 @@ export interface PurchaseInvoiceCreateBody {
   invoice_date: string;
   paid_amount: number;
   note: string | null;
+  /** Omitted or null: the workspace's default warehouse. */
+  warehouse_id?: number | null;
   items: {
     item_id: number;
     quantity: number;
@@ -670,6 +706,8 @@ export interface SaleInvoice {
   paid_amount: number;
   payment_status: PaymentStatus;
   note: string | null;
+  /** Where the goods were issued from (14.1). */
+  warehouse_id: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -720,6 +758,8 @@ export interface SaleInvoiceCreateBody {
   invoice_date: string;
   paid_amount: number;
   note: string | null;
+  /** Omitted or null: the workspace's default warehouse. */
+  warehouse_id?: number | null;
   items: SaleInvoiceLineBody[];
 }
 
@@ -802,6 +842,8 @@ export interface RepairInvoice {
   warranty_until: string | null;
   technician_id: number | null;
   notes: string | null;
+  /** Where the parts come from when it is issued (14.1). */
+  warehouse_id: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -877,6 +919,8 @@ export interface RepairInvoiceCreateBody {
   discount_type: DiscountType | null;
   discount_value: number;
   notes: string;
+  /** Omitted or null: the workspace's default warehouse. */
+  warehouse_id?: number | null;
   items: RepairInvoiceLineBody[];
 }
 
@@ -1029,6 +1073,7 @@ export interface DashboardTransaction {
   created_at: string;
   item_name: string;
   item_code: string;
+  item_unit: string;
 }
 
 export interface DashboardTopItem {

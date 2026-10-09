@@ -15,7 +15,7 @@ import {
   TrashIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import type { Id, PurchaseInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
 import InfoRow from "./InfoRow";
@@ -295,7 +295,7 @@ export default function PurchaseInvoiceDetailModal({
                               </button>
                             </td>
                             <td className="px-4 py-3 text-body-sm text-text-primary">
-                              {toPersianDigits(item.quantity)}
+                              {formatQuantity(item.quantity)}
                             </td>
                             <td className="px-4 py-3 text-body-sm text-text-secondary">
                               {item.item_unit}

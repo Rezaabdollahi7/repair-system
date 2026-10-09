@@ -21,7 +21,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import StockStatusBadge from "../components/StockStatusBadge";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { staggerContainer, staggerItem } from "../motion";
@@ -447,7 +447,7 @@ export default function ItemList() {
                         unit={item.unit}
                       />
                       <span className="text-body-xs text-text-muted">
-                        حداقل {toPersianDigits(item.minStock || 0)} {item.unit}
+                        حداقل {formatQuantity(item.minStock || 0)} {item.unit}
                       </span>
                     </div>
 
@@ -521,7 +521,7 @@ export default function ItemList() {
                           />
                         </td>
                         <td className={`${tdMuted} tabular-nums`}>
-                          {toPersianDigits(item.minStock || 0)} {item.unit}
+                          {formatQuantity(item.minStock || 0)} {item.unit}
                         </td>
                         <td className={`${tdMuted} tabular-nums`}>
                           {item.avgPurchasePrice

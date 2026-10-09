@@ -13,7 +13,7 @@ import {
   formatPersianCompact,
   formatPersianCurrency,
   formatPersianPercent,
-  toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import { ChartCard } from "../components/charts/chartKit";
 import DivergingBarList from "../components/charts/DivergingBarList";
@@ -370,7 +370,7 @@ export default function ProfitReport() {
                               {item.item_name ?? "—"}
                             </p>
                             <p className="text-body-xs text-text-muted tabular-nums">
-                              {toPersianDigits(item.total_quantity)} فروش‌رفته
+                              {formatQuantity(item.total_quantity)} فروش‌رفته
                             </p>
                           </div>
                           <span
@@ -462,7 +462,7 @@ export default function ProfitReport() {
                             {item.item_name ?? "—"}
                           </td>
                           <td className={`${tdMuted} tabular-nums`}>
-                            {toPersianDigits(item.total_quantity)}
+                            {formatQuantity(item.total_quantity)}
                           </td>
                           <td className={`${td} tabular-nums`}>
                             {formatPersianCurrency(item.total_revenue)}

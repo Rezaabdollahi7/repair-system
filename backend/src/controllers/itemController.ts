@@ -274,6 +274,8 @@ export const searchForInvoice = async (req: Request, res: Response) => {
         avg_purchase_price: item.avgPurchasePrice.toNumber(),
         sell_price: item.sellPrice.toNumber(),
         category_name: item.category?.name ?? null,
+        // The repair form steps its quantity field by this (14.11).
+        is_fractional: item.isFractional,
       })),
     );
   } catch (error) {

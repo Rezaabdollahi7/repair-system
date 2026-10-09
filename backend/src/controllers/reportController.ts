@@ -479,7 +479,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         where: { workspaceId },
         orderBy: { createdAt: "desc" },
         take: 10,
-        include: { item: { select: { name: true, code: true } } },
+        include: { item: { select: { name: true, code: true, unit: true } } },
       }),
       prisma.saleInvoiceItem.groupBy({
         by: ["itemId"],
@@ -658,6 +658,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         created_at: tx.createdAt.toISOString(),
         item_name: tx.item.name,
         item_code: tx.item.code,
+        // Quantities are decimal (14.1): «۲٫۵» needs «متر», not «عدد».
+        item_unit: tx.item.unit,
       })),
       top_items: topItemsGrouped.map((row) => {
         const item = topItemsById.get(row.itemId as number);

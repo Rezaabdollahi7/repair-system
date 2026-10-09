@@ -9,7 +9,7 @@ import StatusPill from "../components/StatusPill";
 import {
   formatPersianCurrency,
   formatPersianDate,
-  toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import { staggerContainer, staggerItem } from "../motion";
 import {
@@ -25,37 +25,10 @@ import {
   trClickable,
 } from "../utils/tableClasses";
 import type { DashboardTransaction } from "../types/api";
+import { movementTypeOf } from "../utils/movementType";
 
-/**
- * What kind of movement a row is.
- *
- * Stock coming in is green and stock going out is red, which is the shop's
- * reading rather than an accountant's: a sale is good for the books and bad
- * for the shelf, and this page is about the shelf. The «تنظیم» case is a
- * manual correction and takes the neutral.
- */
-const TYPES: Record<string, { label: string; color: string; tone: string }> = {
-  purchase: {
-    label: "خرید",
-    color: "var(--success)",
-    tone: "bg-success-soft text-success-fg",
-  },
-  sale: {
-    label: "فروش",
-    color: "var(--danger)",
-    tone: "bg-danger-soft text-danger-fg",
-  },
-};
-
-const ADJUSTMENT = {
-  label: "تنظیم",
-  color: "var(--text-muted)",
-  tone: "bg-surface-alt text-text-secondary",
-};
-
-function typeOf(type: string) {
-  return TYPES[type] ?? ADJUSTMENT;
-}
+/** Labels and colours are shared with every list of movements (14.11). */
+const typeOf = movementTypeOf;
 
 function TransactionsSkeleton() {
   return (
@@ -199,14 +172,14 @@ export default function TransactionsReport() {
                         }`}
                       >
                         {incoming ? "+" : "−"}
-                        {toPersianDigits(Math.abs(tx.quantity))} عدد
+                        {formatQuantity(Math.abs(tx.quantity))} {tx.item_unit}
                       </span>
                     </div>
 
                     {lineTotal(tx) !== null && (
                       <p className="text-body-xs text-text-muted mt-2 tabular-nums">
                         {formatPersianCurrency(tx.unit_price)} × ‏
-                        {toPersianDigits(Math.abs(tx.quantity))} ={" "}
+                        {formatQuantity(Math.abs(tx.quantity))} ={" "}
                         {formatPersianCurrency(lineTotal(tx))} ریال
                       </p>
                     )}
@@ -273,7 +246,7 @@ export default function TransactionsReport() {
                           }`}
                         >
                           {incoming ? "+" : "−"}
-                          {toPersianDigits(Math.abs(tx.quantity))}
+                          {formatQuantity(Math.abs(tx.quantity))}
                         </td>
                         <td className={`${tdMuted} tabular-nums`}>
                           {tx.unit_price

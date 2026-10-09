@@ -22,7 +22,9 @@ import {
   formatPersianCompact,
   formatPersianCurrency,
   toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
+import { movementTypeOf } from "../utils/movementType";
 import { staggerContainer, staggerItem, transition } from "../motion";
 import { ChartCard } from "../components/charts/chartKit";
 import { SERIES } from "../utils/chartSeries";
@@ -281,8 +283,10 @@ function Section({
 }
 
 function RecentTransactionItem({ tx }: { tx: DashboardTransaction }) {
-  const isPurchase = tx.type === "purchase";
-  const label = isPurchase ? "خرید" : tx.type === "sale" ? "فروش" : "تنظیم";
+  // Coming in or going out by the row's own sign: a reversal or a
+  // correction can go either way, and the label says which kind it was.
+  const isPurchase = tx.quantity > 0;
+  const label = movementTypeOf(tx.type).label;
 
   return (
     <div className="flex items-center justify-between gap-3 py-2.5 border-b border-border-subtle">
@@ -305,7 +309,7 @@ function RecentTransactionItem({ tx }: { tx: DashboardTransaction }) {
           className={`text-body-sm font-bold ${isPurchase ? "text-success-fg" : "text-danger-fg"}`}
         >
           {isPurchase ? "+" : "−"}
-          {toPersianDigits(Math.abs(tx.quantity))} عدد
+          {formatQuantity(Math.abs(tx.quantity))} {tx.item_unit}
         </p>
         <p className="text-body-xs text-text-muted">{label}</p>
       </div>

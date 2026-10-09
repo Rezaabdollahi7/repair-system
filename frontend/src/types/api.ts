@@ -404,6 +404,70 @@ export interface WarehouseBody {
   note?: string | null;
 }
 
+/** Why the shelf was corrected by hand (14.14). `count` is the stock count's own. */
+export type AdjustmentReason =
+  | "damage"
+  | "loss"
+  | "found"
+  | "entry_error"
+  | "internal_use"
+  | "return_from_use"
+  | "other";
+
+/**
+ * A stock adjustment, ADJ-0001 (14.14). Applied when saved and never edited.
+ * `value_in` and `value_out` are rials at the cost each line moved at.
+ */
+export interface StockAdjustment {
+  id: number;
+  number: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  adjusted_at: string;
+  description: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  line_count: number;
+  value_in: number;
+  value_out: number;
+}
+
+export interface StockAdjustmentLine {
+  id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  /** Signed: positive onto the shelf, negative off it. */
+  quantity: number;
+  reason: AdjustmentReason;
+  note: string | null;
+  unit_cost: number;
+  value: number;
+}
+
+export interface StockAdjustmentDetail extends StockAdjustment {
+  lines: StockAdjustmentLine[];
+}
+
+export interface StockAdjustmentLineBody {
+  item_id: number;
+  direction: "in" | "out";
+  quantity: number;
+  reason: AdjustmentReason;
+  note?: string | null;
+  /** Stock coming in only; omitted, the item keeps its average. */
+  unit_cost?: number | null;
+}
+
+export interface StockAdjustmentCreateBody {
+  warehouse_id?: number | null;
+  adjusted_at?: string;
+  description?: string | null;
+  lines: StockAdjustmentLineBody[];
+}
+
 /**
  * Items answer in camelCase too — except `sell_price`, which the create and
  * update bodies take in snake_case while the response gives `sellPrice`.

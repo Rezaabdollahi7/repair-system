@@ -30,6 +30,7 @@ import {
   MoonIcon,
   ChevronDownIcon,
   BuildingStorefrontIcon,
+  AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
 import { jalaliToday } from "../utils/jalali";
@@ -96,6 +97,12 @@ const MENU: MenuSection[] = [
         name: "انبارها",
         path: "/warehouses",
         icon: BuildingStorefrontIcon,
+        adminOnly: true,
+      },
+      {
+        name: "اصلاح موجودی",
+        path: "/stock-adjustments",
+        icon: AdjustmentsHorizontalIcon,
         adminOnly: true,
       },
       {

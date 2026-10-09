@@ -16,6 +16,7 @@ import CustomerList from "./pages/CustomerList";
 import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
 import WarehouseList from "./pages/WarehouseList";
+import StockAdjustmentList from "./pages/StockAdjustmentList";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import Dashboard from "./pages/Dashboard";
@@ -144,6 +145,10 @@ function App() {
                         />
                         <Route path="items" element={<ItemList />} />
                         <Route path="warehouses" element={<WarehouseList />} />
+                        <Route
+                          path="stock-adjustments"
+                          element={<StockAdjustmentList />}
+                        />
                         <Route
                           path="purchase-invoices"
                           element={<PurchaseInvoiceList />}

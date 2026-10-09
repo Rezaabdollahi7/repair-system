@@ -25,6 +25,9 @@ import type {
   CategoryBody,
   Warehouse,
   WarehouseBody,
+  StockAdjustment,
+  StockAdjustmentCreateBody,
+  StockAdjustmentDetail,
   ItemCreateBody,
   Item,
   ItemForInvoice,
@@ -359,6 +362,17 @@ export const setDefaultWarehouse = (id: Id) =>
   api.post<Warehouse>(`/warehouses/${id}/default`);
 export const setWarehouseActive = (id: Id, isActive: boolean) =>
   api.put<Warehouse>(`/warehouses/${id}/status`, { is_active: isActive });
+
+// Stock adjustments (14.14). No update or delete: one is applied when saved,
+// and a mistake is corrected by another.
+export const getStockAdjustments = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<StockAdjustment>>("/stock-adjustments", {
+    params,
+  });
+export const getStockAdjustment = (id: Id) =>
+  api.get<StockAdjustmentDetail>(`/stock-adjustments/${id}`);
+export const createStockAdjustment = (data: StockAdjustmentCreateBody) =>
+  api.post<StockAdjustmentDetail>("/stock-adjustments", data);
 // Items
 export const getItems = (params?: QueryParams) =>
   api.get<PaginatedWithLimit<Item>>("/items", { params });

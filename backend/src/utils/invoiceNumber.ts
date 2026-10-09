@@ -12,6 +12,9 @@ export const INVOICE_PREFIXES = {
   purchase: "PUR",
   sale: "SAL",
   repair: "REP",
+  // Stock documents (phase 14) share the mechanism — same per-workspace,
+  // gap-free counter, same format, no year (agreed 9 October).
+  adjustment: "ADJ",
 } as const;
 
 export type InvoiceKind = keyof typeof INVOICE_PREFIXES;
@@ -69,6 +72,15 @@ export async function nextInvoiceNumber(
         select: { repairSeq: true },
       });
       seq = row.repairSeq;
+      break;
+    }
+    case "adjustment": {
+      const row = await tx.workspace.update({
+        where: { id: workspaceId },
+        data: { adjustmentSeq: { increment: 1 } },
+        select: { adjustmentSeq: true },
+      });
+      seq = row.adjustmentSeq;
       break;
     }
   }

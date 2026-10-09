@@ -139,6 +139,8 @@ model Workspace {
   warehouses            Warehouse[]
   itemStocks            ItemStock[]
   inventoryTransactions InventoryTransaction[]
+  stockAdjustments      StockAdjustment[]
+  stockAdjustmentLines  StockAdjustmentLine[]
   purchaseInvoices      PurchaseInvoice[]
   purchaseInvoiceItems  PurchaseInvoiceItem[]
   saleInvoices          SaleInvoice[]
@@ -207,6 +209,7 @@ model User {
   assignmentsReceived    DeviceAssignment[]     @relation("AssignmentTechnician")
   assignmentsMade        DeviceAssignment[]     @relation("AssignmentAuthor")
   inventoryTransactions  InventoryTransaction[]
+  stockAdjustments       StockAdjustment[]
   purchaseInvoices       PurchaseInvoice[]
   saleInvoices           SaleInvoice[]
   repairInvoicesCreated  RepairInvoice[]        @relation("RepairInvoiceAuthor")
@@ -474,6 +477,7 @@ model Item {
 
   stocks               ItemStock[]
   transactions         InventoryTransaction[]
+  stockAdjustmentLines StockAdjustmentLine[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
   saleInvoiceItems     SaleInvoiceItem[]
 
@@ -505,6 +509,7 @@ model Warehouse {
 
   stocks           ItemStock[]
   transactions     InventoryTransaction[]
+  stockAdjustments StockAdjustment[]
   purchaseInvoices PurchaseInvoice[]
   saleInvoices     SaleInvoice[]
   repairInvoices   RepairInvoice[]
@@ -541,6 +546,61 @@ model ItemStock {
 /// The stock ledger. Append-only: the application role has neither UPDATE
 /// nor DELETE on it, so every figure in items and item_stocks can be checked
 /// against the sum of these rows.
+/// A stock adjustment (14.14): the shop correcting the shelf by hand — a
+/// broken part, a lost one, one found behind the bench, a count entered
+/// wrongly. Applied the moment it is saved (agreed 9 October: no approval
+/// step), and never edited or deleted afterwards: the ledger it wrote is
+/// append-only, and a mistaken adjustment is put right by another one.
+model StockAdjustment {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  /// ADJ-0001, from Workspace.adjustmentSeq — the invoices' mechanism.
+  number      String
+  warehouseId Int      @map("warehouse_id")
+  /// The document's date; the ledger's occurredAt.
+  adjustedAt  DateTime @default(now()) @map("adjusted_at")
+  description String?
+  createdBy   Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  lines StockAdjustmentLine[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, adjustedAt(sort: Desc)])
+  @@index([warehouseId])
+  @@index([createdBy])
+  @@map("stock_adjustments")
+}
+
+model StockAdjustmentLine {
+  id           Int                 @id @default(autoincrement())
+  workspaceId  Int                 @map("workspace_id")
+  adjustmentId Int                 @map("adjustment_id")
+  itemId       Int                 @map("item_id")
+  /// Signed: positive onto the shelf, negative off it. Never zero.
+  quantity     Decimal             @db.Decimal(14, 3)
+  reason       StockMovementReason
+  note         String?
+  /// What one unit moved at — the cost entered for stock coming in, the
+  /// moving average for stock going out. Written from the stock service's
+  /// answer, so the document and its ledger rows agree.
+  unitCost     Decimal             @map("unit_cost") @db.Decimal(18, 2)
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  workspace  Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  adjustment StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  item       Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([adjustmentId])
+  @@index([itemId])
+  @@map("stock_adjustment_lines")
+}
+
 model InventoryTransaction {
   id             Int                      @id @default(autoincrement())
   workspaceId    Int                      @map("workspace_id")

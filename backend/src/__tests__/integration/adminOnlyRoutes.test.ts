@@ -16,6 +16,7 @@ import saleInvoiceRoutes from "../../routes/saleInvoices";
 import repairInvoiceRoutes from "../../routes/repairInvoices";
 import reportRoutes from "../../routes/reports";
 import warehouseRoutes from "../../routes/warehouses";
+import stockAdjustmentRoutes from "../../routes/stockAdjustments";
 
 // The point of this suite is not that atLeast("admin") works — authorize.test.ts
 // covers that, and it always did. What failed was nobody wiring it up. So the
@@ -36,6 +37,7 @@ const GUARDED_ROUTERS: { prefix: string; router: unknown }[] = [
   { prefix: "/api/repair-invoices", router: repairInvoiceRoutes },
   { prefix: "/api/reports", router: reportRoutes },
   { prefix: "/api/warehouses", router: warehouseRoutes },
+  { prefix: "/api/stock-adjustments", router: stockAdjustmentRoutes },
 ];
 
 interface RouteLayer {
@@ -98,8 +100,10 @@ function endpointsOf(prefix: string, router: unknown): Endpoint[] {
   }
 
   // Zero discovered endpoints would make every test below pass by having
-  // nothing to run — the exact silence this suite exists to break.
-  if (endpoints.length < 4) {
+  // nothing to run — the exact silence this suite exists to break. Three is
+  // the smallest real router: stock adjustments list, read and create, and
+  // offer no edit or delete by design (14.14).
+  if (endpoints.length < 3) {
     throw new Error(
       `${prefix}: found only ${endpoints.length} endpoints, which cannot be ` +
         `right. Traversal is broken.`,

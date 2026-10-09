@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import jalaali from "jalaali-js";
 import prisma from "../../lib/prisma";
+import { REASON_LABELS } from "../../schemas/stockAdjustment";
 
 /**
  * Dates are written in Jalali, not ISO: the reader is a workshop owner, and
@@ -159,6 +160,17 @@ export async function buildWorkbook(): Promise<Buffer> {
       warehouse: { select: { name: true, isActive: true } },
       item: {
         select: { code: true, name: true, unit: true, avgPurchasePrice: true },
+      },
+    },
+  });
+
+  const adjustments = await prisma.stockAdjustment.findMany({
+    orderBy: [{ adjustedAt: "desc" }, { id: "desc" }],
+    include: {
+      warehouse: { select: { name: true } },
+      lines: {
+        orderBy: { id: "asc" },
+        include: { item: { select: { code: true, name: true, unit: true } } },
       },
     },
   });
@@ -371,6 +383,48 @@ export async function buildWorkbook(): Promise<Buffer> {
       warranty: invoice.warrantyMonths,
       notes: invoice.notes ?? "",
     })),
+  );
+
+  // One row per line of every stock adjustment (14.14): the shelf corrected
+  // by hand, with the reason a shop gave and what it was worth.
+  addSheet(
+    book,
+    "اصلاح موجودی",
+    [
+      { header: "شماره سند", key: "number", width: 14 },
+      { header: "تاریخ", key: "date", width: 14 },
+      { header: "انبار", key: "warehouse", width: 16 },
+      { header: "کد کالا", key: "code", width: 18 },
+      { header: "نام کالا", key: "name", width: 30 },
+      { header: "مقدار", key: "quantity", width: 10 },
+      { header: "واحد", key: "unit", width: 10 },
+      { header: "دلیل", key: "reason", width: 16 },
+      { header: "توضیح", key: "note", width: 30 },
+      { header: "بهای واحد", key: "unitCost", width: 16, numFmt: MONEY },
+      { header: "ارزش", key: "value", width: 16, numFmt: MONEY },
+    ],
+    adjustments.flatMap((adjustment) =>
+      adjustment.lines.map((line) => {
+        const quantity = line.quantity.toNumber();
+        const unitCost = line.unitCost.toNumber();
+        return {
+          number: adjustment.number,
+          date: toJalali(adjustment.adjustedAt),
+          warehouse: adjustment.warehouse.name,
+          code: line.item.code,
+          name: line.item.name,
+          // Signed, so a column sum is the net change.
+          quantity,
+          unit: line.item.unit,
+          reason:
+            REASON_LABELS[line.reason as keyof typeof REASON_LABELS] ??
+            line.reason,
+          note: line.note ?? adjustment.description ?? "",
+          unitCost,
+          value: Math.round(quantity * unitCost * 100) / 100,
+        };
+      }),
+    ),
   );
 
   // One sheet for every line of every invoice kind rather than three. The

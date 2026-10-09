@@ -2,6 +2,7 @@ import { deviceCreateSchema } from "../schemas/device";
 import { purchaseInvoiceCreateSchema } from "../schemas/purchaseInvoice";
 import { paginationQuerySchema, quantitySchema } from "../schemas/common";
 import { itemCreateSchema, quickPurchaseSchema } from "../schemas/item";
+import { stockAdjustmentCreateSchema } from "../schemas/stockAdjustment";
 import {
   warehouseBodySchema,
   warehouseStatusSchema,
@@ -125,5 +126,82 @@ describe("warehouseStatusSchema", () => {
     expect(
       warehouseStatusSchema.safeParse({ is_active: "false" }).success,
     ).toBe(false);
+  });
+});
+
+describe("stockAdjustmentCreateSchema", () => {
+  const line = (overrides: Record<string, unknown> = {}) => ({
+    item_id: 1,
+    direction: "out",
+    quantity: 1,
+    reason: "damage",
+    ...overrides,
+  });
+  const parse = (lines: unknown[], extra: Record<string, unknown> = {}) =>
+    stockAdjustmentCreateSchema.safeParse({ lines, ...extra });
+  const messages = (result: ReturnType<typeof parse>) =>
+    result.success ? [] : result.error.issues.map((issue) => issue.message);
+
+  it("accepts a plain decrease and defaults the rest", () => {
+    const result = parse([line()]);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toMatchObject({ description: null });
+      expect(result.data.lines[0]).toMatchObject({ note: null });
+    }
+  });
+
+  it.each([
+    ["damage", "in"],
+    ["loss", "in"],
+    ["internal_use", "in"],
+    ["found", "out"],
+    ["return_from_use", "out"],
+  ])("refuses «%s» moving stock %s", (reason, direction) => {
+    const result = parse([line({ reason, direction })]);
+
+    expect(result.success).toBe(false);
+    expect(messages(result)[0]).toContain("فقط برای");
+  });
+
+  it.each([["entry_error"], ["other"]])("lets «%s» go either way", (reason) => {
+    for (const direction of ["in", "out"]) {
+      expect(parse([line({ reason, direction, note: "توضیح" })]).success).toBe(
+        true,
+      );
+    }
+  });
+
+  it("wants a note for «سایر»", () => {
+    expect(messages(parse([line({ reason: "other" })]))).toEqual([
+      "برای دلیل «سایر» توضیح الزامی است",
+    ]);
+    expect(parse([line({ reason: "other", note: "   " })]).success).toBe(false);
+  });
+
+  it("refuses the stock count's own reason", () => {
+    expect(parse([line({ reason: "count" })]).success).toBe(false);
+  });
+
+  it("takes a cost only for stock coming in", () => {
+    expect(
+      parse([line({ direction: "in", reason: "found", unit_cost: 5000 })])
+        .success,
+    ).toBe(true);
+    expect(parse([line({ unit_cost: 5000 })]).success).toBe(false);
+  });
+
+  it("refuses a zero, a negative and a fourth decimal place", () => {
+    expect(parse([line({ quantity: 0 })]).success).toBe(false);
+    expect(parse([line({ quantity: -2 })]).success).toBe(false);
+    expect(parse([line({ quantity: 0.0005 })]).success).toBe(false);
+  });
+
+  it("refuses an empty document and one item listed twice", () => {
+    expect(parse([]).success).toBe(false);
+    expect(messages(parse([line(), line({ quantity: 2 })]))).toEqual([
+      "هر کالا فقط یک بار در سند می‌آید",
+    ]);
   });
 });

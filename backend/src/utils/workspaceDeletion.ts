@@ -56,6 +56,10 @@ export const DELETION_ORDER = [
   "purchaseInvoice",
   "saleInvoice",
   "device",
+  // Before items and warehouses, which their lines and headers point at
+  // with RESTRICT. The ledger rows they wrote leave with the items.
+  "stockAdjustmentLine",
+  "stockAdjustment",
   "itemStock",
   "item",
   "warehouse",

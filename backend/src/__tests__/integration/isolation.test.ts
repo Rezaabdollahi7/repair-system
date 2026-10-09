@@ -123,6 +123,26 @@ const resources: Resource[] = [
     skipDelete: true,
   },
   {
+    name: "stock adjustments",
+    path: "/api/stock-adjustments",
+    create: async (workspaceId) => {
+      const warehouseId = await defaultWarehouseOf(workspaceId);
+      const row = await owner.stockAdjustment.create({
+        // The same number in both workspaces on purpose: it is unique per
+        // workspace, not globally.
+        data: { workspaceId, warehouseId, number: "ADJ-0001" },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.stockAdjustment.count({ where: { id } })) === 1,
+    // Neither route exists: an adjustment is never edited or deleted, and
+    // stockAdjustments.test.ts asserts both answer 404.
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
     name: "services",
     path: "/api/services",
     create: async (workspaceId) => {

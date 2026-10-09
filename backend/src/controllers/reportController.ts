@@ -21,17 +21,50 @@ function stockStatus(currentStock: number, minStock: number): StockStatus {
   return "good";
 }
 
+// A quantity has three decimal places and a cost two (14.1). Sums of
+// products in floating point land a hair off — 0.4 × 30,000 is
+// 12,000.000000000002 — so each figure is rounded once, on the way out.
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function roundQuantity(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
 // GET /api/reports/stock
+//
+// With `warehouseId`, the report answers «what is in this warehouse and what
+// is it worth»: only items holding stock there, valued at that quantity, and
+// `warehouse_stock` beside the total. The status still compares the item's
+// total with its minimum, because the minimum is set per item across every
+// warehouse (14 decisions) — an item that lives in the main warehouse is not
+// «critical» for having none in the repairs one.
 export const getStockReport = async (req: Request, res: Response) => {
   try {
     const query = (req as ValidatedRequest).valid.query as StockReportQuery;
+    const workspaceId = workspaceIdOf(req);
+    const warehouseId = query.warehouseId;
+
+    if (warehouseId !== undefined) {
+      const warehouse = await prisma.warehouse.findFirst({
+        where: { id: warehouseId, workspaceId },
+        select: { id: true },
+      });
+      if (!warehouse) {
+        return res.status(404).json({ error: "انبار یافت نشد" });
+      }
+    }
 
     const where: Prisma.ItemWhereInput = {
       isActive: true,
-      workspaceId: workspaceIdOf(req),
+      workspaceId,
     };
     if (query.categoryId !== undefined) {
       where.categoryId = query.categoryId;
+    }
+    if (warehouseId !== undefined) {
+      where.stocks = { some: { warehouseId, quantity: { gt: 0 } } };
     }
 
     const items = await prisma.item.findMany({
@@ -46,25 +79,47 @@ export const getStockReport = async (req: Request, res: Response) => {
         minStock: true,
         avgPurchasePrice: true,
         category: { select: { name: true } },
+        ...(warehouseId !== undefined
+          ? {
+              stocks: {
+                where: { warehouseId },
+                select: { quantity: true },
+              },
+            }
+          : {}),
       },
     });
 
     // Both the status and the low-stock filter compare two columns against
     // each other, which Prisma can't express in where or orderBy.
-    const rows = items.map((item) => ({
-      id: item.id,
-      code: item.code,
-      name: item.name,
-      unit: item.unit,
-      current_stock: item.currentStock.toNumber(),
-      min_stock: item.minStock.toNumber(),
-      avg_purchase_price: item.avgPurchasePrice.toNumber(),
-      category_name: item.category?.name ?? null,
-      stock_status: stockStatus(
-        item.currentStock.toNumber(),
-        item.minStock.toNumber(),
-      ),
-    }));
+    const rows = items.map((item) => {
+      const currentStock = item.currentStock.toNumber();
+      const minStock = item.minStock.toNumber();
+      const stocks = (item as { stocks?: { quantity: Prisma.Decimal }[] })
+        .stocks;
+      return {
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        unit: item.unit,
+        current_stock: currentStock,
+        warehouse_stock:
+          warehouseId !== undefined
+            ? (stocks?.[0]?.quantity.toNumber() ?? 0)
+            : null,
+        min_stock: minStock,
+        avg_purchase_price: item.avgPurchasePrice.toNumber(),
+        category_name: item.category?.name ?? null,
+        stock_status: stockStatus(currentStock, minStock),
+      };
+    });
+
+    // Within one warehouse the shortest shelf comes first, as the total does
+    // without a filter. Array.sort is stable, so the name order the query
+    // returned survives among equal quantities.
+    if (warehouseId !== undefined) {
+      rows.sort((a, b) => (a.warehouse_stock ?? 0) - (b.warehouse_stock ?? 0));
+    }
 
     const data =
       query.lowStockOnly === "true"
@@ -79,9 +134,14 @@ export const getStockReport = async (req: Request, res: Response) => {
           .length,
         critical_count: data.filter((row) => row.stock_status === "critical")
           .length,
-        total_inventory_value: data.reduce(
-          (sum, row) => sum + row.current_stock * row.avg_purchase_price,
-          0,
+        total_inventory_value: roundMoney(
+          data.reduce(
+            (sum, row) =>
+              sum +
+              (row.warehouse_stock ?? row.current_stock) *
+                row.avg_purchase_price,
+            0,
+          ),
         ),
       },
     });
@@ -190,6 +250,14 @@ export const getSaleReport = async (req: Request, res: Response) => {
 };
 
 // GET /api/reports/profit
+//
+// Each line is costed at the `unit_cost` it stored when it left the shelf
+// (14.6) — the item's average at that moment — so a margin reported today is
+// the margin that sale made, and restocking at a new price no longer rewrites
+// last month. Lines written before 14.6 carry no cost; they fall back to the
+// item's current average, which is all the old report ever had. Production
+// had no invoices when 14.1 shipped, so that fallback only ever meets
+// development and demo data.
 export const getProfitReport = async (req: Request, res: Response) => {
   try {
     const { from_date, to_date } = (req as ValidatedRequest).valid
@@ -198,63 +266,86 @@ export const getProfitReport = async (req: Request, res: Response) => {
     const invoiceDate = dateFilter(from_date, to_date);
     const workspaceId = workspaceIdOf(req);
 
+    // Lines rather than a groupBy: the cost is quantity × unit_cost per line,
+    // a product groupBy cannot sum. A period of one shop's sales is hundreds
+    // of rows, and [workspaceId, invoiceDate] is indexed.
+    //
     // Custom sale lines carry no item_id and so no known cost — the old
     // query's inner join excluded them, and they stay excluded here.
-    const grouped = await prisma.saleInvoiceItem.groupBy({
-      by: ["itemId"],
+    const lines = await prisma.saleInvoiceItem.findMany({
       where: {
         workspaceId,
         itemId: { not: null },
         ...(invoiceDate ? { invoice: { invoiceDate } } : {}),
       },
-      _sum: { quantity: true, totalPrice: true },
+      select: {
+        itemId: true,
+        quantity: true,
+        totalPrice: true,
+        unitCost: true,
+        item: {
+          select: { name: true, code: true, avgPurchasePrice: true },
+        },
+      },
     });
 
-    const itemIds = grouped
-      .map((row) => row.itemId)
-      .filter((id): id is number => id !== null);
+    const byItem = new Map<
+      number,
+      {
+        name: string | null;
+        code: string | null;
+        quantity: number;
+        revenue: number;
+        cost: number;
+      }
+    >();
 
-    const items = itemIds.length
-      ? await prisma.item.findMany({
-          where: { id: { in: itemIds }, workspaceId },
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            avgPurchasePrice: true,
-          },
-        })
-      : [];
+    for (const line of lines) {
+      const itemId = line.itemId as number;
+      const quantity = line.quantity.toNumber();
+      const unitCost =
+        line.unitCost?.toNumber() ??
+        line.item?.avgPurchasePrice.toNumber() ??
+        0;
 
-    const itemsById = new Map(items.map((item) => [item.id, item]));
+      const row = byItem.get(itemId) ?? {
+        name: line.item?.name ?? null,
+        code: line.item?.code ?? null,
+        quantity: 0,
+        revenue: 0,
+        cost: 0,
+      };
+      row.quantity += quantity;
+      row.revenue += line.totalPrice.toNumber();
+      row.cost += quantity * unitCost;
+      byItem.set(itemId, row);
+    }
 
-    const data = grouped
-      .map((row) => {
-        const item = itemsById.get(row.itemId as number);
-        const quantity = row._sum?.quantity?.toNumber() ?? 0;
-        const revenue = row._sum?.totalPrice?.toNumber() ?? 0;
-
-        // Cost uses the item's current average purchase price, not the price
-        // at the time of sale, so past margins shift when an item is
-        // restocked at a different price. Existing behaviour.
-        const cost = quantity * (item?.avgPurchasePrice.toNumber() ?? 0);
+    const data = [...byItem.entries()]
+      .map(([itemId, row]) => {
+        const quantity = roundQuantity(row.quantity);
+        const revenue = row.revenue;
+        const cost = roundMoney(row.cost);
+        const profit = roundMoney(revenue - cost);
 
         return {
-          item_id: row.itemId,
-          item_name: item?.name ?? null,
-          item_code: item?.code ?? null,
+          item_id: itemId,
+          item_name: row.name,
+          item_code: row.code,
           total_quantity: quantity,
           total_revenue: revenue,
           total_cost: cost,
-          profit: revenue - cost,
-          profit_margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+          profit,
+          profit_margin: revenue > 0 ? (profit / revenue) * 100 : 0,
         };
       })
       .sort((a, b) => b.profit - a.profit);
 
     const totalRevenue = data.reduce((sum, row) => sum + row.total_revenue, 0);
-    const totalCost = data.reduce((sum, row) => sum + row.total_cost, 0);
-    const totalProfit = totalRevenue - totalCost;
+    const totalCost = roundMoney(
+      data.reduce((sum, row) => sum + row.total_cost, 0),
+    );
+    const totalProfit = roundMoney(totalRevenue - totalCost);
 
     res.json({
       data,

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const stockReportQuerySchema = z.object({
   categoryId: z.coerce.number().int().positive().optional(),
+  // Narrows the report to what one warehouse holds (14.9).
+  warehouseId: z.coerce.number().int().positive().optional(),
   // Compared as a string because that's what the frontend sends; anything
   // else counts as false, as before.
   lowStockOnly: z.string().optional(),

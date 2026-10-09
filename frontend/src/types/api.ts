@@ -904,6 +904,8 @@ export interface StockReportRow {
   name: string;
   unit: string;
   current_stock: number;
+  /** That warehouse's quantity when the report is filtered by one; else null. */
+  warehouse_stock: number | null;
   min_stock: number;
   avg_purchase_price: number;
   category_name: string | null;

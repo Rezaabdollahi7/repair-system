@@ -423,9 +423,11 @@ impossible rather than unlikely.
   workspace (`populateWorkspace`). `is_default` is **TRUE or NULL, never
   FALSE**: the unique index on `(workspace_id, is_default)` allows one TRUE
   because NULLs are distinct, and a CHECK forbids FALSE — the effect of a
-  partial unique index, in a form Prisma's schema can describe. **No DELETE
-  grant** — the ledger and the
-  invoices name their warehouse forever, so a finished one is deactivated.
+  partial unique index, in a form Prisma's schema can describe. **No
+  delete in the API** — the ledger and the invoices name their warehouse
+  forever, so a finished one is deactivated. The application role keeps its
+  DELETE grant only because workspace deletion (8.7) removes the rows; the
+  RESTRICT foreign keys from the ledger and the invoices stop anything else.
 - `item_stocks` — one row per (item, warehouse) that has ever held it, with
   the quantity and an optional shelf `location`.
 - `items.current_stock` — the **cached sum** of the item's `item_stocks`,

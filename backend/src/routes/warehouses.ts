@@ -36,9 +36,11 @@ router.put(
   ctrl.setStatus,
 );
 
-// No DELETE, deliberately: the ledger and the invoices name their warehouse,
-// and the application role holds no DELETE grant on the table (14.1). A
-// warehouse that is no longer used is deactivated.
+// No DELETE, deliberately: the ledger and the invoices name their warehouse
+// with RESTRICT foreign keys, and a warehouse that is no longer used is
+// deactivated. (The application role does hold DELETE on the table — workspace
+// deletion, 8.7, needs it — so it is this route list, not a grant, that
+// keeps the API from offering it.)
 
 // `export =` rather than `export default`: routes/index.js still uses
 // require(), which would otherwise receive { default: router }.

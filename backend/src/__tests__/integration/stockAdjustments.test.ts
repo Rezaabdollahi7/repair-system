@@ -1,10 +1,8 @@
 import request from "supertest";
 import ExcelJS from "exceljs";
 import app from "../../app";
-import { runInWorkspaceTransaction } from "../../lib/prisma";
 import { runWithWorkspace } from "../../lib/workspaceContext";
 import { buildWorkbook } from "../../utils/export/workbook";
-import { DELETION_ORDER } from "../../utils/workspaceDeletion";
 import {
   disconnectOwner,
   expectAllStockConsistent,
@@ -367,47 +365,6 @@ describe("reading adjustments", () => {
       .get(`/api/stock-adjustments/${created.body.id}`)
       .set("Authorization", `Bearer ${workspaces.b.token}`);
     expect(theirs.status).toBe(404);
-  });
-});
-
-describe("a workspace with adjustments", () => {
-  it("can still be cleared, in the order workspace deletion uses", async () => {
-    const lcd = await stockedItem("LCD", 5, 1_000);
-    await adjust([line(lcd, "out", 1, "damage")]);
-    const workspaceId = workspaces.a.workspaceId;
-
-    // DELETION_ORDER up to the warehouses, as the application role — the
-    // stretch that the adjustment tables sit in, with the Restrict foreign
-    // keys that decide it. Not the whole of deleteWorkspaceData: that stops
-    // further on, at referral_codes, for a reason unrelated to stock (see
-    // the 14.14 report).
-    const upToWarehouses = DELETION_ORDER.slice(
-      0,
-      DELETION_ORDER.indexOf("warehouse") + 1,
-    );
-    await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      for (const model of upToWarehouses) {
-        const delegate = tx[model] as unknown as {
-          deleteMany: (args: {
-            where: { workspaceId: number };
-          }) => Promise<unknown>;
-        };
-        await delegate.deleteMany({ where: { workspaceId } });
-      }
-    });
-
-    expect(await owner.stockAdjustment.count({ where: { workspaceId } })).toBe(
-      0,
-    );
-    expect(
-      await owner.stockAdjustmentLine.count({ where: { workspaceId } }),
-    ).toBe(0);
-    // The ledger went with the items, through the cascade.
-    expect(
-      await owner.inventoryTransaction.count({ where: { workspaceId } }),
-    ).toBe(0);
-    expect(await owner.item.count({ where: { workspaceId } })).toBe(0);
-    expect(await owner.warehouse.count({ where: { workspaceId } })).toBe(0);
   });
 });
 

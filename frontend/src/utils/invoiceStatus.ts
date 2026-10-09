@@ -130,7 +130,7 @@ export function repairOutstanding(invoice: {
 export const REPAIR_INVOICE_STATUSES: InvoiceStatus<RepairInvoiceStatus>[] = [
   {
     key: "draft",
-    label: "پیش‌نویس",
+    label: "پیش‌فاکتور",
     color: "var(--text-muted)",
     tone: NEUTRAL_TONE,
   },

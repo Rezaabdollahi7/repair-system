@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/repairInvoiceController";
 import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
+import { applyStockMovements, InsufficientStockError } from "../utils/stock";
+import { resolveWarehouseId } from "../utils/warehouse";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
@@ -11,16 +13,20 @@ jest.mock("../lib/prisma", () => {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      findFirst: jest.fn(),
     },
-    repairInvoiceItem: { create: jest.fn(), deleteMany: jest.fn() },
+    repairInvoiceItem: {
+      create: jest.fn(),
+      deleteMany: jest.fn(),
+      updateMany: jest.fn(),
+    },
     repairInvoicePayment: { create: jest.fn() },
-    // findFirst rather than findUnique: the controller pairs the item id
-    // with workspaceId now, which findUnique can't express.
-    item: { findFirst: jest.fn(), update: jest.fn() },
-    inventoryTransaction: { create: jest.fn() },
-    warehouse: {
-      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 4 }),
-    },
+    // The catalogue lookup a پیش‌فاکتور's inventory lines are checked
+    // against, scoped by workspace.
+    item: { findMany: jest.fn() },
+    // The row lock every edit, status change and delete takes first. One
+    // row back means the invoice exists in this workspace.
+    $queryRaw: jest.fn(),
   };
 
   return {
@@ -32,6 +38,7 @@ jest.mock("../lib/prisma", () => {
         findFirst: jest.fn(),
       },
       device: { findFirst: jest.fn() },
+      // getById's lookup of each inventory line's code and unit.
       item: { findMany: jest.fn() },
       __tx: tx,
     },
@@ -43,6 +50,17 @@ jest.mock("../lib/prisma", () => {
   };
 });
 
+// The stock arithmetic and locking are the stock service's, tested on their
+// own. Here: which parts this controller asks it to move, and when.
+jest.mock("../utils/stock", () => ({
+  ...jest.requireActual("../utils/stock"),
+  applyStockMovements: jest.fn(),
+}));
+
+jest.mock("../utils/warehouse", () => ({
+  resolveWarehouseId: jest.fn(),
+}));
+
 const db = prisma as unknown as {
   repairInvoice: Record<string, jest.Mock>;
   device: Record<string, jest.Mock>;
@@ -53,9 +71,13 @@ const db = prisma as unknown as {
     repairInvoiceItem: Record<string, jest.Mock>;
     repairInvoicePayment: Record<string, jest.Mock>;
     item: Record<string, jest.Mock>;
-    inventoryTransaction: Record<string, jest.Mock>;
+    $queryRaw: jest.Mock;
   };
 };
+
+const applyMovements = applyStockMovements as unknown as jest.Mock;
+const resolveWarehouse = resolveWarehouseId as unknown as jest.Mock;
+const MAIN_WAREHOUSE = 4;
 
 const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
@@ -160,10 +182,38 @@ const createBody = {
   items: [inventoryLine],
 };
 
+/** The catalogue entry for inventoryLine's item. */
+function catalogueItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 2,
+    name: "خازن",
+    unit: "عدد",
+    sellPrice: decimal(25000),
+    isFractional: false,
+    ...overrides,
+  };
+}
+
+/** The invoice as lockInvoice reads it. */
+function lockedInvoice(overrides: Record<string, unknown> = {}) {
+  db.__tx.$queryRaw.mockResolvedValue([{ id: 5 }]);
+  db.__tx.repairInvoice.findFirst.mockResolvedValue({
+    status: "draft",
+    warehouseId: MAIN_WAREHOUSE,
+    totalAmount: decimal(530000),
+    paidAmount: decimal(0),
+    items: [],
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   db.__tx.workspace.update.mockResolvedValue({ repairSeq: 1 });
   db.__tx.repairInvoice.create.mockResolvedValue(invoiceRow());
+  db.__tx.item.findMany.mockResolvedValue([catalogueItem()]);
+  resolveWarehouse.mockResolvedValue(MAIN_WAREHOUSE);
+  applyMovements.mockResolvedValue([]);
 });
 
 describe("repairInvoiceController.getAll", () => {
@@ -347,10 +397,6 @@ describe("repairInvoiceController.create", () => {
 
   it("fills an inventory line's price from the item when none was sent", async () => {
     db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
-    db.__tx.item.findFirst.mockResolvedValue({
-      sellPrice: decimal(25000),
-      unit: "عدد",
-    });
 
     await controller.create(
       mockRequest(
@@ -365,7 +411,8 @@ describe("repairInvoiceController.create", () => {
       mockResponse(),
     );
 
-    expect(db.__tx.item.findFirst.mock.calls[0][0].where).toMatchObject({
+    expect(db.__tx.item.findMany.mock.calls[0][0].where).toMatchObject({
+      id: { in: [2] },
       workspaceId: WORKSPACE_ID,
     });
     expect(
@@ -385,10 +432,80 @@ describe("repairInvoiceController.create", () => {
       mockResponse(),
     );
 
-    expect(db.__tx.item.findFirst).not.toHaveBeenCalled();
+    expect(db.__tx.item.findMany).not.toHaveBeenCalled();
     expect(
       db.__tx.repairInvoiceItem.create.mock.calls[0][0].data,
     ).toMatchObject({ unitPrice: 500000, itemType: "service" });
+  });
+
+  it("refuses an inventory line naming an item it cannot find", async () => {
+    // Until 14.7 such a line was skipped here and skipped again at issue:
+    // it printed on the invoice and took nothing from the shelf.
+    db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
+    db.__tx.item.findMany.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.create(mockRequest({ body: createBody }, 3), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "کالا با شناسه 2 یافت نشد",
+    });
+    expect(db.__tx.repairInvoice.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a fraction of a whole-number part", async () => {
+    db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
+
+    const res = mockResponse();
+    await controller.create(
+      mockRequest({
+        body: { ...createBody, items: [{ ...inventoryLine, quantity: 0.5 }] },
+      }),
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toContain("«خازن»");
+  });
+
+  it("accepts a fraction of a fractional part", async () => {
+    db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
+    db.__tx.item.findMany.mockResolvedValue([
+      catalogueItem({ isFractional: true }),
+    ]);
+
+    const res = mockResponse();
+    await controller.create(
+      mockRequest({
+        body: { ...createBody, items: [{ ...inventoryLine, quantity: 0.4 }] },
+      }),
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(
+      db.__tx.repairInvoiceItem.create.mock.calls[0][0].data.quantity,
+    ).toBe(0.4);
+  });
+
+  it("draws its parts from the warehouse it names", async () => {
+    db.device.findFirst.mockResolvedValue({ customerId: 2, customer: null });
+    resolveWarehouse.mockResolvedValue(9);
+
+    await controller.create(
+      mockRequest({ body: { ...createBody, warehouse_id: 9 } }),
+      mockResponse(),
+    );
+
+    expect(resolveWarehouse).toHaveBeenCalledWith(
+      expect.anything(),
+      WORKSPACE_ID,
+      9,
+    );
+    expect(db.__tx.repairInvoice.create.mock.calls[0][0].data.warehouseId).toBe(
+      9,
+    );
   });
 
   it("sets the warranty expiry from the invoice date", async () => {
@@ -434,14 +551,27 @@ describe("repairInvoiceController.create", () => {
       mockResponse(),
     );
 
-    expect(db.__tx.item.update).not.toHaveBeenCalled();
-    expect(db.__tx.inventoryTransaction.create).not.toHaveBeenCalled();
+    expect(applyMovements).not.toHaveBeenCalled();
   });
 });
 
 describe("repairInvoiceController.update", () => {
-  it("refuses to edit anything past draft", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({ status: "issued" });
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.__tx.$queryRaw.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.update(
+      mockRequest({ params: { id: 9 }, body: createBody }),
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("refuses to edit anything past پیش‌فاکتور, under the lock", async () => {
+    // Checked inside the transaction now: the invoice could otherwise be
+    // issued between the check and the line rewrite.
+    lockedInvoice({ status: "issued" });
 
     const res = mockResponse();
     await controller.update(
@@ -451,13 +581,13 @@ describe("repairInvoiceController.update", () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
-      error: "فقط فاکتورهای پیش‌نویس قابل ویرایش هستند",
+      error: "فقط پیش‌فاکتور قابل ویرایش است",
     });
-    expect(runInTx).not.toHaveBeenCalled();
+    expect(db.__tx.repairInvoiceItem.deleteMany).not.toHaveBeenCalled();
   });
 
-  it("replaces the lines of a draft", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({ status: "draft" });
+  it("replaces the lines of a پیش‌فاکتور without moving stock", async () => {
+    lockedInvoice();
 
     const res = mockResponse();
     await controller.update(
@@ -468,144 +598,232 @@ describe("repairInvoiceController.update", () => {
     expect(db.__tx.repairInvoiceItem.deleteMany).toHaveBeenCalledWith({
       where: { invoiceId: 5, workspaceId: WORKSPACE_ID },
     });
+    expect(applyMovements).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({
       message: "فاکتور با موفقیت ویرایش شد",
     });
+  });
+
+  it("moves the invoice to another warehouse only when told to", async () => {
+    lockedInvoice();
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body: createBody }),
+      mockResponse(),
+    );
+    expect(
+      db.__tx.repairInvoice.update.mock.calls[0][0].data,
+    ).not.toHaveProperty("warehouseId");
+
+    resolveWarehouse.mockResolvedValue(9);
+    await controller.update(
+      mockRequest({
+        params: { id: 5 },
+        body: { ...createBody, warehouse_id: 9 },
+      }),
+      mockResponse(),
+    );
+    expect(db.__tx.repairInvoice.update.mock.calls[1][0].data.warehouseId).toBe(
+      9,
+    );
   });
 });
 
 describe("repairInvoiceController.changeStatus", () => {
   const lines = [
     {
+      id: 11,
       itemType: "inventory",
       itemId: 2,
       quantity: decimal(3),
       unitPrice: decimal(10000),
+      unitCost: null,
     },
     {
+      id: 12,
       itemType: "service",
       itemId: 1,
       quantity: decimal(1),
       unitPrice: decimal(500000),
+      unitCost: null,
     },
   ];
 
-  it("refuses to change a cancelled invoice", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
-      status: "cancelled",
-      totalAmount: decimal(0),
-      paidAmount: decimal(0),
-      items: [],
-    });
-
+  function change(status: string, actorId = 3) {
     const res = mockResponse();
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "issued" } }, 3),
-      res,
-    );
+    return controller
+      .changeStatus(
+        mockRequest({ params: { id: 5 }, body: { status } }, actorId),
+        res,
+      )
+      .then(() => res);
+  }
+
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.__tx.$queryRaw.mockResolvedValue([]);
+
+    const res = await change("issued");
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("refuses to change a cancelled invoice", async () => {
+    lockedInvoice({ status: "cancelled" });
+
+    const res = await change("issued");
 
     expect(res.status).toHaveBeenCalledWith(400);
+    expect(applyMovements).not.toHaveBeenCalled();
+  });
+
+  it("refuses to send an issued invoice back to پیش‌فاکتور", async () => {
+    // It used to go back and move nothing, so issuing it again took the
+    // parts a second time.
+    lockedInvoice({ status: "issued", items: lines });
+
+    const res = await change("draft");
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toContain("ابطال");
+    expect(db.__tx.repairInvoice.update).not.toHaveBeenCalled();
   });
 
   it("refuses to mark an invoice paid before it has been", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
+    lockedInvoice({
       status: "issued",
       totalAmount: decimal(200000),
       paidAmount: decimal(50000),
-      items: [],
     });
 
-    const res = mockResponse();
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "paid" } }, 3),
-      res,
-    );
+    const res = await change("paid");
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ error: "مبلغ پرداختی کافی نیست" });
   });
 
-  it("takes only the inventory parts off the shelf when issuing", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
-      status: "draft",
-      totalAmount: decimal(530000),
-      paidAmount: decimal(0),
-      items: lines,
-    });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(10) });
+  it("takes only the inventory parts, exactly, when issuing", async () => {
+    lockedInvoice({ items: lines });
+    applyMovements.mockResolvedValue([{ unitCost: 8000 }]);
 
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "issued" } }, 3),
-      mockResponse(),
-    );
+    await change("issued");
 
-    expect(db.__tx.item.update).toHaveBeenCalledTimes(1);
-    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
-      currentStock: 7,
-    });
-    expect(
-      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-      type: "repair_use",
-      quantity: -3,
-      referenceId: 5,
+    const [, workspaceId, document, moved] = applyMovements.mock.calls[0];
+    expect(workspaceId).toBe(WORKSPACE_ID);
+    expect(document).toMatchObject({
       referenceType: "repair_invoice",
-      createdBy: 3,
+      referenceId: 5,
+      actorId: 3,
+    });
+    expect(moved).toEqual([
+      {
+        itemId: 2,
+        warehouseId: MAIN_WAREHOUSE,
+        quantity: -3,
+        type: "repair_use",
+        unitPrice: 10000,
+        note: "مصرف در فاکتور تعمیر",
+      },
+    ]);
+  });
+
+  it("moves a fractional part without rounding it", async () => {
+    // 0.4 metres used to round to nothing.
+    lockedInvoice({ items: [{ ...lines[0], quantity: decimal(0.4) }] });
+    applyMovements.mockResolvedValue([{ unitCost: 50 }]);
+
+    await change("issued");
+
+    expect(applyMovements.mock.calls[0][3][0].quantity).toBe(-0.4);
+  });
+
+  it("records on each part the cost it left at", async () => {
+    lockedInvoice({ items: lines });
+    applyMovements.mockResolvedValue([{ unitCost: 8000 }]);
+
+    await change("issued");
+
+    expect(db.__tx.repairInvoiceItem.updateMany).toHaveBeenCalledTimes(1);
+    expect(db.__tx.repairInvoiceItem.updateMany).toHaveBeenCalledWith({
+      where: { id: 11, workspaceId: WORKSPACE_ID },
+      data: { unitCost: 8000 },
     });
   });
 
-  it("puts the parts back when cancelling an issued invoice", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
+  it("takes the parts when a پیش‌فاکتور goes straight to paid", async () => {
+    // A zero-total invoice can; it used to be paid with its parts still on
+    // the shelf, and deleting it later "returned" parts never taken.
+    lockedInvoice({
+      items: lines,
+      totalAmount: decimal(0),
+      paidAmount: decimal(0),
+    });
+    applyMovements.mockResolvedValue([{ unitCost: 8000 }]);
+
+    const res = await change("paid");
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(applyMovements).toHaveBeenCalledTimes(1);
+    expect(applyMovements.mock.calls[0][3][0].type).toBe("repair_use");
+  });
+
+  it("does not issue when the shelf is short, and says which part", async () => {
+    lockedInvoice({ items: lines });
+    applyMovements.mockRejectedValue(
+      new InsufficientStockError(2, "خازن", 1, 3),
+    );
+
+    const res = await change("issued");
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toContain("«خازن»");
+    expect(db.__tx.repairInvoice.update).not.toHaveBeenCalled();
+  });
+
+  it("puts the parts back at the cost they left at when cancelling", async () => {
+    lockedInvoice({
       status: "issued",
-      totalAmount: decimal(530000),
-      paidAmount: decimal(0),
-      items: lines,
+      items: [{ ...lines[0], unitCost: decimal(8000) }, lines[1]],
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
 
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
-      mockResponse(),
-    );
+    await change("cancelled");
 
-    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
-      currentStock: 10,
-    });
-    expect(
-      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
-    ).toMatchObject({ type: "reversal", quantity: 3 });
+    expect(applyMovements.mock.calls[0][3]).toEqual([
+      {
+        itemId: 2,
+        warehouseId: MAIN_WAREHOUSE,
+        quantity: 3,
+        type: "reversal",
+        unitCost: 8000,
+        unitPrice: 10000,
+        note: "ابطال فاکتور تعمیر - برگشت موجودی",
+      },
+    ]);
   });
 
-  it("moves no stock when cancelling a draft", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
-      status: "draft",
-      totalAmount: decimal(530000),
-      paidAmount: decimal(0),
+  it("moves no stock when cancelling a پیش‌فاکتور", async () => {
+    lockedInvoice({ items: lines });
+
+    await change("cancelled");
+
+    expect(applyMovements).not.toHaveBeenCalled();
+  });
+
+  it("moves no stock when an issued invoice is marked paid", async () => {
+    lockedInvoice({
+      status: "issued",
       items: lines,
+      paidAmount: decimal(530000),
     });
 
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
-      mockResponse(),
-    );
+    await change("paid");
 
-    expect(db.__tx.item.update).not.toHaveBeenCalled();
+    expect(applyMovements).not.toHaveBeenCalled();
   });
 
   it("clears the payment obligation when cancelling", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
-      status: "issued",
-      totalAmount: decimal(530000),
-      paidAmount: decimal(0),
-      items: lines,
-    });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
+    lockedInvoice({ status: "issued", items: lines });
 
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
-      mockResponse(),
-    );
+    await change("cancelled");
 
     expect(db.__tx.repairInvoice.update.mock.calls[0][0].data).toEqual({
       status: "cancelled",
@@ -614,18 +832,13 @@ describe("repairInvoiceController.changeStatus", () => {
   });
 
   it("clears it for a part-paid invoice too, and keeps the amounts", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
+    lockedInvoice({
       status: "issued",
-      totalAmount: decimal(530000),
-      paidAmount: decimal(200000),
       items: lines,
+      paidAmount: decimal(200000),
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
 
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
-      mockResponse(),
-    );
+    await change("cancelled");
 
     // Not «partial», which is what it used to stay. And neither amount is
     // touched: the 200,000 the customer handed over is still on the record.
@@ -636,17 +849,13 @@ describe("repairInvoiceController.changeStatus", () => {
   });
 
   it("still marks a fully-paid invoice paid rather than cancelled", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
+    lockedInvoice({
       status: "issued",
-      totalAmount: decimal(530000),
-      paidAmount: decimal(530000),
       items: lines,
+      paidAmount: decimal(530000),
     });
 
-    await controller.changeStatus(
-      mockRequest({ params: { id: 5 }, body: { status: "paid" } }, 3),
-      mockResponse(),
-    );
+    await change("paid");
 
     expect(db.__tx.repairInvoice.update.mock.calls[0][0].data).toEqual({
       status: "paid",
@@ -753,62 +962,68 @@ describe("repairInvoiceController.addPayment", () => {
 });
 
 describe("repairInvoiceController.remove", () => {
+  const issuedLine = {
+    id: 11,
+    itemType: "inventory",
+    itemId: 2,
+    quantity: decimal(3),
+    unitPrice: decimal(10000),
+    unitCost: decimal(8000),
+  };
+
   it("returns 404 for an invoice in another workspace", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue(null);
+    db.__tx.$queryRaw.mockResolvedValue([]);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 9 } }, 3), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(runInTx).not.toHaveBeenCalled();
+    expect(db.__tx.repairInvoice.delete).not.toHaveBeenCalled();
   });
 
   it("returns the parts of an issued invoice before deleting it", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
-      status: "issued",
-      items: [
-        {
-          itemType: "inventory",
-          itemId: 2,
-          quantity: decimal(3),
-          unitPrice: decimal(10000),
-        },
-      ],
-    });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
+    lockedInvoice({ status: "issued", items: [issuedLine] });
 
     await controller.remove(
       mockRequest({ params: { id: 5 } }, 3),
       mockResponse(),
     );
 
-    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
-      currentStock: 10,
-    });
+    expect(applyMovements.mock.calls[0][3]).toEqual([
+      expect.objectContaining({
+        itemId: 2,
+        quantity: 3,
+        type: "reversal",
+        unitCost: 8000,
+      }),
+    ]);
     expect(db.__tx.repairInvoice.delete).toHaveBeenCalledWith({
       where: { id: 5 },
     });
   });
 
-  it("moves no stock when deleting a draft", async () => {
-    db.repairInvoice.findFirst.mockResolvedValue({
-      status: "draft",
-      items: [
-        {
-          itemType: "inventory",
-          itemId: 2,
-          quantity: decimal(3),
-          unitPrice: decimal(10000),
-        },
-      ],
-    });
+  it("returns the parts of a paid invoice too", async () => {
+    lockedInvoice({ status: "paid", items: [issuedLine] });
 
-    await controller.remove(
-      mockRequest({ params: { id: 5 } }, 3),
-      mockResponse(),
-    );
+    await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
 
-    expect(db.__tx.item.update).not.toHaveBeenCalled();
-    expect(db.__tx.repairInvoice.delete).toHaveBeenCalled();
+    expect(applyMovements).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["draft", "cancelled"])(
+    "moves no stock when deleting a %s invoice",
+    async (status) => {
+      // A پیش‌فاکتور never took its parts; a cancelled invoice already gave
+      // them back.
+      lockedInvoice({ status, items: [issuedLine] });
+
+      await controller.remove(
+        mockRequest({ params: { id: 5 } }, 3),
+        mockResponse(),
+      );
+
+      expect(applyMovements).not.toHaveBeenCalled();
+      expect(db.__tx.repairInvoice.delete).toHaveBeenCalled();
+    },
+  );
 });

@@ -40,7 +40,7 @@ const PAYMENT_STATUS: Record<string, string> = {
 };
 
 const REPAIR_STATUS: Record<string, string> = {
-  draft: "پیش‌نویس",
+  draft: "پیش‌فاکتور",
   issued: "صادر شده",
   paid: "پرداخت شده",
   cancelled: "ابطال شده",

@@ -243,7 +243,6 @@ export async function seedTechnician(
   return { userId: user.id, token };
 }
 
-
 /**
  * A device inside an existing workspace, numbered the way the controller
  * numbers one.
@@ -289,4 +288,41 @@ export async function defaultWarehouseOf(workspaceId: number): Promise<number> {
     select: { id: true },
   });
   return warehouse.id;
+}
+
+/**
+ * The invariant 14.1 promised and every scenario below must keep: the
+ * item's total is the sum of its warehouses, each warehouse is the sum of
+ * its ledger rows, and the newest row's after-quantity is what the
+ * warehouse holds.
+ */
+export async function expectStockConsistent(itemId: number) {
+  const item = await owner.item.findUniqueOrThrow({ where: { id: itemId } });
+  const stocks = await owner.itemStock.findMany({ where: { itemId } });
+  const ledger = await owner.inventoryTransaction.findMany({
+    where: { itemId },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+
+  const sum = (values: { toNumber(): number }[]) =>
+    values.reduce((total, value) => total + value.toNumber(), 0);
+
+  expect(item.currentStock.toNumber()).toBeCloseTo(
+    sum(stocks.map((s) => s.quantity)),
+    3,
+  );
+
+  for (const stock of stocks) {
+    const rows = ledger.filter((row) => row.warehouseId === stock.warehouseId);
+    expect(sum(rows.map((row) => row.quantity))).toBeCloseTo(
+      stock.quantity.toNumber(),
+      3,
+    );
+    if (rows.length > 0) {
+      expect(rows[rows.length - 1].afterQuantity?.toNumber()).toBeCloseTo(
+        stock.quantity.toNumber(),
+        3,
+      );
+    }
+  }
 }

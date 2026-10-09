@@ -34,3 +34,28 @@ export const trackIdSchema = z
   .string()
   .regex(/^\d+$/, "شناسه پرداخت نامعتبر است")
   .transform((value) => BigInt(value));
+
+/**
+ * A stock quantity on a document line (14.1): positive, and no finer than
+ * the three decimal places the columns hold — 0.125 metre of cable, not
+ * 0.1255. Whether an item may move by fractions at all is the item's own
+ * setting, checked by the stock service against the row, not here.
+ */
+export const quantitySchema = (message: string) =>
+  z.coerce
+    .number()
+    .positive(message)
+    // On the number's own spelling: 0.1 prints as "0.1" even though it is
+    // not exactly a tenth, and anything a person typed with more than three
+    // places, or small enough to print in exponent form, does not match.
+    .refine((value) => /^\d+(\.\d{1,3})?$/.test(String(value)), {
+      message: "تعداد حداکثر سه رقم اعشار می‌پذیرد",
+    });
+
+/** An optional warehouse on a document; omitted, the workspace's default. */
+export const warehouseIdSchema = z.coerce
+  .number()
+  .int()
+  .positive()
+  .nullable()
+  .optional();

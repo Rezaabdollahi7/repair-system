@@ -6,10 +6,13 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { paymentStatusFor } from "../utils/payment";
+import { lineTotals } from "../utils/invoiceTotals";
 import {
-  averageAfterAdding,
-  averageAfterRemoving,
-} from "../utils/avgPurchasePrice";
+  applyStockMovements,
+  InsufficientStockError,
+  StockError,
+  type StockLine,
+} from "../utils/stock";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
 import type {
@@ -20,13 +23,14 @@ import type {
 } from "../schemas/purchaseInvoice";
 import { dateFilter } from "../utils/dateRange";
 import { workspaceIdOf } from "../utils/workspace";
-import { defaultWarehouseId } from "../utils/warehouse";
+import { resolveWarehouseId } from "../utils/warehouse";
 
 function toInvoiceResponse(invoice: PurchaseInvoice) {
   return {
     id: invoice.id,
     invoice_number: invoice.invoiceNumber,
     supplier_name: invoice.supplierName,
+    warehouse_id: invoice.warehouseId,
     invoice_date: invoice.invoiceDate.toISOString(),
     total_amount: invoice.totalAmount.toNumber(),
     paid_amount: invoice.paidAmount.toNumber(),
@@ -44,160 +48,129 @@ interface LineInput {
   unit_price: number;
 }
 
-/**
- * Every id in the list must name an item this workspace owns. Checked up
- * front, outside the transaction, so an unknown id is reported by its own
- * number rather than surfacing as a foreign-key error — and scoped by
- * workspace, so an id from another shop reads as missing.
- *
- * Returns the message to send back, or null when the lines are fine.
- */
-async function findUnknownItem(
-  lines: LineInput[],
-  workspaceId: number,
-): Promise<string | null> {
-  const itemIds = [...new Set(lines.map((line) => line.item_id))];
-
-  const existing = await prisma.item.findMany({
-    where: { id: { in: itemIds }, workspaceId },
-    select: { id: true },
-  });
-
-  const existingIds = new Set(existing.map((item) => item.id));
-  const missing = itemIds.find((id) => !existingIds.has(id));
-
-  return missing === undefined ? null : `کالا با شناسه ${missing} یافت نشد`;
+/** A line already on the invoice, as the stock reversal needs it. */
+interface StoredLine {
+  itemId: number;
+  quantity: Prisma.Decimal;
+  unitPrice: Prisma.Decimal;
 }
 
-/**
- * Writes the invoice's lines and moves the stock they bought in: the line
- * row, the item's new stock and average price, and a ledger entry each.
- * Shared by create and update so an edited invoice lands in the warehouse
- * exactly as a new one would.
- */
-async function writeLines(
-  tx: Prisma.TransactionClient,
-  invoiceId: number,
+const REFERENCE_TYPE = "purchase_invoice";
+
+/** A line's total in rials. Shared with the sale and repair forms, so a
+ * fractional quantity rounds the same way everywhere. */
+function lineTotal(line: LineInput): number {
+  return lineTotals(line).totalPrice;
+}
+
+function invoiceTotal(lines: LineInput[]): number {
+  return lines.reduce((sum, line) => sum + lineTotal(line), 0);
+}
+
+/** The goods each line brings in, at the price paid — which is their cost. */
+function purchaseMovements(
   lines: LineInput[],
-  actorId: number | null,
-  workspaceId: number,
   warehouseId: number,
-): Promise<void> {
-  for (const line of lines) {
-    const totalPrice = line.quantity * line.unit_price;
-
-    await tx.purchaseInvoiceItem.create({
-      data: {
-        workspaceId,
-        invoiceId,
-        itemId: line.item_id,
-        quantity: line.quantity,
-        unitPrice: line.unit_price,
-        totalPrice,
-      },
-    });
-
-    // findFirstOrThrow rather than findUniqueOrThrow: the composite
-    // condition rules out an item from another workspace, and the ids
-    // were already verified above.
-    const item = await tx.item.findFirstOrThrow({
-      where: { id: line.item_id, workspaceId },
-      select: { currentStock: true, avgPurchasePrice: true },
-    });
-
-    await tx.item.update({
-      where: { id: line.item_id },
-      data: {
-        currentStock: item.currentStock.toNumber() + line.quantity,
-        avgPurchasePrice: averageAfterAdding({
-          avg: item.avgPurchasePrice.toNumber(),
-          stock: item.currentStock.toNumber(),
-          quantity: line.quantity,
-          unitPrice: line.unit_price,
-        }),
-      },
-    });
-
-    await tx.inventoryTransaction.create({
-      data: {
-        workspaceId,
-        itemId: line.item_id,
-        warehouseId,
-        type: "purchase",
-        quantity: line.quantity,
-        unitPrice: line.unit_price,
-        // The old code passed null here while still setting
-        // referenceType, so purchases made through a full invoice never
-        // showed their invoice number in an item's stock history.
-        referenceId: invoiceId,
-        referenceType: "purchase_invoice",
-        note: "خرید از فاکتور",
-        createdBy: actorId,
-      },
-    });
-  }
-}
-
-/**
- * Takes the invoice's lines back out of stock — what delete does, and what
- * an edit has to do before writing the new lines.
- *
- * The average purchase price comes back out with them, at the price each
- * line was bought at. It used to be left standing, so deleting or editing
- * an invoice valued the surviving stock at a price nobody had paid — and
- * the stock report multiplies that figure by the quantity on hand.
- */
-async function reverseLines(
-  tx: Prisma.TransactionClient,
-  invoiceId: number,
-  lines: {
-    itemId: number;
-    quantity: Prisma.Decimal;
-    unitPrice: Prisma.Decimal;
-  }[],
   note: string,
-  actorId: number | null,
-  workspaceId: number,
-  warehouseId: number,
-): Promise<void> {
-  for (const line of lines) {
-    const quantity = line.quantity.toNumber();
-
-    const item = await tx.item.findFirstOrThrow({
-      where: { id: line.itemId, workspaceId },
-      select: { currentStock: true, avgPurchasePrice: true },
-    });
-
-    await tx.item.update({
-      where: { id: line.itemId },
-      data: {
-        // Clamped at zero, as before: the stock may already have been sold
-        // on, and a negative figure would be worse than an inexact one.
-        currentStock: Math.max(0, item.currentStock.toNumber() - quantity),
-        avgPurchasePrice: averageAfterRemoving({
-          avg: item.avgPurchasePrice.toNumber(),
-          stock: item.currentStock.toNumber(),
-          quantity,
-          unitPrice: line.unitPrice.toNumber(),
-        }),
-      },
-    });
-
-    await tx.inventoryTransaction.create({
-      data: {
-        workspaceId,
-        itemId: line.itemId,
-        warehouseId,
-        type: "reversal",
-        quantity: -quantity,
-        referenceId: invoiceId,
-        referenceType: "purchase_invoice",
-        note,
-        createdBy: actorId,
-      },
-    });
-  }
+): StockLine[] {
+  return lines.map((line) => ({
+    itemId: line.item_id,
+    warehouseId,
+    quantity: line.quantity,
+    type: "purchase",
+    unitCost: line.unit_price,
+    unitPrice: line.unit_price,
+    note,
+  }));
 }
+
+/**
+ * The invoice's existing lines taken back out — what delete does, and half
+ * of what an edit does.
+ *
+ * Each leaves at the price it was bought at, not at the current average:
+ * the only inverse that lands back on what the surviving stock cost
+ * (utils/avgPurchasePrice.ts). And from the warehouse it went into, which an
+ * edit may be about to change.
+ */
+function reversalMovements(
+  lines: StoredLine[],
+  warehouseId: number,
+  note: string,
+): StockLine[] {
+  return lines.map((line) => ({
+    itemId: line.itemId,
+    warehouseId,
+    quantity: -line.quantity.toNumber(),
+    type: "reversal",
+    unitCost: line.unitPrice.toNumber(),
+    unitPrice: line.unitPrice.toNumber(),
+    note,
+  }));
+}
+
+async function writeLineRows(
+  tx: Prisma.TransactionClient,
+  invoiceId: number,
+  lines: LineInput[],
+  workspaceId: number,
+): Promise<void> {
+  await tx.purchaseInvoiceItem.createMany({
+    data: lines.map((line) => ({
+      workspaceId,
+      invoiceId,
+      itemId: line.item_id,
+      quantity: line.quantity,
+      unitPrice: line.unit_price,
+      totalPrice: lineTotal(line),
+    })),
+  });
+}
+
+/**
+ * The invoice and its lines, read under a row lock on the invoice.
+ *
+ * Inside the transaction rather than before it: two deletes of the same
+ * invoice used to read it outside, both find it, and both put its goods
+ * back. The lock makes the second wait, and then find nothing.
+ */
+async function lockInvoice(
+  tx: Prisma.TransactionClient,
+  id: number,
+  workspaceId: number,
+) {
+  const locked = await tx.$queryRaw<{ id: number }[]>`
+    SELECT id FROM purchase_invoices
+    WHERE id = ${id} AND workspace_id = ${workspaceId}
+    FOR UPDATE
+  `;
+  if (locked.length === 0) return null;
+
+  return tx.purchaseInvoice.findFirst({
+    where: { id, workspaceId },
+    include: {
+      items: { select: { itemId: true, quantity: true, unitPrice: true } },
+    },
+  });
+}
+
+/**
+ * The 400 for a stock refusal. Taking a purchase back out can only be
+ * refused for one reason worth explaining — its goods have since been sold
+ * or used — so that one is said in those words.
+ */
+function stockErrorMessage(error: StockError): string {
+  if (error instanceof InsufficientStockError) {
+    return (
+      `از کالای «${error.itemName}» فقط ${error.available} در انبار مانده و ` +
+      "بخشی از آنچه این فاکتور وارد کرده فروخته یا مصرف شده است. " +
+      "تا آن فروش یا مصرف باشد، این فاکتور را نمی‌توان به این شکل تغییر داد."
+    );
+  }
+  return error.message;
+}
+
+class InvoiceNotFound extends Error {}
 
 // GET /api/purchase-invoices
 export const getAll = async (req: Request, res: Response) => {
@@ -264,6 +237,7 @@ export const getById = async (req: Request, res: Response) => {
             item: { select: { code: true, name: true, unit: true } },
           },
         },
+        warehouse: { select: { name: true } },
       },
     });
 
@@ -273,6 +247,7 @@ export const getById = async (req: Request, res: Response) => {
 
     res.json({
       ...toInvoiceResponse(invoice),
+      warehouse_name: invoice.warehouse.name,
       items: invoice.items.map((line) => ({
         id: line.id,
         invoice_id: line.invoiceId,
@@ -301,27 +276,25 @@ export const create = async (req: Request, res: Response) => {
     // it: the request isn't available in there.
     const workspaceId = workspaceIdOf(req);
 
-    const unknownItem = await findUnknownItem(body.items, workspaceId);
-    if (unknownItem) {
-      return res.status(400).json({ error: unknownItem });
-    }
-
-    const totalAmount = body.items.reduce(
-      (sum, line) => sum + line.quantity * line.unit_price,
-      0,
-    );
+    const totalAmount = invoiceTotal(body.items);
     const paidAmount = body.paid_amount;
 
-    // One transaction: the invoice, its lines, every stock adjustment and
-    // every ledger entry have to land together, or stock and history drift
-    // apart.
+    // One transaction: the invoice, its lines and the stock they bring in
+    // land together or not at all. An unknown item is refused by the stock
+    // service inside it, and the rollback returns the invoice number too.
     const invoice = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      const warehouseId = await resolveWarehouseId(
+        tx,
+        workspaceId,
+        body.warehouse_id,
+      );
+
       const created = await tx.purchaseInvoice.create({
         data: {
           workspaceId,
           invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "purchase"),
           supplierName: body.supplier_name,
-          warehouseId: await defaultWarehouseId(tx, workspaceId),
+          warehouseId,
           invoiceDate: body.invoice_date ?? new Date(),
           totalAmount,
           paidAmount,
@@ -331,13 +304,18 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(
+      await writeLineRows(tx, created.id, body.items, workspaceId);
+
+      await applyStockMovements(
         tx,
-        created.id,
-        body.items,
-        actorId,
         workspaceId,
-        created.warehouseId,
+        {
+          referenceType: REFERENCE_TYPE,
+          referenceId: created.id,
+          occurredAt: created.invoiceDate,
+          actorId,
+        },
+        purchaseMovements(body.items, warehouseId, "خرید از فاکتور"),
       );
 
       return created;
@@ -345,6 +323,9 @@ export const create = async (req: Request, res: Response) => {
 
     res.status(201).json(toInvoiceResponse(invoice));
   } catch (error) {
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: stockErrorMessage(error) });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -358,42 +339,18 @@ export const update = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    const existing = await prisma.purchaseInvoice.findFirst({
-      where: { id, workspaceId },
-      include: {
-        items: { select: { itemId: true, quantity: true, unitPrice: true } },
-      },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
-    // Before the transaction, as create does, so an unknown id comes back as
-    // its own message and nothing has been touched yet.
-    const unknownItem = await findUnknownItem(body.items, workspaceId);
-    if (unknownItem) {
-      return res.status(400).json({ error: unknownItem });
-    }
-
-    const totalAmount = body.items.reduce(
-      (sum, line) => sum + line.quantity * line.unit_price,
-      0,
-    );
+    const totalAmount = invoiceTotal(body.items);
+    const note = "ویرایش فاکتور خرید";
 
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      // The old lines come out of stock first, then the new ones go in — so
-      // an edit that only changes a quantity nets out to the difference
-      // rather than adding the whole line a second time.
-      await reverseLines(
-        tx,
-        id,
-        existing.items,
-        "ویرایش فاکتور خرید",
-        actorId,
-        workspaceId,
-        existing.warehouseId,
-      );
+      const existing = await lockInvoice(tx, id, workspaceId);
+      if (!existing) throw new InvoiceNotFound();
+
+      // Omitted, the goods stay where they were received.
+      const warehouseId =
+        body.warehouse_id === null || body.warehouse_id === undefined
+          ? existing.warehouseId
+          : await resolveWarehouseId(tx, workspaceId, body.warehouse_id);
 
       await tx.purchaseInvoiceItem.deleteMany({ where: { invoiceId: id } });
 
@@ -401,6 +358,7 @@ export const update = async (req: Request, res: Response) => {
         where: { id },
         data: {
           supplierName: body.supplier_name,
+          warehouseId,
           invoiceDate: body.invoice_date ?? new Date(),
           totalAmount,
           paidAmount: body.paid_amount,
@@ -409,18 +367,39 @@ export const update = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(
+      await writeLineRows(tx, id, body.items, workspaceId);
+
+      // The new lines go in before the old ones come out. The result is the
+      // same either way — the average lands on the same figure — but this
+      // order does not refuse an edit that only raises a quantity: ten
+      // bought, five sold since, edited to twelve. Taking the ten out first
+      // would fall below zero on the way to a perfectly valid fifteen.
+      // Both halves stay in the history, so the shop can see the invoice was
+      // edited rather than finding the purchase silently rewritten.
+      await applyStockMovements(
         tx,
-        id,
-        body.items,
-        actorId,
         workspaceId,
-        existing.warehouseId,
+        {
+          referenceType: REFERENCE_TYPE,
+          referenceId: id,
+          occurredAt: body.invoice_date ?? new Date(),
+          actorId,
+        },
+        [
+          ...purchaseMovements(body.items, warehouseId, note),
+          ...reversalMovements(existing.items, existing.warehouseId, note),
+        ],
       );
     });
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
   } catch (error) {
+    if (error instanceof InvoiceNotFound) {
+      return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: stockErrorMessage(error) });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -467,29 +446,25 @@ export const remove = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    // Looks up the invoice itself, not its lines. The old code read the lines
-    // and treated an empty result as "not found", which made an invoice with
-    // no lines impossible to delete.
-    const invoice = await prisma.purchaseInvoice.findFirst({
-      where: { id, workspaceId },
-      include: {
-        items: { select: { itemId: true, quantity: true, unitPrice: true } },
-      },
-    });
-
-    if (!invoice) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      await reverseLines(
+      // Looks up the invoice itself, not its lines: an invoice with no lines
+      // is still an invoice, and used to be impossible to delete.
+      const invoice = await lockInvoice(tx, id, workspaceId);
+      if (!invoice) throw new InvoiceNotFound();
+
+      await applyStockMovements(
         tx,
-        id,
-        invoice.items,
-        "حذف فاکتور خرید",
-        actorId,
         workspaceId,
-        invoice.warehouseId,
+        {
+          referenceType: REFERENCE_TYPE,
+          referenceId: id,
+          actorId,
+        },
+        reversalMovements(
+          invoice.items,
+          invoice.warehouseId,
+          "حذف فاکتور خرید",
+        ),
       );
 
       // The lines go with it via onDelete: Cascade.
@@ -498,6 +473,12 @@ export const remove = async (req: Request, res: Response) => {
 
     res.json({ message: "فاکتور و تراکنش‌های مربوطه حذف شدند" });
   } catch (error) {
+    if (error instanceof InvoiceNotFound) {
+      return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: stockErrorMessage(error) });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };

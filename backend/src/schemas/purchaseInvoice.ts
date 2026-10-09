@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { paginationQuerySchema } from "./common";
+import {
+  paginationQuerySchema,
+  quantitySchema,
+  warehouseIdSchema,
+} from "./common";
 
 /*
  * A comma-separated list, the same shape the devices and sale-invoice lists
@@ -35,7 +39,9 @@ export type PurchaseInvoiceListQuery = z.infer<
 
 const invoiceLineSchema = z.object({
   item_id: z.coerce.number().int().positive("مشخصات کالاها ناقص است"),
-  quantity: z.coerce.number().int().positive("مشخصات کالاها ناقص است"),
+  // Fractions allowed since 14.1; whether this item takes them is checked
+  // against the item itself by the stock service.
+  quantity: quantitySchema("مشخصات کالاها ناقص است"),
   // Positive, not min(0): the old check rejected a zero price and its message
   // said so, so a free line has never been accepted here.
   unit_price: z.coerce.number().positive("قیمت واحد باید مثبت باشد"),
@@ -52,6 +58,9 @@ export const purchaseInvoiceCreateSchema = z.object({
     (value) => (value === "" ? undefined : value),
     z.coerce.date().nullable().optional(),
   ),
+  // Where the goods are received; omitted, the workspace's default — which
+  // is all a shop with one warehouse ever sends.
+  warehouse_id: warehouseIdSchema,
   paid_amount: z.coerce.number().min(0).default(0),
   note: z
     .string()

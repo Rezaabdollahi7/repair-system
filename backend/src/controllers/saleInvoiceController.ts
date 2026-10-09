@@ -6,6 +6,12 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { paymentStatusFor } from "../utils/payment";
+import { lineTotals } from "../utils/invoiceTotals";
+import {
+  applyStockMovements,
+  StockError,
+  type StockLine,
+} from "../utils/stock";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
 import type {
@@ -16,7 +22,7 @@ import type {
 } from "../schemas/saleInvoice";
 import { dateFilter } from "../utils/dateRange";
 import { workspaceIdOf } from "../utils/workspace";
-import { defaultWarehouseId } from "../utils/warehouse";
+import { resolveWarehouseId } from "../utils/warehouse";
 
 const deviceSelect = {
   device: {
@@ -54,6 +60,7 @@ function toInvoiceResponse(
     customer_id: invoice.customerId,
     customer_name: invoice.customerName,
     customer_phone: invoice.customerPhone,
+    warehouse_id: invoice.warehouseId,
     invoice_date: invoice.invoiceDate.toISOString(),
     total_amount: invoice.totalAmount.toNumber(),
     paid_amount: invoice.paidAmount.toNumber(),
@@ -202,149 +209,133 @@ interface LineInput {
   unit_price: number;
 }
 
+/** A line already on the invoice, as the stock reversal needs it. */
+interface StoredLine {
+  itemId: number | null;
+  quantity: Prisma.Decimal;
+  unitCost: Prisma.Decimal | null;
+}
+
+const REFERENCE_TYPE = "sale_invoice";
+
 function isInventoryLine(line: LineInput): line is LineInput & {
   item_id: number;
 } {
   return line.item_type === "inventory" && Boolean(line.item_id);
 }
 
-/**
- * Confirms every inventory line has enough stock, naming the first item that
- * doesn't. Runs inside the caller's transaction so the figures it reads are
- * the ones the write will act on.
- */
-async function assertStockAvailable(
-  tx: Prisma.TransactionClient,
+/** A line's total in rials, rounded the same way on every invoice. */
+function lineTotal(line: LineInput): number {
+  return lineTotals(line).totalPrice;
+}
+
+function invoiceTotal(lines: LineInput[]): number {
+  return lines.reduce((sum, line) => sum + lineTotal(line), 0);
+}
+
+/** The goods the inventory lines take off the shelf. Custom lines move
+ * nothing. */
+function saleMovements(
   lines: LineInput[],
-  workspaceId: number,
-): Promise<string | null> {
-  for (const line of lines) {
-    if (!isInventoryLine(line)) continue;
-
-    // Scoped, so an item id from another workspace reads as missing rather
-    // than lending its stock to this invoice.
-    const item = await tx.item.findFirst({
-      where: { id: line.item_id, workspaceId },
-      select: { name: true, currentStock: true },
-    });
-
-    if (!item) {
-      return `کالا با شناسه ${line.item_id} یافت نشد`;
-    }
-
-    if (item.currentStock.toNumber() < line.quantity) {
-      return `موجودی کالای "${item.name}" کافی نیست. موجودی فعلی: ${item.currentStock.toNumber()}`;
-    }
-  }
-
-  return null;
+  warehouseId: number,
+  note: string,
+): StockLine[] {
+  return lines.filter(isInventoryLine).map((line) => ({
+    itemId: line.item_id,
+    warehouseId,
+    quantity: -line.quantity,
+    type: "sale",
+    unitPrice: line.unit_price,
+    note,
+  }));
 }
 
 /**
- * Writes the invoice's lines, decrementing stock and recording a ledger entry
- * for each inventory line. Custom lines are stored but leave stock alone.
+ * The invoice's existing lines put back on the shelf — what delete does,
+ * and the first half of an edit.
+ *
+ * At the cost each line left at, which the line has carried since 14.6: the
+ * units return to stock worth what they were worth when they went. A line
+ * from before that has no cost, and comes back at the current average.
  */
-async function writeLines(
+function returnMovements(
+  lines: StoredLine[],
+  warehouseId: number,
+  note: string,
+): StockLine[] {
+  return lines
+    .filter((line): line is StoredLine & { itemId: number } =>
+      Boolean(line.itemId),
+    )
+    .map((line) => ({
+      itemId: line.itemId,
+      warehouseId,
+      quantity: line.quantity.toNumber(),
+      type: "reversal",
+      unitCost: line.unitCost?.toNumber() ?? null,
+      note,
+    }));
+}
+
+/**
+ * The line rows, each inventory line carrying the cost it left the shelf at
+ * — `costs` is in the order of the inventory lines, as the stock service
+ * returned them. Stored so a margin reported later is the one made at the
+ * time, not one recomputed from whatever the item costs then.
+ */
+async function writeLineRows(
   tx: Prisma.TransactionClient,
   invoiceId: number,
   lines: LineInput[],
-  actorId: number | null,
+  costs: number[],
   workspaceId: number,
-  warehouseId: number,
 ): Promise<void> {
-  for (const line of lines) {
-    const totalPrice = line.quantity * line.unit_price;
-    const inventory = isInventoryLine(line);
+  let inventoryIndex = 0;
 
-    await tx.saleInvoiceItem.create({
-      data: {
+  await tx.saleInvoiceItem.createMany({
+    data: lines.map((line) => {
+      const inventory = isInventoryLine(line);
+      return {
         workspaceId,
         invoiceId,
         itemId: inventory ? line.item_id : null,
         quantity: line.quantity,
         unitPrice: line.unit_price,
-        totalPrice,
+        totalPrice: lineTotal(line),
+        unitCost: inventory ? costs[inventoryIndex++] : null,
         name: inventory ? line.name : (line.name ?? "آیتم دلخواه"),
         unit: inventory ? line.unit : (line.unit ?? "عدد"),
-      },
-    });
-
-    if (!inventory) continue;
-
-    const item = await tx.item.findFirstOrThrow({
-      where: { id: line.item_id, workspaceId },
-      select: { currentStock: true },
-    });
-
-    await tx.item.update({
-      where: { id: line.item_id },
-      data: {
-        currentStock: Math.max(0, item.currentStock.toNumber() - line.quantity),
-      },
-    });
-
-    await tx.inventoryTransaction.create({
-      data: {
-        workspaceId,
-        itemId: line.item_id,
-        warehouseId,
-        type: "sale",
-        quantity: -line.quantity,
-        unitPrice: line.unit_price,
-        // The old code passed null here while setting referenceType, so sales
-        // made through a full invoice never showed their invoice number in an
-        // item's stock history.
-        referenceId: invoiceId,
-        referenceType: "sale_invoice",
-        note: "فروش از فاکتور",
-        createdBy: actorId,
-      },
-    });
-  }
+      };
+    }),
+  });
 }
 
 /**
- * Puts back the stock an invoice's existing lines took, before those lines
- * are replaced or the invoice is removed.
+ * The invoice and its lines, read under a row lock on the invoice — inside
+ * the transaction rather than before it, so two deletes cannot both find it
+ * and both put its goods back.
  */
-async function returnLinesToStock(
+async function lockInvoice(
   tx: Prisma.TransactionClient,
-  invoiceId: number,
-  lines: { itemId: number | null; quantity: Prisma.Decimal }[],
-  note: string,
-  actorId: number | null,
+  id: number,
   workspaceId: number,
-  warehouseId: number,
-): Promise<void> {
-  for (const line of lines) {
-    if (line.itemId === null) continue;
-    const quantity = line.quantity.toNumber();
+) {
+  const locked = await tx.$queryRaw<{ id: number }[]>`
+    SELECT id FROM sale_invoices
+    WHERE id = ${id} AND workspace_id = ${workspaceId}
+    FOR UPDATE
+  `;
+  if (locked.length === 0) return null;
 
-    const item = await tx.item.findFirstOrThrow({
-      where: { id: line.itemId, workspaceId },
-      select: { currentStock: true },
-    });
-
-    await tx.item.update({
-      where: { id: line.itemId },
-      data: { currentStock: item.currentStock.toNumber() + quantity },
-    });
-
-    await tx.inventoryTransaction.create({
-      data: {
-        workspaceId,
-        itemId: line.itemId,
-        warehouseId,
-        type: "reversal",
-        quantity,
-        referenceId: invoiceId,
-        referenceType: "sale_invoice",
-        note,
-        createdBy: actorId,
-      },
-    });
-  }
+  return tx.saleInvoice.findFirst({
+    where: { id, workspaceId },
+    include: {
+      items: { select: { itemId: true, quantity: true, unitCost: true } },
+    },
+  });
 }
+
+class InvoiceNotFound extends Error {}
 
 // POST /api/sale-invoices
 export const create = async (req: Request, res: Response) => {
@@ -356,20 +347,23 @@ export const create = async (req: Request, res: Response) => {
     const workspaceId = workspaceIdOf(req);
 
     const lines = body.items as LineInput[];
-    const totalAmount = lines.reduce(
-      (sum, line) => sum + line.quantity * line.unit_price,
-      0,
-    );
+    const totalAmount = invoiceTotal(lines);
 
-    const result = await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      const stockError = await assertStockAvailable(tx, lines, workspaceId);
-      if (stockError) return { error: stockError };
+    // One transaction: a refusal from the stock service — not enough on the
+    // shelf, an item from another workspace — rolls back the invoice and the
+    // number it drew.
+    const invoice = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      const warehouseId = await resolveWarehouseId(
+        tx,
+        workspaceId,
+        body.warehouse_id,
+      );
 
-      const invoice = await tx.saleInvoice.create({
+      const created = await tx.saleInvoice.create({
         data: {
           workspaceId,
           invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "sale"),
-          warehouseId: await defaultWarehouseId(tx, workspaceId),
+          warehouseId,
           customerId: body.customer_id ?? null,
           customerName: body.customer_name,
           customerPhone: body.customer_phone,
@@ -383,23 +377,29 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(
+      const moved = await applyStockMovements(
         tx,
-        invoice.id,
-        lines,
-        actorId,
         workspaceId,
-        invoice.warehouseId,
+        {
+          referenceType: REFERENCE_TYPE,
+          referenceId: created.id,
+          occurredAt: created.invoiceDate,
+          actorId,
+        },
+        saleMovements(lines, warehouseId, "فروش از فاکتور"),
       );
 
-      return { invoice };
+      await writeLineRows(
+        tx,
+        created.id,
+        lines,
+        moved.map((movement) => movement.unitCost),
+        workspaceId,
+      );
+
+      return created;
     });
 
-    if (result.error) {
-      return res.status(400).json({ error: result.error });
-    }
-
-    const invoice = result.invoice!;
     res.status(201).json({
       id: invoice.id,
       invoice_number: invoice.invoiceNumber,
@@ -407,6 +407,9 @@ export const create = async (req: Request, res: Response) => {
       payment_status: invoice.paymentStatus,
     });
   } catch (error) {
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -420,41 +423,40 @@ export const update = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    const existing = await prisma.saleInvoice.findFirst({
-      where: { id, workspaceId },
-      include: { items: { select: { itemId: true, quantity: true } } },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
     const lines = body.items as LineInput[];
-    const totalAmount = lines.reduce(
-      (sum, line) => sum + line.quantity * line.unit_price,
-      0,
-    );
+    const totalAmount = invoiceTotal(lines);
+    const note = "ویرایش فاکتور فروش";
 
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      // Old stock goes back first so an edit that raises a quantity can draw
-      // on what this same invoice was already holding. Inside the transaction
-      // now: the old code wrote this back before validating the new lines, so
-      // a rejected edit permanently inflated stock with nothing to undo it.
-      await returnLinesToStock(
-        tx,
-        id,
-        existing.items,
-        "ویرایش فاکتور فروش",
-        actorId,
-        workspaceId,
-        existing.warehouseId,
-      );
+      const existing = await lockInvoice(tx, id, workspaceId);
+      if (!existing) throw new InvoiceNotFound();
 
-      const stockError = await assertStockAvailable(tx, lines, workspaceId);
-      if (stockError) {
-        // Unwinds every write above, including the stock that was put back.
-        throw new StockError(stockError);
-      }
+      const warehouseId =
+        body.warehouse_id === null || body.warehouse_id === undefined
+          ? existing.warehouseId
+          : await resolveWarehouseId(tx, workspaceId, body.warehouse_id);
+
+      // The old lines go back on the shelf before the new ones come off it,
+      // so an edit that raises a quantity can draw on what this same invoice
+      // was already holding. One call, so a refusal of the new lines undoes
+      // the return too — the old code once wrote the return before checking,
+      // and a rejected edit inflated the stock for good.
+      const returns = returnMovements(
+        existing.items,
+        existing.warehouseId,
+        note,
+      );
+      const moved = await applyStockMovements(
+        tx,
+        workspaceId,
+        {
+          referenceType: REFERENCE_TYPE,
+          referenceId: id,
+          occurredAt: body.invoice_date ?? new Date(),
+          actorId,
+        },
+        [...returns, ...saleMovements(lines, warehouseId, note)],
+      );
 
       await tx.saleInvoiceItem.deleteMany({ where: { invoiceId: id } });
 
@@ -465,6 +467,7 @@ export const update = async (req: Request, res: Response) => {
           customerName: body.customer_name,
           customerPhone: body.customer_phone,
           deviceId: body.device_id ?? null,
+          warehouseId,
           invoiceDate: body.invoice_date ?? new Date(),
           totalAmount,
           paidAmount: body.paid_amount,
@@ -473,31 +476,27 @@ export const update = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(
+      // The sale movements are the ones after the returns.
+      await writeLineRows(
         tx,
         id,
         lines,
-        actorId,
+        moved.slice(returns.length).map((movement) => movement.unitCost),
         workspaceId,
-        existing.warehouseId,
       );
     });
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
   } catch (error) {
+    if (error instanceof InvoiceNotFound) {
+      return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
     if (error instanceof StockError) {
       return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
-
-/**
- * Thrown to roll the update transaction back on a stock problem. A plain
- * return can't be used there: the writes that put the old stock back have to
- * be undone, and only a throw does that.
- */
-class StockError extends Error {}
 
 // PUT /api/sale-invoices/:id/payment
 export const updatePayment = async (req: Request, res: Response) => {
@@ -540,27 +539,21 @@ export const remove = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    // Looks up the invoice, not its lines: the old code read the lines and
-    // treated an empty result as "not found", so an invoice with no lines
-    // could never be deleted.
-    const invoice = await prisma.saleInvoice.findFirst({
-      where: { id, workspaceId },
-      include: { items: { select: { itemId: true, quantity: true } } },
-    });
-
-    if (!invoice) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      await returnLinesToStock(
+      // The invoice, not its lines: an invoice with no lines is still one,
+      // and used to be impossible to delete.
+      const invoice = await lockInvoice(tx, id, workspaceId);
+      if (!invoice) throw new InvoiceNotFound();
+
+      await applyStockMovements(
         tx,
-        id,
-        invoice.items,
-        "ابطال فاکتور فروش",
-        actorId,
         workspaceId,
-        invoice.warehouseId,
+        { referenceType: REFERENCE_TYPE, referenceId: id, actorId },
+        returnMovements(
+          invoice.items,
+          invoice.warehouseId,
+          "ابطال فاکتور فروش",
+        ),
       );
 
       // The lines go with it via onDelete: Cascade.
@@ -569,6 +562,12 @@ export const remove = async (req: Request, res: Response) => {
 
     res.json({ message: "فاکتور فروش حذف و موجودی کالاها بازگردانده شد" });
   } catch (error) {
+    if (error instanceof InvoiceNotFound) {
+      return res.status(404).json({ error: "فاکتور یافت نشد" });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };

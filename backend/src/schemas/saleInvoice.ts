@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { paginationQuerySchema } from "./common";
+import {
+  paginationQuerySchema,
+  quantitySchema,
+  warehouseIdSchema,
+} from "./common";
 
 const csvStrings = z
   .string()
@@ -40,7 +44,9 @@ const saleInvoiceLineSchema = z
     item_id: z.coerce.number().int().positive().nullable().optional(),
     name: optionalText,
     unit: optionalText,
-    quantity: z.coerce.number().int().positive("مشخصات کالاها ناقص است"),
+    // Fractions allowed since 14.1 — whether this item takes them is the
+    // stock service's check, against the item itself.
+    quantity: quantitySchema("مشخصات کالاها ناقص است"),
     unit_price: z.coerce.number().min(0),
   })
   .refine((line) => line.item_type !== "inventory" || Boolean(line.item_id), {
@@ -55,6 +61,8 @@ const saleInvoiceBodySchema = z.object({
   customer_name: optionalText,
   customer_phone: optionalText,
   device_id: z.coerce.number().int().positive().nullable().optional(),
+  // Where the goods are issued from; omitted, the workspace's default.
+  warehouse_id: warehouseIdSchema,
   invoice_date: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.coerce.date().nullable().optional(),

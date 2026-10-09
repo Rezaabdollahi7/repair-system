@@ -1699,7 +1699,7 @@ per-warehouse minimums; a year in document numbers; two-step transfers.
 - [x] 14.10 Warehouses: API (admin) and `/warehouses` page — create, rename, set default, deactivate only at zero stock. The picker is hidden while one warehouse is active; the export workbook gains warehouse columns and a per-warehouse stock sheet
 - [x] 14.11 Frontend decimals and pickers: the sale form's default line price becomes the item's sell price (editable) rather than average × 1.2; `formatQuantity` (Persian digits, «٫»), quantity inputs stepped by `is_fractional`, warehouse picker on the three invoice headers, item form with sell price, «کسری» flag and opening stock + cost + warehouse
 - [x] 14.12 Tests. Unit: the service with a hand-rolled tx; controller tests mock `utils/stock`. Integration (real database): `current_stock = SUM(item_stocks) = SUM(ledger)` after every scenario; N concurrent sales of the last unit → exactly one succeeds; two invoices locking items in opposite order; UPDATE/DELETE on the ledger refused for `dofixo_app` while an item delete still cascades; the repair-invoice transitions; the migration backfill; warehouses in `isolation.test.ts`
-- [ ] 14.13 An «Inventory» section in `CLAUDE.md`, in the style of the SMS wallet's: the one-writer rule, lock order, no-negative rule, cost per item
+- [x] 14.13 An «Inventory» section in `CLAUDE.md`, in the style of the SMS wallet's: the one-writer rule, lock order, no-negative rule, cost per item
 
 ### Sprint 14B — Stock documents
 

@@ -166,8 +166,13 @@ export function stockKey(itemId: number, warehouseId: number): string {
   return `${itemId}:${warehouseId}`;
 }
 
-/** avg_purchase_price is Decimal(18,2); planning at the same precision
- * means the figure carried to the next line is the one the row will hold. */
+/**
+ * avg_purchase_price and unit_cost are Decimal(18,2). Applied to what is
+ * written, never to what is carried between lines: rounding after every line
+ * lets the error build up across a document — an edit that adds four units
+ * at 2500 and takes ten at 2000 back out would land on 2500.01 rather than
+ * 2500.
+ */
 function toCostPrecision(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -279,7 +284,7 @@ export function planStockMovements(
 
     itemState.set(line.itemId, {
       stock: current.stock.plus(quantity),
-      avgCost: toCostPrecision(avgCost),
+      avgCost,
     });
     stockState.set(key, after);
 
@@ -304,7 +309,14 @@ export function planStockMovements(
 
   return {
     movements,
-    items: new Map([...itemState].filter(([id]) => touchedItems.has(id))),
+    items: new Map(
+      [...itemState]
+        .filter(([id]) => touchedItems.has(id))
+        .map(([id, state]) => [
+          id,
+          { stock: state.stock, avgCost: toCostPrecision(state.avgCost) },
+        ]),
+    ),
     stocks: new Map([...stockState].filter(([key]) => touchedStocks.has(key))),
   };
 }

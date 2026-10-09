@@ -5,6 +5,7 @@ import { runWithWorkspace } from "../../lib/workspaceContext";
 import { buildWorkbook } from "../../utils/export/workbook";
 import {
   disconnectOwner,
+  expectAllStockConsistent,
   expectStockConsistent,
   owner,
   seedTwoWorkspaces,
@@ -20,6 +21,12 @@ let workspaces: TwoWorkspaces;
 beforeEach(async () => {
   await truncateAll();
   workspaces = await seedTwoWorkspaces();
+});
+
+// Every item in the database, after every test: a scenario cannot leave
+// stock inconsistent anywhere, even on an item it never checks (14.12).
+afterEach(async () => {
+  await expectAllStockConsistent();
 });
 
 afterAll(async () => {

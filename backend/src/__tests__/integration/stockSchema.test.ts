@@ -3,6 +3,7 @@ import {
   disconnectOwner,
   owner,
   seedTwoWorkspaces,
+  stockViolations,
   truncateAll,
   type TwoWorkspaces,
 } from "./helpers";
@@ -220,5 +221,73 @@ describe("quantities", () => {
     });
 
     expect(stored.quantity.toNumber()).toBe(2.125);
+  });
+});
+
+// The check every stock suite runs after each test (14.12). Proven here to
+// fail when it should — an afterEach that could never fail would be a
+// passing suite proving nothing.
+describe("the stock consistency check", () => {
+  it("finds nothing wrong with a consistent item", async () => {
+    await itemWithHistory();
+
+    expect(await stockViolations()).toEqual([]);
+  });
+
+  it("names an item whose total disagrees with its warehouses", async () => {
+    const item = await itemWithHistory();
+    await owner.item.update({
+      where: { id: item.id },
+      data: { currentStock: 6 },
+    });
+
+    expect(await stockViolations()).toEqual([
+      expect.stringContaining(`item ${item.id}: current_stock`),
+    ]);
+  });
+
+  it("names a warehouse whose stock disagrees with its ledger", async () => {
+    const item = await itemWithHistory();
+    // Through the owner, which the append-only grant does not bind: the
+    // only way such a row could exist, and exactly what the check is for.
+    await owner.inventoryTransaction.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        itemId: item.id,
+        warehouseId: workspaces.a.warehouseId,
+        type: "adjustment",
+        quantity: 1,
+        beforeQuantity: 5,
+        afterQuantity: 6,
+      },
+    });
+
+    const problems = await stockViolations();
+    expect(problems).toContainEqual(
+      expect.stringContaining(`warehouse ${workspaces.a.warehouseId}: stock`),
+    );
+    expect(problems).toContainEqual(
+      expect.stringContaining("last after_quantity"),
+    );
+  });
+
+  it("names ledger rows in a warehouse with no stock row", async () => {
+    const item = await itemWithHistory();
+    const other = await owner.warehouse.create({
+      data: { workspaceId: workspaces.a.workspaceId, name: "دوم" },
+    });
+    await owner.inventoryTransaction.create({
+      data: {
+        workspaceId: workspaces.a.workspaceId,
+        itemId: item.id,
+        warehouseId: other.id,
+        type: "opening",
+        quantity: 2,
+      },
+    });
+
+    expect(await stockViolations()).toContainEqual(
+      expect.stringContaining(`in warehouse ${other.id}: stock 0`),
+    );
   });
 });

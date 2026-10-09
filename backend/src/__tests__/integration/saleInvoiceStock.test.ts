@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "../../app";
 import {
   disconnectOwner,
+  expectAllStockConsistent,
   expectStockConsistent,
   owner,
   seedTwoWorkspaces,
@@ -18,6 +19,12 @@ let workspaces: TwoWorkspaces;
 beforeEach(async () => {
   await truncateAll();
   workspaces = await seedTwoWorkspaces();
+});
+
+// Every item in the database, after every test: a scenario cannot leave
+// stock inconsistent anywhere, even on an item it never checks (14.12).
+afterEach(async () => {
+  await expectAllStockConsistent();
 });
 
 afterAll(async () => {
@@ -201,6 +208,29 @@ describe("a sale invoice moves stock", () => {
     expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
     expect(await stockOf(itemId)).toBe(0);
     await expectStockConsistent(itemId);
+  });
+
+  it("does not deadlock invoices that list the same items in opposite orders", async () => {
+    // Without a fixed lock order, one invoice holds A waiting for B while the
+    // other holds B waiting for A, and Postgres kills one of them. A few
+    // rounds, because a deadlock needs the two to interleave just so.
+    const a = await stockedItem("A", 20, 1000);
+    const b = await stockedItem("B", 20, 1000);
+
+    for (let round = 0; round < 5; round += 1) {
+      const results = await Promise.all([
+        api("post", "/api/sale-invoices").send(
+          saleBody([saleLine(a, 1), saleLine(b, 1)]),
+        ),
+        api("post", "/api/sale-invoices").send(
+          saleBody([saleLine(b, 1), saleLine(a, 1)]),
+        ),
+      ]);
+      expect(results.map((r) => r.status)).toEqual([201, 201]);
+    }
+
+    expect(await stockOf(a)).toBe(10);
+    expect(await stockOf(b)).toBe(10);
   });
 });
 

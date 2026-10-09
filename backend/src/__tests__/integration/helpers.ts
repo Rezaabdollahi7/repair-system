@@ -326,3 +326,62 @@ export async function expectStockConsistent(itemId: number) {
     }
   }
 }
+
+/**
+ * The same invariant as expectStockConsistent, for every item in the
+ * database at once, in SQL — run after each test of the stock suites
+ * (14.12), so a scenario that never thought to check an item it touched
+ * still cannot leave it inconsistent. Answers with the violations, each
+ * named, so a failure says which item and which rule rather than "false".
+ */
+export async function stockViolations(): Promise<string[]> {
+  const rows = await owner.$queryRaw<{ problem: string }[]>`
+    -- The item's total is the sum of its warehouses.
+    SELECT 'item ' || i.id || ': current_stock ' || i.current_stock
+           || ' <> warehouses ' || COALESCE(s.total, 0) AS problem
+    FROM items i
+    LEFT JOIN (
+      SELECT item_id, SUM(quantity) AS total FROM item_stocks GROUP BY item_id
+    ) s ON s.item_id = i.id
+    WHERE i.current_stock <> COALESCE(s.total, 0)
+
+    UNION ALL
+    -- Each warehouse is the sum of its ledger rows — both ways round, so a
+    -- ledger row in a warehouse with no stock row is caught too.
+    SELECT 'item ' || COALESCE(s.item_id, l.item_id) || ' in warehouse '
+           || COALESCE(s.warehouse_id, l.warehouse_id) || ': stock '
+           || COALESCE(s.quantity, 0) || ' <> ledger ' || COALESCE(l.total, 0)
+    FROM item_stocks s
+    FULL JOIN (
+      SELECT item_id, warehouse_id, SUM(quantity) AS total
+      FROM inventory_transactions GROUP BY item_id, warehouse_id
+    ) l ON l.item_id = s.item_id AND l.warehouse_id = s.warehouse_id
+    WHERE COALESCE(s.quantity, 0) <> COALESCE(l.total, 0)
+
+    UNION ALL
+    -- The newest row's after-quantity is what the warehouse holds.
+    SELECT 'item ' || latest.item_id || ' in warehouse ' || latest.warehouse_id
+           || ': last after_quantity ' || latest.after_quantity
+           || ' <> stock ' || s.quantity
+    FROM (
+      SELECT DISTINCT ON (item_id, warehouse_id)
+             item_id, warehouse_id, after_quantity
+      FROM inventory_transactions
+      ORDER BY item_id, warehouse_id, created_at DESC, id DESC
+    ) latest
+    JOIN item_stocks s
+      ON s.item_id = latest.item_id AND s.warehouse_id = latest.warehouse_id
+    WHERE latest.after_quantity IS DISTINCT FROM s.quantity
+
+    UNION ALL
+    -- A cost is never negative.
+    SELECT 'item ' || id || ': average cost ' || avg_purchase_price
+    FROM items WHERE avg_purchase_price < 0
+  `;
+  return rows.map((row) => row.problem);
+}
+
+/** For an afterEach: fails the test that left the stock inconsistent. */
+export async function expectAllStockConsistent() {
+  expect(await stockViolations()).toEqual([]);
+}

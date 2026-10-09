@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "../../app";
 import {
   disconnectOwner,
+  expectAllStockConsistent,
   owner,
   seedTwoWorkspaces,
   truncateAll,
@@ -16,6 +17,12 @@ let workspaces: TwoWorkspaces;
 beforeEach(async () => {
   await truncateAll();
   workspaces = await seedTwoWorkspaces();
+});
+
+// Every item in the database, after every test: a scenario cannot leave
+// stock inconsistent anywhere, even on an item it never checks (14.12).
+afterEach(async () => {
+  await expectAllStockConsistent();
 });
 
 afterAll(async () => {

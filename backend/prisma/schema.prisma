@@ -15,12 +15,42 @@ datasource db {
 // constraint the old SQLite schema already had, and the validStatuses array
 // in repairInvoiceController.
 
+// What moved the stock. The ledger is the stock (14.4), so this is also what
+// the kardex prints beside each row.
+//
+// `reversal` is an invoice taking back its own earlier movement — an edit, a
+// delete, a cancelled repair invoice — and is distinct from `adjustment`,
+// which is a person correcting the shelf. Before 14.1 both were written as
+// `adjustment`; the migration relabelled them.
 enum InventoryTransactionType {
   purchase
   sale
   adjustment
+  opening
+  repair_use
+  count
+  transfer_out
+  transfer_in
+  purchase_return
+  sale_return
+  reversal
 
   @@map("inventory_transaction_type")
+}
+
+// Why a person changed the stock by hand. Only adjustments and counts carry
+// one; a purchase needs no reason beyond being a purchase.
+enum StockMovementReason {
+  count
+  damage
+  loss
+  found
+  entry_error
+  internal_use
+  return_from_use
+  other
+
+  @@map("stock_movement_reason")
 }
 
 enum RepairInvoiceStatus {
@@ -92,7 +122,12 @@ model Workspace {
   /// key stood in for this, and that key comes from a sequence shared by
   /// every workspace — so the first device a new shop took in could be
   /// numbered 4,812, and no two shops could both have a device «۱».
-  deviceSeq   Int @default(0) @map("device_seq")
+  deviceSeq Int @default(0) @map("device_seq")
+
+  /// Stock documents (phase 14): ADJ, CNT and TRF, numbered like invoices.
+  adjustmentSeq Int @default(0) @map("adjustment_seq")
+  countSeq      Int @default(0) @map("count_seq")
+  transferSeq   Int @default(0) @map("transfer_seq")
 
   users                 User[]
   customers             Customer[]
@@ -101,6 +136,8 @@ model Workspace {
   deviceAssignments     DeviceAssignment[]
   categories            Category[]
   items                 Item[]
+  warehouses            Warehouse[]
+  itemStocks            ItemStock[]
   inventoryTransactions InventoryTransaction[]
   purchaseInvoices      PurchaseInvoice[]
   purchaseInvoiceItems  PurchaseInvoiceItem[]
@@ -291,9 +328,9 @@ model Customer {
 }
 
 model Device {
-  id           Int       @id @default(autoincrement())
-  workspaceId  Int       @map("workspace_id")
-   /// What the shop calls this device: the number on the intake slip, quoted
+  id              Int       @id @default(autoincrement())
+  workspaceId     Int       @map("workspace_id")
+  /// What the shop calls this device: the number on the intake slip, quoted
   /// on the phone, printed on the invoice and sent in the #NUMBER# parameter
   /// of every customer notification.
   ///
@@ -302,20 +339,20 @@ model Device {
   /// anything a customer sees. Drawn from Workspace.deviceSeq inside the
   /// device's own transaction, so it is per-workspace, sequential and
   /// gap-free, exactly as invoice numbers are since 2.8.
-  receptionNumber Int    @map("reception_number")
-  customerId   Int?      @map("customer_id")
-  personnelId  Int?      @map("personnel_id")
-  deviceName   String    @map("device_name")
-  brand        String?
-  model        String?
-  serialNumber String?   @map("serial_number")
-  entryDate    DateTime? @map("entry_date")
-  exitDate     DateTime? @map("exit_date")
-  status       String    @default("received")
-  description  String?
-  needsInvoice Boolean   @default(true) @map("needs_invoice")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  receptionNumber Int       @map("reception_number")
+  customerId      Int?      @map("customer_id")
+  personnelId     Int?      @map("personnel_id")
+  deviceName      String    @map("device_name")
+  brand           String?
+  model           String?
+  serialNumber    String?   @map("serial_number")
+  entryDate       DateTime? @map("entry_date")
+  exitDate        DateTime? @map("exit_date")
+  status          String    @default("received")
+  description     String?
+  needsInvoice    Boolean   @default(true) @map("needs_invoice")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // SetNull rather than Cascade: a repair history should survive deleting
@@ -414,10 +451,19 @@ model Item {
   name             String
   code             String?
   unit             String   @default("عدد")
-  minStock         Int      @default(0) @map("min_stock")
-  currentStock     Int      @default(0) @map("current_stock")
+  // Three decimal places because metres, kilograms and litres are units a
+  // shop actually stocks; a whole-number item is kept whole by isFractional,
+  // not by the column type.
+  minStock         Decimal  @default(0) @map("min_stock") @db.Decimal(14, 3)
+  /// The total across every warehouse — a cached sum of item_stocks, kept so
+  /// the list can filter and sort by stock in one indexed query. Written only
+  /// by the stock service, in the same transaction as the rows it sums.
+  currentStock     Decimal  @default(0) @map("current_stock") @db.Decimal(14, 3)
   avgPurchasePrice Decimal  @default(0) @map("avg_purchase_price") @db.Decimal(18, 2)
   sellPrice        Decimal  @default(0) @map("sell_price") @db.Decimal(18, 0)
+  /// Whether a quantity may be fractional: 0.5 metre of cable, never 0.5 of a
+  /// phone. The form defaults it from the unit; the server enforces it.
+  isFractional     Boolean  @default(false) @map("is_fractional")
   description      String?
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
@@ -426,6 +472,7 @@ model Item {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  stocks               ItemStock[]
   transactions         InventoryTransaction[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
   saleInvoiceItems     SaleInvoiceItem[]
@@ -437,26 +484,101 @@ model Item {
   @@map("items")
 }
 
-model InventoryTransaction {
-  id            Int                      @id @default(autoincrement())
-  workspaceId   Int                      @map("workspace_id")
-  itemId        Int                      @map("item_id")
-  type          InventoryTransactionType
-  quantity      Int
-  unitPrice     Decimal                  @default(0) @map("unit_price") @db.Decimal(18, 0)
-  // Polymorphic pointer (referenceType says which table), so no FK.
-  referenceId   Int?                     @map("reference_id")
-  referenceType String?                  @map("reference_type")
-  note          String?
-  createdBy     Int?                     @map("created_by")
-  createdAt     DateTime                 @default(now()) @map("created_at")
+/// A place stock is kept. Every workspace has exactly one default warehouse,
+/// created with the workspace; a shop that never adds a second one never sees
+/// a warehouse picker.
+model Warehouse {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  name        String
+  /// TRUE on the default warehouse and NULL — never FALSE — on every other.
+  /// NULLs are distinct in a unique index, so the unique pair below allows
+  /// any number of NULLs and exactly one TRUE per workspace: a partial index
+  /// without the partial index, which Prisma cannot express.
+  isDefault   Boolean? @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  stocks           ItemStock[]
+  transactions     InventoryTransaction[]
+  purchaseInvoices PurchaseInvoice[]
+  saleInvoices     SaleInvoice[]
+  repairInvoices   RepairInvoice[]
+
+  @@unique([workspaceId, name])
+  @@unique([workspaceId, isDefault])
+  @@map("warehouses")
+}
+
+/// How much of one item one warehouse holds. Written only by the stock
+/// service, which locks the row before it reads it.
+model ItemStock {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  itemId      Int      @map("item_id")
+  warehouseId Int      @map("warehouse_id")
+  quantity    Decimal  @default(0) @db.Decimal(14, 3)
+  /// Shelf or drawer, free text — enough for a shop with one room, without
+  /// modelling bins.
+  location    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([itemId, warehouseId])
+  @@index([workspaceId, warehouseId])
+  @@index([warehouseId])
+  @@map("item_stocks")
+}
+
+/// The stock ledger. Append-only: the application role has neither UPDATE
+/// nor DELETE on it, so every figure in items and item_stocks can be checked
+/// against the sum of these rows.
+model InventoryTransaction {
+  id             Int                      @id @default(autoincrement())
+  workspaceId    Int                      @map("workspace_id")
+  itemId         Int                      @map("item_id")
+  warehouseId    Int                      @map("warehouse_id")
+  type           InventoryTransactionType
+  /// Signed: positive in, negative out.
+  quantity       Decimal                  @db.Decimal(14, 3)
+  /// The price on the document line — what was paid on a purchase, what was
+  /// charged on a sale. Not a cost; see unitCost.
+  unitPrice      Decimal                  @default(0) @map("unit_price") @db.Decimal(18, 0)
+  /// What one unit cost the shop at this movement: the purchase price coming
+  /// in, the moving average going out. NULL only on rows from before 14.1
+  /// that were not purchases.
+  unitCost       Decimal?                 @map("unit_cost") @db.Decimal(18, 2)
+  /// This warehouse's quantity either side of the movement, which is what
+  /// makes the kardex's balance column a read rather than a recomputation.
+  beforeQuantity Decimal?                 @map("before_quantity") @db.Decimal(14, 3)
+  afterQuantity  Decimal?                 @map("after_quantity") @db.Decimal(14, 3)
+  reason         StockMovementReason?
+  // Polymorphic pointer (referenceType says which table), so no FK.
+  referenceId    Int?                     @map("reference_id")
+  referenceType  String?                  @map("reference_type")
+  note           String?
+  /// The document's own date, which may be earlier than createdAt — an
+  /// invoice can be back-dated. The kardex orders by createdAt and shows this.
+  occurredAt     DateTime                 @default(now()) @map("occurred_at")
+  createdBy      Int?                     @map("created_by")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt(sort: Desc)])
-  @@index([itemId])
+  @@index([itemId, createdAt])
+  @@index([warehouseId])
   @@index([createdBy])
   @@map("inventory_transactions")
 }
@@ -468,6 +590,8 @@ model PurchaseInvoice {
   workspaceId   Int      @map("workspace_id")
   invoiceNumber String   @map("invoice_number")
   supplierName  String?  @map("supplier_name")
+  /// Where the goods were received. One per invoice, not per line.
+  warehouseId   Int      @map("warehouse_id")
   invoiceDate   DateTime @default(now()) @map("invoice_date")
   totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
   paidAmount    Decimal  @default(0) @map("paid_amount") @db.Decimal(18, 0)
@@ -478,12 +602,14 @@ model PurchaseInvoice {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   items PurchaseInvoiceItem[]
 
   @@unique([workspaceId, invoiceNumber])
   @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([warehouseId])
   @@index([createdBy])
   @@map("purchase_invoices")
 }
@@ -493,7 +619,7 @@ model PurchaseInvoiceItem {
   workspaceId Int      @map("workspace_id")
   invoiceId   Int      @map("invoice_id")
   itemId      Int      @map("item_id")
-  quantity    Int
+  quantity    Decimal  @db.Decimal(14, 3)
   unitPrice   Decimal  @map("unit_price") @db.Decimal(18, 0)
   totalPrice  Decimal  @map("total_price") @db.Decimal(18, 0)
   createdAt   DateTime @default(now()) @map("created_at")
@@ -522,6 +648,8 @@ model SaleInvoice {
   customerName  String?  @map("customer_name")
   customerPhone String?  @map("customer_phone")
   deviceId      Int?     @map("device_id")
+  /// Where the goods were issued from.
+  warehouseId   Int      @map("warehouse_id")
   invoiceDate   DateTime @default(now()) @map("invoice_date")
   totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
   paidAmount    Decimal  @default(0) @map("paid_amount") @db.Decimal(18, 0)
@@ -534,6 +662,7 @@ model SaleInvoice {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   device    Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   items SaleInvoiceItem[]
@@ -543,6 +672,7 @@ model SaleInvoice {
   @@index([workspaceId, paymentStatus])
   @@index([customerId])
   @@index([deviceId])
+  @@index([warehouseId])
   @@index([createdBy])
   @@map("sale_invoices")
 }
@@ -554,12 +684,17 @@ model SaleInvoiceItem {
   itemId         Int?     @map("item_id")
   name           String?
   unit           String?
-  quantity       Int
+  quantity       Decimal  @db.Decimal(14, 3)
   unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 0)
   discountType   String?  @map("discount_type")
   discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
   totalPrice     Decimal  @map("total_price") @db.Decimal(18, 0)
+  /// What one unit cost the shop when it left — the item's moving average at
+  /// that moment. Stored so a margin reported today is the margin made then,
+  /// not one recomputed from whatever the item costs now. NULL on custom
+  /// (non-inventory) lines.
+  unitCost       Decimal? @map("unit_cost") @db.Decimal(18, 2)
   createdAt      DateTime @default(now()) @map("created_at")
 
   workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -602,6 +737,8 @@ model RepairInvoice {
   customerId     Int?                @map("customer_id")
   customerName   String?             @map("customer_name")
   customerPhone  String?             @map("customer_phone")
+  /// Where the parts are drawn from when the invoice is issued.
+  warehouseId    Int                 @map("warehouse_id")
   invoiceDate    DateTime            @default(now()) @map("invoice_date")
   dueDate        DateTime?           @map("due_date")
   status         RepairInvoiceStatus @default(draft)
@@ -627,6 +764,7 @@ model RepairInvoice {
   // be meaningless.
   device     Device    @relation(fields: [deviceId], references: [id], onDelete: Restrict)
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  warehouse  Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   technician User?     @relation("RepairInvoiceTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
   author     User?     @relation("RepairInvoiceAuthor", fields: [createdBy], references: [id], onDelete: SetNull)
 
@@ -636,6 +774,7 @@ model RepairInvoice {
   @@unique([workspaceId, invoiceNumber])
   @@index([workspaceId, invoiceDate(sort: Desc)])
   @@index([workspaceId, status])
+  @@index([warehouseId])
   @@index([deviceId])
   @@index([customerId])
   @@index([technicianId])
@@ -653,13 +792,16 @@ model RepairInvoiceItem {
   itemId         Int?     @map("item_id")
   name           String
   description    String?
-  quantity       Decimal  @default(1) @db.Decimal(10, 2)
+  quantity       Decimal  @default(1) @db.Decimal(14, 3)
   unit           String?
   unitPrice      Decimal  @default(0) @map("unit_price") @db.Decimal(18, 0)
   discountType   String?  @map("discount_type")
   discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
   totalPrice     Decimal  @default(0) @map("total_price") @db.Decimal(18, 0)
+  /// The part's moving-average cost when the invoice was issued. NULL on
+  /// service and custom lines, and until the invoice is issued.
+  unitCost       Decimal? @map("unit_cost") @db.Decimal(18, 2)
   sortOrder      Int      @default(0) @map("sort_order")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -717,7 +859,7 @@ model Settings {
   /// that has to find a switch.
   smsCustomerNotificationsEnabled Boolean @default(false) @map("sms_customer_notifications_enabled")
 
-  invoiceFooterText     String? @map("invoice_footer_text")
+  invoiceFooterText String? @map("invoice_footer_text")
 
   saleInvoicePaperSize         String  @default("A5") @map("sale_invoice_paper_size")
   saleInvoiceShowLogo          Boolean @default(true) @map("sale_invoice_show_logo")
@@ -1205,7 +1347,7 @@ model SmsWalletTransaction {
   createdBy   Int?     @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   /// SetNull, not Restrict: sms_messages holds a customer's phone number and
   /// is deleted with the rest of the tenant data in 8.7, while this row is
   /// money and stays. The amount survives; the link to whose message it was

@@ -29,6 +29,13 @@ import { errorMessage } from "./errors";
  * exactly the personal data this deletion exists to remove. The wallet rows
  * that point at a deleted message keep their amounts and lose the link
  * (SetNull), so the money history survives without the person in it.
+ *
+ * inventory_transactions is not on the list either, but for the opposite
+ * reason: it does go. The stock ledger is append-only (14.1) — the
+ * application role cannot DELETE from it — so it leaves through the
+ * ON DELETE CASCADE on item_id when the items are deleted, which Postgres
+ * runs as the table's owner. Warehouses go after the items, since the ledger
+ * and the invoices point at them with Restrict.
  */
 // ⚠️ Prisma's delegates are singular — `tx.user`, not `tx.users` — and the
 // names below are those, not the table names. Getting it wrong is a compile
@@ -48,9 +55,10 @@ export const DELETION_ORDER = [
   "saleInvoiceItem",
   "purchaseInvoice",
   "saleInvoice",
-  "inventoryTransaction",
   "device",
+  "itemStock",
   "item",
+  "warehouse",
   "category",
   "service",
   "customer",
@@ -182,6 +190,9 @@ export async function deleteWorkspaceData(workspaceId: number): Promise<void> {
         purchaseSeq: 0,
         saleSeq: 0,
         repairSeq: 0,
+        adjustmentSeq: 0,
+        countSeq: 0,
+        transferSeq: 0,
       },
     });
   });

@@ -107,6 +107,30 @@ describe("deleteWorkspaceData", () => {
     );
   });
 
+  it("leaves the stock ledger to the item cascade", async () => {
+    // The ledger is append-only: the application role has no DELETE on it,
+    // so a deleteMany here would fail the whole deletion. Its rows go with
+    // their items (ON DELETE CASCADE). The integration suite proves that
+    // cascade runs as the app role.
+    expect(DELETION_ORDER).not.toContain("inventoryTransaction");
+    expect(DELETION_ORDER.indexOf("itemStock")).toBeLessThan(
+      DELETION_ORDER.indexOf("warehouse"),
+    );
+    expect(DELETION_ORDER.indexOf("item")).toBeLessThan(
+      DELETION_ORDER.indexOf("warehouse"),
+    );
+    // Invoices point at their warehouse with Restrict.
+    for (const invoice of [
+      "purchaseInvoice",
+      "saleInvoice",
+      "repairInvoice",
+    ] as const) {
+      expect(DELETION_ORDER.indexOf(invoice)).toBeLessThan(
+        DELETION_ORDER.indexOf("warehouse"),
+      );
+    }
+  });
+
   it("clears repair invoices before the devices they point at", async () => {
     // repair_invoices.deviceId is NOT NULL with Restrict.
     expect(DELETION_ORDER.indexOf("repairInvoice")).toBeLessThan(
@@ -198,6 +222,9 @@ describe("deleteWorkspaceData", () => {
         purchaseSeq: 0,
         saleSeq: 0,
         repairSeq: 0,
+        adjustmentSeq: 0,
+        countSeq: 0,
+        transferSeq: 0,
       }),
     });
   });

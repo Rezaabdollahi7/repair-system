@@ -6,6 +6,8 @@ import {
   GiftIcon,
 } from "@heroicons/react/24/solid";
 import { getReferral } from "../api";
+import { toPersianDigits } from "../utils/formatters";
+import { secondaryButton } from "../utils/tableClasses";
 import type { ReferralResponse } from "../types/api";
 
 /**
@@ -38,7 +40,11 @@ export default function Referral() {
 
   if (!data) {
     return (
-      <div className="text-text-secondary text-sm">در حال بارگذاری...</div>
+      <div dir="rtl" className="animate-pulse space-y-4">
+        <div className="h-9 w-48 rounded-field bg-surface-alt" />
+        <div className="h-56 rounded-panel border border-border bg-surface" />
+        <div className="h-40 rounded-panel border border-border bg-surface" />
+      </div>
     );
   }
 
@@ -59,31 +65,39 @@ export default function Referral() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-surface rounded-3xl p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-text-primary mb-1">
-          دعوت از دوستان
-        </h2>
-        <p className="text-sm text-text-secondary mb-4">
+    <div dir="rtl" className="space-y-4">
+      <header>
+        <p className="text-body-sm text-text-secondary">
+          {/* Persian digits, like every other figure in the app — these three
+              counts and the two below were the last Latin numerals left. */}
           هر تعمیرگاهی که با کد شما ثبت‌نام کند و اشتراک بخرد،{" "}
-          {data.reward_days} روز به اشتراک شما اضافه می‌شود. خودِ او هم{" "}
-          {data.discount_percent}٪ تخفیف روی اولین خریدش می‌گیرد.
+          {toPersianDigits(data.reward_days)} روز به اشتراک شما اضافه می‌شود.
+          خودِ او هم ٪{toPersianDigits(data.discount_percent)} تخفیف روی اولین
+          خریدش می‌گیرد.
         </p>
+      </header>
+
+      <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+        <h2 className="text-title-sm font-bold text-text-primary mb-4">
+          کد و لینک شما
+        </h2>
 
         {data.code ? (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-text-secondary mb-1">
+              <label className="block text-body-xs text-text-secondary mb-1">
                 کد دعوت شما
               </label>
               <div className="flex gap-2">
-                <div className="flex-1 px-4 py-3 rounded-2xl bg-surface-alt font-mono text-xl tracking-widest text-center text-text-primary">
+                {/* The accent, once: the code is the whole point of the
+                    page and the one thing on it to be copied. */}
+                <div className="flex-1 px-4 py-3 rounded-field bg-accent-tint border border-accent-border font-mono text-xl tracking-widest text-center text-text-primary">
                   {data.code}
                 </div>
                 <button
                   type="button"
                   onClick={() => void copy(data.code!, "کد")}
-                  className="px-4 rounded-2xl bg-primary-soft text-primary hover:bg-primary hover:text-text-inverse transition-colors"
+                  className={`${secondaryButton} flex-none px-4`}
                   title="کپی کد"
                 >
                   <ClipboardDocumentIcon className="w-5 h-5" />
@@ -93,17 +107,17 @@ export default function Referral() {
 
             {link && (
               <div>
-                <label className="block text-xs text-text-secondary mb-1">
+                <label className="block text-body-xs text-text-secondary mb-1">
                   لینک دعوت
                 </label>
                 <div className="flex gap-2">
-                  <div className="flex-1 px-4 py-2 rounded-2xl bg-surface-alt text-sm text-text-secondary truncate">
+                  <div className="flex-1 px-4 py-2 rounded-card bg-surface-alt text-body-sm text-text-secondary truncate">
                     {link}
                   </div>
                   <button
                     type="button"
                     onClick={() => void copy(link, "لینک")}
-                    className="px-4 rounded-2xl bg-primary-soft text-primary hover:bg-primary hover:text-text-inverse transition-colors"
+                    className={`${secondaryButton} flex-none px-4`}
                     title="کپی لینک"
                   >
                     <ClipboardDocumentIcon className="w-5 h-5" />
@@ -113,16 +127,18 @@ export default function Referral() {
             )}
           </div>
         ) : (
-          <p className="text-sm text-text-secondary">
+          <p className="text-body-sm text-text-secondary">
             کد دعوتی برای این کارگاه ثبت نشده است.
           </p>
         )}
       </div>
 
-      <div className="bg-surface rounded-3xl p-5 shadow-sm">
+      <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
         <div className="flex items-center gap-2 mb-4">
-          <GiftIcon className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-bold text-text-primary">پاداش شما</h2>
+          <GiftIcon className="w-5 h-5 text-text-muted" aria-hidden="true" />
+          <h2 className="text-title-sm font-bold text-text-primary">
+            پاداش شما
+          </h2>
         </div>
 
         <div className="grid gap-2 sm:grid-cols-4">
@@ -132,34 +148,35 @@ export default function Referral() {
             return (
               <div
                 key={step.invites}
-                className={`p-3 rounded-2xl text-center ${
+                className={`p-3 rounded-field text-center border ${
                   reached
-                    ? "bg-success-soft text-success"
-                    : "bg-surface-alt text-text-secondary"
+                    ? "bg-success-soft border-success/25 text-success-fg"
+                    : "bg-surface-alt border-transparent text-text-secondary"
                 }`}
               >
-                <p className="text-sm font-medium">
-                  {step.invites} دعوت موفق
+                <p className="text-body-sm font-bold">
+                  {toPersianDigits(step.invites)} دعوت موفق
                 </p>
-                <p className="text-xs mt-1">{step.reward}</p>
+                <p className="text-body-xs mt-1">{step.reward}</p>
               </div>
             );
           })}
         </div>
 
-        <p className="mt-4 text-sm text-text-secondary">
-          تا امروز {data.invited_count} نفر با کد شما ثبت‌نام کرده‌اند و{" "}
-          {data.rewarded_count} نفرشان اشتراک خریده‌اند.
+        <p className="mt-4 text-body-sm text-text-secondary">
+          تا امروز {toPersianDigits(data.invited_count)} نفر با کد شما ثبت‌نام
+          کرده‌اند و {toPersianDigits(data.rewarded_count)} نفرشان اشتراک
+          خریده‌اند.
         </p>
       </div>
 
       {data.invites.length > 0 && (
-        <div className="bg-surface rounded-3xl p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-text-primary mb-4">
+        <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+          <h2 className="text-title-sm font-bold text-text-primary mb-4">
             دعوت‌های شما
           </h2>
 
-          <table className="w-full text-sm">
+          <table className="w-full text-body-sm">
             <thead>
               <tr className="text-text-secondary text-right">
                 <th className="pb-2 font-medium">تاریخ ثبت‌نام</th>
@@ -177,7 +194,7 @@ export default function Referral() {
                   </td>
                   <td className="py-2">
                     {invite.rewarded_at ? (
-                      <span className="text-success flex items-center gap-1">
+                      <span className="text-success-fg flex items-center gap-1">
                         <CheckCircleIcon className="w-4 h-4" />
                         پاداش دریافت شد
                       </span>

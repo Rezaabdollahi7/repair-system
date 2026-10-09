@@ -2,26 +2,75 @@ import { Request, Response } from "express";
 import * as controller from "../controllers/deviceController";
 import prisma from "../lib/prisma";
 import { deleteDeviceImages } from "../controllers/imageController";
+import { notifyCustomer } from "../utils/customerNotification";
 
-jest.mock("../lib/prisma", () => ({
-  __esModule: true,
-  default: {
-    device: {
-      count: jest.fn(),
-      findMany: jest.fn(),
-      // findFirst rather than findUnique: the controller pairs id with
-      // workspaceId now, which findUnique can't express.
-      findFirst: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-  },
-}));
+jest.mock("../lib/prisma", () => {
+  const device = {
+    count: jest.fn(),
+    findMany: jest.fn(),
+    // findFirst rather than findUnique: the controller pairs id with
+    // workspaceId now, which findUnique can't express.
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  return {
+    __esModule: true,
+    default: { device },
+    /*
+     * `create` draws a reception number and writes the device in one
+     * transaction since 2.9, so the module's second export has to exist here
+     * too — and it has to actually run the callback. A jest.fn() that
+     * resolves to undefined would leave every create silently returning
+     * nothing, which reads as a controller bug rather than a missing mock.
+     *
+     * The same `device` object is handed in as `tx`, so an assertion can
+     * reach the call whether the controller writes through the client or
+     * through the transaction.
+     */
+    runInWorkspaceTransaction: jest.fn(
+      (_workspaceId: number, fn: (tx: unknown) => unknown) =>
+        fn({ device, workspace: { update: jest.fn() } }),
+    ),
+  };
+});
 
 jest.mock("../controllers/imageController", () => ({
   deleteDeviceImages: jest.fn(),
 }));
+
+/*
+ * Mocked because what this file is about is what the controller does with a
+ * number, not how the counter is moved — that is deviceNumber.test.ts, and
+ * the row lock it depends on is proved against a real database in
+ * integration/deviceNumbering.test.ts.
+ */
+jest.mock("../utils/deviceNumber", () => ({
+  nextReceptionNumber: jest.fn().mockResolvedValue(1),
+}));
+
+// Mocked deliberately: what this file is about is which message the
+// controller decides is owed, not what the service does with it. The wallet,
+// the refusals and the refund are covered against a real database in
+// integration/customerNotification.test.ts.
+//
+// transitionNotification is NOT mocked — it is the pure rule this controller
+// is built around, and stubbing it would leave the §10 tests below asserting
+// that a mock returns what the mock was told to return.
+jest.mock("../utils/customerNotification", () => {
+  const actual = jest.requireActual("../utils/customerNotification");
+
+  return {
+    ...actual,
+    notifyCustomer: jest.fn().mockResolvedValue({
+      smsMessageId: 9,
+      status: "sent",
+      costRials: 3_500,
+    }),
+  };
+});
 
 const db = prisma as unknown as { device: Record<string, jest.Mock> };
 
@@ -124,7 +173,9 @@ describe("deviceController.getAll", () => {
 
     // AND[0] is the workspace condition now; the search alternatives follow.
     const where = db.device.findMany.mock.calls[0][0].where;
-    expect(where.AND[1].OR).toContainEqual({ id: 12 });
+    // A number in the search box is a reception number since 2.9, not the
+    // primary key — the two were the same value until then.
+    expect(where.AND[1].OR).toContainEqual({ receptionNumber: 12 });
   });
 
   it("omits the id filter for a non-numeric search term", async () => {
@@ -266,6 +317,67 @@ describe("deviceController.update", () => {
     });
   });
 
+  it("stamps today's date when a device is handed back", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "repaired" });
+    db.device.update.mockResolvedValue(deviceRow({ status: "delivered" }));
+
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { status: "delivered" } }),
+      mockResponse(),
+    );
+
+    const { exitDate } = db.device.update.mock.calls[0][0].data;
+    const now = new Date();
+
+    expect(exitDate).toEqual(
+      new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+    );
+  });
+
+  it("does not move the exit date of a device already delivered", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "delivered" });
+    db.device.update.mockResolvedValue(deviceRow({ status: "delivered" }));
+
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { status: "delivered" } }),
+      mockResponse(),
+    );
+
+    expect(db.device.update.mock.calls[0][0].data).toEqual({
+      status: "delivered",
+    });
+  });
+
+  it("keeps an exit date the request set for itself", async () => {
+    const backdated = new Date("2026-02-03T00:00:00.000Z");
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "repaired" });
+    db.device.update.mockResolvedValue(deviceRow({ status: "delivered" }));
+
+    await controller.update(
+      mockRequest({
+        params: { id: 1 },
+        body: { status: "delivered", exit_date: backdated },
+      }),
+      mockResponse(),
+    );
+
+    expect(db.device.update.mock.calls[0][0].data.exitDate).toEqual(backdated);
+  });
+
+  it("leaves the exit date alone for every other status", async () => {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: "pending" });
+    db.device.update.mockResolvedValue(deviceRow());
+
+    await controller.update(
+      mockRequest({ params: { id: 1 }, body: { status: "repairing" } }),
+      mockResponse(),
+    );
+
+    expect(db.device.update.mock.calls[0][0].data).toEqual({
+      status: "repairing",
+    });
+  });
+
   it("returns 404 without attempting the update", async () => {
     db.device.findFirst.mockResolvedValue(null);
 
@@ -334,6 +446,181 @@ describe("deviceController.create", () => {
     expect(db.device.create.mock.calls[0][0].data).toMatchObject({
       workspaceId: WORKSPACE_ID,
       deviceName: "یخچال",
+      // Drawn from the workspace's counter rather than left to the primary
+      // key. Without this line the transaction could be removed and the test
+      // would stay green.
+      receptionNumber: 1,
+    });
+  });
+});
+
+// ── Customer notifications (12.7) ────────────────────────────
+//
+// The rules here are §10 and §11 of the brief, and they are the part of this
+// feature with the most ways to be quietly wrong: a message that fires on a
+// value instead of a transition texts the same customer every time anybody
+// edits the row.
+
+describe("the message a device write owes its customer", () => {
+  const customer = { name: "علی رضایی", phone: "09121234567" };
+
+  function seedUpdate(previousStatus: string, nextStatus: string) {
+    db.device.findFirst.mockResolvedValue({ id: 1, status: previousStatus });
+    db.device.update.mockResolvedValue(
+      deviceRow({ status: nextStatus, customer }),
+    );
+  }
+
+  it("texts an acceptance when a device is taken in", async () => {
+    db.device.create.mockResolvedValue(deviceRow({ customer }));
+
+    await controller.create(
+      mockRequest({
+        body: { device_name: "یخچال", status: "pending", send_sms: true },
+      }),
+      mockResponse(),
+    );
+
+    expect(jest.mocked(notifyCustomer).mock.calls[0][0]).toMatchObject({
+      kind: "device_accepted",
+      workspaceId: WORKSPACE_ID,
+      device: { id: 1, deviceName: "یخچال" },
+    });
+  });
+
+  it("says nothing when the box was not ticked", async () => {
+    db.device.create.mockResolvedValue(deviceRow({ customer }));
+
+    await controller.create(
+      mockRequest({ body: { device_name: "یخچال", status: "pending" } }),
+      mockResponse(),
+    );
+
+    expect(notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("texts on a real move to ready, and to delivered", async () => {
+    for (const [from, to, kind] of [
+      ["repairing", "ready_for_pickup", "device_ready"],
+      ["ready_for_pickup", "delivered", "device_delivered"],
+    ]) {
+      jest.mocked(notifyCustomer).mockClear();
+      seedUpdate(from, to);
+
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { status: to, send_sms: true },
+        }),
+        mockResponse(),
+      );
+
+      expect(jest.mocked(notifyCustomer).mock.calls[0][0]).toMatchObject({
+        kind,
+      });
+    }
+  });
+
+  it("stays quiet when the status did not actually move", async () => {
+    // §10. A device edited while already ready — a note corrected, a
+    // technician reassigned — must not tell the customer a second time.
+    seedUpdate("ready_for_pickup", "ready_for_pickup");
+
+    await controller.update(
+      mockRequest({
+        params: { id: 1 },
+        body: { description: "یادداشت تازه", send_sms: true },
+      }),
+      mockResponse(),
+    );
+
+    expect(notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("never re-sends an acceptance from an edit", async () => {
+    // §11. Whatever the status does on an update, `device_accepted` is not
+    // reachable from this handler — there is no branch that produces it.
+    for (const [from, to] of [
+      ["pending", "repairing"],
+      ["delivered", "pending"],
+      ["repairing", "ready_for_pickup"],
+    ]) {
+      jest.mocked(notifyCustomer).mockClear();
+      seedUpdate(from, to);
+
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { status: to, send_sms: true },
+        }),
+        mockResponse(),
+      );
+
+      const kinds = jest
+        .mocked(notifyCustomer)
+        .mock.calls.map((call) => call[0].kind);
+      expect(kinds).not.toContain("device_accepted");
+    }
+  });
+
+  it("sends nothing for a status with no message", async () => {
+    // Seven of the nine states say nothing to a customer, `repaired` among
+    // them: the bench is done, but the job has not been checked or priced.
+    for (const to of [
+      "repaired",
+      "unrepairable",
+      "not_repaired",
+      "diagnosing",
+    ]) {
+      jest.mocked(notifyCustomer).mockClear();
+      seedUpdate("repairing", to);
+
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { status: to, send_sms: true },
+        }),
+        mockResponse(),
+      );
+
+      expect(notifyCustomer).not.toHaveBeenCalled();
+    }
+  });
+
+  it("decides from the stored status, not from the request body", async () => {
+    // An update that leaves `status` out has not changed it. Comparing
+    // against the body would read that absence as a move to undefined, which
+    // is not equal to the old value — and would text the customer for an
+    // edit that changed a serial number.
+    seedUpdate("delivered", "delivered");
+
+    await controller.update(
+      mockRequest({
+        params: { id: 1 },
+        body: { serial_number: "SN-2", send_sms: true },
+      }),
+      mockResponse(),
+    );
+
+    expect(notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("hands the outcome back on the response", async () => {
+    // So the modal can say what became of the message. The device saved
+    // either way — this is information, not a status code.
+    db.device.create.mockResolvedValue(deviceRow({ customer }));
+    const res = mockResponse();
+
+    await controller.create(
+      mockRequest({
+        body: { device_name: "یخچال", status: "pending", send_sms: true },
+      }),
+      res,
+    );
+
+    expect(res.json.mock.calls[0][0]).toMatchObject({
+      id: 1,
+      sms: { status: "sent", costRials: 3_500 },
     });
   });
 });

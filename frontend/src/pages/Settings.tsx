@@ -2,16 +2,19 @@ import { useState, useEffect } from "react";
 import { getSettings, updateSettings, uploadSettingImage } from "../api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   BuildingOfficeIcon,
   PhotoIcon,
   DocumentTextIcon,
   CheckCircleIcon,
   Cog6ToothIcon,
+  InformationCircleIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/solid";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import type { SettingsForm } from "../types/api";
+import { primaryButton } from "../utils/tableClasses";
 
 type UploadType = "logo" | "stamp" | "signature";
 
@@ -48,10 +51,10 @@ function ImageUploadBox({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-text-primary mb-2">
+      <label className="block text-body-sm font-medium text-text-primary mb-2">
         {label}
       </label>
-      <div className="border-2 border-dashed border-border rounded-lg p-3 sm:p-4 text-center">
+      <div className="border-2 border-dashed border-border rounded-field p-3 sm:p-4 text-center">
         {imagePath ? (
           <div className="space-y-2">
             <img
@@ -61,13 +64,16 @@ function ImageUploadBox({
               alt={label}
               className="max-h-32 mx-auto object-contain"
             />
-            <p className="text-xs text-text-secondary">تصویر آپلود شده</p>
+            <p className="text-body-xs text-text-secondary">تصویر آپلود شده</p>
           </div>
         ) : (
           <PhotoIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-text-secondary mb-2" />
         )}
         <label className="cursor-pointer inline-block mt-2">
-          <span className="bg-primary-soft text-primary px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm hover:opacity-80 transition">
+          <span
+            className="bg-surface-alt border border-border text-text-primary px-3 py-1.5
+                       rounded-field text-body-xs font-bold hover:border-border-strong transition-colors"
+          >
             {uploading ? "در حال آپلود..." : "انتخاب تصویر"}
           </span>
           <input
@@ -78,7 +84,7 @@ function ImageUploadBox({
             className="hidden"
           />
         </label>
-        <p className="text-xs text-text-secondary mt-1">PNG, JPG تا ۵MB</p>
+        <p className="text-body-xs text-text-secondary mt-1">PNG, JPG تا ۵MB</p>
       </div>
     </div>
   );
@@ -100,9 +106,11 @@ function ToggleSwitch({
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
       <div>
-        <span className="text-sm font-medium text-text-primary">{label}</span>
+        <span className="text-body-sm font-medium text-text-primary">
+          {label}
+        </span>
         {description && (
-          <p className="text-xs text-text-secondary">{description}</p>
+          <p className="text-body-xs text-text-secondary">{description}</p>
         )}
       </div>
       <button
@@ -230,8 +238,10 @@ export default function Settings() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64" dir="rtl">
-        <div className="text-text-secondary">در حال بارگذاری...</div>
+      <div dir="rtl" className="animate-pulse space-y-4">
+        <div className="h-9 w-40 rounded-field bg-surface-alt" />
+        <div className="h-10 w-full rounded-field bg-surface-alt" />
+        <div className="h-96 rounded-panel border border-border bg-surface" />
       </div>
     );
   }
@@ -255,16 +265,25 @@ export default function Settings() {
     : "ui";
 
   return (
-    <div dir="rtl" className="px-2 sm:px-4 mx-auto">
-      <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-4 sm:mb-6 flex gap-2 items-center">
-        <Cog6ToothIcon className="w-5 h-5 sm:w-6 sm:h-6 text-text-secondary" />
-        تنظیمات
-        {!isSuperAdmin && (
-          <span className="text-sm font-normal text-text-secondary mr-2">
-            (دسترسی محدود - فقط تنظیمات ظاهری)
-          </span>
-        )}
-      </h1>
+    /* No padding of its own: <main> in the shell already provides it, and the
+       extra `px-2 sm:px-4` made this the one page inset from the others. */
+    <div dir="rtl">
+      {/*
+        The descriptive half of this went with the page titles: «ظاهر برنامه،
+        اطلاعات کارگاه و پیش‌فرض‌های فاکتور» was a list of the tabs sitting
+        directly above the tabs. What is left is the half that tells a
+        technician why there is only one of them, which is not something the
+        page says anywhere else.
+      */}
+      {!isSuperAdmin && (
+        <p className="mb-4 flex items-center gap-2 rounded-panel border border-info/25 bg-info-soft px-4 py-3 text-body-sm text-info-fg">
+          <InformationCircleIcon
+            className="h-5 w-5 shrink-0"
+            aria-hidden="true"
+          />
+          دسترسی محدود — فقط تنظیمات ظاهری
+        </p>
+      )}
 
       <div className="border-b border-border mb-4 sm:mb-6 overflow-x-auto">
         <nav className="flex gap-3 sm:gap-6 min-w-max">
@@ -274,14 +293,22 @@ export default function Settings() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors ${
+                /*
+                  The accent underlines the open tab. It was `border-primary
+                  text-primary`, and once the palette made primary the ink
+                  the underline became the same near-black as the label above
+                  it — a selected tab told apart from its neighbours only by
+                  how dark its text was. Same call as the sidebar's active
+                  item: one unambiguous "you are here" per surface.
+                */
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-1 py-2 sm:py-3 border-b-2 transition-colors cursor-pointer ${
                   currentTab === tab.id
-                    ? "border-primary text-primary"
+                    ? "border-accent text-text-primary font-bold"
                     : "border-transparent text-text-secondary hover:text-text-primary"
                 }`}
               >
                 <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
+                <span className="text-body-xs sm:text-body-sm font-medium whitespace-nowrap">
                   {tab.label}
                 </span>
               </button>
@@ -292,21 +319,50 @@ export default function Settings() {
 
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {currentTab === "ui" && (
-          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
             <ThemeSwitcher />
           </div>
         )}
 
+        {/*
+          A pointer, not a second switch.
+
+          The toggle itself lives on the wallet page beside the balance,
+          because the two questions a shop has about this feature — «is it
+          on» and «can I afford it» — are one question, and answering them in
+          two places is how they come to disagree. But a shop looks for
+          switches here, so here is where it is told where the switch is, and
+          what turning it on costs.
+        */}
+        {currentTab === "ui" && (
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-2 flex items-center gap-2">
+              <ChatBubbleLeftRightIcon className="w-5 h-5 text-text-secondary" />
+              پیامک به مشتریان
+            </h2>
+            <p className="text-body-sm text-text-secondary">
+              اطلاع‌رسانی پذیرش، آماده تحویل و تحویل دستگاه از اعتبار پیامکی
+              خودِ تعمیرگاه کسر می‌شود و بخشی از اشتراک دوفیکسو نیست.
+            </p>
+            <Link
+              to="/sms-wallet"
+              className="inline-block mt-3 text-body-sm font-medium text-primary"
+            >
+              تنظیم و شارژ کیف پول پیامکی
+            </Link>
+          </div>
+        )}
+
         {isSuperAdmin && currentTab === "company" && (
-          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <BuildingOfficeIcon className="w-5 h-5 text-text-secondary" />
               اطلاعات شرکت
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   نام شرکت/تعمیرگاه
                 </label>
                 <input
@@ -314,13 +370,13 @@ export default function Settings() {
                   name="company_name"
                   value={settings.company_name || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="مثلاً: تعمیرگاه تخصصی الکترونیک"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   شماره تماس
                 </label>
                 <input
@@ -328,13 +384,13 @@ export default function Settings() {
                   name="company_phone"
                   value={settings.company_phone || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="مثلاً: 021-12345678, 09123456789"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   آدرس
                 </label>
                 <textarea
@@ -342,13 +398,13 @@ export default function Settings() {
                   value={settings.company_address || ""}
                   onChange={handleChange}
                   rows={2}
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="آدرس کامل تعمیرگاه..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   ایمیل
                 </label>
                 <input
@@ -356,13 +412,13 @@ export default function Settings() {
                   name="company_email"
                   value={settings.company_email || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="info@example.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   وب‌سایت
                 </label>
                 <input
@@ -370,7 +426,7 @@ export default function Settings() {
                   name="company_website"
                   value={settings.company_website || ""}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   placeholder="www.example.com"
                 />
               </div>
@@ -379,8 +435,8 @@ export default function Settings() {
         )}
 
         {isSuperAdmin && currentTab === "images" && (
-          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <PhotoIcon className="w-5 h-5 text-text-secondary" />
               تصاویر
             </h2>
@@ -409,15 +465,15 @@ export default function Settings() {
         )}
 
         {isSuperAdmin && currentTab === "invoice" && (
-          <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <DocumentTextIcon className="w-5 h-5 text-text-secondary" />
               تنظیمات پیش‌فرض فاکتور
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   پیشوند شماره فاکتور
                 </label>
                 <input
@@ -425,12 +481,12 @@ export default function Settings() {
                   name="invoice_prefix"
                   value={settings.invoice_prefix || "INV-"}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   نرخ مالیات پیش‌فرض (%)
                 </label>
                 <input
@@ -441,27 +497,27 @@ export default function Settings() {
                   min="0"
                   max="100"
                   step="0.5"
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   مدت گارانتی پیش‌فرض (ماه)
                 </label>
                 <input
                   type="number"
                   name="default_warranty_months"
-                  value={settings.default_warranty_months || 3}
+                  value={settings.default_warranty_months ?? 3}
                   onChange={handleChange}
                   min="0"
-                  className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
             </div>
 
             <div className="mt-3 sm:mt-4">
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label className="block text-body-sm font-medium text-text-primary mb-2">
                 متن ثابت پایین فاکتور (برای فاکتور تعمیر)
               </label>
               <textarea
@@ -469,7 +525,7 @@ export default function Settings() {
                 value={settings.invoice_footer_text || ""}
                 onChange={handleChange}
                 rows={2}
-                className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 placeholder="مثلاً: با تشکر از اعتماد شما - تحویل گرفته شد"
               />
             </div>
@@ -477,22 +533,22 @@ export default function Settings() {
         )}
 
         {isSuperAdmin && currentTab === "template" && (
-          <div className="bg-surface shadow rounded-lg p-4 sm:p-6 overflow-x-auto">
-            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-border rounded-panel shadow-sm p-5 overflow-x-auto">
+            <h2 className="text-title-sm font-bold text-text-primary mb-4 flex items-center gap-2">
               <Cog6ToothIcon className="w-5 h-5 text-text-secondary" />
               قالب فاکتور فروش
             </h2>
 
             <div className="space-y-4 sm:space-y-6">
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label className="block text-body-sm font-medium text-text-primary mb-2">
                   اندازه کاغذ
                 </label>
                 <select
                   name="sale_invoice_paper_size"
                   value={settings.sale_invoice_paper_size || "A5"}
                   onChange={handleChange}
-                  className="w-full sm:w-64 border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                  className="w-full sm:w-64 border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary"
                 >
                   <option value="A4">A4 - حرفه‌ای (کامل)</option>
                   <option value="A5">A5 - نیمه‌حرفه‌ای (متوسط)</option>
@@ -501,10 +557,10 @@ export default function Settings() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-text-primary mb-3">
+                <h3 className="text-body-sm font-medium text-text-primary mb-3">
                   بخش‌های قابل نمایش
                 </h3>
-                <div className="space-y-1 border border-border rounded-lg divide-y divide-border">
+                <div className="space-y-1 border border-border rounded-field divide-y divide-border">
                   <div className="p-2 sm:p-3">
                     <ToggleSwitch
                       label="نمایش لوگو"
@@ -617,12 +673,12 @@ export default function Settings() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-text-primary mb-3">
+                <h3 className="text-body-sm font-medium text-text-primary mb-3">
                   متون سفارشی
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
+                    <label className="block text-body-sm font-medium text-text-primary mb-2">
                       متن بالای فاکتور
                     </label>
                     <textarea
@@ -630,12 +686,12 @@ export default function Settings() {
                       value={settings.sale_invoice_header_text || ""}
                       onChange={handleChange}
                       rows={2}
-                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="متن دلخواه برای بالای فاکتور..."
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
+                    <label className="block text-body-sm font-medium text-text-primary mb-2">
                       متن پایین فاکتور
                     </label>
                     <textarea
@@ -646,7 +702,7 @@ export default function Settings() {
                       }
                       onChange={handleChange}
                       rows={2}
-                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       placeholder="متن دلخواه برای پایین فاکتور..."
                     />
                   </div>
@@ -656,15 +712,29 @@ export default function Settings() {
           </div>
         )}
 
-        {isSuperAdmin && (
-          <div className="flex justify-center">
+        {/*
+          Not on the appearance tab. The theme writes itself to localStorage
+          the moment it is clicked — the panel says so — and a "save settings"
+          button under it implies the choice is not kept until you press it.
+          Every other tab edits the settings row, which does need saving.
+        */}
+        {isSuperAdmin && currentTab !== "ui" && (
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
               disabled={saving}
-              className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 text-sm sm:text-base"
+              aria-busy={saving}
+              className={`${primaryButton} flex-none disabled:opacity-60 disabled:cursor-not-allowed`}
             >
-              <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-              {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
+              {saving ? (
+                <span
+                  aria-hidden
+                  className="w-4 h-4 rounded-full border-2 border-current/30 border-t-current animate-spin"
+                />
+              ) : (
+                <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+              )}
+              {saving ? "در حال ذخیره…" : "ذخیره تنظیمات"}
             </button>
           </div>
         )}

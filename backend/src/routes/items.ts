@@ -1,6 +1,7 @@
 import express from "express";
 import * as ctrl from "../controllers/itemController";
 import { authenticate } from "../middleware/auth";
+import { atLeast } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import { idParamSchema } from "../schemas/common";
 import {
@@ -17,6 +18,12 @@ import {
 const router = express.Router();
 
 router.use(authenticate);
+
+// Purchase prices and stock levels are the owner's commercial data, not a
+// technician's working data — so reads are guarded too, not just writes.
+// On the router rather than per-route: five unguarded paths here is what the
+// per-route style produced in the first place.
+router.use(atLeast("admin"));
 
 // Literal paths are declared before /:id so they aren't captured by it.
 router.get("/", validate({ query: itemListQuerySchema }), ctrl.getAll);

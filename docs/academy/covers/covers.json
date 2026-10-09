@@ -1,0 +1,67 @@
+[
+  {
+    "slug": "guide/mobile-repair-shop-management",
+    "section": "راهنمای مدیریت تعمیرگاه",
+    "title": "راهنمای جامع مدیریت تعمیرگاه موبایل",
+    "screenshot": "overview/customer-page"
+  },
+  {
+    "slug": "guide/mobile-repair-software",
+    "section": "راهنمای مدیریت تعمیرگاه",
+    "title": "بهترین نرم‌افزار مدیریت تعمیرگاه موبایل: چطور انتخاب کنیم",
+    "screenshot": "overview/devices"
+  },
+  {
+    "slug": "guide/phone-intake-form",
+    "section": "راهنمای مدیریت تعمیرگاه",
+    "title": "رسید پذیرش تعمیرات موبایل: چه چیزهایی باید داشته باشد",
+    "screenshot": "downloads/phone-intake-form",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/getting-started",
+    "section": "آموزش دوفیکسو",
+    "title": "آموزش دوفیکسو: شروع سریع در ده دقیقه",
+    "screenshot": "overview/dashboard"
+  },
+  {
+    "slug": "tutorials/device-intake",
+    "section": "آموزش دوفیکسو",
+    "title": "پذیرش دستگاه در دوفیکسو",
+    "screenshot": "overview/devices"
+  },
+  {
+    "slug": "tutorials/device-statuses",
+    "section": "آموزش دوفیکسو",
+    "title": "وضعیت دستگاه در دوفیکسو: پیگیری تعمیر تا تحویل",
+    "screenshot": "device-statuses/04-status-picker",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/sign-up",
+    "section": "آموزش دوفیکسو",
+    "title": "ثبت نام در دوفیکسو",
+    "screenshot": "sign-up/02-otp"
+  },
+  {
+    "slug": "tutorials/settings",
+    "section": "آموزش دوفیکسو",
+    "title": "تنظیمات دوفیکسو: اطلاعات تعمیرگاه، لوگو و فاکتور",
+    "screenshot": "settings/03-images",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/personnel",
+    "section": "آموزش دوفیکسو",
+    "title": "تعریف تعمیرکار در دوفیکسو",
+    "screenshot": "personnel/06-technician-page",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/customers",
+    "section": "آموزش دوفیکسو",
+    "title": "ثبت مشتری در دوفیکسو",
+    "screenshot": "customers/05-history-invoices",
+    "position": "center top"
+  }
+]

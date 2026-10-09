@@ -2,7 +2,13 @@ import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
-import { dateFilter, monthRange, todayRange } from "../utils/dateRange";
+import {
+  dateFilter,
+  lastDaysRange,
+  monthRange,
+  todayRange,
+  utcDayKey,
+} from "../utils/dateRange";
 import { errorMessage } from "../utils/errors";
 import type { DateRangeQuery, StockReportQuery } from "../schemas/report";
 import { workspaceIdOf } from "../utils/workspace";
@@ -50,11 +56,14 @@ export const getStockReport = async (req: Request, res: Response) => {
       code: item.code,
       name: item.name,
       unit: item.unit,
-      current_stock: item.currentStock,
-      min_stock: item.minStock,
+      current_stock: item.currentStock.toNumber(),
+      min_stock: item.minStock.toNumber(),
       avg_purchase_price: item.avgPurchasePrice.toNumber(),
       category_name: item.category?.name ?? null,
-      stock_status: stockStatus(item.currentStock, item.minStock),
+      stock_status: stockStatus(
+        item.currentStock.toNumber(),
+        item.minStock.toNumber(),
+      ),
     }));
 
     const data =
@@ -108,7 +117,7 @@ export const getPurchaseReport = async (req: Request, res: Response) => {
       payment_status: invoice.paymentStatus,
       item_count: invoice.items.length,
       total_quantity: invoice.items.reduce(
-        (sum, line) => sum + line.quantity,
+        (sum, line) => sum + line.quantity.toNumber(),
         0,
       ),
     }));
@@ -158,7 +167,7 @@ export const getSaleReport = async (req: Request, res: Response) => {
       payment_status: invoice.paymentStatus,
       item_count: invoice.items.length,
       total_quantity: invoice.items.reduce(
-        (sum, line) => sum + line.quantity,
+        (sum, line) => sum + line.quantity.toNumber(),
         0,
       ),
     }));
@@ -222,7 +231,7 @@ export const getProfitReport = async (req: Request, res: Response) => {
     const data = grouped
       .map((row) => {
         const item = itemsById.get(row.itemId as number);
-        const quantity = row._sum?.quantity ?? 0;
+        const quantity = row._sum?.quantity?.toNumber() ?? 0;
         const revenue = row._sum?.totalPrice?.toNumber() ?? 0;
 
         // Cost uses the item's current average purchase price, not the price
@@ -267,6 +276,13 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const today = todayRange();
     const month = monthRange();
+    /*
+     * The trend chart's window. Fourteen days rather than thirty: a workshop
+     * closes one day a week, and at thirty points those closures crowd into a
+     * comb the eye reads as noise instead of a weekly rhythm.
+     */
+    const TREND_DAYS = 14;
+    const trend = lastDaysRange(TREND_DAYS);
     const workspaceId = workspaceIdOf(req);
 
     const issuedOrPaid: Prisma.RepairInvoiceWhereInput = {
@@ -277,6 +293,31 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       workspaceId,
       status: "issued",
       paymentStatus: { in: ["pending", "partial"] },
+    };
+
+    /*
+     * Which devices still have work in them.
+     *
+     * `IN_PROGRESS` is the set the «در حال تعمیر» figure has always counted,
+     * pulled out of its query so the two cannot drift. `OPEN` adds the ones
+     * that have arrived and not been looked at yet — a device sitting in
+     * `pending` is on somebody's bench even though nobody has touched it,
+     * and the workload card would be lying if it left those out.
+     *
+     * Everything else is finished as far as a technician is concerned:
+     * `repaired` and `ready_for_pickup` are waiting on the customer, and
+     * `delivered`, `unrepairable` and `not_repaired` are closed.
+     *
+     * The test is the status rather than `exitDate`. That column exists and
+     * would read more naturally, but nothing in the app sets it except a
+     * field on the edit form, so a shop that never fills it in would show
+     * every device it has ever taken in as open.
+     */
+    const IN_PROGRESS = ["diagnosing", "repairing", "waiting_for_parts"];
+    const OPEN = ["pending", ...IN_PROGRESS];
+    const openDevice: Prisma.DeviceWhereInput = {
+      workspaceId,
+      status: { in: OPEN },
     };
 
     // Issued in parallel: they're independent reads and the dashboard waits
@@ -299,6 +340,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       todayDevices,
       repairingDevices,
       devicesByStatus,
+      openDevices,
+      unassignedDevices,
+      openAssignments,
+      trendRepairInvoices,
+      trendSaleInvoices,
+      monthRepairPayments,
     ] = await Promise.all([
       prisma.repairInvoice.count({
         where: { workspaceId, invoiceDate: today },
@@ -353,16 +400,60 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       prisma.device.count({ where: { workspaceId } }),
       prisma.device.count({ where: { workspaceId, createdAt: today } }),
       prisma.device.count({
-        where: {
-          workspaceId,
-          status: { in: ["diagnosing", "repairing", "waiting_for_parts"] },
-        },
+        where: { workspaceId, status: { in: IN_PROGRESS } },
       }),
       prisma.device.groupBy({
         by: ["status"],
         where: { workspaceId },
         _count: { status: true },
         orderBy: { _count: { status: "desc" } },
+      }),
+      prisma.device.count({ where: openDevice }),
+      /*
+       * Open devices nobody owns. `assignments: { none: {} }` rather than a
+       * null `personnelId`: the schema still has that column but the app
+       * assigns through device_assignments, and a device can have more than
+       * one technician on it.
+       */
+      prisma.device.count({
+        where: { ...openDevice, assignments: { none: {} } },
+      }),
+      /*
+       * The assignments themselves, counted in JS.
+       *
+       * groupBy would count them in one query but cannot bring the name
+       * along, so it would be a groupBy plus a findMany over the ids it
+       * returned — two round trips for a list that is at most one row per
+       * open device per technician. A workshop has single digits of
+       * technicians and hundreds of open devices at the very most.
+       */
+      prisma.deviceAssignment.findMany({
+        where: { workspaceId, device: { status: { in: OPEN } } },
+        select: {
+          personnelId: true,
+          personnel: { select: { fullName: true, username: true } },
+        },
+      }),
+      /*
+       * The two trend reads pull rows and bucket them in JS rather than
+       * grouping in SQL. groupBy cannot group by a date's day — only by the
+       * whole timestamp — so the alternative is $queryRaw with a date_trunc,
+       * which would bypass the Prisma client extension that scopes every
+       * query by workspace. Two weeks of one workshop's invoices is tens of
+       * rows, and [workspaceId, invoiceDate] is already indexed, so the
+       * safer form costs nothing here.
+       */
+      prisma.repairInvoice.findMany({
+        where: { invoiceDate: trend, ...issuedOrPaid },
+        select: { invoiceDate: true, totalAmount: true },
+      }),
+      prisma.saleInvoice.findMany({
+        where: { workspaceId, invoiceDate: trend },
+        select: { invoiceDate: true, totalAmount: true },
+      }),
+      prisma.repairInvoice.aggregate({
+        where: { invoiceDate: month, ...issuedOrPaid },
+        _sum: { totalAmount: true, paidAmount: true },
       }),
     ]);
 
@@ -382,13 +473,70 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const topItemsById = new Map(topItemRecords.map((item) => [item.id, item]));
 
     const lowStockCount = items.filter(
-      (item) => item.currentStock <= item.minStock,
+      (item) => item.currentStock.toNumber() <= item.minStock.toNumber(),
     ).length;
 
     // Accepts undefined as well: Prisma types an aggregate's _sum as
     // optional, so the property access can produce it.
     const amount = (value: { toNumber(): number } | null | undefined) =>
       value?.toNumber() ?? 0;
+
+    /*
+     * How many open devices each technician has, busiest first.
+     *
+     * A device may carry more than one technician, so these counts can add
+     * up to more than `openDevices` — each one answers "how much is on this
+     * person's bench", not "what share of the total is theirs". The card
+     * scales its bars against the busiest person rather than against a sum
+     * for exactly that reason.
+     *
+     * The username is the fallback name because it is never null and it is a
+     * phone number, which a shop will recognise. `fullName` is a form field
+     * and can be blank.
+     */
+    const loadByTechnician = new Map<number, { name: string; count: number }>();
+    for (const assignment of openAssignments) {
+      const existing = loadByTechnician.get(assignment.personnelId);
+      if (existing) {
+        existing.count += 1;
+        continue;
+      }
+      loadByTechnician.set(assignment.personnelId, {
+        name:
+          assignment.personnel.fullName?.trim() ||
+          assignment.personnel.username,
+        count: 1,
+      });
+    }
+
+    const technicianLoad = [...loadByTechnician.entries()]
+      .map(([id, row]) => ({ id, name: row.name, count: row.count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "fa"));
+
+    /*
+     * One bucket per day in the window, zero-filled before anything is added.
+     * A day with no invoices has to reach the chart as a zero rather than be
+     * missing: a line drawn over absent days joins Sunday to Tuesday and
+     * hides the closure, and the x axis stops being evenly spaced.
+     */
+    const trendBuckets = new Map<string, { repair: number; sale: number }>();
+    for (let i = 0; i < TREND_DAYS; i += 1) {
+      const day = new Date(trend.gte);
+      day.setUTCDate(day.getUTCDate() + i);
+      trendBuckets.set(utcDayKey(day), { repair: 0, sale: 0 });
+    }
+
+    for (const invoice of trendRepairInvoices) {
+      const bucket = trendBuckets.get(utcDayKey(invoice.invoiceDate));
+      if (bucket) bucket.repair += invoice.totalAmount.toNumber();
+    }
+    for (const invoice of trendSaleInvoices) {
+      const bucket = trendBuckets.get(utcDayKey(invoice.invoiceDate));
+      if (bucket) bucket.sale += invoice.totalAmount.toNumber();
+    }
+
+    const monthRepairTotal = amount(monthRepairPayments._sum?.totalAmount);
+    const monthRepairPaid = amount(monthRepairPayments._sum?.paidAmount);
 
     const todayPurchaseTotal = amount(todayPurchase._sum.totalAmount);
     const todaySaleTotal = amount(todaySale._sum.totalAmount);
@@ -414,7 +562,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         id: tx.id,
         item_id: tx.itemId,
         type: tx.type,
-        quantity: tx.quantity,
+        quantity: tx.quantity.toNumber(),
         unit_price: tx.unitPrice.toNumber(),
         created_at: tx.createdAt.toISOString(),
         item_name: tx.item.name,
@@ -426,7 +574,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
           id: row.itemId,
           name: item?.name ?? null,
           code: item?.code ?? null,
-          sold_quantity: row._sum.quantity ?? 0,
+          sold_quantity: row._sum.quantity?.toNumber() ?? 0,
           revenue: amount(row._sum.totalPrice),
         };
       }),
@@ -439,6 +587,11 @@ export const getDashboardStats = async (req: Request, res: Response) => {
           count: row._count.status,
         })),
       },
+      technician_load: {
+        open_devices: openDevices,
+        unassigned: unassignedDevices,
+        technicians: technicianLoad,
+      },
       repair_invoices: {
         today_count: todayRepairCount,
         today_revenue: amount(todayRepairRevenue._sum?.totalAmount),
@@ -447,7 +600,27 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         issued_unpaid_amount:
           amount(unpaidTotals._sum?.totalAmount) -
           amount(unpaidTotals._sum?.paidAmount),
+        /*
+         * This month's billed amount split by what has actually come in.
+         * month_revenue answers "how much did we bill"; these two answer
+         * "how much of it did we collect", which is the number a workshop
+         * chases. Floored at zero because an overpayment — a customer
+         * rounding up — would otherwise send the remainder negative and put
+         * a segment on the wrong side of the ring.
+         */
+        month_paid: monthRepairPaid,
+        month_unpaid: Math.max(monthRepairTotal - monthRepairPaid, 0),
       },
+      /*
+       * Daily totals for the trend chart, oldest first, one entry per day
+       * with no gaps. Dates are UTC day keys, the same boundary every other
+       * window in this response uses.
+       */
+      revenue_series: [...trendBuckets.entries()].map(([date, totals]) => ({
+        date,
+        repair: totals.repair,
+        sale: totals.sale,
+      })),
     });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });

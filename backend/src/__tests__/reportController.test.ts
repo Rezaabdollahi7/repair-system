@@ -9,9 +9,14 @@ jest.mock("../lib/prisma", () => ({
     purchaseInvoice: { findMany: jest.fn(), aggregate: jest.fn() },
     saleInvoice: { findMany: jest.fn(), aggregate: jest.fn() },
     saleInvoiceItem: { groupBy: jest.fn() },
-    repairInvoice: { count: jest.fn(), aggregate: jest.fn() },
+    repairInvoice: {
+      count: jest.fn(),
+      aggregate: jest.fn(),
+      findMany: jest.fn(),
+    },
     inventoryTransaction: { findMany: jest.fn() },
     device: { count: jest.fn(), groupBy: jest.fn() },
+    deviceAssignment: { findMany: jest.fn() },
   },
 }));
 
@@ -23,6 +28,7 @@ const db = prisma as unknown as {
   repairInvoice: Record<string, jest.Mock>;
   inventoryTransaction: Record<string, jest.Mock>;
   device: Record<string, jest.Mock>;
+  deviceAssignment: Record<string, jest.Mock>;
 };
 
 function decimal(value: number) {
@@ -53,8 +59,8 @@ function itemRow(overrides: Record<string, unknown> = {}) {
     code: "C-100",
     name: "خازن",
     unit: "عدد",
-    currentStock: 20,
-    minStock: 5,
+    currentStock: decimal(20),
+    minStock: decimal(5),
     avgPurchasePrice: decimal(1000),
     category: { name: "قطعات" },
     ...overrides,
@@ -67,7 +73,7 @@ beforeEach(() => {
 
 describe("reportController.getStockReport", () => {
   it("marks an item with no stock as critical", async () => {
-    db.item.findMany.mockResolvedValue([itemRow({ currentStock: 0 })]);
+    db.item.findMany.mockResolvedValue([itemRow({ currentStock: decimal(0) })]);
 
     const res = mockResponse();
     await controller.getStockReport(mockRequest({ query: {} }), res);
@@ -77,7 +83,7 @@ describe("reportController.getStockReport", () => {
 
   it("marks an item at its minimum as low, not good", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ currentStock: 5, minStock: 5 }),
+      itemRow({ currentStock: decimal(5), minStock: decimal(5) }),
     ]);
 
     const res = mockResponse();
@@ -88,9 +94,9 @@ describe("reportController.getStockReport", () => {
 
   it("keeps only low and critical items when asked", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ id: 1, currentStock: 20, minStock: 5 }),
-      itemRow({ id: 2, currentStock: 0, minStock: 5 }),
-      itemRow({ id: 3, currentStock: 3, minStock: 5 }),
+      itemRow({ id: 1, currentStock: decimal(20), minStock: decimal(5) }),
+      itemRow({ id: 2, currentStock: decimal(0), minStock: decimal(5) }),
+      itemRow({ id: 3, currentStock: decimal(3), minStock: decimal(5) }),
     ]);
 
     const res = mockResponse();
@@ -106,8 +112,12 @@ describe("reportController.getStockReport", () => {
 
   it("values the inventory at each item's average purchase price", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ currentStock: 20, avgPurchasePrice: decimal(1000) }),
-      itemRow({ id: 2, currentStock: 5, avgPurchasePrice: decimal(2000) }),
+      itemRow({ currentStock: decimal(20), avgPurchasePrice: decimal(1000) }),
+      itemRow({
+        id: 2,
+        currentStock: decimal(5),
+        avgPurchasePrice: decimal(2000),
+      }),
     ]);
 
     const res = mockResponse();
@@ -142,7 +152,7 @@ describe("reportController.getPurchaseReport", () => {
         totalAmount: decimal(30000),
         paidAmount: decimal(10000),
         paymentStatus: "partial",
-        items: [{ quantity: 4 }, { quantity: 6 }],
+        items: [{ quantity: decimal(4) }, { quantity: decimal(6) }],
       },
     ]);
 
@@ -204,7 +214,7 @@ describe("reportController.getSaleReport", () => {
         totalAmount: decimal(50000),
         paidAmount: decimal(50000),
         paymentStatus: "paid",
-        items: [{ quantity: 2 }],
+        items: [{ quantity: decimal(2) }],
       },
     ]);
 
@@ -249,7 +259,7 @@ describe("reportController.getProfitReport", () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
       {
         itemId: 1,
-        _sum: { quantity: 10, totalPrice: decimal(50000) },
+        _sum: { quantity: decimal(10), totalPrice: decimal(50000) },
       },
     ]);
     db.item.findMany.mockResolvedValue([
@@ -270,7 +280,7 @@ describe("reportController.getProfitReport", () => {
 
   it("costs items from the caller's own catalogue", async () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 1, totalPrice: decimal(1000) } },
+      { itemId: 1, _sum: { quantity: decimal(1), totalPrice: decimal(1000) } },
     ]);
     db.item.findMany.mockResolvedValue([]);
 
@@ -286,8 +296,8 @@ describe("reportController.getProfitReport", () => {
 
   it("orders the most profitable item first", async () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 1, totalPrice: decimal(1000) } },
-      { itemId: 2, _sum: { quantity: 1, totalPrice: decimal(9000) } },
+      { itemId: 1, _sum: { quantity: decimal(1), totalPrice: decimal(1000) } },
+      { itemId: 2, _sum: { quantity: decimal(1), totalPrice: decimal(9000) } },
     ]);
     db.item.findMany.mockResolvedValue([
       { id: 1, name: "الف", code: "A", avgPurchasePrice: decimal(0) },
@@ -306,7 +316,7 @@ describe("reportController.getProfitReport", () => {
 
   it("reports a zero margin rather than dividing by zero", async () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 0, totalPrice: decimal(0) } },
+      { itemId: 1, _sum: { quantity: decimal(0), totalPrice: decimal(0) } },
     ]);
     db.item.findMany.mockResolvedValue([
       { id: 1, name: "خازن", code: "C-100", avgPurchasePrice: decimal(0) },
@@ -338,6 +348,11 @@ describe("reportController.getDashboardStats", () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([]);
     db.device.count.mockResolvedValue(0);
     db.device.groupBy.mockResolvedValue([]);
+    db.deviceAssignment.findMany.mockResolvedValue([]);
+    // The two reads behind the trend series. Rows rather than aggregates,
+    // because a daily bucket cannot be grouped in SQL through Prisma.
+    db.repairInvoice.findMany.mockResolvedValue([]);
+    db.saleInvoice.findMany.mockResolvedValue([]);
   }
 
   it("reports zeros rather than nulls on an empty database", async () => {
@@ -357,19 +372,22 @@ describe("reportController.getDashboardStats", () => {
 
     await controller.getDashboardStats(mockRequest(), mockResponse());
 
-    // Seventeen parallel queries; a workspace filter missing from any one of
-    // them would leak another shop's figures into this dashboard.
+    // Twenty-three parallel queries; a workspace filter missing from any
+    // one of them would leak another shop's figures into this dashboard.
     const everyWhere = [
       ...db.repairInvoice.count.mock.calls,
       ...db.repairInvoice.aggregate.mock.calls,
+      ...db.repairInvoice.findMany.mock.calls,
       ...db.item.count.mock.calls,
       ...db.item.findMany.mock.calls,
       ...db.purchaseInvoice.aggregate.mock.calls,
       ...db.saleInvoice.aggregate.mock.calls,
+      ...db.saleInvoice.findMany.mock.calls,
       ...db.inventoryTransaction.findMany.mock.calls,
       ...db.saleInvoiceItem.groupBy.mock.calls,
       ...db.device.count.mock.calls,
       ...db.device.groupBy.mock.calls,
+      ...db.deviceAssignment.findMany.mock.calls,
     ].map(([args]) => args?.where);
 
     expect(everyWhere.length).toBeGreaterThan(0);
@@ -397,9 +415,9 @@ describe("reportController.getDashboardStats", () => {
   it("counts low stock by comparing each item's two columns", async () => {
     stubDashboard();
     db.item.findMany.mockResolvedValue([
-      { currentStock: 20, minStock: 5 },
-      { currentStock: 2, minStock: 5 },
-      { currentStock: 5, minStock: 5 },
+      { currentStock: decimal(20), minStock: decimal(5) },
+      { currentStock: decimal(2), minStock: decimal(5) },
+      { currentStock: decimal(5), minStock: decimal(5) },
     ]);
 
     const res = mockResponse();
@@ -430,10 +448,21 @@ describe("reportController.getDashboardStats", () => {
   it("attaches item names to the top sellers", async () => {
     stubDashboard();
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 12, totalPrice: decimal(90000) } },
+      {
+        itemId: 1,
+        _sum: { quantity: decimal(12), totalPrice: decimal(90000) },
+      },
     ]);
+    // One mock serves both item reads on the dashboard — the low-stock count
+    // and the top sellers' names — so the row carries what each needs.
     db.item.findMany.mockResolvedValue([
-      { id: 1, name: "خازن", code: "C-100" },
+      {
+        id: 1,
+        name: "خازن",
+        code: "C-100",
+        currentStock: decimal(20),
+        minStock: decimal(5),
+      },
     ]);
 
     const res = mockResponse();
@@ -446,6 +475,77 @@ describe("reportController.getDashboardStats", () => {
       sold_quantity: 12,
       revenue: 90000,
     });
+  });
+
+  it("returns one trend bucket per day, zero-filled and oldest first", async () => {
+    stubDashboard();
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    const series = res.json.mock.calls[0][0].revenue_series;
+
+    // Fourteen days with no invoices at all still arrive as fourteen zeros:
+    // a missing day would leave the chart's x axis unevenly spaced and let a
+    // line be drawn straight over a day the workshop was closed.
+    expect(series).toHaveLength(14);
+    expect(
+      series.every((point: { repair: number }) => point.repair === 0),
+    ).toBe(true);
+    expect(series[0].date < series[13].date).toBe(true);
+  });
+
+  it("buckets each trend invoice into its own UTC day", async () => {
+    stubDashboard();
+
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    db.repairInvoice.findMany.mockResolvedValue([
+      { invoiceDate: today, totalAmount: decimal(40000) },
+      { invoiceDate: today, totalAmount: decimal(60000) },
+    ]);
+    db.saleInvoice.findMany.mockResolvedValue([
+      { invoiceDate: today, totalAmount: decimal(25000) },
+    ]);
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    const series = res.json.mock.calls[0][0].revenue_series;
+    const bucket = series.find(
+      (point: { date: string }) => point.date === todayKey,
+    );
+
+    // Two invoices on the same day sum into one bucket rather than producing
+    // two points.
+    expect(bucket).toEqual({ date: todayKey, repair: 100000, sale: 25000 });
+  });
+
+  it("splits the month's billing into collected and outstanding", async () => {
+    stubDashboard();
+    db.repairInvoice.aggregate.mockResolvedValue({
+      _sum: { totalAmount: decimal(900000), paidAmount: decimal(350000) },
+    });
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    const invoices = res.json.mock.calls[0][0].repair_invoices;
+    expect(invoices.month_paid).toBe(350000);
+    expect(invoices.month_unpaid).toBe(550000);
+  });
+
+  it("floors the outstanding month total at zero when a customer overpays", async () => {
+    stubDashboard();
+    db.repairInvoice.aggregate.mockResolvedValue({
+      _sum: { totalAmount: decimal(100000), paidAmount: decimal(120000) },
+    });
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    // A negative remainder would draw a ring segment on the wrong side.
+    expect(res.json.mock.calls[0][0].repair_invoices.month_unpaid).toBe(0);
   });
 
   it("flattens the device status grouping", async () => {
@@ -462,5 +562,108 @@ describe("reportController.getDashboardStats", () => {
       { status: "repairing", count: 4 },
       { status: "delivered", count: 2 },
     ]);
+  });
+
+  it("counts each technician's open devices, busiest first", async () => {
+    stubDashboard();
+    db.deviceAssignment.findMany.mockResolvedValue([
+      {
+        personnelId: 2,
+        personnel: { fullName: "علی رضایی", username: "09120000002" },
+      },
+      {
+        personnelId: 3,
+        personnel: { fullName: "سارا نوری", username: "09120000003" },
+      },
+      {
+        personnelId: 2,
+        personnel: { fullName: "علی رضایی", username: "09120000002" },
+      },
+      {
+        personnelId: 2,
+        personnel: { fullName: "علی رضایی", username: "09120000002" },
+      },
+    ]);
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    expect(res.json.mock.calls[0][0].technician_load.technicians).toEqual([
+      { id: 2, name: "علی رضایی", count: 3 },
+      { id: 3, name: "سارا نوری", count: 1 },
+    ]);
+  });
+
+  it("falls back to the username when a technician has no full name", async () => {
+    stubDashboard();
+    db.deviceAssignment.findMany.mockResolvedValue([
+      {
+        personnelId: 4,
+        personnel: { fullName: "   ", username: "09120000004" },
+      },
+    ]);
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    expect(res.json.mock.calls[0][0].technician_load.technicians).toEqual([
+      { id: 4, name: "09120000004", count: 1 },
+    ]);
+  });
+
+  it("reports an empty workload rather than omitting it", async () => {
+    stubDashboard();
+
+    const res = mockResponse();
+    await controller.getDashboardStats(mockRequest(), res);
+
+    expect(res.json.mock.calls[0][0].technician_load).toEqual({
+      open_devices: 0,
+      unassigned: 0,
+      technicians: [],
+    });
+  });
+
+  it("counts only devices a technician still has work on", async () => {
+    stubDashboard();
+
+    await controller.getDashboardStats(mockRequest(), mockResponse());
+
+    // «در حال تعمیر» keeps the three statuses it has always counted; the
+    // workload card adds the ones that have arrived and not been looked at.
+    const statusFilters = db.device.count.mock.calls
+      .map(([args]) => args?.where?.status?.in)
+      .filter(Boolean);
+
+    expect(statusFilters).toContainEqual([
+      "diagnosing",
+      "repairing",
+      "waiting_for_parts",
+    ]);
+    expect(statusFilters).toContainEqual([
+      "pending",
+      "diagnosing",
+      "repairing",
+      "waiting_for_parts",
+    ]);
+    expect(db.deviceAssignment.findMany.mock.calls[0][0].where.device).toEqual({
+      status: {
+        in: ["pending", "diagnosing", "repairing", "waiting_for_parts"],
+      },
+    });
+  });
+
+  it("asks for unassigned devices by the absence of an assignment", async () => {
+    stubDashboard();
+
+    await controller.getDashboardStats(mockRequest(), mockResponse());
+
+    // Not a null personnelId: that column is still on the table but the app
+    // assigns through device_assignments, and a device may have several.
+    const unassigned = db.device.count.mock.calls
+      .map(([args]) => args?.where)
+      .find((where) => where?.assignments !== undefined);
+
+    expect(unassigned?.assignments).toEqual({ none: {} });
   });
 });

@@ -111,13 +111,24 @@ const prisma = basePrisma.$extends({
 export function runInWorkspaceTransaction<T>(
   workspaceId: number,
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  /*
+   * Passed straight through to Prisma. Only the two timing options, not the
+   * whole $transaction shape: isolationLevel in a multi-tenant app under RLS
+   * is not something an individual call site should be able to change.
+   *
+   * It was missing until 5.8, and silently so — the import script had been
+   * passing { timeout: 600_000 } since it was written, JavaScript discarded
+   * the extra argument, and every transaction ran on Prisma's five-second
+   * default. Nothing failed until six thousand inserts took 5,005ms.
+   */
+  options?: { timeout?: number; maxWait?: number },
 ): Promise<T> {
   return basePrisma.$transaction(async (tx) => {
     await tx.$executeRaw`
       SELECT set_config('app.workspace_id', ${String(workspaceId)}, TRUE)
     `;
     return fn(tx);
-  });
+  }, options);
 }
 
 /**

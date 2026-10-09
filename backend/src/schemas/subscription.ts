@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { trackIdSchema } from "./common";
 
 /**
  * A plan code, never a price. The amount is worked out from the Plan row on
@@ -22,15 +23,8 @@ export const checkoutSchema = z.object({
 
 export type CheckoutBody = z.infer<typeof checkoutSchema>;
 
-/**
- * Zibal's trackId is int64, past what a JS number holds exactly, so it
- * travels as a string and is parsed to BigInt here.
- */
 export const verifySchema = z.object({
-  track_id: z
-    .string()
-    .regex(/^\d+$/, "شناسه پرداخت نامعتبر است")
-    .transform((value) => BigInt(value)),
+  track_id: trackIdSchema,
 });
 
 export type VerifyBody = z.infer<typeof verifySchema>;

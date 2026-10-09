@@ -15,9 +15,12 @@ import type {
   ItemUpdateBody,
   QuickPurchaseBody,
   QuickSaleBody,
+  StockFilter,
 } from "../schemas/item";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
+import { averageAfterAdding } from "../utils/avgPurchasePrice";
+import { defaultWarehouseId } from "../utils/warehouse";
 
 const itemInclude = {
   category: { select: { name: true } },
@@ -38,8 +41,8 @@ function toItemResponse(item: ItemWithCategory) {
     name: item.name,
     code: item.code,
     unit: item.unit,
-    minStock: item.minStock,
-    currentStock: item.currentStock,
+    minStock: item.minStock.toNumber(),
+    currentStock: item.currentStock.toNumber(),
     avgPurchasePrice: item.avgPurchasePrice.toNumber(),
     description: item.description,
     isActive: item.isActive,
@@ -51,6 +54,35 @@ function toItemResponse(item: ItemWithCategory) {
 }
 
 const DUPLICATE_CODE = { error: "این کد کالا قبلاً ثبت شده است" };
+
+/**
+ * The where fragment for one stock bucket.
+ *
+ * `low` and `ok` compare two columns of the same row, which is what Prisma's
+ * field references are for — `prisma.item.fields.minStock` becomes a column
+ * reference in the generated SQL rather than a bound value. That matters
+ * here: it keeps the filter in the database, so the count and the page still
+ * come from one indexed query.
+ *
+ * The alternative was what getLowStock below still does — load the whole
+ * catalogue and filter in JS — which the list cannot use, because it also has
+ * to paginate and report a total. The page filtered its own rows client-side
+ * before this existed, so a workshop asking for its low-stock items got only
+ * the low-stock rows that happened to be on page one, under a total that
+ * counted everything.
+ *
+ * The three buckets match stockStatus() in the report controller exactly,
+ * `out` first: an item with minStock 0 and nothing in stock is out, not ok.
+ */
+function stockWhere(stock: StockFilter): Prisma.ItemWhereInput {
+  if (stock === "out") return { currentStock: { lte: 0 } };
+  if (stock === "low") {
+    return {
+      currentStock: { gt: 0, lte: prisma.item.fields.minStock },
+    };
+  }
+  return { currentStock: { gt: prisma.item.fields.minStock } };
+}
 
 function paginate<T>(data: T[], total: number, page: number, limit: number) {
   return {
@@ -65,12 +97,15 @@ function paginate<T>(data: T[], total: number, page: number, limit: number) {
 // GET /api/items
 export const getAll = async (req: Request, res: Response) => {
   try {
-    const { categoryId, page, limit } = (req as ValidatedRequest).valid
+    const { categoryId, stock, page, limit } = (req as ValidatedRequest).valid
       .query as ItemListQuery;
 
     const where: Prisma.ItemWhereInput = { workspaceId: workspaceIdOf(req) };
     if (categoryId !== undefined) {
       where.categoryId = categoryId;
+    }
+    if (stock !== undefined) {
+      Object.assign(where, stockWhere(stock));
     }
 
     const [total, items] = await Promise.all([
@@ -115,8 +150,8 @@ export const getById = async (req: Request, res: Response) => {
 // GET /api/items/search
 export const search = async (req: Request, res: Response) => {
   try {
-    const { q, categoryId, page, limit } = (req as ValidatedRequest).valid
-      .query as ItemSearchQuery;
+    const { q, categoryId, stock, page, limit } = (req as ValidatedRequest)
+      .valid.query as ItemSearchQuery;
 
     const where: Prisma.ItemWhereInput = { workspaceId: workspaceIdOf(req) };
 
@@ -130,6 +165,9 @@ export const search = async (req: Request, res: Response) => {
 
     if (categoryId !== undefined) {
       where.categoryId = categoryId;
+    }
+    if (stock !== undefined) {
+      Object.assign(where, stockWhere(stock));
     }
 
     const [total, items] = await Promise.all([
@@ -163,9 +201,14 @@ export const getLowStock = async (req: Request, res: Response) => {
     });
 
     const lowStock = items
-      .filter((item) => item.currentStock <= item.minStock)
+      .filter(
+        (item) => item.currentStock.toNumber() <= item.minStock.toNumber(),
+      )
       .sort(
-        (a, b) => b.minStock - b.currentStock - (a.minStock - a.currentStock),
+        (a, b) =>
+          b.minStock.toNumber() -
+          b.currentStock.toNumber() -
+          (a.minStock.toNumber() - a.currentStock.toNumber()),
       );
 
     res.json(lowStock.map(toItemResponse));
@@ -208,7 +251,7 @@ export const searchForInvoice = async (req: Request, res: Response) => {
         code: item.code,
         name: item.name,
         unit: item.unit,
-        current_stock: item.currentStock,
+        current_stock: item.currentStock.toNumber(),
         avg_purchase_price: item.avgPurchasePrice.toNumber(),
         sell_price: item.sellPrice.toNumber(),
         category_name: item.category?.name ?? null,
@@ -272,7 +315,7 @@ export const getTransactions = async (req: Request, res: Response) => {
       id: tx.id,
       item_id: tx.itemId,
       type: tx.type,
-      quantity: tx.quantity,
+      quantity: tx.quantity.toNumber(),
       unit_price: tx.unitPrice.toNumber(),
       reference_id: tx.referenceId,
       reference_type: tx.referenceType,
@@ -428,12 +471,17 @@ export const quickPurchase = async (req: Request, res: Response) => {
     }
 
     const totalAmount = body.quantity * body.unit_price;
-    const newStock = item.currentStock + body.quantity;
+    const newStock = item.currentStock.toNumber() + body.quantity;
 
-    // Weighted average: existing stock valued at the old average, plus this
-    // purchase at its own price, spread over the new total.
-    const currentValue = item.avgPurchasePrice.toNumber() * item.currentStock;
-    const newAvgPrice = (currentValue + totalAmount) / newStock;
+    // The same arithmetic a purchase-invoice line runs, from the same
+    // module: a quick purchase is a one-line purchase invoice and had no
+    // business computing the average its own way.
+    const newAvgPrice = averageAfterAdding({
+      avg: item.avgPurchasePrice.toNumber(),
+      stock: item.currentStock.toNumber(),
+      quantity: body.quantity,
+      unitPrice: body.unit_price,
+    });
 
     // One transaction: the invoice, its line, the stock adjustment and the
     // ledger entry have to land together or not at all, or stock and history
@@ -442,9 +490,11 @@ export const quickPurchase = async (req: Request, res: Response) => {
       workspaceId,
       async (tx) => {
         const number = await nextInvoiceNumber(tx, workspaceId, "purchase");
+        const warehouseId = await defaultWarehouseId(tx, workspaceId);
         const invoice = await tx.purchaseInvoice.create({
           data: {
             workspaceId,
+            warehouseId,
             invoiceNumber: number,
             supplierName: "خرید سریع",
             totalAmount,
@@ -475,6 +525,7 @@ export const quickPurchase = async (req: Request, res: Response) => {
           data: {
             workspaceId,
             itemId: id,
+            warehouseId,
             type: "purchase",
             quantity: body.quantity,
             unitPrice: body.unit_price,
@@ -516,9 +567,9 @@ export const quickSale = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "کالا یافت نشد" });
     }
 
-    if (item.currentStock < body.quantity) {
+    if (item.currentStock.toNumber() < body.quantity) {
       return res.status(400).json({
-        error: `موجودی کافی نیست. موجودی فعلی: ${item.currentStock}`,
+        error: `موجودی کافی نیست. موجودی فعلی: ${item.currentStock.toNumber()}`,
       });
     }
 
@@ -531,15 +582,17 @@ export const quickSale = async (req: Request, res: Response) => {
       sellPrice > 0 ? sellPrice : item.avgPurchasePrice.toNumber();
 
     const totalAmount = body.quantity * unitPrice;
-    const newStock = item.currentStock - body.quantity;
+    const newStock = item.currentStock.toNumber() - body.quantity;
 
     const invoiceNumber = await runInWorkspaceTransaction(
       workspaceId,
       async (tx) => {
         const number = await nextInvoiceNumber(tx, workspaceId, "sale");
+        const warehouseId = await defaultWarehouseId(tx, workspaceId);
         const invoice = await tx.saleInvoice.create({
           data: {
             workspaceId,
+            warehouseId,
             invoiceNumber: number,
             customerName: body.customer_name ?? "فروش سریع",
             totalAmount,
@@ -570,6 +623,7 @@ export const quickSale = async (req: Request, res: Response) => {
           data: {
             workspaceId,
             itemId: id,
+            warehouseId,
             type: "sale",
             // Negative, matching how the ledger records outgoing stock.
             quantity: -body.quantity,

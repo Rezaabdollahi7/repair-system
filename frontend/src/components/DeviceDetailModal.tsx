@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import PersonnelLink from "./PersonnelLink";
+import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { getDevice, deleteDevice, getDeviceImages } from "../api";
 import ImageSlider from "./ImageSlider";
@@ -17,43 +19,10 @@ import {
 import ConfirmModal from "./ConfirmModal";
 import LoadingSpinner from "./LoadingSpinner";
 import type { Device, Id, ListedDeviceImage } from "../types/api";
-
-/** "received", the schema default, is deliberately absent — as it was. */
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: "در انتظار بررسی", color: "bg-warning-soft text-warning" },
-  diagnosing: { label: "در حال بررسی", color: "bg-primary-soft text-primary" },
-  waiting_for_parts: {
-    label: "در انتظار قطعه",
-    color: "bg-warning-soft text-warning",
-  },
-  repairing: { label: "در حال تعمیر", color: "bg-primary-soft text-primary" },
-  repaired: { label: "تعمیر شده", color: "bg-success-soft text-success" },
-  delivered: { label: "تحویل داده شده", color: "bg-success-soft text-success" },
-  unrepairable: { label: "غیرقابل تعمیر", color: "bg-danger-soft text-danger" },
-  ready_for_pickup: {
-    label: "آماده تحویل",
-    color: "bg-primary-soft text-primary",
-  },
-  not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
-};
-
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-}
-
-function InfoRow({ label, value }: InfoRowProps) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-border pb-2 sm:pb-3 mb-2 sm:mb-3 last:border-0">
-      <span className="text-xs sm:text-sm text-text-secondary mb-1 sm:mb-0">
-        {label}
-      </span>
-      <span className="text-sm sm:text-base text-text-primary font-medium break-words">
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
+import { modalPanel } from "../motion";
+import DeviceStatusBadge from "./DeviceStatusBadge";
+import InfoRow from "./InfoRow";
+import { formatPersianPhone } from "../utils/formatters";
 
 interface SectionTitleProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -65,11 +34,11 @@ function SectionTitle({ icon: Icon, title, count }: SectionTitleProps) {
   return (
     <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-2 border-b border-primary-soft">
       <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-      <span className="text-sm sm:text-base font-semibold text-text-primary">
+      <span className="text-body-sm sm:text-base font-semibold text-text-primary">
         {title}
       </span>
       {count !== undefined && (
-        <span className="bg-primary-soft text-primary text-xs px-1.5 sm:px-2 py-0.5 rounded-full mr-1">
+        <span className="bg-primary-soft text-primary text-body-xs px-1.5 sm:px-2 py-0.5 rounded-full mr-1">
           {count}
         </span>
       )}
@@ -156,15 +125,18 @@ export default function DeviceDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl my-2 sm:my-8 animate-in fade-in zoom-in duration-200"
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-4xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
-        <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
+        <div className="sticky top-0 bg-surface rounded-t-card border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-primary-soft p-2 rounded-xl">
+            <div className="bg-primary-soft p-2 rounded-card">
               <DevicePhoneMobileIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -172,15 +144,15 @@ export default function DeviceDetailModal({
                 جزئیات دستگاه
               </h2>
               {device && (
-                <p className="text-xs text-text-secondary mt-0.5 hidden sm:block">
-                  شماره پذیرش: {device.id}
+                <p className="text-body-xs text-text-secondary mt-0.5 hidden sm:block">
+                  شماره پذیرش: {device.reception_number}
                 </p>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
+            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -195,47 +167,45 @@ export default function DeviceDetailModal({
           ) : device ? (
             <div className="space-y-4 sm:space-y-6">
               {/* Summary card */}
-              <div className="bg-gradient-to-r from-primary-soft to-surface rounded-2xl p-4 sm:p-6">
+              <div className="bg-gradient-to-r from-primary-soft to-surface rounded-card p-4 sm:p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-xs text-text-secondary mb-1">
+                    <p className="text-body-xs text-text-secondary mb-1">
                       شماره پذیرش
                     </p>
                     <p className="text-lg sm:text-xl font-bold text-primary font-mono">
-                      {device.id}
+                      {device.reception_number}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-text-secondary mb-1">
+                    <p className="text-body-xs text-text-secondary mb-1">
                       تاریخ پذیرش
                     </p>
-                    <p className="text-sm sm:text-base text-text-primary font-medium flex items-center gap-1">
+                    <p className="text-body-sm sm:text-base text-text-primary font-medium flex items-center gap-1">
                       <CalendarIcon className="w-3.5 h-3.5 text-text-secondary" />
                       {formatDate(device.entry_date)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-text-secondary mb-1">
+                    <p className="text-body-xs text-text-secondary mb-1">
                       تاریخ تحویل
                     </p>
-                    <p className="text-sm sm:text-base text-text-primary font-medium flex items-center gap-1">
+                    <p className="text-body-sm sm:text-base text-text-primary font-medium flex items-center gap-1">
                       <CalendarIcon className="w-3.5 h-3.5 text-text-secondary" />
                       {formatDate(device.exit_date)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-text-secondary mb-1">وضعیت</p>
-                    <span
-                      className={`inline-block px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium ${STATUS_MAP[device.status]?.color || "bg-surface-alt text-text-secondary"}`}
-                    >
-                      {STATUS_MAP[device.status]?.label || device.status}
-                    </span>
+                    <p className="text-body-xs text-text-secondary mb-1">
+                      وضعیت
+                    </p>
+                    <DeviceStatusBadge status={device.status} />
                   </div>
                 </div>
 
                 {/* Assignees */}
                 <div className="mt-4 pt-4 border-t border-primary-soft">
-                  <p className="text-xs text-text-secondary mb-2">
+                  <p className="text-body-xs text-text-secondary mb-2">
                     مسئولین تعمیر
                   </p>
                   {device.assignees && device.assignees.length > 0 ? (
@@ -243,14 +213,20 @@ export default function DeviceDetailModal({
                       {device.assignees.map((person) => (
                         <span
                           key={person.id}
-                          className="px-2 py-1 sm:px-3 sm:py-2 bg-primary-soft text-primary rounded-full text-xs sm:text-sm font-medium"
+                          className="px-2 py-1 sm:px-3 sm:py-2 bg-primary-soft text-primary rounded-full text-body-xs sm:text-body-sm font-medium"
                         >
-                          {person.name || person.username}
+                          {/* The pill already wears the brand colour, so the
+                              link keeps it rather than painting over it. */}
+                          <PersonnelLink
+                            id={person.id}
+                            name={person.name || person.username}
+                            tone="inherit"
+                          />
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-text-secondary text-xs sm:text-sm">
+                    <p className="text-text-secondary text-body-xs sm:text-body-sm">
                       مسئولی تعیین نشده
                     </p>
                   )}
@@ -260,7 +236,7 @@ export default function DeviceDetailModal({
               {/* Device and customer */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Device */}
-                <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5">
+                <div className="bg-surface rounded-card shadow-sm border border-border p-4 sm:p-5">
                   <SectionTitle icon={TagIcon} title="اطلاعات دستگاه" />
                   <div className="space-y-1">
                     <InfoRow label="نوع دستگاه" value={device.device_name} />
@@ -271,28 +247,31 @@ export default function DeviceDetailModal({
                 </div>
 
                 {/* Customer */}
-                <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5">
+                <div className="bg-surface rounded-card shadow-sm border border-border p-4 sm:p-5">
                   <SectionTitle icon={UserIcon} title="اطلاعات مشتری" />
                   <div className="space-y-1">
                     <InfoRow label="نام مشتری" value={device.customer_name} />
-                    <InfoRow label="شماره تماس" value={device.customer_phone} />
+                    <InfoRow
+                      label="شماره تماس"
+                      value={formatPersianPhone(device.customer_phone)}
+                    />
                   </div>
                 </div>
 
                 {/* Description */}
-                <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
+                <div className="bg-surface rounded-card shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
                   <SectionTitle
                     icon={ClipboardDocumentListIcon}
                     title="توضیحات"
                   />
-                  <p className="text-sm sm:text-base text-text-primary leading-relaxed break-words">
+                  <p className="text-body-sm sm:text-base text-text-primary leading-relaxed break-words">
                     {device.description || "—"}
                   </p>
                 </div>
 
                 {/* Images */}
                 {images.length > 0 && (
-                  <div className="bg-surface rounded-xl shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
+                  <div className="bg-surface rounded-card shadow-sm border border-border p-4 sm:p-5 md:col-span-2">
                     <SectionTitle
                       icon={PhotoIcon}
                       title="عکس‌های دستگاه"
@@ -314,7 +293,7 @@ export default function DeviceDetailModal({
                             src={img.thumbnail_url ?? img.url}
                             alt={img.filename}
                             loading="lazy"
-                            className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-lg border border-border group-hover:border-primary group-hover:shadow-md transition-all"
+                            className="w-full h-24 sm:h-28 md:h-32 object-cover rounded-field border border-border group-hover:border-primary group-hover:shadow-md transition-all"
                           />
                         </div>
                       ))}
@@ -327,9 +306,9 @@ export default function DeviceDetailModal({
         </div>
 
         {/* Footer actions */}
-        <div className="sticky bottom-0 bg-surface-alt rounded-b-2xl border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div className="sticky bottom-0 bg-surface-alt rounded-b-card border-t border-border px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
           {device && (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs text-text-secondary order-2 sm:order-1">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-body-xs text-text-secondary order-2 sm:order-1">
               <span className="flex items-center gap-1">
                 <CalendarIcon className="w-3 h-3" />
                 ثبت: {formatDate(device.created_at)}
@@ -343,7 +322,7 @@ export default function DeviceDetailModal({
           <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
             <button
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2 border border-border rounded-xl text-text-primary hover:bg-surface-alt transition-colors text-sm"
+              className="flex-1 sm:flex-none px-4 py-2 border border-border rounded-card text-text-primary hover:bg-surface-alt transition-colors text-body-sm"
             >
               بستن
             </button>
@@ -352,7 +331,7 @@ export default function DeviceDetailModal({
                 onClose();
                 if (deviceId) onEdit?.(deviceId);
               }}
-              className="flex-1 sm:flex-none px-4 py-2 bg-primary text-text-inverse rounded-xl hover:bg-primary-hover transition-colors text-sm flex items-center justify-center gap-1 shadow-sm"
+              className="flex-1 sm:flex-none px-4 py-2 bg-primary text-primary-fg rounded-card hover:bg-primary-hover transition-colors text-body-sm flex items-center justify-center gap-1 shadow-sm"
             >
               <PencilSquareIcon className="w-4 h-4" />
               ویرایش
@@ -360,7 +339,7 @@ export default function DeviceDetailModal({
             {isAtLeast("admin") && (
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="flex-1 sm:flex-none px-4 py-2 bg-danger text-text-inverse rounded-xl hover:bg-danger-hover transition-colors text-sm flex items-center justify-center gap-1"
+                className="flex-1 sm:flex-none px-4 py-2 bg-danger-fill text-on-status rounded-card hover:bg-danger-hover transition-colors text-body-sm flex items-center justify-center gap-1"
               >
                 <TrashIcon className="w-4 h-4" />
                 حذف
@@ -368,7 +347,7 @@ export default function DeviceDetailModal({
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Delete Confirm */}
       <ConfirmModal
@@ -383,13 +362,15 @@ export default function DeviceDetailModal({
       />
 
       {/* Image Slider */}
-      {sliderIndex !== null && (
-        <ImageSlider
-          images={images}
-          initialIndex={sliderIndex}
-          onClose={() => setSliderIndex(null)}
-        />
-      )}
+      <AnimatePresence>
+        {sliderIndex !== null && (
+          <ImageSlider
+            images={images}
+            initialIndex={sliderIndex}
+            onClose={() => setSliderIndex(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,4 +1,8 @@
-import { toJalaliSms } from "../utils/jalali";
+import {
+  jalaliMonthLabel,
+  lastJalaliMonths,
+  toJalaliSms,
+} from "../utils/jalali";
 
 describe("toJalaliSms", () => {
   it("formats with dashes and Persian digits", () => {
@@ -22,5 +26,41 @@ describe("toJalaliSms", () => {
       expect(value).toMatch(/^[۰-۹]{4}-[۰-۹]{2}-[۰-۹]{2}$/);
       expect(value.length).toBeLessThanOrEqual(40);
     }
+  });
+});
+
+describe("lastJalaliMonths", () => {
+  it("ends with the month the date falls in", () => {
+    // 2026-08-15 is ۲۴ مرداد ۱۴۰۵.
+    const months = lastJalaliMonths(3, new Date("2026-08-15T00:00:00.000Z"));
+
+    expect(months).toEqual([
+      { jy: 1405, jm: 3 },
+      { jy: 1405, jm: 4 },
+      { jy: 1405, jm: 5 },
+    ]);
+  });
+
+  it("walks back across a year boundary", () => {
+    // 2026-04-10 is ۲۱ فروردین ۱۴۰۵, so two months back is اسفند ۱۴۰۴.
+    const months = lastJalaliMonths(3, new Date("2026-04-10T00:00:00.000Z"));
+
+    expect(months).toEqual([
+      { jy: 1404, jm: 11 },
+      { jy: 1404, jm: 12 },
+      { jy: 1405, jm: 1 },
+    ]);
+  });
+
+  it("returns as many months as asked for", () => {
+    expect(
+      lastJalaliMonths(12, new Date("2026-08-15T00:00:00.000Z")),
+    ).toHaveLength(12);
+  });
+});
+
+describe("jalaliMonthLabel", () => {
+  it("names the month and puts the year in Persian digits", () => {
+    expect(jalaliMonthLabel({ jy: 1405, jm: 5 })).toBe("مرداد ۱۴۰۵");
   });
 });

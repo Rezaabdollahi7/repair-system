@@ -19,6 +19,9 @@ jest.mock("../lib/prisma", () => {
       update: jest.fn(),
     },
     inventoryTransaction: { create: jest.fn() },
+    warehouse: {
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 4 }),
+    },
   };
 
   return {
@@ -261,7 +264,7 @@ describe("saleInvoiceController.getById", () => {
           id: 1,
           invoiceId: 5,
           itemId: 2,
-          quantity: 3,
+          quantity: decimal(3),
           unitPrice: decimal(10000),
           totalPrice: decimal(30000),
           createdAt: new Date("2026-08-06T00:00:00.000Z"),
@@ -271,7 +274,7 @@ describe("saleInvoiceController.getById", () => {
             code: "C-100",
             name: "خازن",
             unit: "عدد",
-            currentStock: 12,
+            currentStock: decimal(12),
           },
         },
       ],
@@ -295,7 +298,7 @@ describe("saleInvoiceController.getById", () => {
           id: 1,
           invoiceId: 5,
           itemId: null,
-          quantity: 1,
+          quantity: decimal(1),
           unitPrice: decimal(5000),
           totalPrice: decimal(5000),
           createdAt: new Date("2026-08-06T00:00:00.000Z"),
@@ -357,7 +360,7 @@ describe("saleInvoiceController.create", () => {
   it("names the item whose stock is short", async () => {
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 1,
+      currentStock: decimal(1),
     });
 
     const res = mockResponse();
@@ -387,9 +390,11 @@ describe("saleInvoiceController.create", () => {
   it("takes its number from its own workspace's counter", async () => {
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 10,
+      currentStock: decimal(10),
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 10 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(10),
+    });
 
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
@@ -406,9 +411,11 @@ describe("saleInvoiceController.create", () => {
   it("links the ledger entry to the invoice", async () => {
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 10,
+      currentStock: decimal(10),
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 10 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(10),
+    });
 
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
@@ -444,9 +451,11 @@ describe("saleInvoiceController.create", () => {
   it("derives the total from the lines", async () => {
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 10,
+      currentStock: decimal(10),
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 10 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(10),
+    });
 
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
@@ -488,12 +497,14 @@ describe("saleInvoiceController.update", () => {
   it("puts the old stock back before validating the new lines", async () => {
     db.saleInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
-      items: [{ itemId: 2, quantity: 3 }],
+      items: [{ itemId: 2, quantity: decimal(3) }],
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 7 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(7),
+    });
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 10,
+      currentStock: decimal(10),
     });
 
     await controller.update(
@@ -510,12 +521,14 @@ describe("saleInvoiceController.update", () => {
   it("rolls back when the new lines exceed stock", async () => {
     db.saleInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
-      items: [{ itemId: 2, quantity: 3 }],
+      items: [{ itemId: 2, quantity: decimal(3) }],
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 0 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(0),
+    });
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 3,
+      currentStock: decimal(3),
     });
 
     const res = mockResponse();
@@ -544,9 +557,11 @@ describe("saleInvoiceController.update", () => {
     });
     db.__tx.item.findFirst.mockResolvedValue({
       name: "خازن",
-      currentStock: 10,
+      currentStock: decimal(10),
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 10 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(10),
+    });
 
     const res = mockResponse();
     await controller.update(mockRequest({ params: { id: 5 }, body }, 3), res);
@@ -631,11 +646,13 @@ describe("saleInvoiceController.remove", () => {
     db.saleInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
       items: [
-        { itemId: 2, quantity: 3 },
-        { itemId: null, quantity: 1 },
+        { itemId: 2, quantity: decimal(3) },
+        { itemId: null, quantity: decimal(1) },
       ],
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 7 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(7),
+    });
 
     await controller.remove(
       mockRequest({ params: { id: 5 } }, 3),
@@ -651,7 +668,7 @@ describe("saleInvoiceController.remove", () => {
       db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
     ).toMatchObject({
       workspaceId: WORKSPACE_ID,
-      type: "adjustment",
+      type: "reversal",
       quantity: 3,
       referenceId: 5,
       note: "ابطال فاکتور فروش",

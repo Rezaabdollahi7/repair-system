@@ -94,6 +94,14 @@ services:
       SMS_TEMPLATE_AFTER_EXPIRY: ${SMS_TEMPLATE_AFTER_EXPIRY:?required}
       SMS_TEMPLATE_PAYMENT_OK: ${SMS_TEMPLATE_PAYMENT_OK:?required}
       SMS_TEMPLATE_REFERRAL_REWARD: ${SMS_TEMPLATE_REFERRAL_REWARD:?required}
+      # Phase 12: the three templates a workshop sends to its own customer,
+      # charged to that workshop's SMS wallet rather than to us. Required
+      # like the five above — lib/sms resolves every id at import, so a
+      # missing one is a container that never starts rather than a feature
+      # that quietly does nothing.
+      SMS_TEMPLATE_DEVICE_ACCEPTED: ${SMS_TEMPLATE_DEVICE_ACCEPTED:?required}
+      SMS_TEMPLATE_DEVICE_READY: ${SMS_TEMPLATE_DEVICE_READY:?required}
+      SMS_TEMPLATE_DEVICE_DELIVERED: ${SMS_TEMPLATE_DEVICE_DELIVERED:?required}
       ZIBAL_MERCHANT: ${ZIBAL_MERCHANT:?required}
       # Derived from APP_DOMAIN, not set separately: Zibal rejects a callback
       # whose domain does not match the registered gateway with result 106,
@@ -165,6 +173,23 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       DATABASE_URL_APP: postgresql://dofixo_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      # The 5.8 import script uploads device photographs, and lib/storage
+      # reads these four at import time and throws without them — the script
+      # would not start at all. Less sensitive than the DATABASE_URL above:
+      # that one is the owner role and bypasses RLS, while these reach the
+      # same bucket the backend already writes to.
+      #
+      # S3_REGION is optional (storage defaults it) and is here only so the
+      # two services cannot silently diverge if the region ever changes.
+      #
+      # Plain ${} rather than :?required, matching backend: compose
+      # interpolates this whole file on every command, so a :? here would
+      # break backup-database.sh as well.
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION:-default}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
 
 volumes:
   dofixo_pgdata:

@@ -28,6 +28,17 @@ const OPEN_PATHS = [
   // Built in 8.5. Listed now so the guard is complete when it lands rather
   // than being one edit away from locking a workspace out of paying.
   "/api/subscription",
+  // Buying SMS credit, which a lapsed workspace is allowed to do (12.4).
+  //
+  // Only these two, not the whole of /api/sms: the toggle and everything
+  // else stay closed, and this list's own rule is that what is open is
+  // either a way to pay or a way to stay signed in long enough to.
+  //
+  // Safe to open because the credit cannot be spent while lapsed — sending
+  // rides on a device write, which this same guard blocks. That falls out of
+  // the design rather than needing a check of its own.
+  "/api/sms/wallet/topup",
+  "/api/sms/wallet/verify",
 ];
 
 /**

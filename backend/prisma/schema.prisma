@@ -15,12 +15,42 @@ datasource db {
 // constraint the old SQLite schema already had, and the validStatuses array
 // in repairInvoiceController.
 
+// What moved the stock. The ledger is the stock (14.4), so this is also what
+// the kardex prints beside each row.
+//
+// `reversal` is an invoice taking back its own earlier movement — an edit, a
+// delete, a cancelled repair invoice — and is distinct from `adjustment`,
+// which is a person correcting the shelf. Before 14.1 both were written as
+// `adjustment`; the migration relabelled them.
 enum InventoryTransactionType {
   purchase
   sale
   adjustment
+  opening
+  repair_use
+  count
+  transfer_out
+  transfer_in
+  purchase_return
+  sale_return
+  reversal
 
   @@map("inventory_transaction_type")
+}
+
+// Why a person changed the stock by hand. Only adjustments and counts carry
+// one; a purchase needs no reason beyond being a purchase.
+enum StockMovementReason {
+  count
+  damage
+  loss
+  found
+  entry_error
+  internal_use
+  return_from_use
+  other
+
+  @@map("stock_movement_reason")
 }
 
 enum RepairInvoiceStatus {
@@ -61,7 +91,7 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-// One expiresAt covers both the trial and a paid period: the question
+  // One expiresAt covers both the trial and a paid period: the question
   // asked of it is always "may this workspace still be written to".
   status    WorkspaceStatus @default(trial)
   expiresAt DateTime?       @map("expires_at")
@@ -86,6 +116,19 @@ model Workspace {
   saleSeq     Int @default(0) @map("sale_seq")
   repairSeq   Int @default(0) @map("repair_seq")
 
+  /// The reception-number counter, alongside the three invoice counters and
+  /// for the same reason: a number a customer reads back over the phone has
+  /// to belong to the shop that issued it. Until 2.9 the device's primary
+  /// key stood in for this, and that key comes from a sequence shared by
+  /// every workspace — so the first device a new shop took in could be
+  /// numbered 4,812, and no two shops could both have a device «۱».
+  deviceSeq Int @default(0) @map("device_seq")
+
+  /// Stock documents (phase 14): ADJ, CNT and TRF, numbered like invoices.
+  adjustmentSeq Int @default(0) @map("adjustment_seq")
+  countSeq      Int @default(0) @map("count_seq")
+  transferSeq   Int @default(0) @map("transfer_seq")
+
   users                 User[]
   customers             Customer[]
   devices               Device[]
@@ -93,6 +136,8 @@ model Workspace {
   deviceAssignments     DeviceAssignment[]
   categories            Category[]
   items                 Item[]
+  warehouses            Warehouse[]
+  itemStocks            ItemStock[]
   inventoryTransactions InventoryTransaction[]
   purchaseInvoices      PurchaseInvoice[]
   purchaseInvoiceItems  PurchaseInvoiceItem[]
@@ -113,6 +158,11 @@ model Workspace {
   referralsMade             Referral[]                 @relation("ReferralReferrer")
   referralReceived          Referral?                  @relation("ReferralReferred")
   subscriptionNotifications SubscriptionNotification[]
+
+  smsWallet             SmsWallet?
+  smsWalletTransactions SmsWalletTransaction[]
+  smsMessages           SmsMessage[]
+  smsTopups             SmsTopup[]
 
   @@index([status])
   // The nightly job scans by expiry, not by status.
@@ -165,6 +215,9 @@ model User {
   backups                Backup[]
   refreshTokens          RefreshToken[]
   payments               Payment[]
+  smsWalletTransactions  SmsWalletTransaction[]
+  smsMessages            SmsMessage[]
+  smsTopups              SmsTopup[]
 
   @@index([workspaceId])
   @@index([roleId])
@@ -226,10 +279,10 @@ model OtpCode {
   // be sent the same five digits, and lookup is by phone + purpose anyway.
   codeHash String @map("code_hash")
 
-  expiresAt DateTime @map("expires_at")
+  expiresAt  DateTime  @map("expires_at")
   // Burns the row at three. Checked alongside expiry and consumption, so a
   // code that ran out of attempts is dead even while it is still in date.
-  attempts  Int      @default(0)
+  attempts   Int       @default(0)
   // Set when the code is spent, and also when a newer code supersedes it:
   // re-sending invalidates whatever came before, so only ever one live code
   // exists per phone and purpose.
@@ -254,6 +307,10 @@ model Customer {
   workspaceId Int      @map("workspace_id")
   name        String
   phone       String?
+  // The shop's own note about this customer — «pays late, don't release the
+  // device until the money is in». Staff-facing only: it is never printed on
+  // an invoice and never leaves the workspace.
+  notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -261,6 +318,7 @@ model Customer {
   devices        Device[]
   saleInvoices   SaleInvoice[]
   repairInvoices RepairInvoice[]
+  smsMessages    SmsMessage[]
 
   // Leads with workspaceId so the index serves the scoped query the
   // application always issues.
@@ -270,21 +328,31 @@ model Customer {
 }
 
 model Device {
-  id           Int       @id @default(autoincrement())
-  workspaceId  Int       @map("workspace_id")
-  customerId   Int?      @map("customer_id")
-  personnelId  Int?      @map("personnel_id")
-  deviceName   String    @map("device_name")
-  brand        String?
-  model        String?
-  serialNumber String?   @map("serial_number")
-  entryDate    DateTime? @map("entry_date")
-  exitDate     DateTime? @map("exit_date")
-  status       String    @default("received")
-  description  String?
-  needsInvoice Boolean   @default(true) @map("needs_invoice")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id              Int       @id @default(autoincrement())
+  workspaceId     Int       @map("workspace_id")
+  /// What the shop calls this device: the number on the intake slip, quoted
+  /// on the phone, printed on the invoice and sent in the #NUMBER# parameter
+  /// of every customer notification.
+  ///
+  /// Separate from `id` deliberately. The primary key is a surrogate shared
+  /// across the whole platform — fine for foreign keys and URLs, wrong for
+  /// anything a customer sees. Drawn from Workspace.deviceSeq inside the
+  /// device's own transaction, so it is per-workspace, sequential and
+  /// gap-free, exactly as invoice numbers are since 2.8.
+  receptionNumber Int       @map("reception_number")
+  customerId      Int?      @map("customer_id")
+  personnelId     Int?      @map("personnel_id")
+  deviceName      String    @map("device_name")
+  brand           String?
+  model           String?
+  serialNumber    String?   @map("serial_number")
+  entryDate       DateTime? @map("entry_date")
+  exitDate        DateTime? @map("exit_date")
+  status          String    @default("received")
+  description     String?
+  needsInvoice    Boolean   @default(true) @map("needs_invoice")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // SetNull rather than Cascade: a repair history should survive deleting
@@ -296,7 +364,11 @@ model Device {
   assignments    DeviceAssignment[]
   repairInvoices RepairInvoice[]
   saleInvoices   SaleInvoice[]
+  smsMessages    SmsMessage[]
 
+  /// The rule itself, not a convention: one number per shop, held by the
+  /// database rather than by whichever controller happens to write next.
+  @@unique([workspaceId, receptionNumber])
   @@index([workspaceId, id(sort: Desc)])
   @@index([workspaceId, status])
   @@index([workspaceId, entryDate])
@@ -306,9 +378,9 @@ model Device {
 }
 
 model DeviceImage {
-  id          Int      @id @default(autoincrement())
-  workspaceId Int      @map("workspace_id")
-  deviceId    Int      @map("device_id")
+  id          Int    @id @default(autoincrement())
+  workspaceId Int    @map("workspace_id")
+  deviceId    Int    @map("device_id")
   filename    String
   filepath    String
 
@@ -322,8 +394,8 @@ model DeviceImage {
   /// image, so an old row renders correctly and merely costs more bytes.
   thumbnailPath String? @map("thumbnail_path")
 
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
@@ -379,10 +451,19 @@ model Item {
   name             String
   code             String?
   unit             String   @default("عدد")
-  minStock         Int      @default(0) @map("min_stock")
-  currentStock     Int      @default(0) @map("current_stock")
+  // Three decimal places because metres, kilograms and litres are units a
+  // shop actually stocks; a whole-number item is kept whole by isFractional,
+  // not by the column type.
+  minStock         Decimal  @default(0) @map("min_stock") @db.Decimal(14, 3)
+  /// The total across every warehouse — a cached sum of item_stocks, kept so
+  /// the list can filter and sort by stock in one indexed query. Written only
+  /// by the stock service, in the same transaction as the rows it sums.
+  currentStock     Decimal  @default(0) @map("current_stock") @db.Decimal(14, 3)
   avgPurchasePrice Decimal  @default(0) @map("avg_purchase_price") @db.Decimal(18, 2)
   sellPrice        Decimal  @default(0) @map("sell_price") @db.Decimal(18, 0)
+  /// Whether a quantity may be fractional: 0.5 metre of cable, never 0.5 of a
+  /// phone. The form defaults it from the unit; the server enforces it.
+  isFractional     Boolean  @default(false) @map("is_fractional")
   description      String?
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
@@ -391,6 +472,7 @@ model Item {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  stocks               ItemStock[]
   transactions         InventoryTransaction[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
   saleInvoiceItems     SaleInvoiceItem[]
@@ -402,26 +484,101 @@ model Item {
   @@map("items")
 }
 
-model InventoryTransaction {
-  id            Int                      @id @default(autoincrement())
-  workspaceId   Int                      @map("workspace_id")
-  itemId        Int                      @map("item_id")
-  type          InventoryTransactionType
-  quantity      Int
-  unitPrice     Decimal                  @default(0) @map("unit_price") @db.Decimal(18, 0)
-  // Polymorphic pointer (referenceType says which table), so no FK.
-  referenceId   Int?                     @map("reference_id")
-  referenceType String?                  @map("reference_type")
-  note          String?
-  createdBy     Int?                     @map("created_by")
-  createdAt     DateTime                 @default(now()) @map("created_at")
+/// A place stock is kept. Every workspace has exactly one default warehouse,
+/// created with the workspace; a shop that never adds a second one never sees
+/// a warehouse picker.
+model Warehouse {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  name        String
+  /// TRUE on the default warehouse and NULL — never FALSE — on every other.
+  /// NULLs are distinct in a unique index, so the unique pair below allows
+  /// any number of NULLs and exactly one TRUE per workspace: a partial index
+  /// without the partial index, which Prisma cannot express.
+  isDefault   Boolean? @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  stocks           ItemStock[]
+  transactions     InventoryTransaction[]
+  purchaseInvoices PurchaseInvoice[]
+  saleInvoices     SaleInvoice[]
+  repairInvoices   RepairInvoice[]
+
+  @@unique([workspaceId, name])
+  @@unique([workspaceId, isDefault])
+  @@map("warehouses")
+}
+
+/// How much of one item one warehouse holds. Written only by the stock
+/// service, which locks the row before it reads it.
+model ItemStock {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  itemId      Int      @map("item_id")
+  warehouseId Int      @map("warehouse_id")
+  quantity    Decimal  @default(0) @db.Decimal(14, 3)
+  /// Shelf or drawer, free text — enough for a shop with one room, without
+  /// modelling bins.
+  location    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([itemId, warehouseId])
+  @@index([workspaceId, warehouseId])
+  @@index([warehouseId])
+  @@map("item_stocks")
+}
+
+/// The stock ledger. Append-only: the application role has neither UPDATE
+/// nor DELETE on it, so every figure in items and item_stocks can be checked
+/// against the sum of these rows.
+model InventoryTransaction {
+  id             Int                      @id @default(autoincrement())
+  workspaceId    Int                      @map("workspace_id")
+  itemId         Int                      @map("item_id")
+  warehouseId    Int                      @map("warehouse_id")
+  type           InventoryTransactionType
+  /// Signed: positive in, negative out.
+  quantity       Decimal                  @db.Decimal(14, 3)
+  /// The price on the document line — what was paid on a purchase, what was
+  /// charged on a sale. Not a cost; see unitCost.
+  unitPrice      Decimal                  @default(0) @map("unit_price") @db.Decimal(18, 0)
+  /// What one unit cost the shop at this movement: the purchase price coming
+  /// in, the moving average going out. NULL only on rows from before 14.1
+  /// that were not purchases.
+  unitCost       Decimal?                 @map("unit_cost") @db.Decimal(18, 2)
+  /// This warehouse's quantity either side of the movement, which is what
+  /// makes the kardex's balance column a read rather than a recomputation.
+  beforeQuantity Decimal?                 @map("before_quantity") @db.Decimal(14, 3)
+  afterQuantity  Decimal?                 @map("after_quantity") @db.Decimal(14, 3)
+  reason         StockMovementReason?
+  // Polymorphic pointer (referenceType says which table), so no FK.
+  referenceId    Int?                     @map("reference_id")
+  referenceType  String?                  @map("reference_type")
+  note           String?
+  /// The document's own date, which may be earlier than createdAt — an
+  /// invoice can be back-dated. The kardex orders by createdAt and shows this.
+  occurredAt     DateTime                 @default(now()) @map("occurred_at")
+  createdBy      Int?                     @map("created_by")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt(sort: Desc)])
-  @@index([itemId])
+  @@index([itemId, createdAt])
+  @@index([warehouseId])
   @@index([createdBy])
   @@map("inventory_transactions")
 }
@@ -433,6 +590,8 @@ model PurchaseInvoice {
   workspaceId   Int      @map("workspace_id")
   invoiceNumber String   @map("invoice_number")
   supplierName  String?  @map("supplier_name")
+  /// Where the goods were received. One per invoice, not per line.
+  warehouseId   Int      @map("warehouse_id")
   invoiceDate   DateTime @default(now()) @map("invoice_date")
   totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
   paidAmount    Decimal  @default(0) @map("paid_amount") @db.Decimal(18, 0)
@@ -443,12 +602,14 @@ model PurchaseInvoice {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   items PurchaseInvoiceItem[]
 
   @@unique([workspaceId, invoiceNumber])
   @@index([workspaceId, invoiceDate(sort: Desc)])
+  @@index([warehouseId])
   @@index([createdBy])
   @@map("purchase_invoices")
 }
@@ -458,7 +619,7 @@ model PurchaseInvoiceItem {
   workspaceId Int      @map("workspace_id")
   invoiceId   Int      @map("invoice_id")
   itemId      Int      @map("item_id")
-  quantity    Int
+  quantity    Decimal  @db.Decimal(14, 3)
   unitPrice   Decimal  @map("unit_price") @db.Decimal(18, 0)
   totalPrice  Decimal  @map("total_price") @db.Decimal(18, 0)
   createdAt   DateTime @default(now()) @map("created_at")
@@ -487,6 +648,8 @@ model SaleInvoice {
   customerName  String?  @map("customer_name")
   customerPhone String?  @map("customer_phone")
   deviceId      Int?     @map("device_id")
+  /// Where the goods were issued from.
+  warehouseId   Int      @map("warehouse_id")
   invoiceDate   DateTime @default(now()) @map("invoice_date")
   totalAmount   Decimal  @default(0) @map("total_amount") @db.Decimal(18, 0)
   paidAmount    Decimal  @default(0) @map("paid_amount") @db.Decimal(18, 0)
@@ -499,6 +662,7 @@ model SaleInvoice {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   device    Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   items SaleInvoiceItem[]
@@ -508,6 +672,7 @@ model SaleInvoice {
   @@index([workspaceId, paymentStatus])
   @@index([customerId])
   @@index([deviceId])
+  @@index([warehouseId])
   @@index([createdBy])
   @@map("sale_invoices")
 }
@@ -519,12 +684,17 @@ model SaleInvoiceItem {
   itemId         Int?     @map("item_id")
   name           String?
   unit           String?
-  quantity       Int
+  quantity       Decimal  @db.Decimal(14, 3)
   unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 0)
   discountType   String?  @map("discount_type")
   discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
   totalPrice     Decimal  @map("total_price") @db.Decimal(18, 0)
+  /// What one unit cost the shop when it left — the item's moving average at
+  /// that moment. Stored so a margin reported today is the margin made then,
+  /// not one recomputed from whatever the item costs now. NULL on custom
+  /// (non-inventory) lines.
+  unitCost       Decimal? @map("unit_cost") @db.Decimal(18, 2)
   createdAt      DateTime @default(now()) @map("created_at")
 
   workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -567,6 +737,8 @@ model RepairInvoice {
   customerId     Int?                @map("customer_id")
   customerName   String?             @map("customer_name")
   customerPhone  String?             @map("customer_phone")
+  /// Where the parts are drawn from when the invoice is issued.
+  warehouseId    Int                 @map("warehouse_id")
   invoiceDate    DateTime            @default(now()) @map("invoice_date")
   dueDate        DateTime?           @map("due_date")
   status         RepairInvoiceStatus @default(draft)
@@ -592,6 +764,7 @@ model RepairInvoice {
   // be meaningless.
   device     Device    @relation(fields: [deviceId], references: [id], onDelete: Restrict)
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  warehouse  Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   technician User?     @relation("RepairInvoiceTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
   author     User?     @relation("RepairInvoiceAuthor", fields: [createdBy], references: [id], onDelete: SetNull)
 
@@ -601,6 +774,7 @@ model RepairInvoice {
   @@unique([workspaceId, invoiceNumber])
   @@index([workspaceId, invoiceDate(sort: Desc)])
   @@index([workspaceId, status])
+  @@index([warehouseId])
   @@index([deviceId])
   @@index([customerId])
   @@index([technicianId])
@@ -618,13 +792,16 @@ model RepairInvoiceItem {
   itemId         Int?     @map("item_id")
   name           String
   description    String?
-  quantity       Decimal  @default(1) @db.Decimal(10, 2)
+  quantity       Decimal  @default(1) @db.Decimal(14, 3)
   unit           String?
   unitPrice      Decimal  @default(0) @map("unit_price") @db.Decimal(18, 0)
   discountType   String?  @map("discount_type")
   discountValue  Decimal  @default(0) @map("discount_value") @db.Decimal(18, 2)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(18, 0)
   totalPrice     Decimal  @default(0) @map("total_price") @db.Decimal(18, 0)
+  /// The part's moving-average cost when the invoice was issued. NULL on
+  /// service and custom lines, and until the invoice is issued.
+  unitCost       Decimal? @map("unit_cost") @db.Decimal(18, 2)
   sortOrder      Int      @default(0) @map("sort_order")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -676,7 +853,13 @@ model Settings {
   defaultTaxRate        Decimal @default(0) @map("default_tax_rate") @db.Decimal(5, 2)
   defaultWarrantyMonths Int     @default(3) @map("default_warranty_months")
   invoicePrefix         String  @default("INV-") @map("invoice_prefix")
-  invoiceFooterText     String? @map("invoice_footer_text")
+
+  /// Off until a workshop turns it on. A shop that upgrades and discovers it
+  /// has been texting its customers is a worse first impression than one
+  /// that has to find a switch.
+  smsCustomerNotificationsEnabled Boolean @default(false) @map("sms_customer_notifications_enabled")
+
+  invoiceFooterText String? @map("invoice_footer_text")
 
   saleInvoicePaperSize         String  @default("A5") @map("sale_invoice_paper_size")
   saleInvoiceShowLogo          Boolean @default(true) @map("sale_invoice_show_logo")
@@ -732,7 +915,6 @@ model Backup {
   @@index([createdBy])
   @@map("backups")
 }
-
 
 // ── Subscriptions & billing ──────────────────────────────────
 
@@ -835,7 +1017,7 @@ model Payment {
   /// What actually went to Zibal, and what verify must return. A mismatch
   /// means something was tampered with between here and the gateway.
   amountRials      Decimal @map("amount_rials") @db.Decimal(18, 0)
-    planDurationDays Int     @map("plan_duration_days")
+  planDurationDays Int     @map("plan_duration_days")
 
   /// Which code this attempt used, if any.
   ///
@@ -898,16 +1080,16 @@ model Payment {
 ///
 /// Append-only: no UPDATE and no DELETE for the application role.
 model SubscriptionEvent {
-  id          Int                   @id @default(autoincrement())
-  workspaceId Int                   @map("workspace_id")
-  type        SubscriptionEventType
-  days        Int
+  id                Int                   @id @default(autoincrement())
+  workspaceId       Int                   @map("workspace_id")
+  type              SubscriptionEventType
+  days              Int
   /// Null for the very first event, where the workspace had no expiry yet.
-  previousExpiresAt DateTime? @map("previous_expires_at")
-  newExpiresAt      DateTime  @map("new_expires_at")
-  paymentId         Int?      @map("payment_id")
+  previousExpiresAt DateTime?             @map("previous_expires_at")
+  newExpiresAt      DateTime              @map("new_expires_at")
+  paymentId         Int?                  @map("payment_id")
   note              String?
-  createdAt         DateTime  @default(now()) @map("created_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   payment   Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
@@ -924,11 +1106,11 @@ model SubscriptionEvent {
 /// counter that can drift from the rows it counts is worse than no counter:
 /// maxUses is checked against COUNT(*) on discount_code_uses.
 model DiscountCode {
-  id   Int              @id @default(autoincrement())
-  code String           @unique
-  type DiscountCodeType
+  id    Int              @id @default(autoincrement())
+  code  String           @unique
+  type  DiscountCodeType
   /// Whole percent for `percent`, rials for `fixed`.
-  value Decimal @db.Decimal(18, 0)
+  value Decimal          @db.Decimal(18, 0)
 
   expiresAt DateTime? @map("expires_at")
   /// Null means unlimited. Without it, one code shared in a Telegram group
@@ -1032,4 +1214,310 @@ model SubscriptionNotification {
   @@unique([workspaceId, kind, expiresAtSnapshot])
   @@index([workspaceId])
   @@map("subscription_notifications")
+}
+
+// ── SMS wallet ───────────────────────────────────────────────
+//
+// The other kind of message. Everything above this line — OTP, expiry
+// reminders, the payment confirmation — is sent by us and paid for by us.
+// These are sent by a workshop to its own customer and paid for out of that
+// workshop's own credit, which is what every table here exists to track.
+
+/// Four states, identical to SubscriptionPaymentStatus and deliberately not
+/// the same type.
+///
+/// That enum is named subscription_payment_status because the invoice tables
+/// already own the words "payment status" with a different meaning; adding a
+/// third meaning to it would undo the distinction its own comment was written
+/// to draw. Sharing would also couple the two: a value added for
+/// subscriptions would silently widen top-ups.
+enum SmsTopupStatus {
+  pending
+  paid
+  verified
+  failed
+
+  @@map("sms_topup_status")
+}
+
+enum SmsWalletTransactionType {
+  topup
+  send
+  refund
+  /// An operator correction, made with psql — the wallet's equivalent of
+  /// SubscriptionEventType.manual, and recorded like any other movement so
+  /// the balance is always the sum of its rows.
+  adjustment
+
+  @@map("sms_wallet_transaction_type")
+}
+
+/// Which event produced the message. Not the device status it came from:
+/// a status is a workflow state and this is what the customer was told.
+enum SmsMessageKind {
+  device_accepted
+  device_ready
+  device_delivered
+
+  @@map("sms_message_kind")
+}
+
+/// What became of one attempt.
+///
+/// Four of these are refusals rather than failures — the message was never
+/// handed to the provider and nothing was charged. They are rows rather than
+/// silence because "why did my customer not get a text" is the question this
+/// table answers, and "we decided not to send it" is an answer.
+enum SmsMessageStatus {
+  /// Debited and handed to the provider; no answer yet. A row left here is
+  /// the recoverable case 12.16 looks for.
+  pending
+  sent
+  /// The provider rejected or could not be reached. Refunded.
+  failed
+  insufficient_balance
+  invalid_phone
+  /// The workspace has customer notifications switched off.
+  disabled
+  /// Charged, failed, and given back.
+  refunded
+
+  @@map("sms_message_status")
+}
+
+/// One workshop's SMS credit.
+///
+/// Its own table rather than a column on Workspace: the balance is written
+/// on the send path with a row lock held, and locking the workspace row for
+/// that would serialise invoice numbering — which takes a lock on the same
+/// row — behind every text message.
+///
+/// The balance is a column AND the sum of sms_wallet_transactions. Two
+/// answers to one question is only safe because the rows cannot be edited or
+/// deleted (see the migration's grants), which makes the sum the authority
+/// and this column a cache the debit statement maintains atomically.
+model SmsWallet {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @unique @map("workspace_id")
+
+  /// Rials, like every amount in the schema. Never negative — the debit in
+  /// 12.3 is a single conditional UPDATE, so there is no window in which it
+  /// could become so.
+  balanceRials Decimal @default(0) @map("balance_rials") @db.Decimal(18, 0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Restrict, like payments: deleting a workspace with money against its
+  /// name must fail loudly. 8.7 leaves the workspace row as a tombstone and
+  /// never reaches this, so it is here for the day someone writes a delete
+  /// that forgets.
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@map("sms_wallets")
+}
+
+/// Every movement of a wallet balance, and the only explanation of why it is
+/// what it is.
+///
+/// Append-only: the application role has neither UPDATE nor DELETE. balance
+/// before and after are stored rather than derived, so a row is readable on
+/// its own without replaying the whole table.
+model SmsWalletTransaction {
+  id          Int                      @id @default(autoincrement())
+  workspaceId Int                      @map("workspace_id")
+  type        SmsWalletTransactionType
+
+  /// Signed: positive for a top-up or refund, negative for a send. Storing
+  /// the sign rather than inferring it from `type` means the balance is
+  /// literally SUM(amount_rials), which is what makes the column above
+  /// checkable.
+  amountRials        Decimal @map("amount_rials") @db.Decimal(18, 0)
+  balanceBeforeRials Decimal @map("balance_before_rials") @db.Decimal(18, 0)
+  balanceAfterRials  Decimal @map("balance_after_rials") @db.Decimal(18, 0)
+
+  /// What caused it. Two nullable typed references rather than the
+  /// `referenceId` the brief asks for: a bare id with a kind beside it
+  /// cannot be a foreign key, so nothing would stop it pointing at a row
+  /// that does not exist — and the unique below could not be written at all.
+  smsMessageId Int? @map("sms_message_id")
+  topupId      Int? @map("topup_id")
+
+  description String?
+  createdBy   Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  /// SetNull, not Restrict: sms_messages holds a customer's phone number and
+  /// is deleted with the rest of the tenant data in 8.7, while this row is
+  /// money and stays. The amount survives; the link to whose message it was
+  /// does not, which is the correct direction for personal data.
+  smsMessage SmsMessage? @relation(fields: [smsMessageId], references: [id], onDelete: SetNull)
+  topup      SmsTopup?   @relation(fields: [topupId], references: [id], onDelete: Restrict)
+  author     User?       @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  /// The refund idempotency rule, held in the database rather than in a
+  /// controller that a second code path could bypass: one debit and at most
+  /// one refund per message, ever. Running the refund twice is a constraint
+  /// violation rather than a second credit.
+  ///
+  /// Postgres treats NULLs as distinct in a unique index, so the rows left
+  /// pointing at nothing after a workspace deletion do not collide.
+  @@unique([smsMessageId, type])
+  /// The same rule for the other direction: one credit per top-up, ever.
+  /// settleTopup already gates on the status transition, which is what makes
+  /// two simultaneous callbacks credit once — but that is application logic,
+  /// and a second settle path written later would not inherit it. This is
+  /// the database saying no regardless of who asks.
+  @@unique([topupId, type])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([topupId])
+  @@index([createdBy])
+  @@map("sms_wallet_transactions")
+}
+
+/// Every attempt to send a customer notification, sent or refused.
+///
+/// Tenant data rather than ledger, because of one column: `phone` belongs to
+/// the workshop's customer. That is why this table is on DELETION_ORDER and
+/// the three money tables are not.
+model SmsMessage {
+  id          Int  @id @default(autoincrement())
+  workspaceId Int  @map("workspace_id")
+  customerId  Int? @map("customer_id")
+  deviceId    Int? @map("device_id")
+
+  /// Normalised at send time to 09XXXXXXXXX. Stored as it was actually used,
+  /// not as the customer row has it — the two can differ, and what matters
+  /// afterwards is where the message went.
+  phone String
+  kind  SmsMessageKind
+
+  /// How many SMS parts the rendered text came to. A Persian message is 70
+  /// characters in one part and 67 per part beyond that, so every one of
+  /// these templates is two — see 12.2. Stored because the cost depends on
+  /// it and because a future one-part template must stay cheaper in the
+  /// history rather than being re-priced.
+  segments Int @default(1)
+
+  /// The price in force when this was sent, copied on rather than read back
+  /// through sms_prices — the same reason payments carries its own
+  /// base_price_rials. A history that re-renders at today's price is not a
+  /// history.
+  unitPriceRials Decimal @map("unit_price_rials") @db.Decimal(18, 0)
+  /// What was actually taken. Derived from the two above by utils/smsPricing
+  /// rather than here, so the question "per part or per message" stays a
+  /// decision in one function instead of a shape in the schema.
+  costRials      Decimal @default(0) @map("cost_rials") @db.Decimal(18, 0)
+
+  status SmsMessageStatus @default(pending)
+
+  /// Which provider sent it, for the day there are two. A string rather than
+  /// an enum: this is a label on a historical row, not a value the code
+  /// branches on.
+  provider          String  @default("smsir")
+  providerMessageId String? @map("provider_message_id")
+  errorCode         String? @map("error_code")
+  errorMessage      String? @map("error_message")
+
+  createdBy Int?      @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// SetNull on both, matching Device's own treatment of them: the record
+  /// that a customer was told something should outlive tidying up the
+  /// customer or the job it was about.
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  device    Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  walletTransactions SmsWalletTransaction[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  /// The recovery sweep's query: anything left pending.
+  @@index([workspaceId, status])
+  @@index([customerId])
+  @@index([deviceId])
+  @@index([createdBy])
+  @@map("sms_messages")
+}
+
+/// Buying SMS credit. The subscription ledger's twin, and deliberately not
+/// the same table.
+///
+/// `payments` is counted in four places — subscriptionController's three
+/// `paidBefore` lookups and utils/referral's `verifiedPayments` — and every
+/// one of them reads a verified row as "this workshop has bought a
+/// subscription before". A top-up row in that table would silently cancel a
+/// referred workshop's discount on its first subscription, and the
+/// referrer's reward with it. A `kind` column would fix that only by editing
+/// all four, and again for the fifth written next year by someone who has
+/// not read this. A separate table cannot be counted by accident.
+model SmsTopup {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @map("workspace_id")
+
+  /// Ours, prefixed DFXS- so a top-up and a subscription payment are
+  /// distinguishable by eye in Zibal's panel.
+  orderId String  @unique @map("order_id")
+  /// Zibal's. int64 in their API, so BigInt rather than Int.
+  trackId BigInt? @unique @map("track_id")
+
+  status SmsTopupStatus @default(pending)
+
+  /// What went to Zibal, and what verify must return. The credit added to
+  /// the wallet is this figure and nothing else.
+  amountRials Decimal @map("amount_rials") @db.Decimal(18, 0)
+
+  refNumber  String? @map("ref_number")
+  /// Masked by Zibal before it reaches us (62741****44).
+  cardNumber String? @map("card_number")
+
+  paidAt        DateTime? @map("paid_at")
+  verifiedAt    DateTime? @map("verified_at")
+  failureReason String?   @map("failure_reason")
+
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  author    User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  walletTransactions SmsWalletTransaction[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  /// The settlement sweep's query: everything still in `paid`.
+  @@index([status])
+  @@index([createdBy])
+  @@map("sms_topups")
+}
+
+/// What a message costs, over time.
+///
+/// Reference data like `plans`: no RLS, SELECT only for the app role, set
+/// with psql. Effective-dated rather than a single active row, so the price
+/// last month is answerable even for a month in which nothing was sent —
+/// which is the thing an environment variable could never do, and the reason
+/// this is a table at all.
+///
+/// The current price is the row with the greatest `effective_from` not in
+/// the future. There is no `is_active` flag, because a flag and a date can
+/// disagree and then nobody knows which won.
+model SmsPrice {
+  id Int @id @default(autoincrement())
+
+  /// Rials. Per SMS part — see the note on SmsMessage.segments. How this
+  /// combines with `segments` to reach a cost is utils/smsPricing's
+  /// decision, not this table's.
+  unitPriceRials Decimal @map("unit_price_rials") @db.Decimal(18, 0)
+
+  /// Unique: two prices starting at the same instant is a tie with no
+  /// tiebreaker, and "whichever the planner returned first" is not a price.
+  effectiveFrom DateTime @unique @map("effective_from")
+  note          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("sms_prices")
 }

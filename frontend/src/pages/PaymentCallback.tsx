@@ -97,7 +97,7 @@ export default function PaymentCallback() {
 
         {outcome.kind === "done" && (
           <>
-            <CheckCircleIcon className="w-14 h-14 text-success mx-auto" />
+            <CheckCircleIcon className="w-14 h-14 text-success-fg mx-auto" />
             <h1 className="mt-4 text-lg font-bold text-text-primary">
               {outcome.extended
                 ? "پرداخت شما با موفقیت انجام شد"
@@ -113,7 +113,7 @@ export default function PaymentCallback() {
 
         {outcome.kind === "failed" && (
           <>
-            <ExclamationCircleIcon className="w-14 h-14 text-danger mx-auto" />
+            <ExclamationCircleIcon className="w-14 h-14 text-danger-fg mx-auto" />
             <h1 className="mt-4 text-lg font-bold text-text-primary">
               پرداخت تکمیل نشد
             </h1>

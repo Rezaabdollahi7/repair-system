@@ -46,6 +46,34 @@ Goal: introduce `Workspace` as a first-class concept and isolate all tenant data
 - [x] 2.6 Add composite indexes leading with `workspaceId` on hot tables (Device, Invoices) for query performance at the ~500 tenants / ~1,000 devices each scale
 - [x] 2.7 Write unit tests confirming cross-tenant data access is impossible (e.g. workspace A's token cannot read workspace B's devices)
 - [x] 2.8 Unify invoice numbering across all three invoice types, with the counter held on the Workspace row rather than derived from COUNT — atomic, per-workspace, and free of the race the current daily count has. Prefix comes from settings, as repair invoices already do. (Moved from 1.7: it needs Workspace to exist first.)
+- [x] 2.9 Reception numbers, per workspace. `devices.id` was doing two jobs:
+      a surrogate key for foreign keys and routes, and the number a shop
+      writes on the intake slip, quotes on the phone, prints on the invoice
+      and sends as `#NUMBER#` in every customer notification. The key comes
+      from a sequence shared by the whole platform, so the numbers a shop saw
+      depended on how many devices every _other_ shop had taken in — a new
+      workshop's first device could be numbered 4,812, and no two shops could
+      both have a device «۱».
+
+      `Device.receptionNumber` and `Workspace.deviceSeq`, following 2.8
+      exactly: `seq = seq + 1` inside the writing transaction, so it takes a
+      row lock and a failed intake returns the number rather than leaving a
+      gap. `create` moved into `runInWorkspaceTransaction` for that, with the
+      notification still outside it — a twenty-second provider call must not
+      hold a row lock (12.7).
+
+      The migration numbers existing devices per workspace by id ascending
+      and sets each counter past them, so no data moves and no key changes.
+
+      ⚠️ A number typed into the device search box now means a reception
+      number rather than a primary key. The two were the same value until
+      now, so nobody could tell the difference.
+
+      Every place the number reaches a person moved with it: the device list
+      and detail modal, the printed invoice (`InvoicePreview`), the repair
+      invoice detail and its device picker, and both «شماره پذیرش» columns in
+      the Excel export. Both invoice controllers return `reception_number`
+      beside `device_id` — display and link are different values now.
 
 ## Phase 3 — Auth Rework (Sign-up, Login, Sessions)
 
@@ -93,6 +121,143 @@ workspace.
 - [x] 5.5 Write an operator runbook for restoring a single workspace from a platform dump. A manual, support-mediated procedure rather than a feature — selectively replacing one tenant's rows in a shared schema while others are live is too dangerous to expose.
 - [~] 5.6 Fineti import: give `importFromExcel` and `importDeviceImages` a `--workspace-id` parameter so they can onboard a customer migrating from Fineti. Stays an operator-run script; wrap it in an admin UI only if it turns out to be frequent.
 - [x] 5.7 Operator recovery: a documented procedure for restoring access to a workspace whose owner is locked out — a runbook plus, if it proves frequent, a script keyed on workspaceId. The old resetAdmin script is not the basis for this: it only ever knew one hardcoded username, which stops existing once each workspace has its own super admin. Password self-service for customers is task 8.6 (SMS OTP).
+- [x] 5.8 Import from the single-tenant Dofixo. Separate from 5.6, which is
+      about a Fineti export: this source is our own old schema, so the
+      mapping is mostly "the same columns plus workspaceId" rather than a
+      translation, and the entities line up one for one.
+
+      `backend/scripts/import-legacy.ts`, three commands rather than one.
+      `plan` reads and reports and writes nothing anywhere, which makes it
+      the only one safe to point at live data while still thinking. `media`
+      turns every photograph into the two sizes 7.0 measured, into a staging
+      directory — pure CPU, no database and no network. `apply` writes the
+      rows and uploads the staged objects.
+
+      The split is not tidiness. `media` is twenty minutes of CPU on 3,678
+      photographs and `apply` talks to a database and an object store; one
+      command that failed two thirds of the way through would leave no way
+      to continue except starting over.
+
+      **Every photograph goes through `processDeviceImage`**, not a file
+      copy. `.rotate()` is the reason: most phone photographs carry a
+      non-default EXIF orientation and sharp neither applies the tag nor
+      preserves it, so copying them across would store a thousand pictures
+      sideways — the finding 7.0 came out of. It also means an imported
+      photograph is byte-for-byte what an uploaded one would have been,
+      thumbnail included. 11GB of source becomes 1.2GB.
+
+      **`media` is resumable and `apply` is resumable separately.** Staged
+      files are named after the source row id, so the same input always
+      produces the same path and a file already written is skipped. `apply`
+      writes a `legacy-{id}.webp` marker into `filename`, so a second pass
+      uploads nothing twice. `--images-only` skips the row phase entirely
+      and rebuilds the device mapping from `receptionNumber` — which is the
+      source id by design, so the relationship between the two databases can
+      be recovered from the destination alone at any time.
+
+      **Rows in one transaction, uploads outside it.** Six thousand inserts
+      either all arrive or none do, because a half-imported workshop is
+      worse than an unimported one and there is no undo. The 3,678 uploads
+      that follow are outside, six at a time: holding those locks for as
+      long as a network takes is the mistake 8.10 caught once and 12.7
+      wrote down.
+
+      **Reception numbers come from the source id, not from the counter.**
+      These are historical records and the numbers are already written on
+      slips customers are holding. `Workspace.deviceSeq` is set past the
+      imported range at the end, so the next real intake continues the
+      series. This is what 2.9 was done first for.
+
+      **The owner is not created by the script.** They sign up through the
+      app so `populateWorkspace` runs — the settings row, the four default
+      services, the trial, the referral code and the SMS wallet all come
+      from there, and a second definition of "what a new workspace looks
+      like" is exactly what that function exists to prevent. The users file
+      still carries their line, because device assignments reference the old
+      id.
+
+      ⚠️ **Usernames are checked on the owner connection.** A username is
+      unique across the whole platform, so "is this number already taken" is
+      a question no workspace-scoped query can answer: RLS would narrow it
+      to the destination and report a number free that belongs to somebody
+      else, and the insert would then fail thousands of rows into a
+      transaction naming nothing useful. An operator script legitimately
+      holds that credential; the API never does.
+
+      ⚠️ **The old app stored `""` rather than NULL for an empty date.**
+      `new Date("")` is an Invalid Date and Postgres refuses it — the same
+      trap `schemas/device.ts` already works around for the date pickers.
+      1,996 of 2,054 devices have one, so this is the normal case rather
+      than an edge case.
+
+      Not imported, and each for its own reason: invoices, stock and
+      categories (the source workshop never used them — two of each, all
+      test data), services (`populateWorkspace` seeds the same four), the
+      company logo (settings images have their own profile and it was easier
+      to re-upload), and `backups`.
+
+      ⚠️ **Twenty source photographs are corrupt** and cannot be recovered —
+      they do not open in an image viewer either. Eighteen of them are
+      consecutive, which suggests one bad transfer years ago. They are
+      counted and named rather than skipped silently, and the devices they
+      belong to arrive without them.
+
+      ⚠️ **The source is read through the `sqlite3` CLI, not a driver.**
+      There was a driver — `better-sqlite3` — and it was removed. It is a
+      native module, so `pnpm install` inside the Docker build needed
+      python3 and a compiler, and the `migrate` image stopped building
+      altogether the day it was added: a permanent cost on every build of
+      the project, for one operator script that runs twice.
+      `sqlite3 -readonly -json` returns the same rows from a binary the
+      workstation already has, and the server needs no sqlite3 at all since
+      production reads the JSON it produces. `execFileSync` needs a 64MB
+      `maxBuffer`: the default 1MB truncates the devices table silently into
+      a parse error that names nothing.
+
+      ⚠️ **Removing it from `package.json` was not enough.** Prisma 7
+      declares `better-sqlite3` as an optional peer, so pnpm kept unpacking
+      it, kept running node-gyp and kept failing to find Python — silently
+      now rather than fatally, because an optional peer's install failure is
+      ignored. What actually invoked the compiler was its entry in
+      `pnpm-workspace.yaml`'s `onlyBuiltDependencies`; off that list,
+      node-gyp is never called and a successful build says
+      `Ignored build scripts: better-sqlite3` instead. The lockfile still
+      names the package inside Prisma's own resolved key, which is cosmetic:
+      regenerating it to drop ten lines would re-resolve 421 packages for
+      nothing, and `archiver` is pinned to v7 on purpose.
+
+      ⚠️ **`runInWorkspaceTransaction` ignored its third argument.** The
+      helper took two parameters and called `$transaction` with no options,
+      so every transaction in the codebase ran on Prisma's five-second
+      default. This script had been passing `{ timeout: 600_000 }` since it
+      was written and JavaScript discarded it. It surfaced only here and
+      only on the server: the same six thousand inserts took one to two
+      seconds on the workstation, under the default, and 5,005ms on the VPS,
+      where the transaction expired mid-import with P2028 and rolled back
+      cleanly. `lib/prisma.ts` now accepts `timeout` and `maxWait` — not
+      `isolationLevel`, which under RLS is not a per-call-site decision.
+
+      ⚠️ **2.9 was committed but had never reached production.** Neither its
+      migration nor the seven display sites: the `migrate` image had not
+      been built since the day `better-sqlite3` was added, so the migration
+      had no way across, and `backend` and `frontend` were older still. The
+      import itself ran correctly and the browser then showed reception
+      numbers 1,367 to 3,420 — `devices.id`, the exact bug 2.9 fixed — until
+      all three images were rebuilt and shipped. Committed is not deployed.
+
+      Running `apply` on the server means the `migrate` service rather than
+      `backend`: it is the only container carrying `scripts/`, tsx and
+      `DATABASE_URL`, which the username check needs. Its compose entry
+      gained the `S3_*` variables for the upload phase — less sensitive than
+      the owner credential already sitting there, and it serves no requests
+      and runs under `run --rm`.
+
+      **Imported 17 September 2026** into workspace 5: 6 users, 299
+      customers, 2,054 devices, 3,658 photographs, 70 assignments. Reception
+      numbers 1..2,054 with no gaps and no duplicates, `deviceSeq` at 2,054.
+      The rows landed in under a second; the 3,658 uploads took 220 seconds
+      from the VPS, against an estimate that had ranged from fifteen minutes
+      to three hours.
 
 ## Frontend TypeScript Migration (done, outside the phase numbering)
 
@@ -305,7 +470,7 @@ plan before that decision.
       following the InvoicePreview pattern — no new dependency, and the
       browser's own "save as PDF" does the rest
 
-- [ ] 8.10 Payment confirmation SMS. settlePayment extends the subscription
+- [x] 8.10 Payment confirmation SMS. settlePayment extends the subscription
       and rewards the referrer but never sends SMS_TEMPLATE_PAYMENT_OK —
       the template is declared in lib/sms.ts, present in every env file and
       approved in the sms.ir panel, so every signal said it was done. A
@@ -326,14 +491,54 @@ plan before that decision.
       ⚠️ The #DATE# parameter is Jalali with dashes, never slashes.
       sendTemplate refuses a slash, but as an SmsError at send time.
 
-      ⚠️ Check utils/referral.ts in the same task: the referral reward SMS
-      did not arrive either, and rewardReferrer swallows its errors. If it
-      swallows without logging, that is the RULES §6 violation that made
-      both of these silent.
+         utils/referral.ts had the same hole and not the suspected cause:
+      rewardReferrer logged its failures correctly all along — it simply
+      never sent anything either. Both are one omission, not a swallowed
+      error, and both are closed here. ownerPhone moved from
+      subscriptionJob.ts to subscription.ts alongside a new notifyOwner().
 
       A test asserting sendTemplate is called with PAYMENT_OK after a
       successful settlePayment is the point of the task — nothing else
       would have caught this.
+
+- [x] 8.11 The nightly job's raw query over `workspaces` returns nothing:
+      raw SQL carries no workspace context and the policy refuses every row.
+      Broken since 8.7 and invisible because an empty result reports exactly
+      like a quiet night.
+      A test that runs the job against a real database with two workspaces
+      and asserts it saw both is the point of the task — mocking `$queryRaw`
+      is what hid this.
+
+      The fix is `app_all_workspaces()`, the fourth SECURITY DEFINER
+      aperture and the first whose reason is not authentication. The three
+      before it exist because the caller does not yet know its workspace;
+      this one because the job rightfully belongs to none — seeing every
+      tenant is its job. Migration `20260907060000_all_workspaces_lookup`.
+
+      ⚠️ `settleAbandonedPayments` deliberately did not take a second
+      aperture. With the workspace list in hand an ordinary query inside
+      each workspace's own context answers it, and RULES §7 asks a new
+      function to say why no ordinary query could. Here one can.
+
+- [x] 8.12 Every open payment gets an ending (debt 41). The sweep only ever
+      acted on money that moved, so a customer who opened the gateway and
+      closed the tab left a row nothing touched again — permanently "in
+      progress" on their payment history. Zibal is asked either way now:
+      paid and recent settles as before, unpaid and older than an hour is
+      written off as `failed` with the reason on the row. The hour clears
+      Zibal's own ~20 minute session, so a customer still typing a second
+      password is never told it failed.
+
+      The seven-day filter came off the query. It kept the sweep bounded and
+      also kept it from seeing the rows it most needed to see; closing the
+      unpaid ones bounds it better, since each resolves on the first run
+      after its hour and never returns. A paid row past the window is logged
+      loudly rather than skipped silently.
+
+      ⚠️ `updateMany` guards on status as well as id: the browser could
+      verify a row in the seconds since it was read, and writing `failed`
+      over a verified payment would take away a subscription somebody paid
+      for. `settleAbandonedPayments` is now `resolveOpenPayments`.
 
 ## Phase 9 — UI Consolidation (after the migration settles)
 
@@ -343,7 +548,7 @@ so a screen that breaks has one obvious cause rather than three.
 - [ ] 9.1 Fold the stock report into the items page as a filter and retire the separate page — it is the item list with one condition applied
 - [ ] 9.2 Move the profit summary onto the dashboard and retire the profit report page, where it currently goes unseen
 - [ ] 9.3 Let the purchase invoice form create a complete item inline. It creates a reduced one today, so the same catalogue has two entry points with different results
-- [ ] 9.4 Decide how deleting a purchase invoice should affect avg_purchase_price. It currently returns the stock but leaves the average untouched, so it drifts — a weighted average can't be reversed from the invoice alone. Either recompute from that item's full purchase history, or stop allowing deletion and record a return invoice instead, which is what accounting practice would do.
+- [x] 9.4 Decided and done: a moving average _can_ be reversed from the invoice alone, as long as each line leaves at the price **it** came in at rather than at the blended average. That is the exact inverse, needs no history replay, and now runs on both delete and edit. `utils/avgPurchasePrice.ts` holds the two halves (`averageAfterAdding` / `averageAfterRemoving`) that the purchase-invoice lines and quick purchase had each been reimplementing. Two edge cases are deliberate: at zero remaining stock the previous figure is kept rather than zeroed (the valuation is zero either way, and the number still has to suggest a price on the next purchase form), and the remaining value is clamped at zero because the reversal cannot see sales that happened in between.
 - [ ] 9.5 A proper invoice template: editable layout, logo/stamp/signature placement, column choice and print styling, replacing the pile of `sale_invoice_show_*` booleans in settings. Numbering is deliberately not part of this — a number is accounting data and should stay boring; this is about what the customer actually sees.
       Also: PersianDatePicker accepts `className`, `required` and `clearable` and reads none of them, and several modals accept a `zIndex` they never apply — layout concerns that belong here rather than scattered across a bug list
 - [ ] 9.6 Remove `settings.invoice_prefix`, unused since 2.8 fixed the prefixes per invoice kind. Touches the schema, the settings form and the response shape, so it belongs with the other frontend work
@@ -362,14 +567,14 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
 `exports` and `personnel` already have it. `categories`, `services` and
 `images` are deliberately open — a technician needs them.
 
-- [ ] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
+- [x] AUTH.1 Add `atLeast("admin")` to the five route files. Backend first
       and on its own: closing only the frontend would hide the gap rather
       than shut it
-- [ ] AUTH.2 Integration tests that hit each of the five with a technician's
+- [x] AUTH.2 Integration tests that hit each of the five with a technician's
       token and expect 403. Not a unit test of the middleware — the middleware
       already works, and what failed was nobody wiring it up. A route file
       without a guard has to fail the suite
-- [ ] AUTH.3 Move `dashboard` and the three report pages inside
+- [x] AUTH.3 Move `dashboard` and the three report pages inside
       `ProtectedRoute minRole="admin"` in App.tsx, matching what the sidebar
       already claims. The dashboard stays admin-only rather than being
       served a reduced payload — that is a product decision for phase 9, and
@@ -377,7 +582,7 @@ Five route files the sidebar marks `adminOnly` carry no `atLeast("admin")`:
       ⚠️ `/reports/transactions` has no sidebar link but does have a route,
       and it calls the dashboard endpoint. It has to move too, or a
       technician lands on an error page instead of a redirect
-- [ ] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
+- [x] AUTH.4 `settings` in Layout.tsx is `adminOnly: false` while App.tsx
       guards it with `minRole="admin"`, so a technician sees a link that
       redirects them away. One or the other is wrong; the route is right
 
@@ -424,8 +629,9 @@ order.
 - [ ] 10.10 `Pagination` labels look swapped — "بعدی" sends `page - 1` and
       "قبلی" sends `page + 1` — and shows its range as `{to}–{from}`. It also
       hardcodes the word "دستگاه" while being used on every list
-- [ ] 10.11 `ProtectedRoute` uses a raw `text-gray-500` where every other
-      component uses `text-text-secondary`, so it ignores the theme
+- [x] 10.11 `ProtectedRoute` uses a raw `text-gray-500` where every other
+      component uses `text-text-secondary`, so it ignores the theme —
+      swept up with the rest of the raw palette classes in the redesign
 
 ### Wasteful
 
@@ -441,13 +647,1105 @@ order.
       Router would still cut what a first visit downloads, but the real
       figure is the compressed one
 
-- [ ] 10.15 `errorText` is defined identically in five components before
+- [x] 10.15 `errorText` is defined identically in five components before
       `utils/errors.ts` existed; fold them into the shared one
 - [ ] 10.16 Add type-aware linting (`parserOptions.project`) now that the
       whole frontend is TypeScript. It was left off during the migration
       because it type-checks the entire program on every run
 
----
+## Phase 11 — Frontend redesign and invoice consistency
+
+Not planned in this roadmap — it started as "redesign the dashboard" and ran
+through every page, then into the modals, then into what the redesign
+exposed. Recorded here after the fact so the next session knows it happened.
+
+- [x] 11.1 A token layer in `src/index.css` bridged into Tailwind with
+      `@theme inline`, and every page moved onto it. Raw hex and Tailwind
+      palette classes are gone from `src/` — they were why a few components
+      stayed light in dark mode
+- [x] 11.2 The brand colour moved from yellow to blue, and the app is called
+      دوفیکسو wherever a name is shown
+- [x] 11.3 A validated categorical chart palette (`utils/chartSeries.ts`) —
+      lightness band, chroma floor, adjacent-pair CVD ΔE, 3:1 contrast
+- [x] 11.4 `utils/tableClasses.ts`: one vocabulary for every table, an
+      Excel-style cell grid, zebra rows, and coloured row actions
+- [x] 11.5 The layout shell — Jalali date centred in the header, the
+      per-page `<h1>` and count line dropped, settings moved from the
+      sidebar to a header icon, the role moved into the user menu
+- [x] 11.6 The dashboard regrouped by module, with technician workload
+      beside the device-status ring
+- [x] 11.7 The subscription page and its plan cards rebuilt
+- [x] 11.8 The modal layer brought onto the same system
+- [x] 11.9 The three invoice form modals put on one skeleton — identity band
+      on top, lines at 9/12, summary sticky at 3/12, actions full width
+- [x] 11.10 Purchase invoices became editable (`PUT /api/purchase-invoices/:id`),
+      the last of the three that could only be deleted and re-entered
+- [x] 11.11 `avg_purchase_price` reversal — closes 9.4; see that entry
+- [x] 11.12 The customer detail modal became a page, `/customers/:id`,
+      with six sections and a breadcrumb back to the list. Reached from
+      four different lists, which is what made a modal wrong: «back» has
+      to mean the list. Brings `Customer.notes`, one aggregate endpoint
+      (`GET /customers/:id/overview`) and `BreadcrumbContext`, through
+      which a detail page names itself to the shell
+
+Real defects found and fixed along the way, none of them styling: a cancelled
+repair invoice left its outstanding balance standing; the purchase form
+printed Latin digits through its own `toLocaleString`; the required asterisk
+was rendered twice on two fields; the repair form's line row overflowed its
+grid on a phone; a selected table row was invisible because `--primary-soft`
+equalled `--surface`; eight hover states repeated their resting colour.
+
+## Phase 12 — SMS Wallet (customer notifications the shop pays for)
+
+Today every SMS the platform sends is ours: the OTP at sign-up, the expiry
+reminders, the payment confirmation. This phase adds the other kind — a
+message a workshop sends to its own customer — and the only sane way to pay
+for it, which is that the workshop does.
+
+The split is the whole point and has to hold everywhere in the code:
+
+    Dofixo pays    OTP · subscription reminders · payment confirmation
+    The shop pays  device accepted · ready for pickup · delivered
+
+Nothing in `utils/subscriptionJob.ts`, `utils/otp.ts` or `utils/referral.ts`
+may ever touch a wallet, and the wallet path may never send one of the five
+templates those own.
+
+Deliberately out of scope: bulk or marketing SMS, a message composer, arrears
+(a shop can never go below zero), and delivery reports. All four are how an
+SMS feature turns into an SMS product.
+
+### Money and units
+
+Rials in the database, tomans on screen — the rule `plans` and `payments`
+already follow. 350 toman is 3,500 rials, and no column anywhere holds
+tomans.
+
+- [x] 12.1 Schema and migration. Five new models plus one column:
+
+      `SmsWallet` — one row per workspace, `balanceRials`, created by
+      `populateWorkspace()` so a seeded workspace and a registered one are
+      furnished identically (the rule 3.1 established). Not a column on
+      `Workspace`: the balance is written on a hot path with a row lock held,
+      and locking the workspace row would serialise invoice numbering behind
+      it.
+
+      `SmsWalletTransaction` — the ledger. `type` (topup · send · refund ·
+      adjustment), signed `amountRials`, `balanceBeforeRials`,
+      `balanceAfterRials`, `description`, `createdBy`, and a reference to
+      what caused it. Append-only, and like `payments` the application role
+      gets no DELETE: a balance that can be reached two ways — a column and
+      a sum of rows — is only trustworthy if the rows cannot be edited.
+
+      `SmsMessage` — every attempt, sent or not. workspace, customer, device,
+      phone, `kind`, `segments`, `unitPriceRials`, `costRials`, `status`,
+      provider, `providerMessageId`, `errorCode`, `errorMessage`, `sentAt`,
+      plus the debit and refund transaction ids. `segments` is there because
+      a Persian SMS is 70 characters and every one of these templates needs
+      two — see 12.2, which is now a costing question rather than a
+      formatting one. Statuses: `pending`, `sent`,
+      `failed`, `insufficient_balance`, `invalid_phone`, `disabled`,
+      `refunded`. The four non-failure refusals are recorded as rows rather
+      than dropped — "why did my customer not get a text" is the support
+      question this table exists to answer.
+
+      `SmsTopup` — the top-up ledger. See 12.4 for why this is not `Payment`.
+
+      ⚠️ Platform credit is watched from sms.ir's own panel, not from our
+      code: پروفایل › تنظیمات حساب کاربری › آگاه‌سازی از کمبود اعتبار, which
+      texts us below a threshold (default 500 messages). There is nothing to
+      build, but the number it alerts has to belong to somebody who acts on
+      it — our account running dry stops every workshop at once.
+
+      `SmsPrice` — reference data, following `plans` and `discount_codes`: no
+      RLS, SELECT only for the app role, priced with psql. §5 of the brief
+      says not to hardcode 350; a table is what "not hardcoded" means here,
+      because an env var cannot be changed without a deploy and leaves no
+      record of what the price was last month. The price is **per part**,
+      not per message — see 12.2.
+
+      `Settings.smsCustomerNotificationsEnabled`, default **false**. Off
+      until a shop turns it on: a workspace that upgrades and discovers it
+      has been texting customers is a worse first impression than one that
+      has to find a switch.
+
+      ⚠️ Every table above carrying `workspace_id` needs RLS and its
+      `workspace_isolation` policy **in the same migration** (RULES §10), and
+      `ops/restore-database.md` needs its policy count raised from 21.
+
+- [x] 12.2 `utils/smsPricing.ts` — resolve the current unit price, count the
+      message's parts, and copy both onto the `SmsMessage` row and the wallet
+      transaction. Same reasoning as `payments.base_price_rials`: a history
+      that re-renders at today's price is not a history. When the price moves,
+      last month's messages must still read what they cost.
+
+      ⚠️ **A Persian SMS is 70 characters, not 160.** Persian has no GSM-7
+      encoding, so every message is UCS-2: 70 characters in one part, 67 per
+      part once it is concatenated. All three texts in the brief run 102–130
+      characters in a typical case and up to 170 with long names, which is
+      **two parts, sometimes three**. Providers bill per part.
+
+      That is the whole margin. sms.ir quotes **130–250 toman per پیامک on
+      the silver plan, the rate improving with the size of the top-up**. At
+      two parts that is 260 at the best tier and 500 at the worst, against
+      the 350 the brief charges — profitable only if we buy in volume, and a
+      loss otherwise. Two things follow, and both belong in this task:
+
+      - The texts are tightened so the worst case is exactly two parts and
+        never three, with the truncation caps in 12.5 chosen to guarantee it
+        rather than left at `sendTemplate`'s 40. The proposed texts are in
+        the note under the open questions.
+      - `costRials = unitPriceRials × segments`, so the ledger explains
+        itself and a future one-part template is automatically cheaper.
+
+      ✅ **Settled 17 September 2026.** The price per part is what the shop
+      is quoted, and it is 340 toman — so a two-part message reads as 680.
+      Measured, not guessed: sms.ir charges 2,400 rials per part, and the
+      opening 1,750 was below cost by 1,300 rials on every two-part message.
+      The `sms_prices` row for 3,400 carries the measurement in its note.
+
+- [x] 12.3 Wallet engine, `utils/smsWallet.ts`. Three operations — credit,
+      debit, refund — and nothing else may write `sms_wallets`.
+
+      The debit is one statement, not a read followed by a write:
+
+          UPDATE sms_wallets SET balance_rials = balance_rials - $cost
+          WHERE workspace_id = $ws AND balance_rials >= $cost
+          RETURNING balance_rials
+
+      Zero rows means insufficient funds, and the balance never goes
+      negative because the condition and the subtraction are the same
+      statement. Checking in JavaScript first is exactly the race §15 of the
+      brief describes: two users, 500 toman, two messages, −200.
+
+      Raw SQL, so it runs inside `runInWorkspaceTransaction()` (RULES §7).
+      The returned balance is `balanceAfter` on the ledger row — read back
+      separately it would be somebody else's.
+
+      Refund is idempotent by a unique index on
+      `(smsMessageId, type = refund)`, not by a flag the caller checks: a
+      second refund must be impossible, not merely unlikely.
+
+      Per RULES §3 the arithmetic is a pure function with its own unit test,
+      separate from the controller test that mocks Prisma — the same lesson
+      `utils/avgPurchasePrice.ts` came out of in 11.11.
+
+- [x] 12.4 Top-up through Zibal — same gateway, separate ledger.
+
+      **Decided: a separate `SmsTopup` table, not a widened `payments`.**
+      The obvious objection to a second table is duplication — the same
+      Zibal dance twice. The reason it wins anyway is not taste, it is four
+      existing call sites:
+
+          subscriptionController.ts:56,155,221   paidBefore = payments where verified
+          utils/referral.ts:69                   verifiedPayments > 1 → no reward
+
+      Every one of them asks "has this workspace ever paid?" by counting
+      verified rows in `payments`, and each takes the answer to mean the shop
+      has bought a subscription before. Put a wallet top-up in that table and
+      a shop that buys 20,000 toman of SMS credit **silently loses the 10%
+      referral discount on its first subscription**, and the workshop that
+      invited it silently loses its 30 days. No error, no log line, and the
+      customer's complaint would arrive as "the discount didn't work".
+
+      A `kind` column would fix it only by editing all four — and the fifth
+      one, written next year by someone who does not know this rule, breaks
+      it again. A separate table cannot be counted by accident.
+
+      The rest follows from the same reading: `payments.plan_id` is NOT NULL,
+      the row means "these many days were bought", and `settlePayment()`
+      extends an expiry from it. `SmsTopup` gets the same shape and the same
+      rules:
+      row written before Zibal is called, amount checked against what verify
+      returns, `orderId` prefixed `DFXS-` so the two are distinguishable in
+      Zibal's panel by eye.
+
+      Minimum 20,000 toman (§2), enforced server-side. The client sends an
+      amount and nothing else — no plan, no price — which is the one place
+      this differs from checkout, so the amount needs its own floor, ceiling
+      and integer check in the Zod schema.
+
+      Credit happens once: inside the same transaction as the status change
+      to `verified`, and only when the payment was not already verified.
+      Verify twice, refresh the return page, let the cron reach it after the
+      browser did — the balance moves once.
+
+      ⚠️ `lib/zibal.ts` has a single `CALLBACK_URL` constant, baked in at
+      import as `${APP_URL}/subscription/callback` and passed by
+      `requestPayment` itself. It needs an optional callback so a top-up
+      returns to its own page; the domain stays the same, which is all Zibal
+      checks (result 106).
+
+      ⚠️ Orphaned top-ups need settling like orphaned payments do, and the
+      sweep they would ride on now works: 8.11 gave it
+      `app_all_workspaces()` and 8.12 taught it to close a payment nobody
+      came back for. `settleTopup()` is built and is what that sweep will
+      call; wiring `resolveOpenPayments` to walk `sms_topups` beside
+      `payments` is a task of its own and is not done.
+
+      **Decided: a lapsed workspace may top up.** The 8.3 guard blocks POST
+      for them, so `/api/sms/wallet/topup` and `/api/sms/wallet/verify` join
+      `OPEN_PATHS` — and only those two. The toggle and everything else stay
+      closed, matching the list's own rule that what is open is either a way
+      to pay or a way to stay signed in long enough to.
+
+      Credit bought while lapsed simply sits there: sending rides on a device
+      write, which the guard blocks anyway, so nothing can be spent until the
+      subscription is renewed. That falls out of the design rather than
+      needing a check of its own, which is why it is safe to open.
+
+- [x] 12.5 Three templates in `lib/sms.ts`, ids from the environment,
+      alongside the five that exist. `.env.example` and `.env.prod.example`
+      both gain them (RULES §7).
+
+      ⚠️ **The message text does not live in this repository.** sms.ir
+      approves each template in its panel and the body is stored there; we
+      hold an id and a parameter list. §25 of the brief asks for central
+      templates with `{{variables}}` — what we can actually centralise is the
+      parameter mapping, and that is what this task builds. The three texts
+      must be submitted and **approved in the sms.ir panel before this phase
+      can be tested at all**, which makes it the long pole: start it first.
+
+      ⚠️ **The 40-character ceiling in `sendTemplate` is wrong — sms.ir's
+      real limit on a parameter value is 25**, confirmed by support, and
+      extendable on request. The comment beside it says the number was never
+      established; it has been now, and it is a third lower than the guess.
+      Anything longer comes back as status 114, a rejected message. Change
+      the constant to 25 and set the truncation caps under it
+      (`NAME` 18 · `DEVICE` 16 · `NUMBER` 7 · `SHOP` 22), which is also what
+      holds the two-part ceiling in 12.2. The slash rule stays: support did
+      not address it and a guess that costs nothing is worth keeping.
+
+      Also confirmed: a template's text can be edited later **under the same
+      id**, so tightening wording is not a re-plumb of env vars; emoji are
+      allowed; and there is no limit on the number of parameters.
+
+      The reception number is the device id — the number the device list
+      already shows and a customer can quote on the phone.
+
+- [x] 12.6 `utils/customerNotification.ts` — the layer the brief's §26 asks
+      for, sitting between the device controller and `lib/sms.ts`:
+
+          deviceController → customerNotification → smsWallet + lib/sms
+
+      One function, `notifyCustomer(event, device, actor)`, and it is the only
+      caller of the wallet's debit. In order: is the workspace's toggle on
+      (else `disabled`) · does the customer have a valid mobile (else
+      `invalid_phone`) · debit (else `insufficient_balance`) · send · on a
+      provider failure, refund and mark `failed`. Every branch writes an
+      `SmsMessage` row; three of the five write no transaction at all,
+      because nothing was ever taken.
+
+      No driver interface and no console driver, following OTP.2 — the tests
+      mock the module.
+
+      ⚠️ `Customer.phone` is a free-form string today (`max(20)`, no
+      validation), while `phoneSchema` normalises to `09XXXXXXXXX`. Do not
+      widen `customerBodySchema` to reject what shops have already typed —
+      normalise at send time and record `invalid_phone` when it does not come
+      out as a mobile. A landline customer is a real customer.
+
+- [x] 12.7 Wire it into the device controller — the part with the most ways
+      to be subtly wrong.
+
+      `devices.status` is a free-form string column (`@default("received")`),
+      not an enum. The workflow's real vocabulary lives on the frontend in
+      `utils/deviceStatus.ts`, which 11.1 consolidated out of six drifting
+      copies, and it is nine states, not the five the pre-redesign screens
+      showed:
+
+          pending · diagnosing · unrepairable · waiting_for_parts ·
+          repairing · repaired · ready_for_pickup · delivered · not_repaired
+
+      Two of them matter here and the rest send nothing. «آماده تحویل» is
+      `ready_for_pickup`, **not** `repaired` — a repaired device is one the
+      bench is done with, and a shop that texts a customer at that point is
+      texting them before the job is checked and priced. `delivered` is the
+      third message. `unrepairable` and `not_repaired` are outcomes with no
+      message in this phase.
+
+      ⚠️ The trigger set therefore has to be named server-side, and the
+      server has no list to name it from — the nine live in a frontend
+      module the backend cannot import. Define the two triggering keys in
+      the notification service as constants with this reasoning written
+      down, and accept that a tenth status added to `deviceStatus.ts` will
+      not send anything until someone decides whether it should. Turning
+      the column into an enum shared by both ends is the real fix and
+      belongs in phase 9, not here.
+
+      **Acceptance fires on create only.** Not on an update that happens to
+      set a status, ever (§11).
+
+      **Ready and delivered fire on a transition, not on a value.** The
+      update handler already reads the row before writing it
+      (`deviceController.ts:264`), so the previous status is one added
+      `select` away: `repairing → ready_for_pickup` sends,
+      `ready_for_pickup → ready_for_pickup` does not (§10). A device the shop
+      moves back and forth sends once per real move, which is what a customer
+      would expect.
+
+      **After the write, never inside it** (§29). The device transaction
+      commits first; the SMS follows. A provider call can take twenty
+      seconds, and holding a row lock that long for a text message is the
+      mistake 8.10 already caught once. Failure to send never fails the
+      device write — the response carries the outcome so the UI can say so.
+
+      The request carries one boolean per event (`send_sms`). Everything
+      else — whether the transition is real, whether there is credit,
+      whether the toggle is on — is the server's decision. RULES §6: the
+      client is not trusted for anything it could lie about.
+
+- [x] 12.8 Routes and schemas. `src/routes/sms.ts`, mounted at `/api/sms`:
+
+          GET   /api/sms/wallet              balance, unit price, ~messages left
+          POST  /api/sms/wallet/topup        amount → Zibal redirect
+          POST  /api/sms/wallet/verify       track id → credit
+          GET   /api/sms/wallet/transactions the wallet ledger
+          GET   /api/sms/messages            the send log, paginated
+          GET   /api/sms/settings            the toggle
+          PATCH /api/sms/settings            flip it
+
+      `atLeast("admin")` on all of the above (§23): a technician has no
+      business seeing what the shop spends, exactly as with `/subscription`.
+      Sending is **not** a route of its own — it rides on the device write,
+      so a technician who may change a status may send the message that goes
+      with it, and no new permission concept is introduced.
+
+      One exception, and it exists because of that rule rather than despite
+      it:
+
+          GET /api/sms/capability   { can_send, reason }
+
+      Open to any authenticated user. A technician's device modal has to know
+      whether the checkbox works, and the wallet endpoint is the wrong way to
+      tell them: it would put a balance in a response their role is not meant
+      to see, and hiding it in the component would leave it in the network
+      tab. So the server answers the question the modal actually asks — may
+      this device send — as two booleans and a reason string, with **no
+      amount in the payload at all**. Admins get the figure from the wallet
+      endpoint they already have.
+
+      Every handler validates through `validate()` and reads `req.valid`
+      (RULES §6). `workspaceId` comes from the token, never the body.
+
+- [x] 12.9 Frontend: `pages/SmsWallet.tsx` at `/sms-wallet`, admin-only in
+      both `App.tsx` and `Layout.tsx` — 10.8 is what happens when those two
+      disagree. Balance, approximate messages remaining, the top-up amounts
+      from §2 as presets plus a free-form field, top-up history and send
+      history.
+
+      **No per-message price is rendered anywhere, and neither is a count
+      of messages remaining.** Both were, on the balance card and again in a
+      «هزینه» column on every message row, and both came off after review.
+      The price is a tariff a shop can do nothing about — it cannot choose a
+      cheaper message — and printing it beside a balance invites arithmetic
+      against a figure we may still change (open question 3). The count had
+      to go with it: «حدود N پیامک» next to a balance *is* the price, one
+      division away, so hiding the tariff while showing the two numbers it
+      falls out of would have been a pretence rather than a decision.
+
+      Both figures are still fetched and still do their work unrendered:
+      `message_price_rials` colours the balance when it is low, and
+      `approximate_messages_left` is what the header badge and
+      SmsBalanceBanner decide «low» from.
+
+      **Two history tabs, not three.** A «گردش حساب» tab over
+      `sms_wallet_transactions` was built and removed: every line in it is
+      either a top-up or a message restated as a signed amount, both of
+      which have their own tab. The ledger is still written on every debit
+      and credit — it is what makes the balance auditable and what a
+      duplicate refund is caught by — and `GET /sms/wallet/transactions`
+      and `getSmsWalletTransactions` stay for support to read. It is not a
+      screen.
+
+      `Subscription.tsx` as rebuilt in 11.7 is the model to follow, not the
+      pre-redesign one: its `toToman`/`toTomanRounded` helpers, the table
+      vocabulary from `utils/tableClasses.ts` (RULES §6a — no hand-rolled
+      cells), the semantic colour tokens, and `PaymentReceipt` for a top-up
+      receipt.
+
+      A callback page for the top-up return, following `PaymentCallback.tsx`:
+      it asks the backend to verify rather than trusting the query string.
+
+- [x] 12.10 `DeviceFormModal`: one switch per event, shown only when that
+      event can actually fire — on create, the acceptance box; on edit, the
+      box for the transition the form is about to make, decided against the
+      status the form loaded with rather than the one in the select. The
+      modal already imports `DEVICE_STATUSES`, so it knows both.
+
+      Three states beside it, from `GET /api/sms/capability`: enough credit
+      (switch live), not enough ("اعتبار کافی نیست"), notifications off
+      ("ارسال پیامک غیرفعال است"). Existing design system, no new components
+      (§24), and the modal layer 11.8 rebuilt is the shape to match.
+
+      **A coloured button rather than a checkbox**, after review — green
+      while the message will go, red while it will not, with the state in
+      words too («ارسال می‌شود» / «ارسال نمی‌شود») so it reads without
+      the colour. This is the last moment before a customer is texted and
+      the shop is charged, and a 16px tick beside a sentence is the easiest
+      thing on a crowded form to skim past. Blocked renders as red, because
+      red is what will happen. The master switch on the wallet page is the
+      same control in the same two colours.
+
+      **The figure is never rendered here, for any role.** The endpoint does
+      not carry it. The "شارژ کیف پول" and "فعال‌سازی" links show only to
+      admins — a technician sent to a page their role cannot open is worse
+      than a technician told to ask their manager, which is what the text
+      says for them.
+
+- [x] 12.11 Low-balance notice, modelled on `SubscriptionBanner` and
+      deliberately quiet: below 10,000 toman a warning, at zero a stronger
+      one, each with a link to the wallet page and each dismissible for the
+      session. Only where it is relevant — the device pages and the wallet
+      page — not on every screen.
+
+- [x] 12.12 A sentence saying plainly that these messages are charged to the
+      shop's own wallet and are not part of the subscription (§21). Somebody
+      will otherwise assume the subscription covers it, and find out from an
+      empty wallet.
+
+      **Built as a pointer on the settings page rather than a second switch.**
+      The toggle itself sits on the wallet page beside the balance, because
+      the two questions a shop has about this feature — is it on, and can I
+      afford it — are one question, and answering them in two places is how
+      they come to disagree. A shop still looks for switches in settings, so
+      that is where it is told where the switch is and what turning it on
+      costs.
+
+      ⚠️ 11.5 moved settings from the sidebar to a header icon — the entry
+      point is not where a pre-redesign screenshot would put it.
+
+- [x] 12.13 Tests. The mocked suites cover the twenty scenarios in §30 of the
+      brief; the ones that cannot be mocked go to `src/__tests__/integration/`:
+
+      - The concurrency case is integration-only and is the reason 12.3 is
+        raw SQL. Two simultaneous debits against a balance that covers one:
+        exactly one succeeds and the balance never goes below zero. A mocked
+        test cannot fail this — it never reaches Postgres, where the
+        guarantee lives.
+      - `sms_wallets`, `sms_wallet_transactions`, `sms_messages` and
+        `sms_topups` each need a line in the `resources` table in
+        `isolation.test.ts`; the wallet is a singleton per workspace, so it
+        goes to `isolationSpecialCases.test.ts` with the reason written down
+        (RULES §3).
+      - Idempotency: verify twice, credit once. Refund twice, credit once.
+      - Transitions: `repairing → ready_for_pickup` sends,
+        `ready_for_pickup → ready_for_pickup` does not, `repaired` sends
+        nothing, and editing a device never re-sends acceptance.
+      - Price history: change `SmsPrice`, and yesterday's rows still read
+        yesterday's price.
+      - A provider failure refunds, and the refund leaves the balance where
+        it started.
+
+      The frontend still has no test runner, so 12.9–12.12 are verified by
+      looking at them, through the throwaway Vite harness RULES §6b
+      describes — "it compiles" is not verification of a UI change.
+
+      **Where each of those six lives, now that they all do:**
+
+      | Scenario | Suite |
+      | --- | --- |
+      | Two simultaneous debits, one wins, never below zero | `integration/smsWallet.test.ts` |
+      | The four SMS tables in the isolation registry | `integration/isolation.test.ts` (the three lists) and `integration/isolationSpecialCases.test.ts` (the wallet) |
+      | Verify twice, credit once | `integration/smsTopup.test.ts` |
+      | Refund twice, credit once | `integration/smsWallet.test.ts` and the unique index in `isolationSpecialCases` |
+      | The four transitions, and an edit that re-sends nothing | `customerNotification.test.ts` (the decision) and `deviceController.test.ts` (the wiring) |
+      | A price change does not reach into the past | `integration/smsPricing.test.ts` |
+      | A provider failure refunds, and the balance lands where it started | `integration/customerNotification.test.ts` |
+
+      ⚠️ **The three SMS lines in `isolation.test.ts` carry all three skips.**
+      A message, a top-up and a ledger row are written by the application and
+      read back as history: there is no `GET /:id`, no `PUT` and no `DELETE`
+      on any of them, so only the list test has anything to address. That
+      test was mutation-checked rather than assumed — with both the
+      application filter and the `sms_messages` policy removed, exactly
+      `sms-messages › lists only the caller's own rows` failed and nothing
+      else did.
+
+      `sms_wallets` is deliberately not in that table: one row per workspace,
+      reached at `GET /api/sms/wallet` with no id at all, so none of the four
+      tests fits. It is in `isolationSpecialCases.test.ts` with the reason
+      written down, per RULES §3.
+
+      **Two things the suite found once it could finally be run.** Phase 12
+      was written in a sandbox with no `node_modules`, so `pnpm lint` and
+      `pnpm format:check` had never executed against any of it:
+
+      - `utils/smsTemplates.ts` failed `no-control-regex`. A false positive —
+        the `[\u0000-\u001F\u007F]` range is the class being stripped, not
+        a typo'd escape — so it carries a targeted disable with that reason
+        rather than a changed regex.
+      - Ten phase 12 files were unformatted and are now run through Prettier.
+        Eleven others still are (`routes/exports.ts`, `utils/pricing.ts`,
+        `utils/referral.ts`, and eight suites), all of them older than this
+        phase and left alone rather than swept into an SMS commit.
+
+- [x] 12.14 Documentation, in the same commit as the task that makes it true
+      (RULES §8): a CLAUDE.md section on the wallet and the Dofixo/shop
+      split, the new environment variables in both `.env.example` files, the
+      policy count in `ops/restore-database.md`, and the expected table list
+      in `prisma/rls-check.sql`.
+
+      Three of the four were already done, each in the commit that made it
+      true — which is what §8 asks for, so this task found them rather than
+      wrote them. **All three were re-checked against a live database built
+      from the migrations**, not taken on trust:
+
+      | Claim | Where | Verified |
+      | --- | --- | --- |
+      | Three template ids | `backend/.env.example` (12.5) | present; the root `.env.example` is compose-only and the frontend has none, so phase 12 added no variable there. `WALLET_CALLBACK_URL` is derived from `APP_URL` rather than being its own variable |
+      | 33 policies, 4 `app_*` functions | `ops/restore-database.md` (12.1) | measured before 8.11 merged; it is **five** now — `app_all_workspaces` joins the four. `ops/restore-database.md` needs the count raised |
+      | `sms_prices` among the tables with no `workspace_id` | `prisma/rls-check.sql` (12.1) | Part 1 returns zero rows; Part 1b returns the eight named, no more |
+
+      ⚠️ That count was taken on a database without 8.11's migration. The
+      five are `app_all_workspaces`, `app_create_workspace`,
+      `app_current_workspace_id`, `app_login_lookup`, `app_refresh_lookup`.
+
+      What was actually missing was the CLAUDE.md section, which is now
+      **SMS wallet (phase 12, implemented)**, placed after Subscriptions
+      because the first thing it has to establish is which of the two pays.
+      Three stale passages elsewhere in that file were corrected in the same
+      pass: the pages list did not mention the wallet, subscription or
+      referral screens; the reference-data tables with no `workspace_id` were
+      not written down at all, so `sms_prices` read as an omission rather
+      than a decision; and the backup section still said sms.ir's templates
+      were awaiting approval.
+
+### ✅ Resolved: the templates were approved
+
+Second submission went through on 1405/06/19, with «دوفیکسو» as the fixed
+organisation name and the workshop's name as an ordinary parameter — option
+1 below. The ids, which 12.5 puts in the environment:
+
+| قالب         | متغیر محیطی                     | شناسه    |
+| ------------ | ------------------------------- | -------- |
+| پذیرش دستگاه | `SMS_TEMPLATE_DEVICE_ACCEPTED`  | `351476` |
+| آماده تحویل  | `SMS_TEMPLATE_DEVICE_READY`     | `153383` |
+| تحویل دستگاه | `SMS_TEMPLATE_DEVICE_DELIVERED` | `986773` |
+
+⚠️ 12.5 must read the approved bodies out of the sms.ir panel before writing
+the parameter map. `sendTemplate` sends parameters by name, and a template
+approved with `#CUSTOMER#` where the code sends `#NAME#` fails at send time
+as a rejected message — not at boot, and not in any test that mocks the
+provider.
+
+The history below is kept because the rule it ran into still shapes the
+design, and because option 2 is what a second provider would need.
+
+### The rule it ran into: whose name is on the message
+
+The first submission was rejected, and one of the two reasons is not a
+wording problem:
+
+> نام مجموعه باید ثابت باشد
+
+The sending organisation's name has to be **fixed text in the template**,
+not a parameter. That is a rule written for one company texting its own
+customers, and this feature is the other shape: one platform account, 500
+workshops, each needing its own name on a message to a stranger. `#SHOP#`
+as a variable is exactly what the reviewer refused.
+
+Three ways out, in the order they should be tried:
+
+1. **Fixed «دوفیکسو» plus the shop as an ordinary data field.** The
+   organisation is us — we hold the account — and the workshop's name is
+   then just another value in the body, like the device or the reception
+   number. The templates below are written this way. This is a question for
+   support before resubmitting, not something to infer from a rejection
+   notice.
+2. **A dedicated line per workshop.** Support says خط اختصاصی is available.
+   It solves the naming question completely and is unthinkable at 500
+   tenants — one line, one approval, one invoice each.
+3. **Drop the shop name.** One part instead of two, so half the cost, and a
+   customer who cannot tell which of the two repair shops in town is texting
+   them. The feature still works; it is just worth less.
+
+Option 1 was accepted, so the wording below is what was approved rather than
+a proposal. Option 2 stays on record: it is what a workshop wanting its own
+sender line would need, and what a second provider would have to offer.
+
+### The three templates, for the sms.ir panel
+
+Submitted as-is; the ids come back into `.env` as `SMS_TEMPLATE_DEVICE_*`.
+Parameter names are what `sendTemplate` passes, so they must match exactly.
+
+**پذیرش دستگاه** — `SMS_TEMPLATE_DEVICE_ACCEPTED`
+
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# در تعمیرگاه #SHOP# پذیرش شد.
+    دوفیکسو
+
+**آماده تحویل** — `SMS_TEMPLATE_DEVICE_READY`
+
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# در تعمیرگاه #SHOP# آماده تحویل است.
+    دوفیکسو
+
+**تحویل دستگاه** — `SMS_TEMPLATE_DEVICE_DELIVERED`
+
+    #NAME# عزیز، دستگاه #DEVICE# با شماره پذیرش #NUMBER# تحویل داده شد.
+    تعمیرگاه #SHOP# | دوفیکسو
+
+124, 131 and 128 characters at the truncation caps — two parts in every
+case the caps allow, never three. The caps are `NAME` 18 · `DEVICE` 16 ·
+`NUMBER` 7 · `SHOP` 22, each inside sms.ir's 25-character limit on a
+parameter value.
+
+The reviewer's second objection is a submission-form matter rather than a
+wording one — each parameter needs a description saying what goes in it:
+
+| پارامتر    | توضیح                     | نمونه          |
+| ---------- | ------------------------- | -------------- |
+| `#NAME#`   | نام و نام خانوادگی مشتری  | علی رضایی      |
+| `#DEVICE#` | نام دستگاه تعمیری         | یخچال سامسونگ  |
+| `#NUMBER#` | شماره پذیرش دستگاه (عددی) | 1042           |
+| `#SHOP#`   | نام تعمیرگاه پذیرنده      | تعمیرگاه مرکزی |
+
+What was cut from the brief's wording, and why: the 🌱 and the closing
+thanks (about 25 characters, which is a third part on its own — a greeting
+worth 200 toman a message is a greeting worth losing, and emoji are allowed
+but not free), and «لطفاً برای دریافت دستگاه ... مراجعه فرمایید», since a
+customer told their device is ready knows to come and get it.
+
+### The frontend was written blind, then looked at
+
+12.9 through 12.12 were `[~]` while they were written: the frontend has no
+test runner, `tsc` is its only automated gate, and neither it nor the Vite
+harness RULES §6b describes can run in the sandbox they were written in —
+what was possible there is a partial type-check that cannot resolve react or
+axios, so it catches a wrong argument count but not a wrong prop.
+
+They are `[x]` now: `pnpm build` passed and the pages were opened in a
+browser. Four corrections came out of that pass, and all four were about
+what the screens _said_ rather than what they did, which is the class of
+mistake a type-check was never going to catch:
+
+- the per-message price came off the balance card and the message table
+  (12.9);
+- the «گردش حساب» tab came out, as a third view of what two tabs already
+  showed (12.9);
+- the send checkbox became a green/red button (12.10);
+- subscription state and the SMS balance went into the header as two badges
+  (`components/HeaderStatusBadges.tsx`), admin-only like the two banners and
+  for the same reason, hidden below `md`. They do not replace the banners: a
+  badge is a resting state, a banner interrupts. The SMS badge shows the
+  balance and not the message count, for the reason in 12.9 — the count
+  would only move the same division into the header — so its colour is the
+  verdict and its tooltip puts that verdict in words.
+
+⚠️ **«طلایی» is `warning`.** There is no gold token and one was not added:
+the brand stopped being gold, and the note in CLAUDE.md says a gold found
+outside the chart palette is a leftover. `--warning` is the amber the app
+already spends on «running out», which is the gold this wanted.
+
+### Open questions — answer before 12.1
+
+1. **May the workshop's name be a parameter if «دوفیکسو» is the fixed
+   organisation name?** The blocker above. Everything in 12.5 waits on it,
+   and the answer decides whether these messages carry a shop's identity at
+   all.
+2. ✅ **Per part — measured 17 September 2026.** `scripts/sms-cost-probe.ts`
+   sent one 65-character message and one 127-character message to a real
+   handset from the server. sms.ir returned `cost=1` and `cost=2`, and the
+   panel's credit fell 7,200 rials across the three parts. So **2,400 rials
+   per part**, `cost` is a count of parts rather than a sum of money, and
+   `priceFor` needed no change.
+
+   It also settled the 67-versus-70 question the support answer left open:
+   our `countSegments` predicted 1 and 2 and was right both times, so the
+   134-character ceiling really is two parts.
+
+   ⚠️ The margin is four characters. The longest combination the caps allow
+   renders 131, and a template whose wording grows in the sms.ir panel would
+   cross into a third part with nothing in this repository changing.
+
+3. ✅ **340 toman per part — 680 for a two-part message.** Measured cost is
+   240, so this leaves 42%. The margin is not only profit: sms.ir can raise
+   its tariff, and the alternative is renegotiating with every workshop each
+   time it does.
+
+   The `sms_prices` row is dated `2026-09-17` and the opening 1,750 row stays
+   for history — messages sent last month are still costed at last month's
+   price, which is the whole reason that table exists rather than a constant.
+4. **`repaired` versus `ready_for_pickup`.** 12.7 sends «آماده تحویل» on
+   `ready_for_pickup` only, on the reasoning that a `repaired` device is one
+   the bench has finished with but nobody has checked or priced yet. If
+   shops in practice treat `repaired` as the moment to call the customer,
+   the trigger moves — but it cannot be both without texting twice for one
+   job.
+
+## Phase 13 — Academy: مرکز آموزش دوفیکسو (content hub on the landing site)
+
+Not a migration phase and not in this repository's code: the hub is built in
+the landing repo (`Rezaabdollahi7/Dofixo-landing`, Astro 7 on Vercel, served
+at `www.dofixo.ir`). It is tracked here because this is the project's one
+roadmap, and because the demo workspace and every screenshot are produced
+from this repository (sprint 13C).
+
+The goal is a specialised content hub rather than a blog: three sections
+with distinct search intent, each built as a pillar article with a cluster
+of articles around it, step-by-step product tutorials with two-minute videos,
+and a complete video course. Main audience: **mobile repair shops**.
+
+### Decisions (agreed 5 October 2026)
+
+| Topic | Decision |
+|---|---|
+| Name | مرکز آموزش دوفیکسو, under `/academy/` |
+| Sections | راهنمای مدیریت تعمیرگاه (`/academy/guide/`) — acquisition from Google · آموزش دوفیکسو (`/academy/tutorials/`) — activation · تجربه‌های تعمیرگاه (`/academy/experience/`) — authority · دوره‌ی کامل (`/academy/course/`) |
+| Focus | Mobile repair shops: keywords, demo data and examples |
+| URLs | English slugs, trailing slash, host `www.dofixo.ir` |
+| Primary CTA | «شروع ۳۰ روز رایگان» → `app.dofixo.ir` sign-up. Not «بدون کارت» — meaningless in Iran |
+| Cadence | One article a day; Reza reviews, edits and publishes each |
+| Old blog | Pruned and consolidated: every `/blog/*` post 301s to its new article (table below) |
+| Old brand «مافیکسو / mafixo» | Removed everywhere it still appears |
+| Video hosting | Aparat embedded on the site (YouTube is filtered in Iran); YouTube as well, for Google Video and backlinks |
+| Videos | Screen only, no face. Voice: یگانه جعفری. Recorded by Reza with OBS |
+| Templates | Downloadable intake form and invoice sample, free and ungated |
+| In-app links to tutorials | Deferred until the hub is finished |
+
+**Authors** — real names, each with an author page (`Person` schema). Claude
+drafts; the named author reads, approves and adds at least one line of their
+own experience before an article goes out, which is what makes the byline true.
+
+| Author | Role | Writes |
+|---|---|---|
+| رضا عبدالهی | Founder, lead developer | Tutorials, choosing software |
+| مهدی باقری | Developer | Some tutorials: SMS, reports, exports |
+| یگانه جعفری | Mobile repair technician (also the video voice) | Mobile-specific: intake, parts inventory, part cost, starting a shop |
+| مهندس داوود جعفری | Manager of the زیمنس پارت repair centre, 25+ years repairing CNC machines, a Dofixo customer | Management pillars, technicians, accounting, warranty, customer retention, and the case study |
+
+⚠️ زیمنس پارت is written as the business's own name only, never in a way
+that suggests an official Siemens affiliation.
+
+⚠️ No article claims a feature the app does not have. The reference is
+`docs/academy/product-facts.md` in the landing repo, checked against this
+repository's code, with a list of what the app does not do. Correction to
+the first draft of this phase: the app **does** have warranty — months on
+the repair invoice, an end date computed from them and printed — so the
+warranty article can point at it. It has no device passcode field.
+
+### Audit of the current landing (5 October 2026)
+
+Search Console, three months: 18 clicks, 113 impressions, average position
+30. «نرم افزار تعمیرگاه» had 20 impressions and no clicks. 54 pages indexed,
+48 not — 33 of them «Discovered – currently not indexed».
+
+The diagnosis is the content, not the technical base, which is sound
+(canonical, sitemap, robots, `BlogPosting`, breadcrumbs):
+
+- 35 posts, all published 18–24 July, 13 of them on one day, all by «تیم دوفیکسو»
+- Median about 430 words
+- 31 of 35 show a literal placeholder such as `[تصویر: ثبت گارانتی در فاکتور دوفیکسو]`; no post has a real image
+- 16 slugs still contain `mafixo`; 3 internal links point to `-dofixo` slugs that do not exist (404)
+- The warranty post claims warranty terms attach to the invoice — the app has no such feature
+- Every CTA leads to `/contact` and «درخواست دموی رایگان» rather than the trial
+- `dofixo.ir` → `www` redirects correctly (Vercel, 308). But **`/about` and `/about/` both answer 200**, and the nav and footer link to the slashless form while canonical and the sitemap name the slashed one. That is the «Alternate page with proper canonical tag» row
+
+Thirty new articles on top of 35 thin ones would inherit the same verdict,
+so the old posts are consolidated rather than kept beside the new ones.
+
+### Article plan and keyword map
+
+One primary keyword per article, owned by no other article. The final map,
+with secondary keywords, authors and the evidence behind each choice, is
+`docs/academy/keyword-map.md` in the landing repo; the table below is its
+summary. Two changes from the first draft came out of 13.6: «نرم افزار
+تعمیرات موبایل» returns phone-fixing tools (Dr.Fone, 3uTools), not shop
+software, so the software article targets the comparison query instead; and
+the head commercial terms («نرم افزار مدیریت تعمیرگاه») belong to the home
+page, not to any article.
+
+**راهنمای مدیریت تعمیرگاه** — `/academy/guide/`
+
+| Slug | Article | Primary keyword |
+|---|---|---|
+| `mobile-repair-shop-management` | ⭐ Pillar: راهنمای جامع مدیریت تعمیرگاه موبایل | مدیریت تعمیرگاه موبایل |
+| `mobile-repair-software` | بهترین نرم‌افزار مدیریت تعمیرگاه موبایل | بهترین نرم افزار مدیریت تعمیرگاه موبایل |
+| `start-mobile-repair-shop` | راه‌اندازی تعمیرگاه موبایل | راه اندازی تعمیرگاه موبایل |
+| `phone-intake-form` | رسید پذیرش گوشی (+ downloadable) | رسید پذیرش تعمیرات موبایل |
+| `mobile-repair-invoice` | فاکتور تعمیر موبایل (+ downloadable) | فاکتور تعمیرات موبایل |
+| `mobile-parts-inventory` | انبارداری قطعات موبایل | مدیریت انبار قطعات یدکی |
+| `repair-shop-accounting` | حساب و کتاب و سود تعمیرگاه | حسابداری تعمیرگاه موبایل |
+| `repair-shop-customer-management` | مدیریت مشتریان تعمیرگاه | مدیریت مشتریان تعمیرگاه |
+| `technician-management` | مدیریت تعمیرکاران و تقسیم کار | مدیریت تعمیرکاران |
+| `paper-to-software` | از دفتر و اکسل به نرم‌افزار | دفتر تعمیرات |
+
+**آموزش دوفیکسو** — `/academy/tutorials/`, in onboarding order with
+previous/next links; each with a two-minute video and step-by-step screenshots.
+
+| # | Slug | Tutorial |
+|---|---|---|
+| 0 | `getting-started` | شروع سریع: راه‌اندازی در ۱۰ دقیقه (index of the path) |
+| 1 | `sign-up` | ثبت‌نام و تأیید شماره |
+| 2 | `settings` | اطلاعات شرکت، تصاویر، قالب فاکتور |
+| 3 | `personnel` | پرسنل و نقش‌ها |
+| 4 | `customers` | ثبت مشتری و صفحه‌ی مشتری |
+| 5 | `device-intake` | پذیرش دستگاه با عکس |
+| 6 | `device-statuses` | وضعیت‌های دستگاه |
+| 7 | `inventory` | کالا، دسته‌بندی، حداقل موجودی |
+| 8 | `purchase-invoice` | فاکتور خرید |
+| 9 | `repair-invoice` | فاکتور تعمیر: قطعه، خدمات، پرداخت‌ها |
+| 10 | `sale-invoice` | فاکتور فروش و چاپ |
+| 11 | `customer-sms` | پیامک خودکار به مشتری و کیف پول پیامکی |
+| 12 | `reports` | داشبورد، گزارش موجودی، سود و زیان |
+| 13 | `exports-and-subscription` | خروجی اطلاعات، اشتراک، دعوت از دوستان |
+
+**تجربه‌های تعمیرگاه** — `/academy/experience/`
+
+| Slug | Article |
+|---|---|
+| `common-mistakes` | ⭐ Pillar: اشتباه‌های رایج در اداره‌ی تعمیرگاه |
+| `uncollected-devices` | دستگاهی که صاحبش برای تحویل نمی‌آید |
+| `intake-photos` | عکس هنگام پذیرش، برای جلوگیری از اختلاف |
+| `part-cost-and-pricing` | قیمت تمام‌شده‌ی قطعه وقتی دلار هر هفته عوض می‌شود (moving average) |
+| `customer-notifications` | خبر دادن به مشتری: کی و با چه متنی |
+| `slow-moving-parts` | قطعات کم‌گردش و نقطه‌ی سفارش |
+| `repair-warranty` | گارانتی تعمیر — general advice, no feature claim |
+| `repair-shop-kpis` | عددهایی که هر هفته باید دید |
+| `customer-retention` | رضایت و برگشت مشتری |
+| `siemens-part-case-study` | داستان مشتری: زیمنس پارت |
+
+### Old post → new article (301 map)
+
+Each old post stays live until its target is published, then redirects the
+same day — never a redirect to a page that does not exist yet. `/blog/`
+itself redirects to `/academy/` once the last post has moved.
+
+| New article | Old `/blog/` slugs |
+|---|---|
+| `guide/mobile-repair-shop-management` | `checklist-modiriat-tamirgah-mobile`, `estandard-herfei-tamirgah-mafixo`, `kahesh-estress-modiran-tamirgah`, `ayande-modiriat-tamirat`, `kahesh-hazine-panhan-tamirgah` |
+| `guide/mobile-repair-software` | `rahnamaye-entekhab-narmafzar-tamirgah`, `moghayese-narmafzar-modiriat-tamirgah`, `chera-narmafzar-modiriat-tamirgah-sarmayegozari-ast`, `che-tamirgahayi-niaz-be-sistem-daran`, `5-dalil-niaz-be-mafixo`, `mafixo-baraye-tamirgah-laptop`, `mafixo-baraye-tamirgah-console` |
+| `guide/start-mobile-repair-shop` | `raahandazi-tamirgah-mobile-az-sefr` |
+| `guide/mobile-repair-invoice` | `sodoor-fakture-herfei-tamirgah` |
+| `guide/mobile-parts-inventory` | `modiriat-anbar-ghataat-tamirgah`, `amoozesh-amali-kontorol-anbar-mafixo` |
+| `guide/repair-shop-accounting` | `modiriat-mali-tamirgah-mafixo`, `dashboard-modiriati-hooshmand-tamirgah`, `gozaresh-giri-hooshmand-mafixo` |
+| `guide/technician-management` | `modiriat-tim-teknesian-mafixo`, `sazmandehi-tim-tamirgah`, `tajrobe-teknesian-ba-sistem-mafixo`, `afzayesh-sorat-tamirat-mafixo` |
+| `guide/repair-shop-customer-management` | `modiriat-hooshmand-moshtarian-mafixo` |
+| `experience/common-mistakes` | `7-eshtebah-modiriat-tamirat` |
+| `experience/part-cost-and-pricing` | `mohasebeh-gheymat-tamir-mobile` |
+| `experience/customer-retention` | `hefz-va-vafadari-moshtari-tamirgah`, `jalb-eatemad-moshtari-tamirgah`, `jazbe-moshtari-jadid-tamirgah`, `barandsazi-tamirgah-ba-mafixo` |
+| `experience/customer-notifications` | `etela-resani-lahzei-moshtari-tamirgah` |
+| `experience/repair-warranty` | `modiriat-garanti-tamirat-mafixo` |
+| `tutorials/device-statuses` | `safar-shafaf-dastgah-mafixo` |
+| `tutorials/getting-started` | `rahnamaye-tanzimat-avalie-mafixo`, `vizhegihaye-kamshenakhte-mafixo` |
+
+All 35 are accounted for.
+
+### Sprint 13A — Foundations and urgent fixes (week 1)
+
+- [x] 13.1 Trailing slash: `trailingSlash: "always"` in `astro.config.mjs`, `"trailingSlash": true` in `vercel.json` so `/about` 308s to `/about/`, and every internal link in the slashed form
+- [x] 13.2 Remove the 31 `[تصویر: …]` placeholders
+- [x] 13.3 Remove the false warranty claim from `modiriat-garanti-tamirat-mafixo`, and check every other post for claims the app does not back. Extended to the features, pricing and FAQ pages, which listed QR labels, customer tags, an activity log, instalments and multi-branch management. The home page's figures (100+ shops, 1,800+ devices, 98%, 4.8 from 200+ reviews) are left until their source is confirmed
+- [x] 13.4 Fix the 3 broken internal links (`-dofixo` slugs that do not exist)
+- [~] 13.5 Every CTA to «شروع ۳۰ روز رایگان» and the app's sign-up instead of `/contact`; resubmit the sitemap in Search Console. Merged and deployed; the sitemap (`sitemap-index.xml`) is for Reza to resubmit in Search Console
+- [x] 13.6 Final keyword map, from Search Console's own queries, Google autocomplete and the current first page for each candidate keyword
+- [x] 13.7 Writing guide: tone, a template per article type (pillar, cluster, tutorial, experience), screenshot conventions, CTA blocks, internal-linking rules
+- [~] 13.8 Bios for the four authors, confirmed by each of them. Drafted in `docs/academy/authors.md`; the site carries placeholder avatars (kept out of the Person schema) until real photos arrive. Still waiting on the `[؟ …]` facts only each author can give, and their approval
+- [x] 13.9 A short Academy section in the landing repo's `CLAUDE.md`, pointing back here
+
+### Sprint 13B — Academy infrastructure in the landing repo (week 2)
+
+Done 5 October 2026. Nothing under `/academy/` is built until it has a
+published article, so the infrastructure is live and invisible: the menu
+switches from the blog to the Academy with the first article. Astro moved
+to 7.3 (MDX 8 requires it) and `sharp` was added explicitly.
+
+Also done in this sprint, outside its tasks: the home page's invented
+figures (100+ shops, 1,800+ devices, 98%, 4.8 from 200+ reviews, 24/7) were
+replaced with numbers the product backs. Data migration from a shop's old
+records is a service the team performs by hand, not an in-app import;
+`product-facts.md` says so.
+
+- [x] 13.10 `/academy/` with its three sections and the course page; extend the content collection schema (section, author reference, pillar, video, related articles, tutorial order)
+- [x] 13.11 Article template: table of contents, breadcrumb, author box, related articles, previous/next for tutorials, CTA blocks, zoomable screenshots
+- [x] 13.12 Structured data: `Article`, `BreadcrumbList`, `VideoObject`, `Person`. Not counting on `HowTo` or `FAQPage` — Google stopped showing them for ordinary sites in 2023
+- [x] 13.13 Aparat embed that loads only on click (a facade), so a video costs nothing until it is wanted
+- [x] 13.14 Author pages
+- [x] 13.15 301 mechanism in `vercel.json`, driven from the map above: `src/data/blog-redirects.json` plus `pnpm redirects`. `pnpm build` now ends with `scripts/check-site.mjs`, which fails the deploy on slashless or broken links, placeholder text, or redirects out of step with what is published
+
+### Sprint 13C — Demo workspace and image pipeline, in this repo (week 2, in parallel)
+
+Done 5 October 2026, in `docs/academy/` (its README has the setup). The
+demo shop is «موبایل‌کده نگین», phones and tablets only, with deliberately
+sequential fake phone numbers so no real person's number can appear in a
+published screenshot. Still missing: real photos of a phone for the intake
+tutorial and the intake-photos article — a generated picture there would
+mislead.
+
+`docs/showcase/` already runs the app locally, injects fake data through the
+real API and screenshots every page with Playwright. This sprint builds on
+it rather than starting again.
+
+- [x] 13.16 Make the demo shop mobile-only (the showcase shop is «موبایل و لپ‌تاپ آرین»): phones such as Galaxy A54, iPhone 13, Redmi Note 13; faults such as a broken LCD, battery, charging port; parts such as LCD, battery, glass, flex. Fake phone numbers only
+- [~] 13.17 Per-step tutorial shots: a script per tutorial that walks the flow and captures each step with numbered callouts and a highlight box; 1440 light plus 420 mobile; WebP; English file names, Persian alt text. The machinery and `device-intake` are done, plus an `overview` of every main page; each further tutorial's script is written with the tutorial itself in 13.21 and 13.23
+- [x] 13.18 Cover template, 1200×630, one consistent design for every article (also the OG image)
+- [x] 13.19 One command regenerates everything, so a UI change means re-running a script, not retaking 150 screenshots by hand
+
+### Sprint 13D — Content wave 1 (weeks 3–4)
+
+- [~] 13.20 `guide/mobile-repair-shop-management` (pillar), `guide/mobile-repair-software`, `guide/phone-intake-form` with its downloadable form. The pillar is written, with Davood Jafari's own answers in `<Experience>` blocks, and rides the launch PR. `phone-intake-form` is drafted under Yeganeh Jafari's name with three questions for her, and its form is a one-sheet A4 PDF (shop copy, customer copy, cut line) generated by `docs/academy/downloads/` — `pnpm downloads`. Dofixo prints no intake receipt; the article says so and puts the paper form beside the reception number (a printed receipt in the app was considered and declined, 15 Mehr). `mobile-repair-software` is drafted under Reza's name as a buyer's guide that rates no competitor — a vendor's ranking is not trustworthy — with two questions for him. Sprint 13D's guide trio is therefore written; all three wait on their authors
+- [~] 13.21 Tutorials 0–5, with video scripts and Persian subtitles (SRT). `getting-started` (0), `device-intake` (5) and `device-statuses` (6, pulled forward because intake leads straight into it) are written with their video scripts; the article template gained a `learn` box, image captions, «چرا مهم است» benefit notes, numbered H2 steps and a closing `<NextStep>` from Reza's review of the first one. Subtitles follow the recordings
+
+      ✓ Found while writing `device-statuses` and fixed: the device list's
+      quick status picker asked about the SMS only for «تحویل داده شده»
+      (b3d0976), so «آماده تحویل» from the list sent nothing. It now asks for
+      both (`StatusSmsPrompt` in `DeviceList.tsx`). The landing's launch PR
+      describes the new prompt, so **this fix must reach production before
+      that PR merges**
+- [~] 13.22 Redirect the old posts each new article absorbs, on its publishing day. The Academy opens with four articles (agreed 14 Mehr): the three tutorials above and the pillar. Landing PR #6 is the launch — all four out of draft, eight old posts redirected — held open as a draft PR until the picker fix is in production, Reza approves the tutorials on the Vercel preview and Davood reads the pillar with his answers in place. `pnpm redirects` now also rewrites internal links to a moved post
+
+### Sprint 13E — Content wave 2 (weeks 5–6)
+
+- [ ] 13.23 Tutorials 6–13 with their video scripts and subtitles
+- [ ] 13.24 The rest of the guide section
+
+### Sprint 13F — Content wave 3 (weeks 7–8)
+
+- [ ] 13.25 The experience section
+- [ ] 13.26 Siemens Part case study: a 30-minute interview with مهندس داوود جعفری, questions prepared beforehand
+
+### Sprint 13G — The full course (weeks 8–9)
+
+Last on purpose: by then the tutorials and their scripts exist to build on,
+and the UI has settled, so an hour of video does not go stale in a month.
+
+- [ ] 13.27 Scripts for the 12 chapters, 4–7 minutes each: start and dashboard · settings · personnel · customers · device intake and tracking · inventory · purchase invoice · repair invoice · sale invoice and printing · SMS · reports · exports, subscription, referral
+- [ ] 13.28 Course page; a playlist on Aparat and on YouTube, plus one full-length YouTube upload with chapter timestamps; titles, descriptions, thumbnails and subtitles for both platforms
+
+### Sprint 13H — Measurement (ongoing)
+
+- [ ] 13.29 Check each new article is indexed within a week (URL Inspection); watch «Discovered – currently not indexed» fall
+- [ ] 13.30 Track each article's primary keyword; rework articles that reach page two
+- [ ] 13.31 Monthly internal-link audit: every cluster links to its pillar, every pillar to all its clusters, no orphans
+
+### Video production
+
+- **Script:** two columns — «کار روی صفحه» (exact clicks, for Reza) and «گفتار» (for خانم جعفری), with a duration per scene and a hook in the first five seconds
+- **Order:** voice first, then the screen. Yeganeh records each scene's narration as its own file; Reza plays it and records the screen to it. Trimming video to fit a voice is easy, re-recording a voice to fit a video is not
+- **OBS:** 1920×1080, 30 fps, browser zoom about 125% so text is readable on a phone, a clean browser profile, system notifications off, light theme, the same demo workspace as the screenshots
+- **Editing:** DaVinci Resolve (free) or CapCut — OBS only records
+- **Every video:** Persian subtitles generated from the script, and a five-second closing frame with «شروع ۳۰ روز رایگان»
+
+## Phase 14 — Inventory: warehouses, stock documents, kardex
+
+The inventory module works for a shop that never makes a mistake and never
+has two people at the counter. It has no answer for the shelf disagreeing
+with the screen, and several of its numbers are quietly wrong. This phase
+makes the stock figure something a shop can trust and audit, then builds
+the documents a real stockroom needs on top of it.
+
+**What is wrong today** (found reading the code, 8 October 2026):
+
+- Every stock write is read-then-write with no lock — purchase, sale and
+  repair lines, quick purchase and quick sale (the last two even read
+  *outside* their transaction). Two sales of the last unit both pass the
+  check and one decrement is lost.
+- `Math.max(0, …)` clamps the column while the ledger logs the full
+  quantity, so `current_stock = SUM(inventory_transactions)` silently
+  breaks.
+- Opening stock is a zero-priced quick purchase: it drags the moving
+  average towards zero, burns a `PUR-` number on a 0-rial invoice, and is a
+  second request whose failure is only `console.error`-ed.
+- Repair invoices: `Math.round` on a decimal quantity (0.4 moves nothing),
+  issued → draft is allowed (issue again = deducted twice), draft → paid
+  skips the deduction, and issuing never checks stock.
+- Profit uses today's average cost, not the cost at the moment of sale, so
+  past margins move every time an item is restocked.
+- The item form has no sell-price field, although the column exists.
+- Stock is `Int` while the units list offers متر, کیلوگرم and لیتر.
+
+### Decisions (agreed 9 October 2026)
+
+| Topic | Decision |
+|---|---|
+| Warehouses | **Multi-warehouse from the start.** Every workspace gets «انبار اصلی»; a shop with one active warehouse never sees a warehouse picker |
+| Warehouse on invoices | Chosen on the **invoice header**, not per line |
+| Cost method | Weighted moving average, **per item** across all warehouses; a transfer does not change cost. No FIFO, but every outgoing movement stores its `unit_cost` so nothing is painted into a corner |
+| Negative stock | **Never.** Refused with a clear message — including deleting or editing a purchase invoice whose goods were already sold |
+| Minimum stock | Per item (total of all warehouses), as today |
+| Decimal quantities | Yes, in 14A. A per-item «کسری» flag, defaulted from the unit (متر / کیلوگرم / لیتر) but editable; whole-number items reject fractions |
+| Opening stock | Entered with the item, in one request; **unit cost required when quantity > 0**; its own movement type, no invoice, no number |
+| Sale price on invoices | Defaults to the item's sell price; the user may change it |
+| Repair invoice | issued → draft is blocked (correct an issued invoice by cancelling it); draft → paid deducts stock like issuing. In the UI «پیش‌نویس» becomes **«پیش‌فاکتور»** |
+| Who runs stock documents | Admin and super admin (counts, adjustments, transfers) |
+| Adjustments | Applied immediately; reason, user and time are on the ledger. No approval step |
+| Transfers | One step: out of the source and into the destination in one transaction |
+| Stock count | Partial (by category), blind count, mobile-first counting page with per-row autosave, printable count sheet |
+| Item detail | A page, `/items/:id`, **fully replacing** `ItemDetailModal` |
+| Kardex order | By entry time, with the document date shown beside it — the running balance stays continuous even when an invoice is back-dated |
+| Document numbers | Current format kept (`PUR-0001`); new kinds `ADJ`, `CNT`, `TRF`, `RET` use the same per-workspace gap-free counter. No year in the number |
+| Production data | Accounts exist, no invoices yet: the migration keeps items and their stock; no historical-cost backfill is needed |
+
+**The ledger is the stock.** `inventory_transactions` stays the one stock
+movement table (no parallel `stock_movements`), becomes append-only like
+`sms_wallet_transactions`, and gains warehouse, before/after quantity,
+reason, document date and unit cost. One service writes it; nothing else
+touches `current_stock`, `avg_purchase_price` or `item_stocks`.
+
+Deliberately out of scope: FIFO and cost layers; four separate
+min/max/reorder-point/reorder-quantity fields; supplier SKU and lead time;
+per-warehouse minimums; a year in document numbers; two-step transfers.
+
+### Sprint 14A — Foundation (everything else depends on it)
+
+- [x] 14.1 Migration: `warehouses` (one default per workspace via a partial unique index; no DELETE grant — deactivate only) and `item_stocks` (item × warehouse quantity, optional shelf `location`). `items.current_stock` and `min_stock`, and the quantity on all three invoice-line tables, become `Decimal(14,3)`; `items.is_fractional`. `warehouse_id` on the three invoice headers. `unit_cost` on sale and repair lines. `inventory_transactions`: `warehouse_id`, decimal quantity, `unit_cost`, `before_quantity`/`after_quantity`, `reason`, `occurred_at`, the wider type enum (`opening, purchase, sale, repair_use, adjustment, count, transfer_out, transfer_in, purchase_return, sale_return, reversal`) and reason enum (`count, damage, loss, found, entry_error, internal_use, return_from_use, other`); `REVOKE UPDATE, DELETE`. Workspace counters `adj_seq`, `cnt_seq`, `trf_seq`. RLS policy on every new table
+- [x] 14.2 Backfill in the same migration: «انبار اصلی» per workspace, an `item_stocks` row per item from `current_stock`, `warehouse_id` on existing rows; where `current_stock ≠ SUM(ledger)`, one `adjustment / entry_error` movement «تطبیق هنگام مهاجرت» so the invariant holds from day one
+- [x] 14.3 Around the schema: `populateWorkspace` creates the default warehouse; test helpers (`seedTwoWorkspaces`, `newWorkspace.test.ts`); `workspaceDeletion.ts` (ledger leaves `DELETION_ORDER` — FK cascades still remove it — and the new counters reset); `ops/extract-workspace.sh` id-shift list. The export workbook's warehouse columns moved to 14.10, with the warehouses page
+- [x] 14.4 `utils/stock.ts` — `applyStockMovements(tx, workspaceId, { document, lines })`, the only writer. Runs inside `runInWorkspaceTransaction`; locks `items` and `item_stocks` rows `FOR UPDATE` in a fixed `(item, warehouse)` order so two invoices cannot deadlock; computes the average with the existing `utils/avgPurchasePrice.ts`; throws `InsufficientStockError` rather than going below zero; returns each line's `unit_cost` and before/after
+- [ ] 14.5 Purchase invoices on the service. Lines and header read inside the transaction; editing or deleting an invoice whose stock has been sold is refused with the item named
+- [ ] 14.6 Sale invoices on the service, storing `unit_cost` per line; `assertStockAvailable` goes (the service is the check). Default line price = item sell price, editable
+- [ ] 14.7 Repair invoices on the service: decimal quantity without rounding, stock checked on issue, issued → draft blocked, draft → paid deducts, inventory `item_id` validated against the workspace, `unit_cost` stored. «پیش‌نویس» → «پیش‌فاکتور» in the UI
+- [ ] 14.8 Items: quick purchase and quick sale on the service, inside one transaction, with a warehouse. Create accepts opening stock + unit cost (required when > 0) + warehouse in the same request and transaction. `GET /items/:id` returns stock per warehouse
+- [ ] 14.9 Reports: profit from the stored `unit_cost`; stock report filterable by warehouse
+- [ ] 14.10 Warehouses: API (admin) and `/warehouses` page — create, rename, set default, deactivate only at zero stock. The picker is hidden while one warehouse is active; the export workbook gains warehouse columns and a per-warehouse stock sheet
+- [ ] 14.11 Frontend decimals and pickers: `formatQuantity` (Persian digits, «٫»), quantity inputs stepped by `is_fractional`, warehouse picker on the three invoice headers, item form with sell price, «کسری» flag and opening stock + cost + warehouse
+- [ ] 14.12 Tests. Unit: the service with a hand-rolled tx; controller tests mock `utils/stock`. Integration (real database): `current_stock = SUM(item_stocks) = SUM(ledger)` after every scenario; N concurrent sales of the last unit → exactly one succeeds; two invoices locking items in opposite order; UPDATE/DELETE on the ledger refused for `dofixo_app` while an item delete still cascades; the repair-invoice transitions; the migration backfill; warehouses in `isolation.test.ts`
+- [ ] 14.13 An «Inventory» section in `CLAUDE.md`, in the style of the SMS wallet's: the one-writer rule, lock order, no-negative rule, cost per item
+
+### Sprint 14B — Stock documents
+
+- [ ] 14.14 Stock adjustment (`ADJ`): warehouse, date, description; per line item, ± quantity, reason, note (required for «سایر»). Applied on save
+- [ ] 14.15 Stock count (`CNT`): `draft → applied | cancelled`, scoped to a warehouse and optionally a category. Each line keeps the system quantity at the moment *that line* was counted; applying posts `counted − system_at_count` as a `count` movement, warning first about items that moved since. Blind mode hides the system quantity. A mobile-first counting page saving each row as it is entered, and a printable count sheet
+- [ ] 14.16 Transfer (`TRF`): from, to, lines; `transfer_out` + `transfer_in` in one transaction. In the menu only while more than one warehouse is active
+
+### Sprint 14C — Item page, kardex, reports
+
+- [ ] 14.17 A Tabs component (the codebase has none)
+- [ ] 14.18 `/items/:id` replacing `ItemDetailModal` (template: `CustomerDetail`, `usePageCrumb`, a `useGoToItem` beside `useGoToCustomer`); every `openItemDetail` call site navigates instead, closing the modal stack when called from an invoice modal. Tabs: نمای کلی · کاردکس · خرید و فروش · قیمت‌ها · تغییرات
+- [ ] 14.19 Kardex: entry order with document date, in / out / balance, warehouse and date filters, every row linked to its document
+- [ ] 14.20 Price statistics: last, lowest, highest and average purchase price, from purchase lines
+- [ ] 14.21 Stock movement report (گردش کالا): opening balance, totals per movement type, closing balance — per item and per warehouse
+- [ ] 14.22 Stock report additions: per-warehouse view, items with no movement for N days, slow sellers
+
+### Sprint 14D — Suppliers and returns
+
+- [ ] 14.23 `suppliers` (name, phone, note); `purchase_invoices.supplier_id`, keeping `supplier_name` for old rows; a main supplier per item; amount owed per supplier from purchase invoices
+- [ ] 14.24 Purchase return (`RET`) against its purchase invoice, leaving at that line's own cost
+- [ ] 14.25 Sale return (`RET`) against its sale invoice, coming back at the cost it left at
+
+### Sprint 14E — Reordering and reservation
+
+- [ ] 14.26 `target_stock` on items; `min_stock` labelled «نقطه سفارش» in the UI. Order quantity = target − available
+- [ ] 14.27 «پیشنهاد خرید» page grouped by main supplier: prefills a purchase invoice, or prints/shares the list
+- [ ] 14.28 Reservation: inventory lines of پیش‌فاکتور repair invoices, summed rather than kept as a counter; «قابل فروش» = on hand − reserved, shown on forms and the item page
+
+### Sprint 14F — Audit and extras
+
+- [ ] 14.29 `audit_logs`, append-only: who, what, when, before/after — invoice edits and deletes, item price and minimum changes. Feeds the item page's «تغییرات» tab
+- [ ] 14.30 Lock date in settings: documents dated before it can be edited or deleted by the super admin only
+- [ ] 14.31 Purchase unit with a conversion factor (۱ کارتن = ۲۴ عدد); stock always in the base unit
+- [ ] 14.32 Item photo (`lib/storage.ts` + `lib/imageProfile.ts`, as device photos)
+- [ ] 14.33 Colleague price (قیمت همکار) beside the sell price
+
+### Candidates — not yet agreed
+
+Raised while reviewing the module; each needs a yes before it gets a number.
+
+- Excel import of the item catalogue — the biggest onboarding barrier for a shop with hundreds of parts
+- A technician view of availability («موجود هست / نیست», no prices), on the pattern of `GET /api/sms/capability`
+- Part compatibility with device models, and quality grade (اورجینال، سرویس‌پک، های‌کپی)
+- Serial / IMEI tracking per unit, and warranty on installed parts
+- Customer-supplied parts on a repair invoice, and salvaged parts from unrepairable devices
+- Barcodes: a field, camera or USB scanning, label printing
 
 ## How to use this with Claude Code
 
@@ -456,5 +1754,9 @@ order.
   (Postgres/Prisma) being done; Phase 3 (auth) depends on Phase 2 (`workspaceId` existing).
   Phases 4–6 can be interleaved once Phase 3 is stable. Phase 7 can start in parallel once there's
   something worth deploying. Phase 8 stays last.
+- Phase 13 depends on none of the others: its work happens in the landing repo, and it borrows
+  only the demo workspace and screenshot scripts from this one.
+- Phase 14 runs in sprint order. 14A comes first because every later document posts through
+  its stock service; 14C–14F can be reordered among themselves once 14B is in.
 - After finishing a task, update this file: flip `[ ]` to `[x]` (or `[~]` if partially done) so the
   roadmap always reflects real progress.

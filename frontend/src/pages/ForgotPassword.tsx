@@ -156,7 +156,7 @@ export default function ForgotPassword() {
             />
 
             <p className="flex gap-2 text-body-xs text-text-secondary mt-5 p-3 rounded-field bg-warning-soft/60 leading-relaxed">
-              <InformationCircleIcon className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+              <InformationCircleIcon className="w-4 h-4 shrink-0 mt-0.5 text-warning-fg" />
               با تغییر رمز، از همه‌ی دستگاه‌هایی که وارد بوده‌اید خارج می‌شوید
             </p>
           </motion.div>

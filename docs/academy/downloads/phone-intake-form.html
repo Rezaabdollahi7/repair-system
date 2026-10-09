@@ -1,0 +1,191 @@
+<!doctype html>
+<!--
+  رسید پذیرش تعمیرات موبایل — فرم چاپی رایگان مرکز آموزش.
+  pnpm downloads ← out/downloads/phone-intake-form.pdf، که در لندینگ به
+  public/downloads/ کپی می‌شود. مقاله: guide/phone-intake-form.
+
+  یک برگه‌ی A4: بالا نسخه‌ی تعمیرگاه (کامل)، پایین نسخه‌ی مشتری (کوتاه)، با خط
+  برش. عمداً بی‌نام و نشان دوفیکسو جز یک خط کوچک پایین: فرمی است که تعمیرگاه
+  به اسم خودش به مشتری می‌دهد.
+-->
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Yekan; src: url("{{FONTS}}/IranYekanX/IRANYekanXFaNum-Regular.woff2"); font-weight: 400; }
+  @font-face { font-family: Yekan; src: url("{{FONTS}}/IranYekanX/IRANYekanXFaNum-Bold.woff2"); font-weight: 700; }
+  @font-face { font-family: Yekan; src: url("{{FONTS}}/IranYekanX/IRANYekanXFaNum-ExtraBold.woff2"); font-weight: 800; }
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 210mm; height: 297mm; }
+  body { font-family: Yekan, sans-serif; color: #1b1838; font-size: 9pt; line-height: 1.55; }
+  .sheet { height: 297mm; overflow: hidden; padding: 7mm 11mm 5mm; display: flex; flex-direction: column; }
+  .copy { border: 1.2px solid #1b1838; border-radius: 3mm; padding: 4mm 5mm; }
+  .shop { display: flex; flex-direction: column; gap: 2.2mm; }
+  .cut { margin: 3mm 0; border-top: 1px dashed #8a87a0; position: relative; text-align: center; }
+  .cut span { position: relative; top: -2.2mm; background: #fff; padding: 0 3mm; font-size: 7.5pt; color: #6b6884; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 6mm; }
+  h1 { font-size: 13pt; font-weight: 800; }
+  .tag { font-size: 7.5pt; font-weight: 700; color: #fff; background: #1b1838; border-radius: 1.5mm; padding: 0.5mm 2.5mm; display: inline-block; margin-top: 1mm; }
+  .shopname { flex: 1; }
+  .meta { display: grid; grid-template-columns: auto 30mm; gap: 1.2mm 2mm; align-items: center; font-weight: 700; }
+  .box { border: 1px solid #1b1838; border-radius: 1.5mm; height: 7mm; }
+  .box.big { height: 9mm; border-width: 1.6px; }
+  h2 { font-size: 9pt; font-weight: 800; border-bottom: 1px solid #c9c7d6; padding-bottom: 0.6mm; margin-bottom: 1.4mm; }
+  .row { display: flex; gap: 4mm; }
+  .field { flex: 1; display: flex; align-items: flex-end; gap: 1.5mm; white-space: nowrap; }
+  .field .line { flex: 1; border-bottom: 1px dotted #1b1838; height: 5mm; }
+  .field.w2 { flex: 2; }
+  .lines .line { border-bottom: 1px dotted #1b1838; height: 5.6mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  th, td { border: 1px solid #c9c7d6; padding: 0.5mm 1.6mm; text-align: right; }
+  th { background: #f2f1f7; font-weight: 700; }
+  td.c, th.c { text-align: center; width: 12mm; }
+  td.note { width: 45%; }
+  .sq { display: inline-block; width: 3.2mm; height: 3.2mm; border: 1px solid #1b1838; border-radius: 0.6mm; vertical-align: -0.6mm; }
+  .checks { display: flex; flex-wrap: wrap; gap: 1.2mm 5mm; }
+  .checks span { white-space: nowrap; }
+  .terms { font-size: 7.6pt; color: #3a3755; line-height: 1.6; }
+  .terms ol { padding-right: 4mm; }
+  .sign { display: flex; gap: 6mm; margin-top: 1mm; }
+  .sign { margin-top: 8mm; }
+  .sign div { flex: 1; border-top: 1px solid #1b1838; padding-top: 0.8mm; font-size: 7.6pt; text-align: center; }
+  .customer { display: flex; flex-direction: column; gap: 2mm; }
+  .foot { font-size: 6.5pt; color: #8a87a0; text-align: center; margin-top: auto; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <section class="copy shop">
+    <header>
+      <div class="shopname">
+        <h1>رسید پذیرش تعمیرات موبایل</h1>
+        <span class="tag">نسخه‌ی تعمیرگاه</span>
+        <div class="row" style="margin-top:2mm">
+          <div class="field w2">نام تعمیرگاه:<span class="line"></span></div>
+          <div class="field">تلفن:<span class="line"></span></div>
+        </div>
+      </div>
+      <div class="meta">
+        <span>شماره‌ی پذیرش</span><span class="box big"></span>
+        <span>تاریخ و ساعت</span><span class="box"></span>
+        <span>پذیرش‌کننده</span><span class="box"></span>
+      </div>
+    </header>
+
+    <div>
+      <h2>مشتری</h2>
+      <div class="row">
+        <div class="field w2">نام و نام خانوادگی:<span class="line"></span></div>
+        <div class="field">موبایل:<span class="line"></span></div>
+        <div class="field">تلفن دوم:<span class="line"></span></div>
+      </div>
+    </div>
+
+    <div>
+      <h2>دستگاه</h2>
+      <div class="row">
+        <div class="field">برند:<span class="line"></span></div>
+        <div class="field">مدل:<span class="line"></span></div>
+        <div class="field">رنگ:<span class="line"></span></div>
+      </div>
+      <div class="row" style="margin-top:1.2mm">
+        <div class="field w2">IMEI یا سریال:<span class="line"></span></div>
+        <div class="field">روشن می‌شود؟ <span class="sq"></span> بله <span class="sq"></span> خیر</div>
+      </div>
+    </div>
+
+    <div>
+      <h2>ایرادی که مشتری می‌گوید <span style="font-weight:400;color:#6b6884">(با کلمات خود مشتری)</span></h2>
+      <div class="lines"><div class="line"></div><div class="line"></div></div>
+    </div>
+
+    <div>
+      <h2>وضعیت ظاهری هنگام پذیرش <span style="font-weight:400;color:#6b6884">(در حضور مشتری)</span></h2>
+      <table>
+        <tr><th>بخش</th><th class="c">سالم</th><th class="c">خط</th><th class="c" style="width:16mm">شکسته</th><th class="note">توضیح</th></tr>
+        <tr><td>صفحه‌ی نمایش</td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td></td></tr>
+        <tr><td>پشت گوشی</td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td></td></tr>
+        <tr><td>بدنه و فریم</td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td></td></tr>
+        <tr><td>لنز دوربین</td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td class="c"><span class="sq"></span></td><td></td></tr>
+        <tr><td>دکمه‌ها</td><td class="c"><span class="sq"></span></td><td class="c" colspan="2" style="text-align:right">کار نمی‌کند: <span class="sq"></span></td><td></td></tr>
+        <tr><td>سوکت شارژ</td><td class="c"><span class="sq"></span></td><td class="c" colspan="2" style="text-align:right">کار نمی‌کند: <span class="sq"></span></td><td></td></tr>
+      </table>
+      <div class="checks" style="margin-top:1.4mm">
+        <span><span class="sq"></span> نشانه‌ی آب‌خوردگی</span>
+        <span><span class="sq"></span> قبلاً جای دیگری باز شده</span>
+        <span><span class="sq"></span> پیچ کم دارد</span>
+        <span><span class="sq"></span> باد کردن باتری</span>
+      </div>
+    </div>
+
+    <div class="two">
+      <div>
+        <h2>همراه دستگاه تحویل گرفته شد</h2>
+        <div class="checks">
+          <span><span class="sq"></span> سیم‌کارت</span>
+          <span><span class="sq"></span> کارت حافظه</span>
+          <span><span class="sq"></span> قاب</span>
+          <span><span class="sq"></span> گلس</span>
+          <span><span class="sq"></span> شارژر/کابل</span>
+          <span><span class="sq"></span> جعبه</span>
+        </div>
+      </div>
+      <div>
+        <h2>برآورد</h2>
+        <div class="field">هزینه یا بازه‌ی تقریبی:<span class="line"></span></div>
+        <div class="field" style="margin-top:1.2mm">زمان تقریبی:<span class="line"></span></div>
+        <div class="field" style="margin-top:1.2mm">بیعانه:<span class="line"></span></div>
+      </div>
+    </div>
+
+    <div class="terms">
+      <h2>شرایط</h2>
+      <ol>
+        <li>هزینه‌ی نهایی پس از بررسی اعلام می‌شود و تعمیر فقط بعد از تأیید مشتری انجام می‌شود.</li>
+        <li>از اطلاعات داخل گوشی پیش از تحویل پشتیبان بگیرید؛ در تعمیر ممکن است اطلاعات پاک شود.</li>
+        <li>دستگاه فقط با این رسید یا شماره‌ی پذیرش، به خود مشتری یا کسی که او معرفی کند تحویل داده می‌شود.</li>
+        <li>گارانتی فقط شامل قطعه و کاری است که روی فاکتور آمده، با مدت و تاریخی که روی فاکتور نوشته شده.</li>
+        <li>اگر دستگاه پس از اعلام آماده‌بودن تا <span style="display:inline-block;width:12mm;border-bottom:1px dotted #1b1838"></span> روز تحویل گرفته نشود، <span style="display:inline-block;width:52mm;border-bottom:1px dotted #1b1838"></span></li>
+      </ol>
+      <div class="sign">
+        <div>امضای مشتری — شرایط و وضعیت ظاهری را دیدم و قبول دارم</div>
+        <div>امضای پذیرش‌کننده</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="cut"><span>✂ برش — پایین را به مشتری بدهید</span></div>
+
+  <section class="copy customer">
+    <header>
+      <div class="shopname">
+        <h1 style="font-size:11pt">رسید پذیرش گوشی</h1>
+        <span class="tag">نسخه‌ی مشتری</span>
+        <div class="row" style="margin-top:1.6mm">
+          <div class="field w2">نام تعمیرگاه:<span class="line"></span></div>
+          <div class="field">تلفن:<span class="line"></span></div>
+        </div>
+      </div>
+      <div class="meta">
+        <span>شماره‌ی پذیرش</span><span class="box big"></span>
+        <span>تاریخ</span><span class="box"></span>
+      </div>
+    </header>
+    <div class="row">
+      <div class="field">نام مشتری:<span class="line"></span></div>
+      <div class="field">دستگاه:<span class="line"></span></div>
+    </div>
+    <div class="row">
+      <div class="field w2">ایراد:<span class="line"></span></div>
+      <div class="field">برآورد:<span class="line"></span></div>
+    </div>
+    <p class="terms">برای پیگیری، شماره‌ی پذیرش را بگویید. دستگاه فقط با این رسید یا شماره‌ی پذیرش تحویل داده می‌شود. شرایط کامل روی نسخه‌ی تعمیرگاه است و امضای شما پای آن.</p>
+  </section>
+
+  <p class="foot">فرم رایگان مرکز آموزش دوفیکسو — dofixo.ir/academy</p>
+</div>
+</body>
+</html>

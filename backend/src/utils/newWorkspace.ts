@@ -26,6 +26,13 @@ export const DEFAULT_SERVICES = [
  */
 const DEFAULT_FULL_NAME = "مدیر";
 
+/**
+ * The same name the 14.1 migration gave the warehouse it created for every
+ * workspace that already existed, so a shop registered today and one
+ * migrated look the same.
+ */
+export const DEFAULT_WAREHOUSE_NAME = "انبار اصلی";
+
 const rolesInclude = {
   role: { select: { name: true, label: true } },
 } satisfies Prisma.UserInclude;
@@ -100,6 +107,25 @@ export async function populateWorkspace(
   // when the referral page is first opened, so the code is a property of the
   // workspace rather than something that may or may not exist yet.
   await createReferralCode(tx, workspaceId);
+
+  // An empty SMS wallet, for the same reason the settings row is created
+  // here: the debit in 12.3 is a conditional UPDATE, and an UPDATE that
+  // matches no row is indistinguishable from one refused for lack of funds.
+  // A workspace without this row would report "not enough credit" forever
+  // and no amount of topping up would change it.
+  //
+  // Zero, not a gift: an opening balance is a pricing decision and this is
+  // not the place to take it.
+  await tx.smsWallet.create({ data: { workspaceId } });
+
+  // The warehouse every invoice and stock movement points at until the shop
+  // adds a second. Created here for the wallet's reason: stock written with
+  // no warehouse to land in would fail on the first purchase, far from the
+  // sign-up that should have created it. Named like the one the 14.1
+  // migration gave every workspace that already existed.
+  await tx.warehouse.create({
+    data: { workspaceId, name: DEFAULT_WAREHOUSE_NAME, isDefault: true },
+  });
 
   return owner;
 }

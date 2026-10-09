@@ -20,7 +20,15 @@ export interface ScheduleVerdict {
   notify: {
     kind: NotificationKind;
     template: SmsTemplate;
-    /** #DAYS#, absent for the template that takes no parameter. */
+    /**
+     * #DAYS#.
+     *
+     * ⚠️ Optional in the type, but every approved template today takes it.
+     * The one that was thought not to — ON_EXPIRY — turned out to, and left
+     * unfilled sms.ir delivers the placeholder verbatim with no error. If a
+     * future template genuinely has no parameter, the test below is what
+     * says so.
+     */
     days?: number;
   } | null;
   /** The status column should read this. Reporting only — see 8.3. */
@@ -106,7 +114,18 @@ export function verdictFor(
   if (elapsed === 0) {
     return {
       ...expired,
-      notify: { kind: "on_expiry", template: SMS_TEMPLATES.ON_EXPIRY },
+      notify: {
+        kind: "on_expiry",
+        template: SMS_TEMPLATES.ON_EXPIRY,
+        // ⚠️ The approved template does carry #DAYS#, whatever the comment
+        // in lib/sms.ts said until 7 September. Left out, sms.ir delivers
+        // the placeholder verbatim — no error, no status, nothing in a log.
+        // A real message arrived on production reading "تا #DAYS# روز".
+        //
+        // Grace, not deletion: the sentence promises full access for this
+        // many days, and that is GRACE_DAYS.
+        days: GRACE_DAYS,
+      },
     };
   }
 

@@ -1,54 +1,94 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getDevices, deleteDevice, updateDevice } from "../api";
+import {
+  getDevices,
+  deleteDevice,
+  updateDevice,
+  getSmsCapability,
+} from "../api";
 import FilterPanel from "../components/FilterPanel";
-import Pagination from "../components/Pagination";
+import SmsBalanceBanner from "../components/SmsBalanceBanner";
+import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
+import { AnimatePresence, motion } from "framer-motion";
 import {
   PlusIcon,
+  ArrowsRightLeftIcon,
+  CheckIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  WrenchScrewdriverIcon,
+} from "@heroicons/react/24/solid";
+/*
+ * The row's own controls come from the outline set. The solid variants of
+ * these four are filled discs — an 18px solid XCircleIcon is a dark blob, and
+ * three of them in a row outweighed the status colour the row is meant to be
+ * read by.
+ */
+import {
   TrashIcon,
   DocumentCurrencyDollarIcon,
-  WrenchScrewdriverIcon,
-  ArrowsRightLeftIcon,
   XCircleIcon,
   CheckCircleIcon,
+  ChatBubbleLeftRightIcon,
   DocumentCheckIcon,
-  FunnelIcon,
-} from "@heroicons/react/24/solid";
+} from "@heroicons/react/24/outline";
 import ConfirmModal from "../components/ConfirmModal";
-import LoadingSpinner from "../components/LoadingSpinner";
+import DeviceStatusBadge from "../components/DeviceStatusBadge";
+import StatusPill from "../components/StatusPill";
+import { deviceInvoiceStateOf } from "../utils/invoiceStatus";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { useModal } from "../context/ModalContext";
+import { useGoToCustomer } from "../utils/navigation";
+import PersonnelLink from "../components/PersonnelLink";
+import { formatPersianPhone, toPersianDigits } from "../utils/formatters";
+import { backdrop, modalPanel, staggerContainer, staggerItem } from "../motion";
+import {
+  actionConfirm,
+  actionDelete,
+  actionNeutral,
+  actionView,
+  primaryButton,
+  rowCard,
+  searchField,
+  searchIcon,
+  secondaryButton,
+  tableCard,
+  tableScroll,
+  tbody,
+  td,
+  tdActions,
+  tdBare,
+  tdMuted,
+  th,
+  thead,
+  toolbar,
+  toolbarActions,
+  toolbarSearch,
+  trClickable,
+} from "../utils/tableClasses";
+import { DEVICE_STATUSES, deviceStatusOf } from "../utils/deviceStatus";
 import type { DeviceFilters } from "../components/FilterPanel";
-import type { Device, DeviceAssignee, QueryParams } from "../types/api";
+import { smsOutcomeText } from "../utils/smsOutcome";
+import type {
+  Device,
+  DeviceAssignee,
+  QueryParams,
+  SmsCapability,
+} from "../types/api";
 
+/**
+ * Whether this device has been invoiced, and if so whether it was paid.
+ *
+ * The four states and their wording live in utils/invoiceStatus.ts, beside
+ * the payment statuses — this page and its filter panel used to describe them
+ * separately and disagree.
+ */
 function InvoiceStatusBadge({ device }: { device: Device }) {
-  const getInvoiceStatus = () => {
-    if (!device.needs_invoice) {
-      return {
-        label: "فاکتور نیاز ندارد",
-        color: "bg-primary-soft text-primary",
-      };
-    }
-    if (device.invoice_count > 0) {
-      return device.invoice_status === "paid"
-        ? { label: "پرداخت شده", color: "bg-success-soft text-success" }
-        : { label: "پرداخت نشده", color: "bg-danger-soft text-danger" };
-    }
-    return { label: "فاکتور ندارد", color: "bg-warning-soft text-warning" };
-  };
-
-  const status = getInvoiceStatus();
-
-  return (
-    <span
-      className={`px-2 py-1 mt-3 rounded-full text-xs font-medium  ${status.color}`}
-    >
-      {status.label}
-    </span>
-  );
+  const { label, color, tone } = deviceInvoiceStateOf(device);
+  return <StatusPill label={label} color={color} tone={tone} size="sm" />;
 }
 
 interface StatusBadgeProps {
@@ -56,133 +96,257 @@ interface StatusBadgeProps {
   onStatusChange: (status: string) => void;
 }
 
+/**
+ * The badge plus the button that changes it.
+ *
+ * The nine-way label-and-colour map that used to live here is gone — it was
+ * one of six copies, and it is now `utils/deviceStatus.ts`. What is left is
+ * the picker, which is this page's own.
+ */
 function StatusBadge({ status, onStatusChange }: StatusBadgeProps) {
   const [showModal, setShowModal] = useState(false);
 
-  const map: Record<string, { label: string; color: string }> = {
-    pending: {
-      label: "در انتظار بررسی",
-      color: "bg-warning-soft text-warning",
-    },
-    diagnosing: {
-      label: "در حال بررسی",
-      color: "bg-primary-soft text-primary",
-    },
-    waiting_for_parts: {
-      label: "در انتظار قطعه",
-      color: "bg-warning-soft text-warning",
-    },
-    repairing: {
-      label: "در حال تعمیر",
-      color: "bg-primary-soft text-primary",
-    },
-    repaired: {
-      label: "تعمیر شده",
-      color: "bg-surface-alt text-text-secondary",
-    },
-    delivered: {
-      label: "تحویل داده شده",
-      color: "bg-success-soft text-success",
-    },
-    ready_for_pickup: {
-      label: "آماده تحویل",
-      color: "bg-primary-soft text-primary",
-    },
-    unrepairable: {
-      label: "غیرقابل تعمیر",
-      color: "bg-danger-soft text-danger",
-    },
-    not_repaired: { label: "تعمیر نشد", color: "bg-warning-soft text-danger" },
-  };
-
-  const current = map[status] || {
-    label: status,
-    color: "bg-surface-alt text-text-secondary",
-  };
-
   return (
     <>
-      <div className="flex items-center  gap-3">
-        <span
-          className={`px-2 py-1 mr-5 rounded-full text-xs font-medium ${current.color}`}
-        >
-          {current.label}
-        </span>
+      <div className="flex items-center justify-center gap-1.5">
+        <DeviceStatusBadge status={status} size="sm" />
         <button
           onClick={(e) => {
             e.stopPropagation();
             setShowModal(true);
           }}
-          className="p-0.5 rounded-full text-text-secondary hover:text-primary group-hover:text-text-inverse hover:opacity-80 transition-colors"
+          className="p-1 rounded-field text-text-muted hover:text-text-primary
+                     hover:bg-surface-alt transition-colors cursor-pointer"
           title="تغییر وضعیت"
+          aria-label="تغییر وضعیت دستگاه"
         >
-          <ArrowsRightLeftIcon className="size-5" />
+          <ArrowsRightLeftIcon className="w-4 h-4" />
         </button>
       </div>
 
       {/* Status picker */}
-      {showModal && (
+      <AnimatePresence>
+        {showModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              variants={backdrop}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-scrim/50"
+            />
+            <motion.div
+              variants={modalPanel}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="relative bg-surface border border-border rounded-panel shadow-xl w-full max-w-xs overflow-hidden"
+              dir="rtl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-border">
+                <h3 className="text-body-sm font-bold text-text-primary">
+                  تغییر وضعیت
+                </h3>
+              </div>
+              {/* Listed in workflow order, so the next step is the row below
+                  the current one rather than somewhere in an alphabet. */}
+              <div className="p-2 max-h-[60vh] overflow-y-auto">
+                {DEVICE_STATUSES.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => {
+                      onStatusChange(option.key);
+                      setShowModal(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 text-right px-3 py-2.5
+                                rounded-field text-body-sm transition-colors mb-1 cursor-pointer ${
+                                  option.key === status
+                                    ? "bg-surface-alt"
+                                    : "hover:bg-surface-alt"
+                                }`}
+                  >
+                    <DeviceStatusBadge status={option.key} />
+                    {option.key === status && (
+                      <CheckIcon className="w-4 h-4 shrink-0 text-text-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="p-2 border-t border-border">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="w-full px-4 py-2.5 text-body-sm text-text-secondary
+                             hover:bg-surface-alt rounded-field transition-colors cursor-pointer"
+                >
+                  انصراف
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/** The two statuses this list stops to ask about: each can text the customer. */
+type SmsStatus = "ready_for_pickup" | "delivered";
+
+const SMS_PROMPT_TEXT: Record<
+  SmsStatus,
+  { title: string; message: string; note: string }
+> = {
+  ready_for_pickup: {
+    title: "آماده تحویل",
+    message: "پیامک آماده تحویل برای",
+    note: "مشتری با این پیامک می‌فهمد دستگاهش آماده است و می‌تواند بیاید.",
+  },
+  delivered: {
+    title: "تحویل دستگاه",
+    message: "پیامک تحویل دستگاه برای",
+    note: "تاریخ خروج دستگاه در هر صورت روی امروز ثبت می‌شود.",
+  },
+};
+
+/**
+ * Asked when a device moves to a status that has a message for the
+ * customer, before anything is saved.
+ *
+ * Both are per-device decisions rather than settings. A customer standing
+ * at the counter collecting their own device does not need a text about
+ * it, and one collected by a relative or a courier very much does; a
+ * device marked ready while its owner is on the phone has already been
+ * announced. The device form asks the same question with a toggle. This
+ * picker used to ask only on delivery, so a device marked ready from the
+ * list quietly told nobody — the message a shop most wants sent.
+ *
+ * Three buttons rather than two, because "no" and "not now" are different
+ * answers: both of the first two change the status, and only انصراف leaves
+ * the device alone.
+ */
+function StatusSmsPrompt({
+  prompt,
+  saving,
+  onAnswer,
+  onCancel,
+}: {
+  prompt: { device: Device; status: SmsStatus } | null;
+  saving: boolean;
+  onAnswer: (sendSms: boolean) => void;
+  onCancel: () => void;
+}) {
+  const device = prompt?.device;
+  const text = prompt ? SMS_PROMPT_TEXT[prompt.status] : null;
+  return (
+    <AnimatePresence>
+      {device && text && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
-          onClick={() => setShowModal(false)}
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
         >
-          <div
-            className="bg-surface rounded-xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
+          <motion.div
+            variants={backdrop}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={saving ? undefined : onCancel}
+            className="absolute inset-0 bg-scrim/50"
+          />
+          <motion.div
+            variants={modalPanel}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="relative bg-surface border border-border rounded-panel
+                       shadow-xl w-full max-w-md overflow-hidden"
             dir="rtl"
-            onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-border">
-              <h3 className="text-sm font-bold text-text-primary">
-                تغییر وضعیت
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-title-sm font-bold text-text-primary">
+                {text.title}
               </h3>
             </div>
-            <div className="p-2">
-              {Object.entries(map).map(([key, val]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    onStatusChange(key);
-                    setShowModal(false);
-                  }}
-                  className={`w-full text-right px-4 py-3 rounded-lg text-sm font-medium transition-colors mb-1 ${
-                    key === status
-                      ? `${val.color} ring-2 ring-inset`
-                      : "text-text-primary hover:bg-surface-alt"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{val.label}</span>
-                    {key === status && (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-              ))}
+
+            <div className="p-5 flex items-start gap-4">
+              <span
+                className="shrink-0 w-11 h-11 rounded-field bg-primary-soft
+                           text-primary flex items-center justify-center"
+              >
+                <ChatBubbleLeftRightIcon className="w-6 h-6" />
+              </span>
+              <div className="text-body-sm text-text-primary space-y-1.5">
+                <p>
+                  {text.message}{" "}
+                  <span className="font-bold">
+                    {device.customer_name ?? "مشتری"}
+                  </span>{" "}
+                  ارسال شود؟
+                </p>
+                {/* The number, because the shop is about to spend a message
+                    on it and a device with the wrong one attached is worth
+                    catching here rather than in the sms log. */}
+                <p className="text-text-secondary tabular-nums">
+                  <span dir="ltr" className="inline-block">
+                    {formatPersianPhone(device.customer_phone)}
+                  </span>
+                </p>
+                <p className="text-text-secondary">{text.note}</p>
+              </div>
             </div>
-            <div className="p-2 border-t border-border">
+
+            <div
+              className="flex flex-wrap gap-3 justify-end px-5 py-4
+                         border-t border-border bg-surface-alt"
+            >
               <button
-                onClick={() => setShowModal(false)}
-                className="w-full px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-alt rounded-lg transition-colors"
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-field border border-border bg-surface
+                           text-body-sm font-bold text-text-primary
+                           hover:border-border-strong transition-colors cursor-pointer
+                           disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 انصراف
               </button>
+              <button
+                type="button"
+                onClick={() => onAnswer(false)}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-field border border-border bg-surface
+                           text-body-sm font-bold text-text-primary
+                           hover:border-border-strong transition-colors cursor-pointer
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                خیر، بدون پیامک
+              </button>
+              <button
+                type="button"
+                onClick={() => onAnswer(true)}
+                disabled={saving}
+                aria-busy={saving}
+                className="px-4 py-2.5 rounded-field bg-primary text-primary-fg
+                           text-body-sm font-bold hover:bg-primary-hover
+                           transition-colors flex items-center gap-2 cursor-pointer
+                           disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {saving && (
+                  <span
+                    aria-hidden
+                    className="w-4 h-4 rounded-full border-2 border-current/30
+                               border-t-current animate-spin"
+                  />
+                )}
+                بله، ارسال کن
+              </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
-    </>
+    </AnimatePresence>
   );
 }
 
@@ -191,24 +355,85 @@ function formatDate(dateStr: string | null | undefined): string {
   return new Date(dateStr).toLocaleDateString("fa-IR");
 }
 
+/**
+ * Who is on the job.
+ *
+ * Neutral, and deliberately so: a technician's name is not a state, and
+ * giving it a colour would put a third coloured chip in a row that already
+ * carries the repair status and the payment status. The initial in front of
+ * it is what makes the chip scannable instead.
+ */
 function AssigneeBadge({ assignees }: { assignees: DeviceAssignee[] }) {
   if (!assignees || assignees.length === 0) {
-    return <span className="text-text-secondary text-xs">—</span>;
+    return <span className="text-text-muted text-body-xs">—</span>;
   }
-  if (assignees.length === 1) {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary">
-        {assignees[0].name}
-      </span>
-    );
-  }
+
+  const shared = assignees.length > 1;
+  /*
+   * One name is a way to that person's page; several is a count, and the
+   * chip has no room for several links. The full list stays in the title.
+   */
+  const label = shared ? (
+    `مشترک — ${toPersianDigits(assignees.length)} نفر`
+  ) : (
+    <PersonnelLink
+      id={assignees[0].id}
+      name={assignees[0].name}
+      tone="inherit"
+    />
+  );
+
   return (
     <span
-      title={assignees.map((a) => a.name).join("، ")}
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary cursor-help"
+      title={shared ? assignees.map((a) => a.name).join("، ") : undefined}
+      className={`inline-flex items-center gap-1.5 ps-1 pe-2.5 py-0.5 rounded-pill
+                  bg-surface-alt text-text-primary text-body-xs font-bold
+                  whitespace-nowrap ${shared ? "cursor-help" : ""}`}
     >
-      مشترک ({assignees.length} نفر)
+      {/* A step of the surface rather than the accent. Ten accent discs down
+          the technician column pulled the eye there instead of to the status,
+          and the accent is meant to be spent once per screen. */}
+      <span
+        className="w-5 h-5 rounded-full bg-surface-sunken text-text-secondary
+                   flex items-center justify-center text-body-xs shrink-0"
+        aria-hidden="true"
+      >
+        {shared
+          ? toPersianDigits(assignees.length)
+          : assignees[0].name.trim().charAt(0)}
+      </span>
+      {label}
     </span>
+  );
+}
+
+/** Mirrors the table so the page does not jump when the rows land. */
+function DeviceListSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="hidden lg:block bg-surface border border-border rounded-panel p-5">
+        <div className="h-4 w-full rounded-field bg-surface-alt mb-5" />
+        {Array.from({ length: 8 }, (_, row) => (
+          <div key={row} className="flex gap-3 mb-4">
+            {[3, 5, 4, 3, 2, 4].map((span, cell) => (
+              <div
+                key={cell}
+                className="h-4 rounded-field bg-surface-alt"
+                style={{ flexGrow: span, flexBasis: 0 }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="lg:hidden space-y-3">
+        {[0, 1, 2, 3].map((card) => (
+          <div
+            key={card}
+            className="h-32 rounded-panel border border-border bg-surface"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -230,12 +455,30 @@ export default function DeviceList() {
   const { isAtLeast } = useAuth();
 
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   const [deleteTarget, setDeleteTarget] = useState<Device | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  /*
+   * The device waiting on an answer about its delivery message, and whether
+   * that answer is currently being saved.
+   *
+   * `smsCapability` is what the server says this workshop can do —
+   * notifications switched on, wallet funded. Asking a shop that cannot send
+   * whether it would like to send is a dialog with one real answer, so when
+   * it says no the status change goes straight through as it always did.
+   */
+  const [smsPrompt, setSmsPrompt] = useState<{
+    device: Device;
+    status: SmsStatus;
+  } | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [smsCapability, setSmsCapability] = useState<SmsCapability | null>(
+    null,
+  );
 
   const activeFilterCount = Object.values(filters).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v !== "",
@@ -244,11 +487,11 @@ export default function DeviceList() {
 
   const {
     openDeviceEdit,
-    openCustomerDetail,
     refreshList,
     openSaleInvoiceCreate,
     openSaleInvoiceDetail,
   } = useModal();
+  const goToCustomer = useGoToCustomer();
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -315,14 +558,101 @@ export default function DeviceList() {
     });
   }, [refreshList, fetchDevices, debouncedSearch, filters, page, limit]);
 
-  const handleStatusChange = async (deviceId: number, newStatus: string) => {
+  /*
+   * Read once, when the page opens. It answers can-I-send as two flags and
+   * a reason with no balance in it, which is why a technician may call it —
+   * and a technician is exactly who marks a device as delivered.
+   *
+   * A failure leaves it null, which reads as "cannot send" and costs the
+   * shop a dialog rather than a message: the server is the one that decides
+   * either way, so guessing optimistically here would only produce a
+   * question whose answer is then ignored.
+   */
+  useEffect(() => {
+    getSmsCapability()
+      .then(({ data }) => setSmsCapability(data))
+      .catch(() => setSmsCapability(null));
+  }, []);
+
+  /**
+   * Writes the new status, and reports what became of any message it earned.
+   *
+   * `send_sms` is only ever sent when the shop was actually asked. Leaving
+   * it out is not the same as sending false — it is the absence the server
+   * already reads as "no message", and it keeps this call identical to what
+   * it was for the seven statuses that have nothing to announce.
+   */
+  const applyStatusChange = async (
+    deviceId: number,
+    newStatus: string,
+    sendSms?: boolean,
+  ) => {
+    setStatusSaving(true);
     try {
-      await updateDevice(deviceId, { status: newStatus });
+      const res = await updateDevice(deviceId, {
+        status: newStatus,
+        ...(sendSms === undefined ? {} : { send_sms: sendSms }),
+      });
       toast.success("وضعیت دستگاه بروز شد");
+
+      // A second toast, not a combined line: the device saved either way,
+      // and a shop reading «وضعیت دستگاه بروز شد» should not have to read
+      // past it to learn the customer was never told.
+      const sms = res.data.sms;
+      if (sms) {
+        const text = smsOutcomeText(sms);
+        if (sms.status === "sent") toast.success(text);
+        else toast.error(text);
+      }
+
+      setSmsPrompt(null);
       void fetchDevices(debouncedSearch, filters, page, limit);
     } catch {
       toast.error("خطا در تغییر وضعیت");
+    } finally {
+      setStatusSaving(false);
     }
+  };
+
+  /**
+   * What the picker calls. Every status but two goes straight through.
+   *
+   * «آماده تحویل» and «تحویل داده شده» stop to ask, because they are the
+   * changes in this list that can put a message on a customer's phone, and
+   * the shop is the only one who knows whether that customer already knows.
+   * Asked on the transition, so re-picking the status a device already has
+   * neither asks nor sends — the same rule the server applies
+   * (`transitionNotification`).
+   */
+  const handleStatusChange = (device: Device, newStatus: string) => {
+    const asksAboutSms =
+      (newStatus === "ready_for_pickup" || newStatus === "delivered") &&
+      device.status !== newStatus &&
+      Boolean(smsCapability?.can_send);
+
+    if (asksAboutSms) {
+      setSmsPrompt({ device, status: newStatus as SmsStatus });
+      return;
+    }
+
+    void applyStatusChange(device.id, newStatus);
+  };
+
+  /**
+   * Adds or removes one status from the filter.
+   *
+   * The chips write into the same `filters.status` array the filter panel
+   * does, rather than keeping a second piece of state — two controls over one
+   * filter that disagree is the bug that arrangement always produces.
+   */
+  const toggleStatus = (key: string) => {
+    setFilters((current) => ({
+      ...current,
+      status: current.status.includes(key)
+        ? current.status.filter((value) => value !== key)
+        : [...current.status, key],
+    }));
+    setPage(1);
   };
 
   const handleToggleNeedsInvoice = async (deviceId: number, value: boolean) => {
@@ -336,45 +666,213 @@ export default function DeviceList() {
   };
 
   // ─── Render ───────────────────────────────────────────────────
+
+  /*
+   * Row actions, shared by the table row and the phone card.
+   *
+   * Neutral until hovered, and that is the point. Each of these used to carry
+   * its own tint — green, red, amber, ink — which put five colours in the
+   * last column of a row that already says what it is four times over: the
+   * status rule down its leading edge, the status badge, the assignee chip
+   * and the payment badge. Colour there competed with the signal instead of
+   * adding one, so the buttons state their meaning on hover and in their
+   * title, and the destructive one turns red only when it is about to be
+   * pressed.
+   */
+
+  const rowActions = (device: Device) => (
+    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+      {device.invoice_count > 0 ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (device.sale_invoice_id)
+              openSaleInvoiceDetail(device.sale_invoice_id);
+          }}
+          className={actionView}
+          title={
+            device.invoice_status === "paid"
+              ? "فاکتور پرداخت شده"
+              : "فاکتور پرداخت نشده"
+          }
+        >
+          <DocumentCheckIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      ) : !device.needs_invoice ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggleNeedsInvoice(device.id, true);
+          }}
+          className={actionNeutral}
+          title="اگر نیاز به فاکتور دارد — کلیک کنید"
+        >
+          <CheckCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openSaleInvoiceCreate(device.id);
+            }}
+            className={actionConfirm}
+            title="ایجاد فاکتور فروش"
+          >
+            <DocumentCurrencyDollarIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleNeedsInvoice(device.id, false);
+            }}
+            className={actionNeutral}
+            title="فاکتور لازم نیست"
+          >
+            <XCircleIcon className="w-[1.15rem] h-[1.15rem]" />
+          </button>
+        </>
+      )}
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setDeleteTarget(device);
+        }}
+        className={actionDelete}
+        title="حذف"
+      >
+        <TrashIcon className="w-[1.15rem] h-[1.15rem]" />
+      </button>
+    </div>
+  );
+
+  const filtering = activeFilterCount > 0 || debouncedSearch !== "";
+
   return (
     <div dir="rtl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-text-primary flex gap-2">
-          <WrenchScrewdriverIcon className="w-6 h-6 text-text-secondary" />
-          دستگاه‌ها
-        </h1>
-        <div className="flex gap-2 w-full sm:w-auto">
+      {/* Here rather than in the layout: this is where a shop stands when it
+          would send a message, and a banner above every screen is one nobody
+          reads by the time it matters. */}
+      <SmsBalanceBanner />
+
+      <header className="mb-5">
+        {/*
+          Quick status filters.
+          -----------------------------------------------------------------
+          The same nine states in the same workflow order as the picker and
+          the dashboard's ring, each carrying its own dot — so a colour means
+          one thing wherever it appears in the app.
+
+          No counts on them, deliberately: this endpoint returns a page of
+          devices and a total, not a breakdown, and a per-status count would
+          need either a second request or a new field. A chip that filters is
+          worth having without one; a chip showing a number that is quietly
+          the wrong number is not.
+        */}
+        {/*
+          One scrollable row on a phone, wrapping from `sm` up. Ten chips wrap
+          to four lines at 390px — about 120px of filters standing between the
+          user and the first device — and a phone is where this list is most
+          often read. The filter panel still offers all ten as a list.
+        */}
+        <div
+          className="flex gap-2 mt-4 overflow-x-auto pb-1
+                     sm:flex-wrap sm:overflow-x-visible sm:pb-0"
+          role="group"
+          aria-label="فیلتر سریع وضعیت"
+        >
+          <button
+            onClick={() => {
+              setFilters((current) => ({ ...current, status: [] }));
+              setPage(1);
+            }}
+            aria-pressed={filters.status.length === 0}
+            className={`shrink-0 px-3 py-1.5 rounded-pill text-body-xs font-bold border
+                        transition-colors cursor-pointer ${
+                          filters.status.length === 0
+                            ? "bg-primary text-primary-fg border-primary"
+                            : "bg-surface text-text-secondary border-border hover:border-border-strong"
+                        }`}
+          >
+            همه
+          </button>
+          {DEVICE_STATUSES.map((status) => {
+            const active = filters.status.includes(status.key);
+            return (
+              <button
+                key={status.key}
+                onClick={() => toggleStatus(status.key)}
+                aria-pressed={active}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill
+                            text-body-xs font-bold border transition-colors cursor-pointer
+                            ${
+                              active
+                                ? "text-text-primary"
+                                : "bg-surface text-text-secondary border-border hover:border-border-strong"
+                            }`}
+                style={
+                  active
+                    ? {
+                        backgroundColor: `color-mix(in oklab, ${status.color} 16%, var(--surface))`,
+                        borderColor: `color-mix(in oklab, ${status.color} 55%, var(--surface))`,
+                      }
+                    : undefined
+                }
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: status.color }}
+                  aria-hidden="true"
+                />
+                {status.label}
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      <div className={toolbar}>
+        <div className={toolbarSearch}>
+          <MagnifyingGlassIcon className={searchIcon} />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس…"
+            aria-label="جستجوی دستگاه"
+            className={searchField}
+          />
+        </div>
+
+        <div className={toolbarActions}>
+          {/*
+            A neutral button, not a green one. --success is reserved for
+            "this went well"; opening a filter panel is neither a success
+            nor a state, and colouring it green spends a status tone on a
+            control that has no status.
+          */}
           <button
             onClick={() => setFilterOpen(true)}
-            className="flex-1 sm:flex-none bg-success text-text-inverse px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm hover:opacity-80"
+            className={secondaryButton}
           >
-            <FunnelIcon className="w-5 h-5" />
-            <span>فیلترها</span>
+            <FunnelIcon className="w-[1.15rem] h-[1.15rem] text-text-secondary" />
+            فیلترها
             {activeFilterCount > 0 && (
-              <span className="bg-surface text-success text-xs font-bold rounded-full  py-1 px-2.5 flex items-center">
-                {activeFilterCount}
+              <span className="min-w-5 h-5 px-1.5 rounded-pill bg-primary text-primary-fg text-body-xs flex items-center justify-center">
+                {toPersianDigits(activeFilterCount)}
               </span>
             )}
           </button>
           <button
             onClick={() => openDeviceEdit(null)}
-            className="flex-1 sm:flex-none bg-primary text-text-inverse px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className={primaryButton}
           >
-            <PlusIcon className="w-5 h-5" />
+            <PlusIcon className="w-[1.15rem] h-[1.15rem]" />
             ثبت دستگاه جدید
           </button>
         </div>
-      </div>
-      {/* Search + Filter */}
-      <div className="mb-4">
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="جستجو در نام، برند، مدل، سریال، مشتری، شماره تماس..."
-          className="w-full border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface text-text-primary"
-        />
+
         <FilterPanel
           isOpen={filterOpen}
           onClose={() => setFilterOpen(false)}
@@ -389,212 +887,244 @@ export default function DeviceList() {
           }}
         />
       </div>
-      {/* Table */}
+
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="md" text=" دارم لود میکنم  ..." />
-        </div>
+        <DeviceListSkeleton />
       ) : devices.length === 0 ? (
-        <div className="text-center py-20 text-text-secondary">
-          {searchInput
-            ? `نتیجه‌ای برای "${searchInput}" یافت نشد`
-            : "هیچ دستگاهی ثبت نشده"}
+        <div className="bg-surface border border-border rounded-panel flex flex-col items-center justify-center text-center py-16 px-4">
+          <span className="w-14 h-14 rounded-panel bg-surface-alt flex items-center justify-center mb-4">
+            <WrenchScrewdriverIcon
+              className="w-7 h-7 text-text-muted"
+              aria-hidden="true"
+            />
+          </span>
+          <p className="text-body-md font-bold text-text-primary">
+            {filtering ? "نتیجه‌ای یافت نشد" : "هنوز دستگاهی ثبت نشده"}
+          </p>
+          <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
+            {searchInput
+              ? `چیزی با «${searchInput}» پیدا نشد. عبارت دیگری را امتحان کنید.`
+              : activeFilterCount > 0
+                ? "این ترکیب فیلترها چیزی برنگرداند. یکی از آن‌ها را بردارید."
+                : "اولین دستگاهی که برای تعمیر پذیرش می‌کنید را اینجا ثبت کنید."}
+          </p>
+          {/* An empty result the user filtered into needs a way back out;
+              an empty workspace needs the button that fills it. */}
+          {filtering ? (
+            <button
+              onClick={() => {
+                setFilters(EMPTY_FILTERS);
+                setSearchInput("");
+                setPage(1);
+              }}
+              className={`${secondaryButton} mt-5 flex-none`}
+            >
+              پاک‌کردن جستجو و فیلترها
+            </button>
+          ) : (
+            <button
+              onClick={() => openDeviceEdit(null)}
+              className={`${primaryButton} mt-5 flex-none`}
+            >
+              <PlusIcon
+                className="w-[1.15rem] h-[1.15rem]"
+                aria-hidden="true"
+              />
+              ثبت دستگاه جدید
+            </button>
+          )}
         </div>
       ) : (
-        <div className="bg-surface shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1400px] lg:min-w-full divide-y divide-border">
-              <thead className="bg-primary-soft">
-                <tr>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    شماره پذیرش
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    مشتری
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    شماره تماس
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    نوع دستگاه
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    برند
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    وضعیت دستگاه
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تعمیرکار
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تاریخ ثبت
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                    تاریخ خروج
-                  </th>
-
-                  {isAtLeast("admin") && (
-                    <>
-                      <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border border-l">
-                        وضعیت پرداخت
-                      </th>
-                      <th className="px-4 py-3 text-center font-semibold text-text-primary border-b border-border">
-                        عملیات
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {devices.map((device, index) => (
-                  <tr
-                    key={device.id}
-                    onClick={() => openDeviceEdit(device.id)}
-                    className={`hover:bg-primary hover:text-text-inverse transition-colors hover:cursor-pointer group ${
-                      index % 2 === 0 ? "bg-surface" : "bg-surface-alt"
-                    }`}
-                  >
-                    <td className="px-4 py-3 text-sm text-center border-l border-border font-mono text-text-primary group-hover:text-text-inverse">
-                      {device.id}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border">
+        <>
+          {/*
+            Below lg the table becomes one card per device. Eleven columns
+            need 1400px, which on a phone is a page the user has to drag
+            sideways to read a single row.
+          */}
+          <motion.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="lg:hidden space-y-3"
+          >
+            {devices.map((device) => (
+              <motion.li key={device.id} variants={staggerItem}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDeviceEdit(device.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openDeviceEdit(device.id);
+                    }
+                  }}
+                  className={`${rowCard} cursor-pointer hover:border-border-strong
+                              relative overflow-hidden ps-5`}
+                >
+                  {/*
+                    A stripe of the status colour down the card's leading
+                    edge. On a phone the card is the row, and this is what
+                    lets a stack of them be skimmed for one state without
+                    reading a single label.
+                  */}
+                  <span
+                    className="absolute inset-y-0 start-0 w-1.5"
+                    style={{
+                      backgroundColor: deviceStatusOf(device.status).color,
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-body-sm font-bold text-text-primary truncate">
+                        {device.device_name}
+                        {device.brand ? ` — ${device.brand}` : ""}
+                      </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (device.customer_id)
-                            openCustomerDetail(device.customer_id);
+                            goToCustomer(device.customer_id);
                         }}
-                        className="text-primary group-hover:text-text-inverse hover:underline font-medium"
+                        className="text-body-sm text-primary hover:underline font-medium"
                       >
                         {device.customer_name ?? "مشتری"}
                       </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
-                      {device.customer_phone}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-primary group-hover:text-text-inverse">
-                      {device.device_name}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-primary group-hover:text-text-inverse">
-                      {device.brand ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 border-l border-border">
-                      <StatusBadge
-                        status={device.status}
-                        onStatusChange={(newStatus) =>
-                          handleStatusChange(device.id, newStatus)
-                        }
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border group-hover:text-text-inverse">
-                      <AssigneeBadge assignees={device.assignees} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
-                      {formatDate(device.entry_date)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center border-l border-border text-text-secondary group-hover:text-text-inverse">
-                      {formatDate(device.exit_date)}
-                    </td>
+                      <p
+                        className="text-body-xs text-text-muted tabular-nums"
+                        dir="ltr"
+                      >
+                        {formatPersianPhone(device.customer_phone)}
+                      </p>
+                    </div>
+                    <span className="text-body-xs text-text-muted shrink-0 tabular-nums">
+                      #{toPersianDigits(device.reception_number)}
+                    </span>
+                  </div>
 
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <StatusBadge
+                      status={device.status}
+                      onStatusChange={(newStatus) =>
+                        handleStatusChange(device, newStatus)
+                      }
+                    />
+                    {isAtLeast("admin") && (
+                      <InvoiceStatusBadge device={device} />
+                    )}
+                    <AssigneeBadge assignees={device.assignees} />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-border-subtle">
+                    <span className="text-body-xs text-text-muted">
+                      ثبت: {formatDate(device.entry_date)}
+                    </span>
+                    {isAtLeast("admin") && rowActions(device)}
+                  </div>
+                </div>
+              </motion.li>
+            ))}
+          </motion.ul>
+
+          <div className={`hidden lg:block ${tableCard}`}>
+            <div className={tableScroll}>
+              <table className="min-w-[1120px] w-full">
+                <thead className={thead}>
+                  <tr>
+                    <th className={th}>پذیرش</th>
+                    <th className={th}>مشتری</th>
+                    <th className={th}>شماره تماس</th>
+                    <th className={th}>نوع دستگاه</th>
+                    <th className={th}>برند</th>
+                    <th className={th}>وضعیت دستگاه</th>
+                    <th className={th}>تعمیرکار</th>
+                    <th className={th}>تاریخ ثبت</th>
+                    <th className={th}>تاریخ خروج</th>
                     {isAtLeast("admin") && (
                       <>
-                        <td className="px-4 py-3 flex  justify-center border-l border-border">
-                          <InvoiceStatusBadge device={device} />
-                        </td>
-
-                        <td className="px-4 py-3 text-sm text-center">
-                          <div className="flex gap-2 justify-end items-center">
-                            {isAtLeast("admin") && (
-                              <>
-                                {device.invoice_count > 0 ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (device.sale_invoice_id)
-                                        openSaleInvoiceDetail(
-                                          device.sale_invoice_id,
-                                        );
-                                    }}
-                                    className={`p-2 rounded-lg transition-colors ${
-                                      device.invoice_status === "paid"
-                                        ? "bg-success-soft text-success hover:opacity-80"
-                                        : "bg-danger-soft text-danger hover:opacity-80"
-                                    }`}
-                                    title={
-                                      device.invoice_status === "paid"
-                                        ? "فاکتور پرداخت شده"
-                                        : "فاکتور پرداخت نشده"
-                                    }
-                                  >
-                                    <DocumentCheckIcon className="w-5 h-5" />
-                                  </button>
-                                ) : !device.needs_invoice ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleNeedsInvoice(device.id, true);
-                                    }}
-                                    className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
-                                    title=" اگر نیاز به فاکتور دارد - کلیک کنید"
-                                  >
-                                    <CheckCircleIcon className="w-5 h-5" />
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openSaleInvoiceCreate(device.id);
-                                      }}
-                                      className="p-2 rounded-lg bg-warning-soft text-warning hover:opacity-80 transition-colors"
-                                      title="ایجاد فاکتور فروش"
-                                    >
-                                      <DocumentCurrencyDollarIcon className="w-5 h-5" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleNeedsInvoice(
-                                          device.id,
-                                          false,
-                                        );
-                                      }}
-                                      className="p-2 rounded-lg bg-primary-soft text-primary hover:opacity-80 transition-colors"
-                                      title="فاکتور لازم نیست"
-                                    >
-                                      <XCircleIcon className="w-5 h-5" />
-                                    </button>
-                                  </>
-                                )}
-
-                                <div className="w-px h-8 bg-border mx-1" />
-                              </>
-                            )}
-
-                            {isAtLeast("admin") && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget(device);
-                                }}
-                                className="p-2 rounded-lg bg-danger-soft text-danger hover:opacity-80 transition-colors cursor-pointer"
-                                title="حذف"
-                              >
-                                <TrashIcon className="w-5 h-5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                        <th className={th}>وضعیت پرداخت</th>
+                        <th className={th}>عملیات</th>
                       </>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className={tbody}>
+                  {devices.map((device) => (
+                    <tr
+                      key={device.id}
+                      onClick={() => openDeviceEdit(device.id)}
+                      className={trClickable}
+                    >
+                      {/*
+                        The status colour again, as a rule down the row's
+                        leading edge. The badge four columns over says the
+                        same thing in words; this is what makes a screenful
+                        of rows skimmable for one state, which is how a
+                        workshop actually uses this table.
+                      */}
+                      <td
+                        className={`${td} tabular-nums relative`}
+                        style={{
+                          boxShadow: `inset -3px 0 0 0 ${deviceStatusOf(device.status).color}`,
+                        }}
+                      >
+                        {toPersianDigits(device.reception_number)}
+                      </td>
+                      <td className={td}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (device.customer_id)
+                              goToCustomer(device.customer_id);
+                          }}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          {device.customer_name ?? "مشتری"}
+                        </button>
+                      </td>
+                      <td className={`${tdMuted} tabular-nums`}>
+                        <span dir="ltr" className="inline-block">
+                          {formatPersianPhone(device.customer_phone)}
+                        </span>
+                      </td>
+                      <td className={td}>{device.device_name}</td>
+                      <td className={td}>{device.brand ?? "—"}</td>
+                      <td className={tdActions}>
+                        <StatusBadge
+                          status={device.status}
+                          onStatusChange={(newStatus) =>
+                            handleStatusChange(device, newStatus)
+                          }
+                        />
+                      </td>
+                      <td className={td}>
+                        <AssigneeBadge assignees={device.assignees} />
+                      </td>
+                      <td className={tdMuted}>
+                        {formatDate(device.entry_date)}
+                      </td>
+                      <td className={tdMuted}>
+                        {formatDate(device.exit_date)}
+                      </td>
+
+                      {isAtLeast("admin") && (
+                        <>
+                          <td className={tdBare}>
+                            <InvoiceStatusBadge device={device} />
+                          </td>
+                          <td className={tdActions}>{rowActions(device)}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
+
       {/* Pagination */}
       <div className="mt-4">
         <Pagination
@@ -609,6 +1139,21 @@ export default function DeviceList() {
           }}
         />
       </div>
+
+      <StatusSmsPrompt
+        prompt={smsPrompt}
+        saving={statusSaving}
+        onAnswer={(sendSms) => {
+          if (smsPrompt) {
+            void applyStatusChange(
+              smsPrompt.device.id,
+              smsPrompt.status,
+              sendSms,
+            );
+          }
+        }}
+        onCancel={() => setSmsPrompt(null)}
+      />
 
       <ConfirmModal
         isOpen={!!deleteTarget}

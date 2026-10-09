@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { motion } from "framer-motion";
+import { errorText } from "../utils/errors";
 import {
   getItem,
   deleteItem,
@@ -18,17 +19,11 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 import LoadingSpinner from "./LoadingSpinner";
-import { formatPersianCurrency } from "../utils/formatters";
+import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
 import type { Id, InventoryTransaction, Item } from "../types/api";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
+import { modalPanel } from "../motion";
+import { stockStatusOf } from "../utils/stockStatus";
+import InfoRow from "./InfoRow";
 
 interface QuickModalProps {
   isOpen: boolean;
@@ -70,8 +65,8 @@ function QuickPurchaseModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-surface rounded-lg p-6 w-full max-w-md" dir="rtl">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
+      <div className="bg-surface rounded-field p-6 w-full max-w-md" dir="rtl">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-text-primary">
             افزایش سریع موجودی
@@ -86,15 +81,15 @@ function QuickPurchaseModal({
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 کالا
               </label>
-              <div className="px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text-primary">
+              <div className="px-3 py-2 bg-surface-alt border border-border rounded-field text-body-sm text-text-primary">
                 [{item?.code}] {item?.name}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 تعداد
               </label>
               <input
@@ -102,12 +97,12 @@ function QuickPurchaseModal({
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="w-full border border-border rounded-lg px-3 py-2 bg-surface text-text-primary"
+                className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 قیمت واحد (ریال)
               </label>
               <input
@@ -115,12 +110,12 @@ function QuickPurchaseModal({
                 min="0"
                 value={price}
                 onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
-                className="w-full border border-border rounded-lg px-3 py-2 bg-surface text-text-primary"
+                className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 required
               />
             </div>
-            <div className="bg-surface-alt p-3 rounded-lg">
-              <div className="flex justify-between text-sm text-text-primary">
+            <div className="bg-surface-alt p-3 rounded-field">
+              <div className="flex justify-between text-body-sm text-text-primary">
                 <span>جمع کل:</span>
                 <span className="font-medium">
                   {(quantity * price).toLocaleString()} ریال
@@ -132,14 +127,14 @@ function QuickPurchaseModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-surface-alt text-text-primary"
+              className="flex-1 px-4 py-2 border border-border rounded-field hover:bg-surface-alt text-text-primary"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50"
             >
               {loading ? "در حال ثبت..." : "ثبت خرید"}
             </button>
@@ -192,8 +187,8 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-surface rounded-lg p-6 w-full max-w-md" dir="rtl">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
+      <div className="bg-surface rounded-field p-6 w-full max-w-md" dir="rtl">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-text-primary">فروش سریع</h3>
           <button
@@ -206,19 +201,25 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 کالا
               </label>
-              <div className="px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text-primary">
+              <div className="px-3 py-2 bg-surface-alt border border-border rounded-field text-body-sm text-text-primary">
                 [{item?.code}] {item?.name}
               </div>
-              <p className="text-xs text-text-secondary mt-1">
+              <p className="text-body-xs text-text-secondary mt-1">
                 موجودی فعلی: {item?.currentStock} {item?.unit}
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                تعداد <span className="text-danger">*</span>
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
+                تعداد{" "}
+                <span
+                  aria-hidden
+                  className="text-danger-fg text-[0.85em] leading-none align-super"
+                >
+                  *
+                </span>
               </label>
               <input
                 type="number"
@@ -226,27 +227,29 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
                 max={item?.currentStock}
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className={`w-full border rounded-lg px-3 py-2 bg-surface text-text-primary ${errors.quantity ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.quantity ? "border-danger" : "border-border"}`}
                 required
               />
               {errors.quantity && (
-                <p className="text-xs text-danger mt-1">{errors.quantity}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.quantity}
+                </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 نام مشتری
               </label>
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 bg-surface text-text-primary"
+                className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 placeholder="مشتری متفرقه"
               />
             </div>
-            <div className="bg-surface-alt p-3 rounded-lg">
-              <div className="flex justify-between text-sm text-text-primary">
+            <div className="bg-surface-alt p-3 rounded-field">
+              <div className="flex justify-between text-body-sm text-text-primary">
                 <span>موجودی بعد از فروش:</span>
                 <span className="font-medium">
                   {(item?.currentStock || 0) - quantity} {item?.unit}
@@ -258,14 +261,14 @@ function QuickSaleModal({ isOpen, onClose, onSuccess, item }: QuickModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-surface-alt text-text-primary"
+              className="flex-1 px-4 py-2 border border-border rounded-field hover:bg-surface-alt text-text-primary"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-danger text-text-inverse rounded-lg hover:bg-danger-hover disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-danger-fill text-on-status rounded-field hover:bg-danger-hover disabled:opacity-50"
             >
               {loading ? "در حال ثبت..." : "ثبت فروش"}
             </button>
@@ -283,71 +286,59 @@ interface StockStatusCardProps {
   unit: string;
 }
 
+/*
+ * The label and the tone come from utils/stockStatus.ts — this was the fourth
+ * copy of the same three states, and the one that printed its numbers in
+ * Latin digits while every other figure in the app is Persian.
+ *
+ * The icon stays local: it is this card's own flourish, and the shared module
+ * describes what a state means rather than how one page draws it.
+ */
+const STOCK_ICONS: Record<string, React.ReactNode> = {
+  out: <ExclamationTriangleIcon className="w-8 h-8 text-danger-fg" />,
+  low: <ArrowTrendingDownIcon className="w-8 h-8 text-warning-fg" />,
+  ok: <ArrowTrendingUpIcon className="w-8 h-8 text-success-fg" />,
+};
+
 function StockStatusCard({ current, min, unit }: StockStatusCardProps) {
-  const isCritical = current === 0;
-  const isLow = current > 0 && current <= min;
-  let bgColor = "bg-success-soft border-success-soft";
-  let textColor = "text-success";
-  let icon = <ArrowTrendingUpIcon className="w-8 h-8 text-success" />;
-  let statusText = "موجودی کافی";
-  if (isCritical) {
-    bgColor = "bg-danger-soft border-danger-soft";
-    textColor = "text-danger";
-    icon = <ExclamationTriangleIcon className="w-8 h-8 text-danger" />;
-    statusText = "اتمام موجودی";
-  } else if (isLow) {
-    bgColor = "bg-warning-soft border-warning-soft";
-    textColor = "text-warning";
-    icon = <ArrowTrendingDownIcon className="w-8 h-8 text-warning" />;
-    statusText = "کم‌موجود";
-  }
+  const status = stockStatusOf(current, min);
+  const needsAttention = status.key !== "ok";
+
   return (
-    <div className={`border rounded-lg p-6 ${bgColor}`}>
+    <div className={`border rounded-panel p-6 ${status.tone}`}>
       <div className="flex items-start justify-between">
         <div>
-          <p className={`text-sm font-medium ${textColor} mb-1`}>
-            {statusText}
+          <p className="text-body-sm font-bold mb-1 flex items-center gap-2">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: status.color }}
+              aria-hidden="true"
+            />
+            {status.label}
           </p>
-          <p className="text-3xl font-bold text-text-primary">
-            {current}{" "}
+          <p className="text-3xl font-bold text-text-primary tabular-nums">
+            {toPersianDigits(current)}{" "}
             <span className="text-lg font-normal text-text-secondary">
               {unit}
             </span>
           </p>
-          <p className="text-sm text-text-secondary mt-2">
-            حداقل موجودی: {min} {unit}
+          <p className="text-body-sm text-text-secondary mt-2 tabular-nums">
+            حداقل موجودی: {toPersianDigits(min)} {unit}
           </p>
         </div>
-        <div className="p-3 bg-surface rounded-full shadow-sm">{icon}</div>
+        <div className="p-3 bg-surface rounded-full shadow-sm">
+          {STOCK_ICONS[status.key]}
+        </div>
       </div>
-      {(isCritical || isLow) && (
-        <div className="mt-4 p-3 bg-surface rounded-lg border border-current">
-          <p className={`text-sm ${textColor}`}>
-            {isCritical
+      {needsAttention && (
+        <div className="mt-4 p-3 bg-surface rounded-field border border-current">
+          <p className="text-body-sm">
+            {status.key === "out"
               ? "موجودی این کالا به اتمام رسیده است."
-              : `موجودی این کالا به زیر حداقل (${min}) رسیده است.`}
+              : `موجودی این کالا به زیر حداقل (${toPersianDigits(min)}) رسیده است.`}
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-interface InfoRowProps {
-  label: string;
-  value: React.ReactNode;
-  highlight?: boolean;
-}
-
-function InfoRow({ label, value, highlight = false }: InfoRowProps) {
-  return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-sm text-text-secondary">{label}</span>
-      <span
-        className={`text-sm ${highlight ? "font-medium text-text-primary" : "text-text-primary"}`}
-      >
-        {value || "—"}
-      </span>
     </div>
   );
 }
@@ -417,13 +408,16 @@ export default function ItemDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-6xl my-8"
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-6xl my-8"
         dir="rtl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-xl font-bold text-text-primary">
             {loading
               ? "در حال بارگذاری..."
@@ -433,7 +427,7 @@ export default function ItemDetailModal({
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -453,21 +447,21 @@ export default function ItemDetailModal({
                   min={item.minStock || 0}
                   unit={item.unit}
                 />
-                <div className="bg-surface shadow rounded-lg p-6">
+                <div className="bg-surface shadow rounded-field p-6">
                   <h3 className="text-lg font-medium text-text-primary mb-4">
                     عملیات سریع
                   </h3>
                   <div className="space-y-3">
                     <button
                       onClick={() => setShowQuickPurchase(true)}
-                      className="w-full px-4 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover flex items-center justify-center gap-2"
                     >
                       <ArrowTrendingUpIcon className="w-4 h-4" />
                       افزایش موجودی (خرید سریع)
                     </button>
                     <button
                       onClick={() => setShowQuickSale(true)}
-                      className="w-full px-4 py-2 border border-border text-text-primary rounded-lg hover:bg-surface-alt flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2 border border-border text-text-primary rounded-field hover:bg-surface-alt flex items-center justify-center gap-2"
                     >
                       <ArrowTrendingDownIcon className="w-4 h-4" />
                       کاهش موجودی (فروش)
@@ -477,7 +471,7 @@ export default function ItemDetailModal({
               </div>
 
               <div className="lg:col-span-2">
-                <div className="bg-surface shadow rounded-lg p-6">
+                <div className="bg-surface shadow rounded-field p-6">
                   <h3 className="text-lg font-medium text-text-primary mb-4">
                     اطلاعات کالا
                   </h3>
@@ -511,7 +505,7 @@ export default function ItemDetailModal({
               </div>
             </div>
 
-            <div className="bg-surface shadow rounded-lg p-6 mt-8">
+            <div className="bg-surface shadow rounded-field p-6 mt-8">
               <h3 className="text-lg font-medium text-text-primary mb-4 flex items-center gap-2">
                 <ClipboardDocumentListIcon className="w-5 h-5 text-text-secondary" />
                 تاریخچه گردش موجودی
@@ -530,19 +524,19 @@ export default function ItemDetailModal({
                   <table className="min-w-full divide-y divide-border">
                     <thead className="bg-surface-alt">
                       <tr>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                        <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                           تاریخ
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                        <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                           نوع
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                        <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                           تعداد
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                        <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                           قیمت واحد
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary">
+                        <th className="px-4 py-3 text-right text-body-xs font-medium text-text-secondary">
                           توضیحات
                         </th>
                       </tr>
@@ -555,40 +549,40 @@ export default function ItemDetailModal({
                         const invoiceId = tx.reference_id;
                         return (
                           <tr key={tx.id}>
-                            <td className="px-4 py-2 text-sm text-text-primary">
+                            <td className="px-4 py-2 text-body-sm text-text-primary">
                               {new Date(tx.created_at).toLocaleDateString(
                                 "fa-IR",
                               )}
                             </td>
-                            <td className="px-4 py-2 text-sm">
+                            <td className="px-4 py-2 text-body-sm">
                               {tx.type === "purchase" ? (
-                                <span className="text-success">خرید</span>
+                                <span className="text-success-fg">خرید</span>
                               ) : tx.type === "sale" ? (
-                                <span className="text-danger">فروش</span>
+                                <span className="text-danger-fg">فروش</span>
                               ) : (
                                 <span className="text-text-secondary">
                                   تنظیم موجودی
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-2 text-sm">
+                            <td className="px-4 py-2 text-body-sm">
                               <span
                                 className={
                                   tx.quantity > 0
-                                    ? "text-success"
-                                    : "text-danger"
+                                    ? "text-success-fg"
+                                    : "text-danger-fg"
                                 }
                               >
                                 {tx.quantity > 0 ? "+" : ""}
                                 {tx.quantity}
                               </span>
                             </td>
-                            <td className="px-4 py-2 text-sm text-text-primary">
+                            <td className="px-4 py-2 text-body-sm text-text-primary">
                               {tx.unit_price
                                 ? formatPersianCurrency(tx.unit_price)
                                 : "—"}
                             </td>
-                            <td className="px-4 py-2 text-sm text-text-secondary">
+                            <td className="px-4 py-2 text-body-sm text-text-secondary">
                               {tx.purchase_invoice_number &&
                               invoiceId !== null ? (
                                 <button
@@ -639,7 +633,7 @@ export default function ItemDetailModal({
           variant="danger"
           loading={deleting}
         />
-      </div>
+      </motion.div>
     </div>
   );
 }

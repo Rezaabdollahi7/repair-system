@@ -22,12 +22,30 @@ import { errorMessage } from "./errors";
  * discount_code_uses and referrals. The ledger outlives the workspace, which
  * is the whole reason the row survives as a tombstone. referral_codes does
  * go — a link to a deleted workshop should stop working.
+ *
+ * The three SMS money tables — sms_wallets, sms_wallet_transactions and
+ * sms_topups — are ledger too and stay for the same reason. sms_messages
+ * does not: it carries the phone number of the workshop's customer, which is
+ * exactly the personal data this deletion exists to remove. The wallet rows
+ * that point at a deleted message keep their amounts and lose the link
+ * (SetNull), so the money history survives without the person in it.
+ *
+ * inventory_transactions is not on the list either, but for the opposite
+ * reason: it does go. The stock ledger is append-only (14.1) — the
+ * application role cannot DELETE from it — so it leaves through the
+ * ON DELETE CASCADE on item_id when the items are deleted, which Postgres
+ * runs as the table's owner. Warehouses go after the items, since the ledger
+ * and the invoices point at them with Restrict.
  */
 // ⚠️ Prisma's delegates are singular — `tx.user`, not `tx.users` — and the
 // names below are those, not the table names. Getting it wrong is a compile
 // error rather than a night the cron half-deletes a workspace, which is the
 // reason this is typed against TransactionClient at all.
 export const DELETION_ORDER = [
+  // Before devices and customers: sms_messages references both, and although
+  // each is SetNull rather than Restrict, clearing them first means the rows
+  // go while they still say who they were about — which is the point.
+  "smsMessage",
   "deviceAssignment",
   "deviceImage",
   "repairInvoicePayment",
@@ -37,9 +55,10 @@ export const DELETION_ORDER = [
   "saleInvoiceItem",
   "purchaseInvoice",
   "saleInvoice",
-  "inventoryTransaction",
   "device",
+  "itemStock",
   "item",
+  "warehouse",
   "category",
   "service",
   "customer",
@@ -171,6 +190,9 @@ export async function deleteWorkspaceData(workspaceId: number): Promise<void> {
         purchaseSeq: 0,
         saleSeq: 0,
         repairSeq: 0,
+        adjustmentSeq: 0,
+        countSeq: 0,
+        transferSeq: 0,
       },
     });
   });

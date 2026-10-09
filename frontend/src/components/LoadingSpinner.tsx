@@ -5,47 +5,38 @@ interface LoadingSpinnerProps {
   text?: string;
 }
 
+/**
+ * One arc on a track, rather than the six stacked rings this used to draw.
+ * Six overlapping spins at staggered delays read as a flicker at small
+ * sizes, and each one was its own animated element.
+ */
 export default function LoadingSpinner({
   size = "md",
-  text = " دارم لود میکنم  ...",
+  text = "در حال بارگذاری…",
 }: LoadingSpinnerProps) {
-  const sizeClasses: Record<SpinnerSize, string> = {
-    sm: "h-16 w-16",
-    md: "h-24 w-24",
-    lg: "h-32 w-32",
+  const ring: Record<SpinnerSize, string> = {
+    sm: "w-6 h-6 border-2",
+    md: "w-10 h-10 border-[3px]",
+    lg: "w-14 h-14 border-4",
   };
 
-  const textSizes: Record<SpinnerSize, string> = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
+  const label: Record<SpinnerSize, string> = {
+    sm: "text-body-xs",
+    md: "text-body-sm",
+    lg: "text-body-md",
   };
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4" dir="rtl">
-      {/* Spinner */}
-      <div className={`relative ${sizeClasses[size]}`}>
-        {[0, 40, 80, 120, 160, 200].map((delay, index) => (
-          <div
-            key={index}
-            className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"
-            style={{
-              animationDuration: "1.5s",
-              animationDelay: `${delay}ms`,
-              opacity: 1 - index * 0.12,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Text */}
-      {text && (
-        <p
-          className={`text-text-secondary font-medium mt-4 ${textSizes[size]}`}
-        >
-          {text}
-        </p>
-      )}
+    <div
+      className="flex flex-col items-center justify-center gap-3"
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        aria-hidden
+        className={`${ring[size]} rounded-full border-border border-t-primary animate-spin`}
+      />
+      {text && <p className={`${label[size]} text-text-secondary`}>{text}</p>}
     </div>
   );
 }

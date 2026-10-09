@@ -1,7 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "../../generated/prisma/client";
+import { PrismaClient, type Prisma } from "../../generated/prisma/client";
 import { JWT_SECRET } from "../../middleware/auth";
 import { hashOtpCode } from "../../utils/otp";
 import { TRIAL_DAYS } from "../../utils/subscription";
@@ -51,6 +51,8 @@ export interface SeededWorkspace {
   workspaceId: number;
   userId: number;
   token: string;
+  /** The default warehouse populateWorkspace would have created. */
+  warehouseId: number;
 }
 
 export interface TwoWorkspaces {
@@ -122,6 +124,14 @@ export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
       select: { id: true },
     });
 
+    // What populateWorkspace gives every workspace, and what every invoice
+    // and stock movement now points at. Without it the first purchase in a
+    // suite fails looking for a default warehouse.
+    const warehouse = await owner.warehouse.create({
+      data: { workspaceId: workspace.id, name: "انبار اصلی", isDefault: true },
+      select: { id: true },
+    });
+
     // Minted directly rather than through /auth/login: what these tests are
     // about is what a valid token can reach, not how it was obtained.
     const token = jwt.sign(
@@ -136,7 +146,12 @@ export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
       { expiresIn: "1h" },
     );
 
-    return { workspaceId: workspace.id, userId: user.id, token };
+    return {
+      workspaceId: workspace.id,
+      userId: user.id,
+      token,
+      warehouseId: warehouse.id,
+    };
   }
 
   return {
@@ -176,4 +191,102 @@ export async function issueCode(phone: string, code = TEST_OTP_CODE) {
       expiresAt: new Date(Date.now() + 60_000),
     },
   });
+}
+
+export interface SeededUser {
+  userId: number;
+  token: string;
+}
+
+/**
+ * A technician inside an existing workspace, with a signed token.
+ *
+ * Separate from seedTwoWorkspaces rather than folded into it: five suites
+ * already depend on that return shape, and none of them needs a technician.
+ * Must be called after it, though — the roles it upserts are gone until then,
+ * because truncateAll() empties that table too.
+ *
+ * Minted directly for the same reason the super admin's token is: the
+ * question is what a valid technician token can reach, not how it was got.
+ */
+export async function seedTechnician(
+  workspaceId: number,
+  username: string,
+): Promise<SeededUser> {
+  const technician = await owner.role.findUniqueOrThrow({
+    where: { name: "technician" },
+  });
+
+  const user = await owner.user.create({
+    data: {
+      workspaceId,
+      fullName: "تکنسین",
+      username,
+      password: await bcrypt.hash("integration-test", 10),
+      roleId: technician.id,
+    },
+    select: { id: true },
+  });
+
+  const token = jwt.sign(
+    {
+      id: user.id,
+      workspaceId,
+      username,
+      role: "technician",
+      isActive: true,
+    },
+    JWT_SECRET,
+    { expiresIn: "1h" },
+  );
+
+  return { userId: user.id, token };
+}
+
+
+/**
+ * A device inside an existing workspace, numbered the way the controller
+ * numbers one.
+ *
+ * Exists because `receptionNumber` became required in 2.9 and six fixtures
+ * were each writing a device directly. Hard-coding a number in each would
+ * work until two devices landed in one workspace and hit the unique index —
+ * and it would mean no fixture ever exercised the numbering at all.
+ *
+ * Draws from the workspace's own counter, so the numbers a test sees are the
+ * numbers a shop would see: per-workspace, starting at 1.
+ *
+ * On the owner connection, so it writes into whichever workspace it is
+ * given — which is what a fixture is for and what the application path may
+ * never do.
+ */
+export async function seedDevice(
+  workspaceId: number,
+  data: Omit<
+    Prisma.DeviceUncheckedCreateInput,
+    "workspaceId" | "receptionNumber"
+  >,
+) {
+  const workspace = await owner.workspace.update({
+    where: { id: workspaceId },
+    data: { deviceSeq: { increment: 1 } },
+    select: { deviceSeq: true },
+  });
+
+  return owner.device.create({
+    data: { ...data, workspaceId, receptionNumber: workspace.deviceSeq },
+  });
+}
+
+/**
+ * The default warehouse of a workspace seeded above — for fixtures that hold
+ * only a workspace id and need to write an invoice, which every invoice now
+ * points at.
+ */
+export async function defaultWarehouseOf(workspaceId: number): Promise<number> {
+  const warehouse = await owner.warehouse.findFirstOrThrow({
+    where: { workspaceId, isDefault: true },
+    select: { id: true },
+  });
+  return warehouse.id;
 }

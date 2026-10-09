@@ -29,15 +29,22 @@ ORDER BY c.relname;
 
 -- Part 1b — the mirror image: tables with NO workspace_id.
 -- Part 1 cannot see these, so a table that is shared by accident would pass
--- it silently. Read this list rather than counting rows — four are expected,
+-- it silently. Read this list rather than counting rows — seven are expected,
 -- and each for a different reason:
 --
 --   workspaces           the tenant itself, scoped by its own id
 --   roles                reference data, identical for every workspace
+--   plans                reference data, priced with psql (8.1)
+--   discount_codes       reference data, created with psql (8.1)
+--   sms_prices           reference data, the SMS unit price over time (12.1)
 --   _prisma_migrations   not application data; dofixo_app has no grant on it
 --   otp_codes            a code is sent before a workspace exists (OTP.1)
 --
--- A fifth name appearing here is the thing this query exists to catch.
+-- `referrals` also appears, and is the one entry that is NOT shared: it
+-- holds tenant data but names two workspace columns rather than one, so this
+-- query cannot see it. Its two-sided policy is checked in smoke.test.ts.
+--
+-- An eighth name appearing here is the thing this query exists to catch.
 SELECT
   c.relname AS "table without workspace_id",
   c.relrowsecurity AS "rls on",

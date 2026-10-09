@@ -6,17 +6,20 @@ import {
   ZibalError,
   ZIBAL_RESULT,
 } from "../lib/zibal";
+import { SMS_TEMPLATES } from "../lib/sms";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
-import { generateOrderId } from "../utils/orderId";
+import { generateOrderId, ORDER_PREFIX } from "../utils/orderId";
 import { quotePrice } from "../utils/pricing";
 import { rewardReferrer } from "../utils/referral";
 import {
   extendSubscription,
+  notifyOwner,
   REFERRAL_DISCOUNT_PERCENT,
   REFERRAL_REWARD_DAYS,
 } from "../utils/subscription";
+import { toJalaliSms } from "../utils/jalali";
 import { workspaceIdOf } from "../utils/workspace";
 import type { CheckoutBody, VerifyBody } from "../schemas/subscription";
 
@@ -244,7 +247,7 @@ export const checkout = async (req: Request, res: Response) => {
         : undefined,
     });
 
-    const orderId = generateOrderId(workspaceId);
+    const orderId = generateOrderId(workspaceId, ORDER_PREFIX.SUBSCRIPTION);
 
     // Written before Zibal is called, so a gateway that answers slowly or
     // not at all still leaves a row explaining what was attempted. A payment
@@ -409,6 +412,20 @@ export async function settlePayment(
       days: payment.planDurationDays,
       paymentId: payment.id,
     });
+  });
+
+  // Sent after the transaction, never inside it: sms.ir is allowed twenty
+  // seconds, and holding the workspace row locked that long for a courtesy
+  // message would block every other write in the shop.
+  //
+  // Before rewardReferrer, because our obligation is to the person who just
+  // paid rather than to somebody else's thirty days. notifyOwner logs and
+  // swallows — a customer whose money has moved must not see a 500 because
+  // an SMS did not go.
+  await notifyOwner(workspaceId, SMS_TEMPLATES.PAYMENT_OK, {
+    // ⚠️ Jalali with dashes. sendTemplate refuses a slash, but as an
+    // SmsError at send time — which is a message that never arrives.
+    DATE: toJalaliSms(expiresAt),
   });
 
   // After the payment's own transaction, not inside it: the reward is

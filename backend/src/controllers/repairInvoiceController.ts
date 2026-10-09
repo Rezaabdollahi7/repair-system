@@ -16,12 +16,14 @@ import type {
   RepairInvoiceUpdateBody,
 } from "../schemas/repairInvoice";
 import { workspaceIdOf } from "../utils/workspace";
+import { defaultWarehouseId } from "../utils/warehouse";
 
 type LineInput = RepairInvoiceCreateBody["items"][number];
 
 const invoiceInclude = {
   device: {
     select: {
+      receptionNumber: true,
       deviceName: true,
       brand: true,
       model: true,
@@ -39,6 +41,10 @@ function toInvoiceResponse(invoice: InvoiceRow) {
   return {
     id: invoice.id,
     invoice_number: invoice.invoiceNumber,
+    // Alongside device_id rather than instead of it: the printed invoice and
+    // the detail panel show this, while the link to the device itself still
+    // needs the key. They were the same value until 2.9.
+    reception_number: invoice.device.receptionNumber,
     device_id: invoice.deviceId,
     customer_id: invoice.customerId,
     customer_name: invoice.customerName,
@@ -147,6 +153,7 @@ async function moveStock(
   note: string,
   actorId: number | null,
   workspaceId: number,
+  warehouseId: number,
 ): Promise<void> {
   for (const line of lines) {
     if (line.itemType !== "inventory" || line.itemId === null) continue;
@@ -161,7 +168,10 @@ async function moveStock(
     await tx.item.update({
       where: { id: line.itemId },
       data: {
-        currentStock: Math.max(0, item.currentStock + direction * quantity),
+        currentStock: Math.max(
+          0,
+          item.currentStock.toNumber() + direction * quantity,
+        ),
       },
     });
 
@@ -169,9 +179,10 @@ async function moveStock(
       data: {
         workspaceId,
         itemId: line.itemId,
-        // Issuing is a sale; putting parts back is an adjustment, matching
-        // how the ledger recorded these before.
-        type: direction === -1 ? "sale" : "adjustment",
+        warehouseId,
+        // Parts used on the repair; putting them back is the invoice
+        // reversing its own movement, not a hand correction.
+        type: direction === -1 ? "repair_use" : "reversal",
         quantity: direction * quantity,
         unitPrice: line.unitPrice,
         // Passed as null before while reference_type was still set, so parts
@@ -363,6 +374,7 @@ export const create = async (req: Request, res: Response) => {
         data: {
           workspaceId,
           invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "repair"),
+          warehouseId: await defaultWarehouseId(tx, workspaceId),
           deviceId: body.device_id,
           customerId: device.customerId,
           customerName:
@@ -484,6 +496,7 @@ export const changeStatus = async (req: Request, res: Response) => {
       where: { id, workspaceId },
       select: {
         status: true,
+        warehouseId: true,
         totalAmount: true,
         paidAmount: true,
         items: {
@@ -525,8 +538,25 @@ export const changeStatus = async (req: Request, res: Response) => {
       status === "cancelled" &&
       (invoice.status === "issued" || invoice.status === "paid");
 
+    /**
+     * A cancelled invoice owes nothing.
+     *
+     * This used to leave `paymentStatus` alone, so a voided invoice kept
+     * saying «در انتظار پرداخت» and kept reporting a balance the shop had no
+     * way to collect and no reason to. `totalAmount` and `paidAmount` are
+     * untouched — they are the historical record, and the payments table
+     * still holds every row — but the obligation is gone, and that is what
+     * `paymentStatus` describes.
+     *
+     * The column is a plain string rather than an enum, so the fourth value
+     * costs no migration. The dashboard's receivables already scoped
+     * themselves to `status: "issued"`, so those figures were never wrong;
+     * it was only the invoice's own display.
+     */
     let paymentStatus: string | null = null;
-    if (status === "paid") {
+    if (status === "cancelled") {
+      paymentStatus = "cancelled";
+    } else if (status === "paid") {
       paymentStatus = "paid";
     } else if (paidAmount > 0 && paidAmount < totalAmount) {
       paymentStatus = "partial";
@@ -544,6 +574,7 @@ export const changeStatus = async (req: Request, res: Response) => {
           "مصرف در فاکتور تعمیر",
           actorId,
           workspaceId,
+          invoice.warehouseId,
         );
       }
 
@@ -556,6 +587,7 @@ export const changeStatus = async (req: Request, res: Response) => {
           "ابطال فاکتور تعمیر - برگشت موجودی",
           actorId,
           workspaceId,
+          invoice.warehouseId,
         );
       }
 
@@ -656,6 +688,7 @@ export const remove = async (req: Request, res: Response) => {
       where: { id, workspaceId },
       select: {
         status: true,
+        warehouseId: true,
         items: {
           select: {
             itemType: true,
@@ -682,6 +715,7 @@ export const remove = async (req: Request, res: Response) => {
           "ابطال فاکتور تعمیر - برگشت موجودی",
           actorId,
           workspaceId,
+          invoice.warehouseId,
         );
       }
 

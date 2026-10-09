@@ -107,6 +107,30 @@ describe("deleteWorkspaceData", () => {
     );
   });
 
+  it("leaves the stock ledger to the item cascade", async () => {
+    // The ledger is append-only: the application role has no DELETE on it,
+    // so a deleteMany here would fail the whole deletion. Its rows go with
+    // their items (ON DELETE CASCADE). The integration suite proves that
+    // cascade runs as the app role.
+    expect(DELETION_ORDER).not.toContain("inventoryTransaction");
+    expect(DELETION_ORDER.indexOf("itemStock")).toBeLessThan(
+      DELETION_ORDER.indexOf("warehouse"),
+    );
+    expect(DELETION_ORDER.indexOf("item")).toBeLessThan(
+      DELETION_ORDER.indexOf("warehouse"),
+    );
+    // Invoices point at their warehouse with Restrict.
+    for (const invoice of [
+      "purchaseInvoice",
+      "saleInvoice",
+      "repairInvoice",
+    ] as const) {
+      expect(DELETION_ORDER.indexOf(invoice)).toBeLessThan(
+        DELETION_ORDER.indexOf("warehouse"),
+      );
+    }
+  });
+
   it("clears repair invoices before the devices they point at", async () => {
     // repair_invoices.deviceId is NOT NULL with Restrict.
     expect(DELETION_ORDER.indexOf("repairInvoice")).toBeLessThan(
@@ -122,9 +146,36 @@ describe("deleteWorkspaceData", () => {
       "subscriptionEvent",
       "discountCodeUse",
       "referral",
+      // The SMS money tables, spared for the same reason (12.1).
+      "smsWallet",
+      "smsWalletTransaction",
+      "smsTopup",
     ]) {
       expect(deleted).not.toContain(spared);
     }
+  });
+
+  it("removes the send log, which is the one SMS table holding a phone number", async () => {
+    // sms_messages is tenant data rather than ledger: it carries the
+    // workshop's customer's number, which is exactly what this deletion
+    // exists to remove. Its wallet rows keep their amounts and lose the
+    // link, so the money history survives without the person in it.
+    await deleteWorkspaceData(WORKSPACE_ID);
+
+    expect(deleted).toContain("smsMessage");
+  });
+
+  it("clears the send log before the customers and devices it names", async () => {
+    // Both references are SetNull rather than Restrict, so the reverse order
+    // would not fail — it would quietly blank the two columns that say who
+    // the message was about, and the rows would go anyway a moment later
+    // carrying less than they should have.
+    expect(DELETION_ORDER.indexOf("smsMessage")).toBeLessThan(
+      DELETION_ORDER.indexOf("customer"),
+    );
+    expect(DELETION_ORDER.indexOf("smsMessage")).toBeLessThan(
+      DELETION_ORDER.indexOf("device"),
+    );
   });
 
   it("removes the objects before the rows", async () => {
@@ -171,6 +222,9 @@ describe("deleteWorkspaceData", () => {
         purchaseSeq: 0,
         saleSeq: 0,
         repairSeq: 0,
+        adjustmentSeq: 0,
+        countSeq: 0,
+        transferSeq: 0,
       }),
     });
   });

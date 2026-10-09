@@ -164,27 +164,88 @@ export interface CustomerBody {
   phone: string;
 }
 
-/**
- * A row of GET /customers/:id/devices.
+/* ── The customer page ─────────────────────────────────────────────────
  *
- * `status` is a plain string column, not an enum: the values in use are
- * received, pending, diagnosing, waiting_for_parts, repairing, repaired,
- * ready_for_pickup, delivered, unrepairable and not_repaired. Left as string
- * rather than narrowed, since nothing on the server constrains it.
+ * `GET /customers/:id/overview` answers the whole page in one request.
+ * The page is one screen and each separate call would pay the RLS
+ * transaction's two round trips over again.
  */
-export interface CustomerDevice {
+
+export interface CustomerSummary {
+  total_devices: number;
+  /** Still in the shop: anything but delivered, unrepairable or not_repaired. */
+  active_devices: number;
+  successful_repairs: number;
+  failed_repairs: number;
+  /** Rials actually received, cancelled invoices excluded. */
+  total_paid: number;
+  last_visit: string | null;
+}
+
+export interface CustomerDeviceRow {
   id: number;
-  customer_id: number | null;
   device_name: string;
   brand: string | null;
   model: string | null;
   serial_number: string | null;
+  status: string;
   entry_date: string | null;
   exit_date: string | null;
+  assignees: { id: number; name: string }[];
+}
+
+export type CustomerTimelineEventType =
+  "registered" | "delivered" | "invoiced" | "paid";
+
+export interface CustomerTimelineEvent {
+  type: CustomerTimelineEventType;
+  date: string;
+  /** Set on `invoiced` and `paid`. */
+  invoice_number?: string;
+  amount?: number;
+}
+
+export interface CustomerTimelineEntry {
+  device_id: number;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
   status: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
+  events: CustomerTimelineEvent[];
+}
+
+/**
+ * Repair and sale invoices in one list. Purchase invoices are absent by
+ * nature: a purchase names a supplier, not a customer, and has no
+ * `customer_id` to match on.
+ */
+export interface CustomerInvoiceRow {
+  kind: "repair" | "sale";
+  id: number;
+  invoice_number: string;
+  invoice_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  device_id: number | null;
+}
+
+export interface CustomerOverview {
+  customer: {
+    id: number;
+    name: string;
+    phone: string | null;
+    notes: string | null;
+    created_at: string;
+  };
+  summary: CustomerSummary;
+  devices: CustomerDeviceRow[];
+  timeline: CustomerTimelineEntry[];
+  invoices: CustomerInvoiceRow[];
+}
+
+export interface CustomerNotesBody {
+  notes: string | null;
 }
 
 /**
@@ -202,6 +263,16 @@ export interface CustomerDevice {
  */
 export interface Device {
   id: number;
+  /**
+   * What the shop calls this device: the number on the intake slip, quoted
+   * over the phone, printed on the invoice and sent in every customer
+   * notification. Per-workspace and starting at 1.
+   *
+   * Not `id`, which is a platform-wide key used for routes and modals. The
+   * two were the same value until 2.9, which meant a new shop's first device
+   * could be numbered 4,812.
+   */
+  reception_number: number;
   customer_id: number | null;
   device_name: string;
   brand: string | null;
@@ -254,6 +325,15 @@ export interface DeviceCreateBody {
   exit_date?: string | null;
   status?: string;
   description?: string | null;
+  /**
+   * A request that the customer be texted, not an instruction.
+   *
+   * The server decides whether a message actually goes: the workshop's
+   * toggle, the customer's number and the wallet balance are all things a
+   * client cannot see, and a status that did not move earns no message
+   * whatever this says.
+   */
+  send_sms?: boolean;
 }
 
 /**
@@ -408,6 +488,64 @@ export interface Personnel {
   role_label: string;
 }
 
+/* ── The personnel page ────────────────────────────────────────────────
+ *
+ * `GET /personnel/:id/overview` answers the whole page in one request, for
+ * the same reason the customer page does.
+ */
+
+export interface PersonnelKpi {
+  /** Assigned and still in the building. */
+  active_devices: number;
+  /** Reached an outcome, either way. */
+  completed_repairs: number;
+  successful_repairs: number;
+  /**
+   * Mean turnaround in days over the jobs that have both an intake and an
+   * exit. Null — not zero — when none has finished: «no data» and «instant»
+   * are different claims.
+   */
+  avg_repair_days: number | null;
+}
+
+/** One slice of the assignment ring. Only statuses actually present. */
+export interface PersonnelStatusCount {
+  status: string;
+  count: number;
+}
+
+export interface PersonnelHistoryRow {
+  device_id: number;
+  /** Shown in the «پذیرش» column; `device_id` is what the row click opens. */
+  reception_number: number;
+  device_name: string;
+  brand: string | null;
+  model: string | null;
+  status: string;
+  entry_date: string;
+  exit_date: string | null;
+  /** Whole days from intake to exit; null while the job is open. */
+  repair_days: number | null;
+  assigned_at: string;
+}
+
+/** One bar of the monthly chart. Twelve of them, gaps included as zeroes. */
+export interface PersonnelMonthlyPoint {
+  jy: number;
+  jm: number;
+  /** «مرداد ۱۴۰۵», ready to render. */
+  label: string;
+  count: number;
+}
+
+export interface PersonnelOverview {
+  personnel: Personnel;
+  kpi: PersonnelKpi;
+  status_breakdown: PersonnelStatusCount[];
+  history: PersonnelHistoryRow[];
+  monthly: PersonnelMonthlyPoint[];
+}
+
 /** `username` is a mobile number, shared with sign-up via phoneSchema. */
 export interface PersonnelCreateBody {
   full_name: string;
@@ -427,6 +565,16 @@ export interface ToggleActiveResponse {
 
 /** Every invoice kind uses these three; the column is a plain string. */
 export type PaymentStatus = "paid" | "partial" | "pending";
+
+/**
+ * A repair invoice can also be voided, and then it owes nothing.
+ *
+ * Only repair invoices carry this fourth value — they are the only kind with
+ * a cancel action — so it is a separate union rather than a widening of
+ * `PaymentStatus`, which would let it through on a sale or a purchase where
+ * nothing can produce it.
+ */
+export type RepairPaymentStatus = PaymentStatus | "cancelled";
 
 /** GET /purchase-invoices — the list rows carry no items. */
 export interface PurchaseInvoice {
@@ -491,6 +639,7 @@ export interface PaymentUpdateResponse {
 export interface SaleInvoice {
   id: number;
   invoice_number: string;
+  reception_number?: number;
   customer_id: number | null;
   customer_name: string;
   customer_phone: string | null;
@@ -611,6 +760,7 @@ export interface RepairInvoice {
   id: number;
   invoice_number: string;
   device_id: number;
+  reception_number: number;
   customer_id: number | null;
   customer_name: string;
   customer_phone: string | null;
@@ -625,7 +775,7 @@ export interface RepairInvoice {
   tax_amount: number;
   total_amount: number;
   paid_amount: number;
-  payment_status: PaymentStatus;
+  payment_status: RepairPaymentStatus;
   warranty_months: number;
   warranty_until: string | null;
   technician_id: number | null;
@@ -866,6 +1016,21 @@ export interface DashboardTopItem {
 }
 
 /**
+ * One day of the dashboard's trend chart. `date` is a `YYYY-MM-DD` UTC day
+ * key — the same boundary as the "today" window, so a Tehran day rolls over
+ * at 03:30 local time here too.
+ *
+ * The series arrives oldest first with no gaps: a day with no invoices is a
+ * zero rather than a missing entry, so the chart's x axis stays evenly
+ * spaced and a closed day reads as closed instead of being drawn over.
+ */
+export interface DashboardRevenuePoint {
+  date: string;
+  repair: number;
+  sale: number;
+}
+
+/**
  * GET /reports/dashboard.
  *
  * Note "today" and "month" boundaries are UTC, so a Tehran day rolls over at
@@ -900,6 +1065,27 @@ export interface DashboardStats {
     month_revenue: number;
     pending_payment_count: number;
     issued_unpaid_amount: number;
+    /**
+     * This month's billed amount split by what has been collected.
+     * `month_revenue` is the billed total; these two are how much of it came
+     * in and how much has not. `month_unpaid` is floored at zero, so an
+     * overpayment does not send it negative.
+     */
+    month_paid: number;
+    month_unpaid: number;
+  };
+  revenue_series: DashboardRevenuePoint[];
+  /**
+   * Open devices per technician, busiest first.
+   *
+   * The counts can add up to more than `open_devices`: a device may carry
+   * several technicians, so each row answers "how much is on this person's
+   * bench" rather than "what share of the total is theirs".
+   */
+  technician_load: {
+    open_devices: number;
+    unassigned: number;
+    technicians: { id: number; name: string; count: number }[];
   };
 }
 
@@ -1025,3 +1211,137 @@ export interface QuoteResponse {
   /** Null when no code was sent; false when one was sent and refused. */
   code_accepted: boolean | null;
 }
+
+// ── SMS wallet (phase 12) ────────────────────────────────────
+//
+// Written from src/controllers/smsController.ts, like every other shape in
+// this file. Rials throughout — the pages divide by ten for display.
+
+/** GET /sms/wallet */
+export interface SmsWalletStatus {
+  balance_rials: number;
+  /** Per SMS part. A Persian message is two parts, hence the next field. */
+  unit_price_rials: number;
+  message_price_rials: number;
+  /** A floor, not an estimate: a shorter message would cost less. */
+  approximate_messages_left: number;
+}
+
+export type SmsWalletTransactionType =
+  "topup" | "send" | "refund" | "adjustment";
+
+/** A row of GET /sms/wallet/transactions. */
+export interface SmsWalletTransaction {
+  id: number;
+  type: SmsWalletTransactionType;
+  /** Signed: negative for a send, positive for a top-up or refund. */
+  amount_rials: number;
+  balance_before_rials: number;
+  balance_after_rials: number;
+  description: string | null;
+  sms_message_id: number | null;
+  topup_id: number | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export type SmsTopupStatus = "pending" | "paid" | "verified" | "failed";
+
+/** A row of GET /sms/topups. */
+export interface SmsTopup {
+  id: number;
+  order_id: string;
+  status: SmsTopupStatus;
+  amount_rials: number;
+  ref_number: string | null;
+  card_number: string | null;
+  paid_at: string | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export type SmsMessageKind =
+  "device_accepted" | "device_ready" | "device_delivered";
+
+export type SmsMessageStatus =
+  | "pending"
+  | "sent"
+  | "failed"
+  | "insufficient_balance"
+  | "invalid_phone"
+  | "disabled"
+  | "refunded";
+
+/** A row of GET /sms/messages. */
+export interface SmsMessageRow {
+  id: number;
+  kind: SmsMessageKind;
+  status: SmsMessageStatus;
+  phone: string;
+  segments: number;
+  cost_rials: number;
+  customer_id: number | null;
+  customer_name: string | null;
+  device_id: number | null;
+  device_name: string | null;
+  error_message: string | null;
+  created_at: string;
+  sent_at: string | null;
+  created_by_name: string | null;
+}
+
+/** POST /sms/wallet/topup */
+export interface SmsTopupStarted {
+  topup_id: number;
+  amount_rials: number;
+  /** Navigate to it. Zibal refuses a request with no matching Referer. */
+  redirect_url: string;
+}
+
+/** POST /sms/wallet/verify */
+export interface SmsTopupVerified {
+  credited: boolean;
+  balance_rials: number | null;
+}
+
+/** GET /sms/settings and PATCH /sms/settings */
+export interface SmsSettings {
+  enabled: boolean;
+}
+
+/**
+ * GET /sms/capability — the only SMS route a technician may call.
+ *
+ * Carries no amount by design: a balance is money, and a technician does not
+ * see the figure. `reason` is ordered the way the server refuses, so the
+ * modal says what a send would have recorded.
+ */
+export interface SmsCapability {
+  can_send: boolean;
+  reason: "disabled" | "insufficient_balance" | null;
+  notifications_enabled: boolean;
+  /** How much of each value survives into the message.  */
+  parameter_caps: {
+    NAME: number;
+    DEVICE: number;
+    NUMBER: number;
+    SHOP: number;
+  };
+}
+
+/** What a device write reports about the message it tried to send. */
+export interface DeviceSmsOutcome {
+  sms_message_id: number | null;
+  status: SmsMessageStatus;
+  costRials: number;
+}
+
+/**
+ * What POST /devices and PUT /devices/:id answer with.
+ *
+ * The device, plus what became of the notification the write may have
+ * earned. `sms` is absent whenever nothing was attempted — which is most
+ * writes — and its presence is not a claim that a message went: read
+ * `sms.status` for that.
+ */
+export type DeviceWriteResponse = Device & { sms?: DeviceSmsOutcome };

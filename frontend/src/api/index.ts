@@ -7,9 +7,9 @@ import type {
   QueryParams,
   Customer,
   CustomerBody,
-  CustomerDevice,
+  CustomerNotesBody,
+  CustomerOverview,
   CustomerListRow,
-  CustomerStats,
   Paginated,
   PaginatedDevices,
   Device,
@@ -19,6 +19,7 @@ import type {
   ListedDeviceImage,
   UploadedDeviceImage,
   DeviceUpdateBody,
+  DeviceWriteResponse,
   DeviceAssignment,
   Category,
   CategoryBody,
@@ -33,6 +34,7 @@ import type {
   QuickStockResponse,
   Personnel,
   PersonnelCreateBody,
+  PersonnelOverview,
   PersonnelUpdateBody,
   ToggleActiveResponse,
   PurchaseInvoice,
@@ -76,6 +78,14 @@ import type {
   CheckoutBody,
   ReferralResponse,
   QuoteResponse,
+  SmsCapability,
+  SmsMessageRow,
+  SmsSettings,
+  SmsTopup,
+  SmsTopupStarted,
+  SmsTopupVerified,
+  SmsWalletStatus,
+  SmsWalletTransaction,
 } from "../types/api";
 
 /**
@@ -232,9 +242,9 @@ export const getDevices = (params?: QueryParams) =>
   api.get<PaginatedDevices>("/devices", { params });
 export const getDevice = (id: Id) => api.get<Device>(`/devices/${id}`);
 export const createDevice = (data: DeviceCreateBody) =>
-  api.post<Device>("/devices", data);
+  api.post<DeviceWriteResponse>("/devices", data);
 export const updateDevice = (id: Id, data: DeviceUpdateBody) =>
-  api.put<Device>(`/devices/${id}`, data);
+  api.put<DeviceWriteResponse>(`/devices/${id}`, data);
 export const deleteDevice = (id: Id) =>
   api.delete<MessageResponse>(`/devices/${id}`);
 
@@ -246,10 +256,11 @@ export const createCustomer = (data: CustomerBody) =>
   api.post<Customer>("/customers", data);
 export const updateCustomer = (id: Id, data: CustomerBody) =>
   api.put<Customer>(`/customers/${id}`, data);
-export const getCustomerDevices = (id: Id) =>
-  api.get<CustomerDevice[]>(`/customers/${id}/devices`);
-export const getCustomerStats = (id: Id) =>
-  api.get<CustomerStats>(`/customers/${id}/stats`);
+/** The whole customer page in one request — see `CustomerOverview`. */
+export const getCustomerOverview = (id: Id) =>
+  api.get<CustomerOverview>(`/customers/${id}/overview`);
+export const updateCustomerNotes = (id: Id, data: CustomerNotesBody) =>
+  api.put<MessageResponse & CustomerNotesBody>(`/customers/${id}/notes`, data);
 export const deleteCustomer = (id: Id) =>
   api.delete<{ success: boolean }>(`/customers/${id}`);
 export const searchCustomers = (q: string) =>
@@ -295,6 +306,9 @@ export const getPersonnel = (params?: QueryParams) =>
   api.get<Personnel[]>("/personnel", { params });
 export const getPersonnelOne = (id: Id) =>
   api.get<Personnel>(`/personnel/${id}`);
+/** The whole personnel page in one request — see `PersonnelOverview`. */
+export const getPersonnelOverview = (id: Id) =>
+  api.get<PersonnelOverview>(`/personnel/${id}/overview`);
 export const createPersonnel = (data: PersonnelCreateBody) =>
   api.post<Personnel>("/personnel", data);
 export const updatePersonnel = (id: Id, data: PersonnelUpdateBody) =>
@@ -364,6 +378,14 @@ export const getPurchaseInvoice = (id: Id) =>
   api.get<PurchaseInvoiceDetail>(`/purchase-invoices/${id}`);
 export const createPurchaseInvoice = (data: PurchaseInvoiceCreateBody) =>
   api.post<PurchaseInvoice>("/purchase-invoices", data);
+/*
+ * The same body as create, as with sale invoices: the server replaces the
+ * header and rebuilds the whole line list, so there is no partial shape.
+ */
+export const updatePurchaseInvoice = (
+  id: Id,
+  data: PurchaseInvoiceCreateBody,
+) => api.put<MessageResponse>(`/purchase-invoices/${id}`, data);
 export const updatePurchaseInvoicePayment = (id: Id, data: PaymentUpdateBody) =>
   api.put<PaymentUpdateResponse>(`/purchase-invoices/${id}/payment`, data);
 export const deletePurchaseInvoice = (id: Id) =>
@@ -466,5 +488,25 @@ export const getReferral = () =>
   api.get<ReferralResponse>("/subscription/referral");
 export const getQuote = (data: CheckoutBody) =>
   api.post<QuoteResponse>("/subscription/quote", data);
+
+// SMS wallet (phase 12)
+export const getSmsWallet = () => api.get<SmsWalletStatus>("/sms/wallet");
+export const getSmsCapability = () => api.get<SmsCapability>("/sms/capability");
+export const startSmsTopup = (amountRials: number) =>
+  api.post<SmsTopupStarted>("/sms/wallet/topup", { amount_rials: amountRials });
+export const verifySmsTopup = (trackId: string) =>
+  api.post<SmsTopupVerified>("/sms/wallet/verify", { track_id: trackId });
+export const getSmsWalletTransactions = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<SmsWalletTransaction>>(
+    "/sms/wallet/transactions",
+    { params },
+  );
+export const getSmsTopups = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<SmsTopup>>("/sms/topups", { params });
+export const getSmsMessages = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<SmsMessageRow>>("/sms/messages", { params });
+export const getSmsSettings = () => api.get<SmsSettings>("/sms/settings");
+export const updateSmsSettings = (enabled: boolean) =>
+  api.patch<SmsSettings>("/sms/settings", { enabled });
 
 export default api;

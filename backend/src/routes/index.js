@@ -16,6 +16,7 @@ const repairInvoiceRoutes = require("./repairInvoices");
 const serviceRoutes = require("./services");
 const exportRoutes = require("./exports");
 const subscriptionRoutes = require("./subscription");
+const smsRoutes = require("./sms");
 
 router.use("/auth", authRoutes);
 router.use("/devices", deviceRoutes);
@@ -31,5 +32,6 @@ router.use("/repair-invoices", repairInvoiceRoutes);
 router.use("/services", serviceRoutes);
 router.use("/exports", exportRoutes);
 router.use("/subscription", subscriptionRoutes);
+router.use("/sms", smsRoutes);
 
 module.exports = router;

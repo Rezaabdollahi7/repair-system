@@ -1,31 +1,39 @@
 // src/components/PurchaseInvoiceFormModal.jsx
 import { useState, useEffect } from "react";
-import axios from "axios";
-import { createPurchaseInvoice, getItems, createItem } from "../api";
+import { motion } from "framer-motion";
+import { errorText } from "../utils/errors";
+import {
+  createPurchaseInvoice,
+  getPurchaseInvoice,
+  updatePurchaseInvoice,
+  getItems,
+  createItem,
+} from "../api";
 import toast from "react-hot-toast";
 import {
   XMarkIcon,
   PlusIcon,
   TrashIcon,
   ShoppingCartIcon,
+  CubeIcon,
 } from "@heroicons/react/24/solid";
 import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import type {
+  Id,
   Item,
   ItemCreateBody,
   PurchaseInvoiceCreateBody,
 } from "../types/api";
 import type { SelectOption, SelectValue } from "./SearchableSelect";
-
-/** The server answers with { error } on every failing path. */
-function errorText(error: unknown, fallback: string): string {
-  return (
-    (axios.isAxiosError(error) &&
-      (error.response?.data as { error?: string } | undefined)?.error) ||
-    fallback
-  );
-}
+import { modalPanel } from "../motion";
+/*
+ * This file had its own `const formatCurrency = (amount) =>
+ * Number(amount).toLocaleString()`, which resolves the browser's default
+ * locale — so the purchase form was the one screen in the app printing
+ * «18,400,000» while every other amount read «۱۸٬۴۰۰٬۰۰۰».
+ */
+import { formatPersianCurrency } from "../utils/formatters";
 
 /** An option carrying the item's own price, so picking one prefills it. */
 interface ItemOption extends SelectOption {
@@ -105,9 +113,9 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div
-        className="bg-surface rounded-xl p-4 sm:p-6 w-full max-w-md"
+        className="bg-surface border border-border rounded-panel shadow-xl p-4 sm:p-6 w-full max-w-md"
         dir="rtl"
       >
         <h3 className="text-base sm:text-lg font-bold text-text-primary mb-3 sm:mb-4">
@@ -116,42 +124,46 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-2 sm:space-y-3">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 کد کالا *
               </label>
               <input
                 name="code"
                 value={formData.code}
                 onChange={handleChange}
-                className={`w-full border rounded px-3 py-2 text-sm bg-surface text-text-primary ${errors.code ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.code ? "border-danger" : "border-border"}`}
               />
               {errors.code && (
-                <p className="text-xs text-danger mt-1">{errors.code}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.code}
+                </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 نام کالا *
               </label>
               <input
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className={`w-full border rounded px-3 py-2 text-sm bg-surface text-text-primary ${errors.name ? "border-danger" : "border-border"}`}
+                className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.name ? "border-danger" : "border-border"}`}
               />
               {errors.name && (
-                <p className="text-xs text-danger mt-1">{errors.name}</p>
+                <p className="text-body-xs text-danger-fg mt-1">
+                  {errors.name}
+                </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label className="block text-body-sm font-medium text-text-primary mb-1">
                 واحد
               </label>
               <select
                 name="unit"
                 value={formData.unit}
                 onChange={handleChange}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-surface text-text-primary"
+                className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
               >
                 <option value="عدد">عدد</option>
                 <option value="متر">متر</option>
@@ -164,14 +176,18 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-border rounded hover:bg-surface-alt text-text-primary order-2 sm:order-1"
+              className="px-4 py-2.5 rounded-field border border-border bg-surface text-body-sm font-bold
+                         text-text-primary hover:border-border-strong transition-colors cursor-pointer
+                         order-2 sm:order-1"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-primary text-text-inverse rounded hover:bg-primary-hover disabled:opacity-50 order-1 sm:order-2"
+              className="px-4 py-2.5 rounded-field bg-primary text-primary-fg text-body-sm font-bold
+                         shadow-primary hover:bg-primary-hover transition-colors cursor-pointer
+                         disabled:opacity-60 disabled:cursor-not-allowed order-1 sm:order-2"
             >
               {loading ? "در حال ثبت..." : "ثبت"}
             </button>
@@ -186,6 +202,8 @@ interface PurchaseInvoiceFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /** Set to edit an existing invoice; omitted, the form creates one. */
+  invoiceId?: Id | null;
   zIndex?: number;
 }
 
@@ -193,8 +211,11 @@ export default function PurchaseInvoiceFormModal({
   isOpen,
   onClose,
   onSuccess,
+  invoiceId,
 }: PurchaseInvoiceFormModalProps) {
+  const isEditMode = Boolean(invoiceId);
   const [loading, setLoading] = useState(false);
+  const [loadingInvoice, setLoadingInvoice] = useState(isEditMode);
   const [items, setItems] = useState<Item[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -229,10 +250,46 @@ export default function PurchaseInvoiceFormModal({
     }
   };
 
+  const loadInvoiceData = async (id: Id) => {
+    setLoadingInvoice(true);
+    try {
+      const res = await getPurchaseInvoice(id);
+      const invoice = res.data;
+
+      setFormData({
+        supplier_name: invoice.supplier_name || "",
+        invoice_date:
+          invoice.invoice_date?.split("T")[0] ||
+          new Date().toISOString().split("T")[0],
+        paid_amount: invoice.paid_amount || 0,
+        note: invoice.note || "",
+      });
+
+      // Named `lines`, not `items`: that name already holds the catalogue
+      // this form searches.
+      const lines: InvoiceLine[] = invoice.items.map((line) => ({
+        item_id: line.item_id,
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+      }));
+      setSelectedItems(lines);
+    } catch (error) {
+      console.error("Failed to load invoice:", error);
+      toast.error("خطا در دریافت اطلاعات فاکتور");
+      onClose();
+    } finally {
+      setLoadingInvoice(false);
+    }
+  };
+
   useEffect(() => {
-    if (isOpen) fetchItems();
+    if (!isOpen) return;
+    void fetchItems();
+    if (isEditMode && invoiceId) {
+      void loadInvoiceData(invoiceId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, invoiceId, isEditMode]);
 
   const calculateItemTotal = (quantity: number, unitPrice: number) =>
     (quantity || 0) * (unitPrice || 0);
@@ -324,8 +381,13 @@ export default function PurchaseInvoiceFormModal({
           unit_price: item.unit_price,
         })),
       };
-      await createPurchaseInvoice(payload);
-      toast.success("فاکتور خرید با موفقیت ثبت شد");
+      if (isEditMode && invoiceId) {
+        await updatePurchaseInvoice(invoiceId, payload);
+        toast.success("فاکتور خرید با موفقیت ویرایش شد");
+      } else {
+        await createPurchaseInvoice(payload);
+        toast.success("فاکتور خرید با موفقیت ثبت شد");
+      }
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -335,139 +397,126 @@ export default function PurchaseInvoiceFormModal({
     }
   };
 
-  const formatCurrency = (amount: number) => Number(amount).toLocaleString();
-
   if (!isOpen) return null;
 
+  if (loadingInvoice) {
+    return (
+      <div className="fixed inset-0 bg-scrim/50 flex items-center justify-center z-50">
+        <div className="bg-surface border border-border rounded-panel shadow-xl p-8">
+          <div className="text-center py-4 text-text-primary" dir="rtl">
+            در حال بارگذاری فاکتور...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-xl shadow-xl w-full max-w-6xl my-2 sm:my-8"
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-7xl my-2 sm:my-8"
         dir="rtl"
       >
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-xl z-10">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border sticky top-0 bg-surface rounded-t-card z-10">
           <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-2">
             <ShoppingCartIcon className="w-5 h-5 text-text-secondary" />
-            ثبت فاکتور خرید جدید
+            {isEditMode ? "ویرایش فاکتور خرید" : "ثبت فاکتور خرید جدید"}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg"
+            className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-3 sm:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            <div className="lg:col-span-1 space-y-4 sm:space-y-6">
-              <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
-                  اطلاعات فاکتور
-                </h2>
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      نام فروشنده
-                    </label>
-                    <input
-                      type="text"
-                      name="supplier_name"
-                      value={formData.supplier_name}
-                      onChange={handleInputChange}
-                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
-                      placeholder="مثلاً: فروشگاه قطعات الکترونیک"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      تاریخ فاکتور
-                    </label>
-                    <PersianDatePicker
-                      value={formData.invoice_date}
-                      onChange={(val) =>
-                        setFormData((prev) => ({ ...prev, invoice_date: val }))
-                      }
-                      placeholder="انتخاب تاریخ"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      توضیحات
-                    </label>
-                    <textarea
-                      name="note"
-                      value={formData.note}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className="w-full border border-border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary"
-                      placeholder="توضیحات اضافی..."
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* ===== بخش اطلاعات فاکتور (افقی) ===== */}
+          <div className="bg-surface shadow rounded-field p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-medium text-text-primary mb-4 flex items-center gap-2">
+              <ShoppingCartIcon className="w-5 h-5 text-text-secondary" />
+              اطلاعات فاکتور
+            </h2>
 
-              <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-medium text-text-primary mb-3 sm:mb-4">
-                  خلاصه پرداخت
-                </h2>
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between py-2 text-sm sm:text-base">
-                    <span className="text-text-secondary">جمع کل:</span>
-                    <span className="font-medium text-text-primary">
-                      {formatCurrency(calculateTotal())} ریال
-                    </span>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      مبلغ پرداختی
-                    </label>
-                    <input
-                      type="number"
-                      name="paid_amount"
-                      value={formData.paid_amount}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="1000"
-                      className={`w-full border rounded-lg px-3 sm:px-4 py-2 text-sm bg-surface text-text-primary ${errors.paid_amount ? "border-danger" : "border-border"}`}
-                    />
-                    {errors.paid_amount && (
-                      <p className="mt-1 text-xs text-danger">
-                        {errors.paid_amount}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex justify-between py-2 border-t border-border text-sm sm:text-base">
-                    <span className="text-text-secondary">مانده:</span>
-                    <span
-                      className={`font-medium ${calculateRemaining() > 0 ? "text-danger" : "text-success"}`}
-                    >
-                      {formatCurrency(calculateRemaining())} ریال
-                    </span>
-                  </div>
-                </div>
+            {/*
+              Two fields across rather than the sales form's four: this form
+              has two, and stretching them over four columns would leave half
+              the band empty. The grid is the same one, filled as far as the
+              content goes.
+            */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div>
+                <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                  نام فروشنده
+                </label>
+                <input
+                  type="text"
+                  name="supplier_name"
+                  value={formData.supplier_name}
+                  onChange={handleInputChange}
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                  placeholder="مثلاً: فروشگاه قطعات الکترونیک"
+                />
+              </div>
+              <div>
+                <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                  تاریخ فاکتور
+                </label>
+                <PersianDatePicker
+                  value={formData.invoice_date}
+                  onChange={(val) =>
+                    setFormData((prev) => ({ ...prev, invoice_date: val }))
+                  }
+                  placeholder="انتخاب تاریخ"
+                />
               </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <div className="bg-surface shadow rounded-lg p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                  <h2 className="text-base sm:text-lg font-medium text-text-primary">
+            <div className="mt-3 sm:mt-4">
+              <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                توضیحات
+              </label>
+              <textarea
+                name="note"
+                value={formData.note}
+                onChange={handleInputChange}
+                rows={2}
+                className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                placeholder="توضیحات اضافی..."
+              />
+            </div>
+          </div>
+
+          {/* ===== گرید اصلی: اقلام فاکتور (9/12) + خلاصه پرداخت (3/12) ===== */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+            {/* ستون راست - اقلام فاکتور (9/12) */}
+            <div className="lg:col-span-9">
+              <div className="bg-surface shadow rounded-field p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 sm:mb-4">
+                  <h2 className="text-base sm:text-lg font-medium text-text-primary flex items-center gap-2">
+                    <CubeIcon className="w-5 h-5 text-text-secondary" />
                     اقلام فاکتور
                   </h2>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setShowQuickModal(true)}
-                      className="bg-success-soft text-success px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-success-soft text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                     >
                       <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       تعریف سریع کالا
                     </button>
+                    {/* Bordered, like its neighbour and like all three of the
+                        sales form's add-buttons. It was the one filled
+                        `bg-primary` among them, which made adding a line look
+                        like the form's main action instead of submitting it. */}
                     <button
                       type="button"
                       onClick={handleAddItem}
-                      className="bg-primary text-text-inverse px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-primary-hover text-xs sm:text-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-field border border-border bg-surface text-text-primary font-bold hover:bg-surface-alt hover:border-border-strong transition-colors cursor-pointer text-body-xs sm:text-body-sm flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                     >
                       <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       افزودن کالا
@@ -476,15 +525,15 @@ export default function PurchaseInvoiceFormModal({
                 </div>
 
                 {errors.items && (
-                  <p className="mb-3 sm:mb-4 text-sm text-danger">
+                  <p className="mb-3 sm:mb-4 text-body-sm text-danger-fg">
                     {errors.items}
                   </p>
                 )}
 
                 {selectedItems.length === 0 ? (
-                  <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-lg">
+                  <div className="text-center py-8 sm:py-10 text-text-secondary border-2 border-dashed border-border rounded-field">
                     <p>هیچ کالایی انتخاب نشده است</p>
-                    <p className="text-xs sm:text-sm mt-1">
+                    <p className="text-body-xs sm:text-body-sm mt-1">
                       از دکمه "افزودن کالا" استفاده کنید
                     </p>
                   </div>
@@ -493,12 +542,19 @@ export default function PurchaseInvoiceFormModal({
                     {selectedItems.map((item, index) => (
                       <div
                         key={index}
-                        className="border border-border rounded-lg p-3 sm:p-4 bg-surface-alt"
+                        className="border border-border rounded-field p-3 sm:p-4 bg-surface-alt"
                       >
-                        <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3 items-center">
-                          <div className="col-span-2 sm:col-span-5">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
-                              کالا <span className="text-danger">*</span>
+                        {/*
+                        Six columns on a phone, twelve from `sm` up, as on
+                        the other two forms. Purchase has no type chip and no
+                        unit column — every line here is a stocked good — so
+                        its twelve are کالا ۵ | تعداد ۲ | قیمت ۲ | جمع ۲ |
+                        حذف ۱.
+                      */}
+                        <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 sm:gap-3 items-start sm:items-center">
+                          <div className="col-span-6 sm:col-span-5">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              کالا
                             </label>
                             <SearchableSelect
                               options={itemOptions}
@@ -508,13 +564,12 @@ export default function PurchaseInvoiceFormModal({
                               }
                               placeholder="جستجو و انتخاب کالا..."
                               loading={loadingItems}
-                              required
                               error={errors[`item_${index}`]}
                             />
                           </div>
-                          <div className="col-span-1 sm:col-span-2">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
-                              تعداد <span className="text-danger">*</span>
+                          <div className="col-span-2 sm:col-span-2">
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              تعداد
                             </label>
                             <input
                               type="number"
@@ -527,18 +582,17 @@ export default function PurchaseInvoiceFormModal({
                                 )
                               }
                               min="1"
-                              className={`w-full border rounded-lg px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary ${errors[`quantity_${index}`] ? "border-danger" : "border-border"}`}
+                              className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`quantity_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`quantity_${index}`] && (
-                              <p className="mt-1 text-xs text-danger">
+                              <p className="mt-1 text-body-xs text-danger-fg">
                                 {errors[`quantity_${index}`]}
                               </p>
                             )}
                           </div>
                           <div className="col-span-2 sm:col-span-2">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
-                              قیمت واحد (ریال){" "}
-                              <span className="text-danger">*</span>
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              قیمت واحد (ریال)
                             </label>
                             <input
                               type="number"
@@ -551,20 +605,20 @@ export default function PurchaseInvoiceFormModal({
                                 )
                               }
                               min="0"
-                              className={`w-full border rounded-lg px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface text-text-primary ${errors[`price_${index}`] ? "border-danger" : "border-border"}`}
+                              className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`price_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`price_${index}`] && (
-                              <p className="mt-1 text-xs text-danger">
+                              <p className="mt-1 text-body-xs text-danger-fg">
                                 {errors[`price_${index}`]}
                               </p>
                             )}
                           </div>
                           <div className="col-span-2 sm:col-span-2">
-                            <label className="block text-xs font-medium text-text-secondary mb-1">
-                              جمع
+                            <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
+                              جمع (ریال)
                             </label>
-                            <div className="px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium bg-surface border border-border rounded-lg text-text-primary">
-                              {formatCurrency(
+                            <div className="px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-text-primary">
+                              {formatPersianCurrency(
                                 calculateItemTotal(
                                   item.quantity,
                                   item.unit_price,
@@ -572,11 +626,11 @@ export default function PurchaseInvoiceFormModal({
                               )}
                             </div>
                           </div>
-                          <div className="col-span-1 sm:col-span-1">
+                          <div className="col-span-6 sm:col-span-1">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(index)}
-                              className="w-full px-2 py-2 text-danger hover:bg-danger-soft rounded-lg"
+                              className="w-full px-2 py-2 text-danger-fg hover:bg-danger-soft rounded-field"
                             >
                               <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />
                             </button>
@@ -588,26 +642,78 @@ export default function PurchaseInvoiceFormModal({
                 )}
               </div>
             </div>
+
+            {/* ستون چپ - خلاصه پرداخت (3/12) */}
+            <div className="lg:col-span-3">
+              <div className="bg-surface shadow rounded-field p-4 sm:p-6 sticky top-24">
+                <h2 className="text-base sm:text-lg font-medium text-text-primary mb-4">
+                  خلاصه پرداخت
+                </h2>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2 text-body-sm sm:text-base border-b border-border">
+                    <span className="text-text-secondary">جمع کل (ریال):</span>
+                    <span className="font-medium text-text-primary">
+                      {formatPersianCurrency(calculateTotal())}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-body-sm font-medium text-text-primary mb-1.5">
+                      مبلغ پرداختی (ریال)
+                    </label>
+                    <input
+                      type="number"
+                      name="paid_amount"
+                      value={formData.paid_amount}
+                      onChange={handleInputChange}
+                      min="0"
+                      step="1000"
+                      className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border-field"}`}
+                    />
+                    {errors.paid_amount && (
+                      <p className="mt-1 text-body-xs text-danger-fg">
+                        {errors.paid_amount}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base font-bold">
+                    <span className="text-text-primary">مانده (ریال):</span>
+                    <span
+                      className={`${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
+                    >
+                      {formatPersianCurrency(calculateRemaining())}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
+          {/* ===== دکمه‌های اقدام ===== */}
           <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 sm:px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-surface-alt order-2 sm:order-1"
+              className="px-3 sm:px-4 py-2 border border-border rounded-field text-text-primary hover:bg-surface-alt order-2 sm:order-1"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 sm:px-6 py-2 bg-primary text-text-inverse rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2 order-1 sm:order-2 justify-center"
+              className="px-4 sm:px-6 py-2 bg-primary text-primary-fg rounded-field hover:bg-primary-hover disabled:opacity-50 text-body-sm sm:text-base order-1 sm:order-2"
             >
-              {loading ? "در حال ثبت..." : "ثبت فاکتور"}
+              {loading
+                ? "در حال ثبت..."
+                : isEditMode
+                  ? "ویرایش فاکتور"
+                  : "ثبت فاکتور خرید"}
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
 
       <QuickItemModal
         isOpen={showQuickModal}

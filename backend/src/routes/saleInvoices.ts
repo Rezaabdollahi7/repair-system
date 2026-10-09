@@ -1,6 +1,7 @@
 import express from "express";
 import * as ctrl from "../controllers/saleInvoiceController";
 import { authenticate } from "../middleware/auth";
+import { atLeast } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import { idParamSchema } from "../schemas/common";
 import {
@@ -13,6 +14,9 @@ import {
 const router = express.Router();
 
 router.use(authenticate);
+
+// Guarded on the router so a path added later inherits it.
+router.use(atLeast("admin"));
 
 router.get("/", validate({ query: saleInvoiceListQuerySchema }), ctrl.getAll);
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getById);

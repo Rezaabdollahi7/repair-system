@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import axios from "axios";
 import {
   createDevice,
@@ -24,6 +26,8 @@ import {
   CalendarIcon,
   PhotoIcon,
   CheckBadgeIcon,
+  CheckCircleIcon,
+  XCircleIcon,
 } from "@heroicons/react/24/solid";
 import { useDebounce } from "../utils/helpers";
 import type {
@@ -35,6 +39,25 @@ import type {
   ListedDeviceImage,
   Personnel,
 } from "../types/api";
+import { modalPanel } from "../motion";
+import { DEVICE_STATUSES } from "../utils/deviceStatus";
+import { getSmsCapability } from "../api";
+import { smsOutcomeText } from "../utils/smsOutcome";
+import { useAuth } from "../context/AuthContext";
+import type { DeviceSmsOutcome, SmsCapability } from "../types/api";
+
+/**
+ * Which statuses the server will text a customer about, mirrored here so the
+ * checkbox only appears when there is something to send.
+ *
+ * ⚠️ A mirror, not the source. utils/customerNotification decides, and a
+ * disagreement costs a checkbox that does nothing rather than a message sent
+ * by accident — the server ignores `send_sms` for any other transition.
+ */
+const NOTIFYING_STATUSES: Record<string, string> = {
+  ready_for_pickup: "ارسال پیامک آماده تحویل به مشتری",
+  delivered: "ارسال پیامک تحویل دستگاه به مشتری",
+};
 
 /**
  * The form holds every field as the inputs produce it. `customer_id` carries
@@ -51,6 +74,12 @@ interface DeviceForm {
   exit_date: string;
   status: string;
   description: string;
+  /**
+   * A request, not an instruction. The server decides whether a message
+   * actually goes — the toggle, the customer's number and the wallet are all
+   * things this form cannot see and should not pretend to.
+   */
+  send_sms: boolean;
 }
 
 /**
@@ -64,6 +93,19 @@ interface SelectedPerson {
   username?: string;
 }
 
+/**
+ * What to call a member of staff on screen.
+ *
+ * Their name, falling back to the username only for a row that somehow has
+ * no name at all. The username is a mobile number here — sign-up and
+ * personnel creation share phoneSchema — so it is a last resort, not a
+ * label: a list of «۰۹۱۲…» is a list of account identifiers, and nobody
+ * assigns a repair to one of those.
+ */
+function personName(person: Personnel): string {
+  return person.full_name || person.username;
+}
+
 const INITIAL_FORM: DeviceForm = {
   customer_id: "",
   device_name: "",
@@ -74,59 +116,23 @@ const INITIAL_FORM: DeviceForm = {
   exit_date: "",
   status: "pending",
   description: "",
+  // Default on: a shop that has switched notifications on and paid for
+  // credit means to use it, and the server refuses anyway when it should.
+  send_sms: true,
 };
 
 const INITIAL_CUSTOMER: CustomerBody = { name: "", phone: "" };
 const INITIAL_DEVICE_NAME = { name: "" };
 const INITIAL_BRAND = { name: "" };
 
-const STATUS_OPTIONS = [
-  {
-    value: "pending",
-    label: "در انتظار بررسی",
-    color: "bg-warning-soft text-warning",
-  },
-  {
-    value: "diagnosing",
-    label: "در حال بررسی",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "waiting_for_parts",
-    label: "در انتظار قطعه",
-    color: "bg-warning-soft text-warning",
-  },
-  {
-    value: "repairing",
-    label: "در حال تعمیر",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "repaired",
-    label: "تعمیر شده",
-    color: "bg-surface-alt text-text-secondary",
-  },
-  {
-    value: "ready_for_pickup",
-    label: "آماده تحویل",
-    color: "bg-primary-soft text-primary",
-  },
-  {
-    value: "delivered",
-    label: "تحویل داده شده",
-    color: "bg-success-soft text-success",
-  },
-  {
-    value: "unrepairable",
-    label: "غیرقابل تعمیر",
-    color: "bg-danger-soft text-danger",
-  },
-  {
-    value: "not_repaired",
-    label: "تعمیر نشد",
-    color: "bg-warning-soft text-danger",
-  },
-];
+/*
+ * From the shared status list. This is a <select>, so only the value and the
+ * label are used — the colours the local copy carried were never rendered.
+ */
+const STATUS_OPTIONS = DEVICE_STATUSES.map((status) => ({
+  value: status.key,
+  label: status.label,
+}));
 
 interface SectionTitleProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -137,7 +143,9 @@ function SectionTitle({ icon: Icon, title }: SectionTitleProps) {
   return (
     <div className="flex items-center gap-2 mb-3 pb-2 border-b border-primary-soft">
       <Icon className="size-5 text-primary" />
-      <span className="text-sm font-semibold text-text-primary">{title}</span>
+      <span className="text-body-sm font-semibold text-text-primary">
+        {title}
+      </span>
     </div>
   );
 }
@@ -147,6 +155,14 @@ interface DeviceFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /**
+   * Opens a new device already belonging to this customer. Set by the
+   * customer page's «ثبت دستگاه جدید», which knows whose device it is —
+   * without it the button would drop the shop back into a search for the
+   * customer whose page they are standing on. Ignored when editing: an
+   * existing device brings its own.
+   */
+  presetCustomer?: { id: Id; name: string } | null;
   zIndex?: number;
 }
 
@@ -155,9 +171,22 @@ export default function DeviceFormModal({
   isOpen,
   onClose,
   onSuccess,
+  presetCustomer = null,
 }: DeviceFormModalProps) {
   const isEdit = Boolean(deviceId);
+  const { isAtLeast } = useAuth();
   const [form, setForm] = useState<DeviceForm>(INITIAL_FORM);
+  const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
+  /*
+   * Shown in the title, and deliberately not taken from `deviceId`.
+   *
+   * That prop is the primary key — what getDevice and updateDevice are
+   * called with — while the number on the intake slip is the workspace's own
+   * since 2.9. They coincided until then, which is why one value was doing
+   * both jobs here.
+   */
+  const [receptionNumber, setReceptionNumber] = useState<number | null>(null);
+  const [capability, setCapability] = useState<SmsCapability | null>(null);
   const [loading, setLoading] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewDeviceName, setShowNewDeviceName] = useState(false);
@@ -199,12 +228,24 @@ export default function DeviceFormModal({
   const debouncedDeviceNameSearch = useDebounce(deviceNameSearch, 300);
   const debouncedBrandSearch = useDebounce(brandSearch, 300);
 
-  const filteredPersonnel = personnelList.filter((p) => {
-    const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
-    // A personnel row has no `name`: the old `p.name ?? p.full_name` always
-    // fell through to the second.
-    return !alreadySelected && p.full_name.includes(personnelSearch);
-  });
+  /**
+   * The people this device can still be assigned to, by name.
+   *
+   * Sorted, and that is the point of the sort key rather than the filter:
+   * the endpoint answers in `createdAt desc`, so the picker listed the shop
+   * in the order its accounts happened to be created — newest first, which
+   * from the counter reads as no order at all. `localeCompare` with "fa"
+   * puts Persian names in Persian alphabetical order; the browser's default
+   * collation sorts by code point and scatters ا، آ and ئ.
+   */
+  const filteredPersonnel = personnelList
+    .filter((p) => {
+      const alreadySelected = selectedPersonnel.some((s) => s.id === p.id);
+      // A personnel row has no `name`: the old `p.name ?? p.full_name` always
+      // fell through to the second.
+      return !alreadySelected && personName(p).includes(personnelSearch);
+    })
+    .sort((a, b) => personName(a).localeCompare(personName(b), "fa"));
 
   const searchCustomersAPI = useCallback(async (query: string) => {
     if (!query || query.trim() === "") {
@@ -272,8 +313,26 @@ export default function DeviceFormModal({
   useEffect(() => {
     if (isOpen) {
       loadPersonnel();
+
+      // Cleared on every open, not only when creating: two edits in a row
+      // would otherwise show the first device's number in the second one's
+      // title for as long as the fetch takes. loadDevice fills it back in.
+      setReceptionNumber(null);
+
       if (isEdit) loadDevice();
-      else resetForm();
+      else {
+        resetForm();
+        setLoadedStatus(null);
+      }
+
+      // Whether the checkbox works at all. Its own endpoint rather than the
+      // wallet's, because a technician may open this modal and a balance is
+      // not theirs to see — this answer carries flags and a reason, no
+      // figure. A failure leaves it null, which reads as "no idea" and
+      // simply hides the checkbox rather than offering one that cannot work.
+      getSmsCapability()
+        .then(({ data }) => setCapability(data))
+        .catch(() => setCapability(null));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, deviceId]);
@@ -306,10 +365,17 @@ export default function DeviceFormModal({
   }, [debouncedBrandSearch, searchBrandsAPI]);
 
   const resetForm = () => {
-    setForm(INITIAL_FORM);
+    // The customer comes with the form when the page that opened it already
+    // knows who it is. `customerSearch` is what the field shows and
+    // `form.customer_id` is what gets submitted, so both are set.
+    setForm(
+      presetCustomer
+        ? { ...INITIAL_FORM, customer_id: Number(presetCustomer.id) }
+        : INITIAL_FORM,
+    );
     setImages([]);
     setSelectedPersonnel([]);
-    setCustomerSearch("");
+    setCustomerSearch(presetCustomer?.name ?? "");
     setDeviceNameSearch("");
     setBrandSearch("");
     setShowNewCustomer(false);
@@ -348,7 +414,16 @@ export default function DeviceFormModal({
         exit_date: deviceRes.data.exit_date || "",
         status: deviceRes.data.status || "pending",
         description: deviceRes.data.description || "",
+        send_sms: true,
       });
+
+      setReceptionNumber(deviceRes.data.reception_number);
+
+      // The status the form opened with. The checkbox is about a change, so
+      // it must not appear when the select still holds what it started on —
+      // the same rule the server applies, mirrored so the UI does not offer
+      // something that would be ignored.
+      setLoadedStatus(deviceRes.data.status || "pending");
 
       if (deviceRes.data.customer_name) {
         setCustomerSearch(
@@ -413,7 +488,7 @@ export default function DeviceFormModal({
   const handleSelectPersonnel = (person: Personnel) => {
     setSelectedPersonnel((prev) => [
       ...prev,
-      { id: person.id, name: person.full_name, username: person.username },
+      { id: person.id, name: personName(person), username: person.username },
     ]);
     setPersonnelSearch("");
     setShowPersonnelDropdown(false);
@@ -428,13 +503,29 @@ export default function DeviceFormModal({
     setLoading(true);
     try {
       let devId: Id | null | undefined = deviceId;
+      // What the server did about the message, if it did anything. The
+      // device saved either way — this is information, not a failure.
+      let sms: DeviceSmsOutcome | undefined;
+
       if (isEdit && deviceId) {
-        await updateDevice(deviceId, form as DeviceCreateBody);
+        const res = await updateDevice(deviceId, form as DeviceCreateBody);
+        sms = res.data.sms;
         toast.success("دستگاه ویرایش شد");
       } else {
         const res = await createDevice(form as DeviceCreateBody);
         devId = res.data.id;
+        sms = res.data.sms;
         toast.success("دستگاه ثبت شد");
+      }
+
+      // A second toast rather than one combined line: the device saving and
+      // the message going are two different pieces of news, and a shop that
+      // sees «دستگاه ثبت شد» should not have to read past it to learn the
+      // customer was not told.
+      if (sms) {
+        const text = smsOutcomeText(sms);
+        if (sms.status === "sent") toast.success(text);
+        else toast.error(text);
       }
       if (devId) {
         await setDeviceAssignments(
@@ -458,26 +549,33 @@ export default function DeviceFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div
-        className="bg-surface rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-8"
+    <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <motion.div
+        variants={modalPanel}
+        initial="hidden"
+        animate="visible"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-5xl my-2 sm:my-8"
         dir="rtl"
       >
         {/* Header */}
-        <div className="sticky top-0 bg-surface rounded-t-2xl border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
+        <div className="sticky top-0 bg-surface rounded-t-card border-b border-primary-soft px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-primary-soft p-2 rounded-xl">
+            <div className="bg-primary-soft p-2 rounded-card">
               <WrenchScrewdriverIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-text-primary">
-                {isEdit ? `ویرایش دستگاه #${deviceId}` : "ثبت دستگاه جدید"}
+                {isEdit
+                  ? receptionNumber === null
+                    ? "ویرایش دستگاه"
+                    : `ویرایش دستگاه #${receptionNumber}`
+                  : "ثبت دستگاه جدید"}
               </h2>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-lg transition-colors"
+            className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-alt rounded-field transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -503,12 +601,12 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowCustomerDropdown(false), 200)
                       }
-                      className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-text-primary"
                     />
                     {showCustomerDropdown && (
-                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-56 overflow-y-auto">
                         <div
-                          className="px-3 py-2.5 text-sm text-text-secondary hover:bg-surface-alt cursor-pointer border-b border-border"
+                          className="px-3 py-2.5 text-body-sm text-text-secondary hover:bg-surface-alt cursor-pointer border-b border-border"
                           onMouseDown={() => {
                             setForm((p) => ({ ...p, customer_id: "" }));
                             setCustomerSearch("");
@@ -518,7 +616,7 @@ export default function DeviceFormModal({
                           بدون مشتری
                         </div>
                         {searchingCustomers ? (
-                          <div className="px-3 py-4 text-sm text-text-secondary text-center">
+                          <div className="px-3 py-4 text-body-sm text-text-secondary text-center">
                             در حال جستجو...
                           </div>
                         ) : customerResults.length > 0 ? (
@@ -532,24 +630,24 @@ export default function DeviceFormModal({
                                 );
                                 setShowCustomerDropdown(false);
                               }}
-                              className="px-3 py-2.5 text-sm hover:bg-primary-soft cursor-pointer border-b border-border"
+                              className="px-3 py-2.5 text-body-sm hover:bg-primary-soft cursor-pointer border-b border-border"
                             >
                               <div className="font-medium text-text-primary">
                                 {c.name}
                               </div>
                               {c.phone && (
-                                <div className="text-xs text-text-secondary mt-0.5">
+                                <div className="text-body-xs text-text-secondary mt-0.5">
                                   {c.phone}
                                 </div>
                               )}
                             </div>
                           ))
                         ) : customerSearch ? (
-                          <div className="px-3 py-4 text-xs text-text-secondary text-center">
+                          <div className="px-3 py-4 text-body-xs text-text-secondary text-center">
                             مشتری‌ای یافت نشد
                           </div>
                         ) : (
-                          <div className="px-3 py-4 text-xs text-text-secondary text-center">
+                          <div className="px-3 py-4 text-body-xs text-text-secondary text-center">
                             برای جستجو نام یا شماره تلفن وارد کنید
                           </div>
                         )}
@@ -559,21 +657,24 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewCustomer(true)}
-                    className="px-3 py-2 text-sm bg-primary-soft text-primary rounded-xl hover:opacity-80 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-body-sm font-bold rounded-field border border-border
+                             bg-surface text-text-primary hover:bg-surface-alt
+                             hover:border-border-strong transition-colors
+                             cursor-pointer whitespace-nowrap"
                   >
                     + جدید
                   </button>
                 </div>
 
                 {showNewCustomer && (
-                  <div className="p-4 bg-primary-soft rounded-xl space-y-3 border border-primary-soft">
+                  <div className="p-4 bg-primary-soft rounded-card space-y-3 border border-primary-soft">
                     <input
                       placeholder="نام مشتری *"
                       value={newCustomer.name}
                       onChange={(e) =>
                         setNewCustomer((p) => ({ ...p, name: e.target.value }))
                       }
-                      className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <input
                       placeholder="شماره تلفن *"
@@ -581,20 +682,20 @@ export default function DeviceFormModal({
                       onChange={(e) =>
                         setNewCustomer((p) => ({ ...p, phone: e.target.value }))
                       }
-                      className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddCustomer}
-                        className="px-4 py-2 text-sm bg-primary text-text-inverse rounded-lg hover:bg-primary-hover"
+                        className="px-4 py-2 text-body-sm bg-primary text-primary-fg rounded-field hover:bg-primary-hover"
                       >
                         ثبت مشتری
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewCustomer(false)}
-                        className="px-4 py-2 text-sm bg-surface-alt rounded-lg hover:bg-surface-alt text-text-primary"
+                        className="px-4 py-2 text-body-sm bg-surface-alt rounded-field hover:bg-surface-alt text-text-primary"
                       >
                         انصراف
                       </button>
@@ -620,12 +721,12 @@ export default function DeviceFormModal({
                     onBlur={() =>
                       setTimeout(() => setShowPersonnelDropdown(false), 150)
                     }
-                    className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                    className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   />
                   {showPersonnelDropdown && (
-                    <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-48 overflow-y-auto">
                       {filteredPersonnel.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-text-secondary">
+                        <div className="px-3 py-2 text-body-sm text-text-secondary">
                           {personnelList.length === 0
                             ? "پرسنلی ثبت نشده"
                             : "موردی یافت نشد"}
@@ -635,12 +736,17 @@ export default function DeviceFormModal({
                           <div
                             key={person.id}
                             onMouseDown={() => handleSelectPersonnel(person)}
-                            className="px-3 py-2.5 text-sm hover:bg-primary-soft cursor-pointer flex items-center justify-between text-text-primary"
+                            className="px-3 py-2.5 text-body-sm hover:bg-primary-soft cursor-pointer flex items-center justify-between text-text-primary"
                           >
-                            <span>{person.full_name}</span>
-                            {person.username && (
-                              <span className="text-xs text-text-secondary">
-                                @{person.username}
+                            <span>{personName(person)}</span>
+                            {/* The role, not the username. The username is
+                                the person's mobile number, and a column of
+                                «@۰۹۱۲…» beside the names told the shop
+                                nothing it was choosing between — where
+                                «تکنسین» does. */}
+                            {person.role_label && (
+                              <span className="text-body-xs text-text-secondary">
+                                {person.role_label}
                               </span>
                             )}
                           </div>
@@ -654,9 +760,9 @@ export default function DeviceFormModal({
                     {selectedPersonnel.map((person) => (
                       <span
                         key={person.id}
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-primary-soft text-primary text-sm rounded-full"
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-primary-soft text-primary text-body-sm rounded-full"
                       >
-                        {person.name}
+                        {person.name || person.username}
                         <button
                           type="button"
                           onClick={() => handleRemovePersonnel(person.id)}
@@ -679,7 +785,13 @@ export default function DeviceFormModal({
               {/* Device name */}
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
-                  نام دستگاه <span className="text-danger">*</span>
+                  نام دستگاه{" "}
+                  <span
+                    aria-hidden
+                    className="text-danger-fg text-[0.85em] leading-none align-super"
+                  >
+                    *
+                  </span>
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -695,12 +807,12 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowDeviceNameDropdown(false), 200)
                       }
-                      className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     {showDeviceNameDropdown && deviceNameResults.length > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-48 overflow-y-auto">
                         {searchingDeviceNames ? (
-                          <div className="px-3 py-2 text-sm text-text-secondary">
+                          <div className="px-3 py-2 text-body-sm text-text-secondary">
                             در حال جستجو...
                           </div>
                         ) : (
@@ -715,7 +827,7 @@ export default function DeviceFormModal({
                                 setDeviceNameSearch(d.device_name);
                                 setShowDeviceNameDropdown(false);
                               }}
-                              className="px-3 py-2 text-sm hover:bg-primary-soft cursor-pointer text-text-primary"
+                              className="px-3 py-2 text-body-sm hover:bg-primary-soft cursor-pointer text-text-primary"
                             >
                               {d.device_name}
                             </div>
@@ -727,33 +839,36 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewDeviceName(true)}
-                    className="px-3 py-2 text-sm bg-primary-soft text-primary rounded-xl hover:opacity-80 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-body-sm font-bold rounded-field border border-border
+                             bg-surface text-text-primary hover:bg-surface-alt
+                             hover:border-border-strong transition-colors
+                             cursor-pointer whitespace-nowrap"
                   >
                     + جدید
                   </button>
                 </div>
                 {showNewDeviceName && (
-                  <div className="mt-2 p-3 bg-primary-soft rounded-xl border border-primary-soft">
+                  <div className="mt-2 p-3 bg-primary-soft rounded-card border border-primary-soft">
                     <input
                       placeholder="نام دستگاه جدید"
                       value={newDeviceName.name}
                       onChange={(e) =>
                         setNewDeviceName({ name: e.target.value })
                       }
-                      className="w-full border border-border rounded-lg px-3 py-2 text-sm mb-2 bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm mb-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddDeviceName}
-                        className="px-3 py-1.5 text-sm bg-primary text-text-inverse rounded-lg hover:bg-primary-hover"
+                        className="px-3 py-1.5 text-body-sm bg-primary text-primary-fg rounded-field hover:bg-primary-hover"
                       >
                         ثبت
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewDeviceName(false)}
-                        className="px-3 py-1.5 text-sm bg-surface-alt rounded-lg text-text-primary"
+                        className="px-3 py-1.5 text-body-sm bg-surface-alt rounded-field text-text-primary"
                       >
                         انصراف
                       </button>
@@ -781,12 +896,12 @@ export default function DeviceFormModal({
                       onBlur={() =>
                         setTimeout(() => setShowBrandDropdown(false), 200)
                       }
-                      className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                     />
                     {showBrandDropdown && brandResults.length > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-border rounded-card shadow-lg max-h-48 overflow-y-auto">
                         {searchingBrands ? (
-                          <div className="px-3 py-2 text-sm text-text-secondary">
+                          <div className="px-3 py-2 text-body-sm text-text-secondary">
                             در حال جستجو...
                           </div>
                         ) : (
@@ -801,7 +916,7 @@ export default function DeviceFormModal({
                                 setBrandSearch(b.brand ?? "");
                                 setShowBrandDropdown(false);
                               }}
-                              className="px-3 py-2 text-sm hover:bg-primary-soft cursor-pointer text-text-primary"
+                              className="px-3 py-2 text-body-sm hover:bg-primary-soft cursor-pointer text-text-primary"
                             >
                               {b.brand}
                             </div>
@@ -813,31 +928,34 @@ export default function DeviceFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNewBrand(true)}
-                    className="px-3 py-2 text-sm bg-primary-soft text-primary rounded-xl hover:opacity-80 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-body-sm font-bold rounded-field border border-border
+                             bg-surface text-text-primary hover:bg-surface-alt
+                             hover:border-border-strong transition-colors
+                             cursor-pointer whitespace-nowrap"
                   >
                     + جدید
                   </button>
                 </div>
                 {showNewBrand && (
-                  <div className="mt-2 p-3 bg-primary-soft rounded-xl border border-primary-soft">
+                  <div className="mt-2 p-3 bg-primary-soft rounded-card border border-primary-soft">
                     <input
                       placeholder="برند جدید"
                       value={newBrand.name}
                       onChange={(e) => setNewBrand({ name: e.target.value })}
-                      className="w-full border border-border rounded-lg px-3 py-2 text-sm mb-2 bg-surface text-text-primary"
+                      className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm mb-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddBrand}
-                        className="px-3 py-1.5 text-sm bg-primary text-text-inverse rounded-lg hover:bg-primary-hover"
+                        className="px-3 py-1.5 text-body-sm bg-primary text-primary-fg rounded-field hover:bg-primary-hover"
                       >
                         ثبت
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewBrand(false)}
-                        className="px-3 py-1.5 text-sm bg-surface-alt rounded-lg text-text-primary"
+                        className="px-3 py-1.5 text-body-sm bg-surface-alt rounded-field text-text-primary"
                       >
                         انصراف
                       </button>
@@ -856,7 +974,7 @@ export default function DeviceFormModal({
                   value={form.model}
                   onChange={handleChange}
                   placeholder="مثال: Galaxy S21"
-                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 />
               </div>
 
@@ -869,7 +987,7 @@ export default function DeviceFormModal({
                   name="serial_number"
                   value={form.serial_number}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 />
               </div>
             </div>
@@ -881,7 +999,13 @@ export default function DeviceFormModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
-                  تاریخ ورود <span className="text-danger">*</span>
+                  تاریخ ورود{" "}
+                  <span
+                    aria-hidden
+                    className="text-danger-fg text-[0.85em] leading-none align-super"
+                  >
+                    *
+                  </span>
                 </label>
                 <PersianDatePicker
                   value={form.entry_date}
@@ -916,7 +1040,7 @@ export default function DeviceFormModal({
                   name="status"
                   value={form.status}
                   onChange={handleChange}
-                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -924,6 +1048,18 @@ export default function DeviceFormModal({
                     </option>
                   ))}
                 </select>
+
+                <SmsSendButton
+                  isEdit={isEdit}
+                  loadedStatus={loadedStatus}
+                  status={form.status}
+                  checked={form.send_sms}
+                  capability={capability}
+                  isAdmin={isAtLeast("admin")}
+                  onChange={(send_sms) =>
+                    setForm((prev) => ({ ...prev, send_sms }))
+                  }
+                />
               </div>
               <div>
                 <label className="block font-medium text-text-primary mb-1.5">
@@ -934,7 +1070,7 @@ export default function DeviceFormModal({
                   value={form.description}
                   onChange={handleChange}
                   rows={7}
-                  className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
+                  className="w-full border border-border-field rounded-card px-3 py-2.5 text-body-sm focus:ring-2 focus:ring-primary bg-surface text-text-primary"
                   placeholder="توضیحات تعمیرکار ..."
                 />
               </div>
@@ -964,14 +1100,14 @@ export default function DeviceFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-6 py-2.5 bg-surface-alt text-text-primary rounded-xl hover:bg-surface-alt transition-colors"
+              className="w-full sm:w-auto px-6 py-2.5 bg-surface-alt text-text-primary rounded-card hover:bg-surface-alt transition-colors"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-6 py-2.5 bg-primary text-text-inverse rounded-xl hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
+              className="w-full sm:w-auto px-6 py-2.5 bg-primary text-primary-fg rounded-card hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
             >
               {loading
                 ? "در حال ذخیره..."
@@ -981,7 +1117,114 @@ export default function DeviceFormModal({
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/**
+ * The one switch, and the three things that can be wrong with it.
+ *
+ * Shown only when there is actually a message to send: on create that is
+ * always (acceptance), on edit only when the status is moving to one the
+ * server notifies about. Offering it otherwise would be offering something
+ * the server ignores, which is worse than not offering it — the shop would
+ * believe a customer had been told.
+ *
+ * A button rather than a checkbox, and coloured: green while the message
+ * will go, red while it will not. This is the last moment before a customer
+ * is texted and the shop is charged, and a 16px tick beside a sentence is
+ * the easiest thing on a crowded form to skim past. The label says the state
+ * in words as well — «ارسال می‌شود» / «ارسال نمی‌شود» — so the control still
+ * reads without the colour.
+ *
+ * ⚠️ No figure appears here for anyone, admin included. The endpoint behind
+ * `capability` does not carry one, which is the point: a technician can open
+ * this modal, and what the shop spends is not theirs to see. The links to
+ * fix either problem are shown only to an admin, because a technician sent
+ * to a page their role cannot open is worse than one told to ask.
+ */
+function SmsSendButton({
+  isEdit,
+  loadedStatus,
+  status,
+  checked,
+  capability,
+  isAdmin,
+  onChange,
+}: {
+  isEdit: boolean;
+  loadedStatus: string | null;
+  status: string;
+  checked: boolean;
+  capability: SmsCapability | null;
+  isAdmin: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  // On edit, the message follows the transition — so a status that has not
+  // moved has nothing to announce, exactly as the server decides it.
+  const label = isEdit
+    ? status !== loadedStatus
+      ? NOTIFYING_STATUSES[status]
+      : undefined
+    : "ارسال پیامک پذیرش به مشتری";
+
+  if (!label || !capability) {
+    return null;
+  }
+
+  const blocked = !capability.can_send;
+  // Blocked reads as off, because off is what will happen. The server
+  // refuses the send either way; showing it green would promise otherwise.
+  const on = checked && !blocked;
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        disabled={blocked}
+        aria-pressed={on}
+        className={`w-full inline-flex items-center gap-2 px-3.5 py-2.5 rounded-card
+                    border text-body-sm font-bold transition-colors ${
+                      blocked
+                        ? "cursor-not-allowed opacity-60 bg-surface-alt text-text-secondary border-border"
+                        : on
+                          ? "cursor-pointer bg-success-soft text-success-fg border-success/25 hover:bg-success-soft-hover"
+                          : "cursor-pointer bg-danger-soft text-danger-fg border-danger/25 hover:bg-danger-soft-hover"
+                    }`}
+      >
+        {on ? (
+          <CheckCircleIcon className="w-5 h-5 shrink-0" />
+        ) : (
+          <XCircleIcon className="w-5 h-5 shrink-0" />
+        )}
+        <span className="text-start">
+          {label} — {on ? "ارسال می‌شود" : "ارسال نمی‌شود"}
+        </span>
+      </button>
+
+      {capability.reason === "disabled" && (
+        <p className="text-body-sm text-text-secondary">
+          ارسال پیامک غیرفعال است
+          {isAdmin && (
+            <Link to="/sms-wallet" className="text-primary mr-1.5">
+              فعال‌سازی
+            </Link>
+          )}
+        </p>
+      )}
+
+      {capability.reason === "insufficient_balance" && (
+        <p className="text-body-sm text-warning-fg">
+          اعتبار کافی نیست
+          {isAdmin && (
+            <Link to="/sms-wallet" className="text-primary mr-1.5">
+              شارژ کیف پول
+            </Link>
+          )}
+        </p>
+      )}
     </div>
   );
 }

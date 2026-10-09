@@ -10,12 +10,16 @@ jest.mock("../lib/prisma", () => {
     purchaseInvoice: {
       create: jest.fn(),
       delete: jest.fn(),
+      update: jest.fn(),
     },
-    purchaseInvoiceItem: { create: jest.fn() },
+    purchaseInvoiceItem: { create: jest.fn(), deleteMany: jest.fn() },
     // findFirstOrThrow rather than findUniqueOrThrow: the controller pairs
     // the item id with workspaceId now, which findUnique can't express.
     item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
+    warehouse: {
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 4 }),
+    },
   };
 
   return {
@@ -100,6 +104,22 @@ beforeEach(() => {
 });
 
 describe("purchaseInvoiceController.getAll", () => {
+  it("counts the same rows it returns when filtering", async () => {
+    db.purchaseInvoice.count.mockResolvedValue(0);
+    db.purchaseInvoice.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({ query: { ...listQuery, payment_status: ["pending"] } }),
+      mockResponse(),
+    );
+
+    // The total drives the pager, so it has to be counted over the filtered
+    // set — otherwise three rows come back under thirty pages of them.
+    expect(db.purchaseInvoice.count.mock.calls[0][0].where).toEqual(
+      db.purchaseInvoice.findMany.mock.calls[0][0].where,
+    );
+  });
+
   it("converts Decimal columns to numbers", async () => {
     db.purchaseInvoice.count.mockResolvedValue(1);
     db.purchaseInvoice.findMany.mockResolvedValue([invoiceRow()]);
@@ -139,6 +159,23 @@ describe("purchaseInvoiceController.getAll", () => {
     expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
       workspaceId: WORKSPACE_ID,
       supplierName: { contains: "پارس", mode: "insensitive" },
+    });
+  });
+
+  it("filters by payment status", async () => {
+    db.purchaseInvoice.count.mockResolvedValue(0);
+    db.purchaseInvoice.findMany.mockResolvedValue([]);
+
+    await controller.getAll(
+      mockRequest({
+        query: { ...listQuery, payment_status: ["pending", "partial"] },
+      }),
+      mockResponse(),
+    );
+
+    expect(db.purchaseInvoice.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      paymentStatus: { in: ["pending", "partial"] },
     });
   });
 
@@ -186,7 +223,7 @@ describe("purchaseInvoiceController.getById", () => {
           id: 1,
           invoiceId: 5,
           itemId: 2,
-          quantity: 10,
+          quantity: decimal(10),
           unitPrice: decimal(3000),
           totalPrice: decimal(30000),
           createdAt: new Date("2026-08-06T00:00:00.000Z"),
@@ -253,7 +290,7 @@ describe("purchaseInvoiceController.create", () => {
   it("derives the total from the lines and marks it paid", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -271,7 +308,7 @@ describe("purchaseInvoiceController.create", () => {
   it("takes its number from its own workspace's counter", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -293,7 +330,7 @@ describe("purchaseInvoiceController.create", () => {
   it("marks a part payment as partial", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -311,7 +348,7 @@ describe("purchaseInvoiceController.create", () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     // 5 units at 1000 plus 10 at 3000 = 35000 over 15 units.
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: 5,
+      currentStock: decimal(5),
       avgPurchasePrice: decimal(1000),
     });
 
@@ -326,7 +363,7 @@ describe("purchaseInvoiceController.create", () => {
   it("links the ledger entry to the invoice", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -348,9 +385,12 @@ describe("purchaseInvoiceController.create", () => {
   it("builds each line's stock on the one before it", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow
-      .mockResolvedValueOnce({ currentStock: 0, avgPurchasePrice: decimal(0) })
       .mockResolvedValueOnce({
-        currentStock: 10,
+        currentStock: decimal(0),
+        avgPurchasePrice: decimal(0),
+      })
+      .mockResolvedValueOnce({
+        currentStock: decimal(10),
         avgPurchasePrice: decimal(3000),
       });
 
@@ -379,7 +419,7 @@ describe("purchaseInvoiceController.create", () => {
   it("does everything inside one transaction", async () => {
     db.item.findMany.mockResolvedValue([{ id: 2 }]);
     db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -463,23 +503,26 @@ describe("purchaseInvoiceController.remove", () => {
   it("reverses the stock each line added", async () => {
     db.purchaseInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
-      items: [{ itemId: 2, quantity: 10 }],
+      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) }],
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 25 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(25),
+      avgPurchasePrice: decimal(3000),
+    });
 
     await controller.remove(
       mockRequest({ params: { id: 5 } }, 3),
       mockResponse(),
     );
 
-    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
+    expect(db.__tx.item.update.mock.calls[0][0].data).toMatchObject({
       currentStock: 15,
     });
     expect(
       db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
     ).toMatchObject({
       workspaceId: WORKSPACE_ID,
-      type: "adjustment",
+      type: "reversal",
       quantity: -10,
       referenceId: 5,
       note: "حذف فاکتور خرید",
@@ -489,15 +532,292 @@ describe("purchaseInvoiceController.remove", () => {
   it("clamps the reversal at zero when the stock was already sold on", async () => {
     db.purchaseInvoice.findFirst.mockResolvedValue({
       ...invoiceRow(),
-      items: [{ itemId: 2, quantity: 10 }],
+      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) }],
     });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({ currentStock: 4 });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(4),
+      avgPurchasePrice: decimal(3000),
+    });
 
     await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
 
-    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
+    expect(db.__tx.item.update.mock.calls[0][0].data).toMatchObject({
       currentStock: 0,
     });
+  });
+});
+
+describe("purchaseInvoiceController.update", () => {
+  const body = {
+    supplier_name: "تأمین‌کننده تازه",
+    invoice_date: new Date("2026-09-01T00:00:00.000Z"),
+    paid_amount: 0,
+    note: null,
+    items: [{ item_id: 2, quantity: 4, unit_price: 5000 }],
+  };
+
+  function existingInvoice(
+    items: {
+      itemId: number;
+      quantity: ReturnType<typeof decimal>;
+      unitPrice: ReturnType<typeof decimal>;
+    }[],
+  ) {
+    return { ...invoiceRow(), items };
+  }
+
+  it("returns 404 for an invoice in another workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await controller.update(mockRequest({ params: { id: 9 }, body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(runInTx).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown item before touching any stock", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.update(mockRequest({ params: { id: 5 }, body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "کالا با شناسه 2 یافت نشد",
+    });
+    // The check runs outside the transaction, so a bad edit leaves the
+    // warehouse exactly as it was.
+    expect(runInTx).not.toHaveBeenCalled();
+  });
+
+  it("scopes the item check to this workspace", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(0),
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }),
+      mockResponse(),
+    );
+
+    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+    });
+  });
+
+  it("takes the old lines out of stock before putting the new ones in", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(
+      existingInvoice([
+        { itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) },
+      ]),
+    );
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      // the reversal reads the stock as it stands
+      .mockResolvedValueOnce({
+        currentStock: decimal(30),
+        avgPurchasePrice: decimal(3000),
+      })
+      // then the rewrite reads what the reversal left
+      .mockResolvedValueOnce({
+        currentStock: decimal(20),
+        avgPurchasePrice: decimal(4000),
+      });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }, 3),
+      mockResponse(),
+    );
+
+    // 30 − 10 (the old line) then + 4 (the new one): an edit nets out to the
+    // difference rather than adding the line a second time.
+    expect(db.__tx.item.update.mock.calls[0][0].data).toMatchObject({
+      currentStock: 20,
+    });
+    expect(db.__tx.item.update.mock.calls[1][0].data).toMatchObject({
+      currentStock: 24,
+    });
+  });
+
+  it("records the reversal against this invoice", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(
+      existingInvoice([
+        { itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) },
+      ]),
+    );
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      .mockResolvedValueOnce({
+        currentStock: decimal(30),
+        avgPurchasePrice: decimal(3000),
+      })
+      .mockResolvedValueOnce({
+        currentStock: decimal(20),
+        avgPurchasePrice: decimal(4000),
+      });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }, 3),
+      mockResponse(),
+    );
+
+    expect(
+      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+      type: "reversal",
+      quantity: -10,
+      referenceId: 5,
+      referenceType: "purchase_invoice",
+      note: "ویرایش فاکتور خرید",
+      createdBy: 3,
+    });
+    // The stock history keeps both halves: the shop can see the invoice was
+    // edited rather than finding the original purchase silently rewritten.
+    expect(
+      db.__tx.inventoryTransaction.create.mock.calls[1][0].data,
+    ).toMatchObject({ type: "purchase", quantity: 4, referenceId: 5 });
+  });
+
+  it("replaces the line rows rather than appending to them", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(
+      existingInvoice([
+        { itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) },
+      ]),
+    );
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      .mockResolvedValueOnce({
+        currentStock: decimal(30),
+        avgPurchasePrice: decimal(3000),
+      })
+      .mockResolvedValueOnce({
+        currentStock: decimal(20),
+        avgPurchasePrice: decimal(4000),
+      });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }),
+      mockResponse(),
+    );
+
+    expect(db.__tx.purchaseInvoiceItem.deleteMany).toHaveBeenCalledWith({
+      where: { invoiceId: 5 },
+    });
+    expect(db.__tx.purchaseInvoiceItem.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("recomputes the total and the payment status from the new lines", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(0),
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.update(
+      mockRequest(
+        { params: { id: 5 }, body: { ...body, paid_amount: 20000 } },
+        3,
+      ),
+      mockResponse(),
+    );
+
+    // 4 × 5000, paid in full — the status follows the edited lines, not what
+    // the invoice said before.
+    expect(db.__tx.purchaseInvoice.update.mock.calls[0][0].data).toMatchObject({
+      totalAmount: 20000,
+      paidAmount: 20000,
+      paymentStatus: "paid",
+    });
+  });
+
+  it("leaves the invoice number alone", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(0),
+      avgPurchasePrice: decimal(0),
+    });
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }),
+      mockResponse(),
+    );
+
+    // Numbering is gap-free per workspace; an edit that drew a new number
+    // would burn one and leave a hole in the sequence.
+    expect(
+      db.__tx.purchaseInvoice.update.mock.calls[0][0].data,
+    ).not.toHaveProperty("invoiceNumber");
+    expect(db.__tx.workspace.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("purchaseInvoiceController — the average purchase price", () => {
+  it("takes the reversed lines back out of the average, not just the stock", async () => {
+    // Five units held at ۱۰۰۰, then this invoice bought ten at ۲۰۰۰:
+    // fifteen units averaging ۱۶۶۶٫۶۷. Deleting the invoice has to leave
+    // the five survivors at the ۱۰۰۰ they cost — the figure used to be left
+    // standing, and the stock report multiplies it by the quantity on hand.
+    db.purchaseInvoice.findFirst.mockResolvedValue({
+      ...invoiceRow(),
+      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(2000) }],
+    });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue({
+      currentStock: decimal(15),
+      avgPurchasePrice: decimal(1666.6666666666667),
+    });
+
+    await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
+
+    const written = db.__tx.item.update.mock.calls[0][0].data;
+    expect(written.currentStock).toBe(5);
+    expect(written.avgPurchasePrice).toBeCloseTo(1000, 6);
+  });
+
+  it("re-prices an edited line at what the shop now says it paid", async () => {
+    db.purchaseInvoice.findFirst.mockResolvedValue({
+      ...invoiceRow(),
+      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(2000) }],
+    });
+    db.item.findMany.mockResolvedValue([{ id: 2 }]);
+    db.__tx.item.findFirstOrThrow
+      // the reversal: 15 units at ۱۶۶۶٫۶۷ back down to 5 at ۱۰۰۰
+      .mockResolvedValueOnce({
+        currentStock: decimal(15),
+        avgPurchasePrice: decimal(1666.6666666666667),
+      })
+      // the rewrite reads what the reversal left
+      .mockResolvedValueOnce({
+        currentStock: decimal(5),
+        avgPurchasePrice: decimal(1000),
+      });
+
+    await controller.update(
+      mockRequest({
+        params: { id: 5 },
+        body: {
+          supplier_name: null,
+          invoice_date: new Date("2026-09-01T00:00:00.000Z"),
+          paid_amount: 0,
+          note: null,
+          items: [{ item_id: 2, quantity: 10, unit_price: 3000 }],
+        },
+      }),
+      mockResponse(),
+    );
+
+    // (5 × ۱۰۰۰ + 10 × ۳۰۰۰) ÷ 15. Reversing at the blended average instead
+    // would have landed on ۲۵۵۵٫۵۶.
+    const written = db.__tx.item.update.mock.calls[1][0].data;
+    expect(written.currentStock).toBe(15);
+    expect(written.avgPurchasePrice).toBeCloseTo(2333.333333, 4);
   });
 });
 

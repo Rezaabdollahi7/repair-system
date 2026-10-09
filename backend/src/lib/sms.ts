@@ -9,31 +9,28 @@
  * justify a dependency.
  */
 
+import { SMS_TEMPLATES, type SmsTemplate } from "./smsTemplateNames";
+
 const SMS_ENDPOINT = "https://api.sms.ir/v1/send/verify";
 
-/**
- * Every template this application can send, by the name the code uses.
- *
- * Ids rather than message text: sms.ir approves each template in its panel
- * and the body lives there, not here. Read from the environment rather than
- * hardcoded because a sandbox template has a different id, and sending a
- * production id from a test account comes back HTTP 400 — which reads in the
- * logs like a malformed request rather than the wrong template.
- */
-export const SMS_TEMPLATES = {
-  /** #DAYS# — sent at 7 days out and again at 1. */
-  BEFORE_EXPIRY: "SMS_TEMPLATE_BEFORE_EXPIRY",
-  /** No parameters. The day the subscription ends. */
-  ON_EXPIRY: "SMS_TEMPLATE_ON_EXPIRY",
-  /** #DAYS# — days left before the data is deleted. */
-  AFTER_EXPIRY: "SMS_TEMPLATE_AFTER_EXPIRY",
-  /** #DATE# — Jalali, with dashes. */
-  PAYMENT_OK: "SMS_TEMPLATE_PAYMENT_OK",
-  /** #DAYS# — days added to the referrer. */
-  REFERRAL_REWARD: "SMS_TEMPLATE_REFERRAL_REWARD",
-} as const;
+// The names live in their own module because that one has no side effects,
+// and the test setup has to read the list without importing this file — see
+// the note there. Re-exported so every call site still says `from "lib/sms"`.
+//
 
-export type SmsTemplate = (typeof SMS_TEMPLATES)[keyof typeof SMS_TEMPLATES];
+// Re-exported from the local import rather than with `export ... from`: that
+// form creates no local binding, so `SmsTemplate` would not be in scope in
+// this file even while being exported from it — which is exactly how the
+// first version of this broke every suite that imports lib/sms.
+export { SMS_TEMPLATES, type SmsTemplate };
+
+/**
+ * How long a single parameter value may be, per sms.ir support.
+ *
+ * Exported so callers can truncate to it rather than discovering it as a
+ * rejected message on somebody's real phone number.
+ */
+export const MAX_PARAMETER_CHARS = 25;
 
 /**
  * A user is waiting behind this request, and fetch on its own waits forever.
@@ -241,11 +238,18 @@ export function sendTemplate(
       throw new SmsError(`Parameter ${name} must not contain a slash`, null);
     }
 
-    // The panel's own ceiling. Longer values come back as status 114, which
-    // is a rejected message rather than an error worth waking anyone for.
-    if (value.length > 40) {
+    // The panel's own ceiling, confirmed by sms.ir support: 25, not the 40
+    // this used to guess at. The comment here said the number was never
+    // established, and it was a third too high — anything between 26 and 40
+    // would have come back as status 114, a rejected message, for reasons
+    // nothing in the logs would explain.
+    //
+    // Support says it can be raised on request. Until it is, callers
+    // truncate to their own caps (see PARAM_CAPS in utils/smsTemplates) and
+    // this is the backstop rather than the thing doing the work.
+    if (value.length > MAX_PARAMETER_CHARS) {
       throw new SmsError(
-        `Parameter ${name} is longer than 40 characters`,
+        `Parameter ${name} is longer than ${MAX_PARAMETER_CHARS} characters`,
         null,
       );
     }

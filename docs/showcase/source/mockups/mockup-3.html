@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Dofixo screen wall mockup</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  body { background: radial-gradient(1200px 800px at 30% 60%, #13286b 0%, #070d24 70%); color: #fff; }
+  .stage { position: absolute; left: -420px; top: -260px; width: 2200px; height: 1700px; perspective: 3200px; }
+  .wall { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: repeat(4, 720px); gap: 44px;
+    transform: rotateX(48deg) rotateZ(-32deg) translate(-120px, 120px); transform-origin: 50% 50%; transform-style: preserve-3d; }
+  .wall .col { display: grid; gap: 44px; }
+  .wall .col:nth-child(2) { transform: translateY(-220px); }
+  .wall .col:nth-child(4) { transform: translateY(-160px); }
+  .wall img { display: block; width: 720px; border-radius: 18px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08), -30px 40px 60px rgba(0,0,0,.55); }
+  .veil { position: absolute; inset: 0;
+    background: linear-gradient(270deg, rgba(7,13,36,.97) 0%, rgba(7,13,36,.9) 28%, rgba(7,13,36,0) 52%),
+                linear-gradient(0deg, rgba(7,13,36,.6), transparent 25%); }
+  .copy { position: absolute; right: 120px; top: 50%; transform: translateY(-50%); width: 560px; }
+  .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; }
+  .brand .mark { width: 58px; height: 58px; border-radius: 16px; background: linear-gradient(135deg,#3b82f6,#1d4ed8); display: grid; place-items: center; box-shadow: 0 12px 30px -8px rgba(59,130,246,.7); }
+  .brand .mark img { width: 30px; }
+  .brand span { font-size: 30px; font-weight: 700; }
+  h2 { font-size: 60px; line-height: 1.3; font-weight: 700; letter-spacing: -1px; margin-bottom: 26px; }
+  h2 span { background: linear-gradient(90deg,#60a5fa,#a5f3fc); -webkit-background-clip: text; color: transparent; }
+  .copy p { font-size: 21px; line-height: 1.9; color: #a8b6d8; margin-bottom: 44px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .stat { padding: 20px 20px 18px; border-radius: 18px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  .stat b { display: block; font-size: 34px; font-weight: 700; color: #fff; }
+  .stat small { font-size: 16px; color: #94a3c8; }
+  .modules { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .modules span { padding: 8px 16px; border-radius: 999px; background: rgba(59,130,246,.14); color: #bfdbfe; font-size: 16px; font-weight: 500; box-shadow: inset 0 0 0 1px rgba(96,165,250,.25); }
+</style>
+</head>
+<body>
+  <div class="stage"><div class="wall">
+    <div class="col"><img src="09-repair-invoices.png"><img src="20-dashboard-dark.png"><img src="06-items.png"></div>
+    <div class="col"><img src="11-profit-report.png"><img src="01-dashboard.png"><img src="21-devices-dark.png"><img src="13-sms-wallet.png"></div>
+    <div class="col"><img src="04-customer-detail.png"><img src="10-stock-report.png"><img src="19-repair-invoice-detail.png"></div>
+    <div class="col"><img src="08-sale-invoices.png"><img src="22-customer-detail-dark.png"><img src="02-devices.png"><img src="18b-new-device-form.png"></div>
+  </div></div>
+  <div class="veil"></div>
+
+  <div class="copy">
+    <div class="brand"><div class="mark"><img src="logo-white.png"></div><span>دوفیکسو</span></div>
+    <h2>همهٔ کارگاه،<br><span>در یک نرم‌افزار</span></h2>
+    <p>از پذیرش گوشی و لپ‌تاپ تا فاکتور تعمیر، انبار قطعات، پیامک به مشتری و گزارش سود — بدون دفتر و کاغذ.</p>
+    <div class="stats">
+      <div class="stat"><b>+۱۵</b><small>ماژول کاربردی</small></div>
+      <div class="stat"><b>۳</b><small>نوع فاکتور</small></div>
+      <div class="stat"><b>۳۰ روز</b><small>آزمایش رایگان</small></div>
+    </div>
+    <div class="modules"><span>دستگاه‌ها</span><span>مشتریان</span><span>انبار</span><span>فاکتور تعمیر</span><span>سود و زیان</span><span>کیف پول پیامکی</span></div>
+  </div>
+</body>
+</html>

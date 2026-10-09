@@ -1,5 +1,9 @@
 import bcrypt from "bcryptjs";
-import { DEFAULT_SERVICES, populateWorkspace } from "../utils/newWorkspace";
+import {
+  DEFAULT_SERVICES,
+  DEFAULT_WAREHOUSE_NAME,
+  populateWorkspace,
+} from "../utils/newWorkspace";
 import type { Prisma } from "../generated/prisma/client";
 
 const WORKSPACE_ID = 7;
@@ -27,6 +31,8 @@ function mockTx() {
       findUnique: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({}),
     },
+    smsWallet: { create: jest.fn().mockResolvedValue({}) },
+    warehouse: { create: jest.fn().mockResolvedValue({ id: 3 }) },
   };
 }
 
@@ -139,5 +145,43 @@ describe("populateWorkspace", () => {
     expect(tx.referralCode.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ workspaceId: WORKSPACE_ID }),
     });
+  });
+
+  it("opens an empty SMS wallet", async () => {
+    const tx = mockTx();
+    await run(tx);
+
+    // Zero rather than a gift: an opening balance is a pricing decision.
+    expect(tx.smsWallet.create).toHaveBeenCalledWith({
+      data: { workspaceId: WORKSPACE_ID },
+    });
+  });
+
+  it("gives every new workspace a wallet, not just the ones that ask", async () => {
+    // The debit in 12.3 is a conditional UPDATE, and one that matches no row
+    // reads exactly like one refused for lack of funds. A workspace missing
+    // this row would report "not enough credit" forever, and topping up
+    // would not fix it — which is why this is asserted rather than assumed.
+    const tx = mockTx();
+    await run(tx);
+
+    expect(tx.smsWallet.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens one default warehouse, named like the migrated ones", async () => {
+    // Every invoice and stock movement points at a warehouse. A workspace
+    // without its default would fail on its first purchase.
+    const tx = mockTx();
+    await run(tx);
+
+    expect(tx.warehouse.create).toHaveBeenCalledTimes(1);
+    expect(tx.warehouse.create).toHaveBeenCalledWith({
+      data: {
+        workspaceId: WORKSPACE_ID,
+        name: DEFAULT_WAREHOUSE_NAME,
+        isDefault: true,
+      },
+    });
+    expect(DEFAULT_WAREHOUSE_NAME).toBe("انبار اصلی");
   });
 });

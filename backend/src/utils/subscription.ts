@@ -1,3 +1,8 @@
+import prisma from "../lib/prisma";
+import { runWithWorkspace } from "../lib/workspaceContext";
+import { sendTemplate, SmsError } from "../lib/sms";
+import type { SmsTemplate } from "../lib/sms";
+import { errorMessage } from "./errors";
 import type { Prisma } from "../generated/prisma/client";
 
 /**
@@ -152,4 +157,69 @@ export function startTrial(
     type: "trial",
     days: TRIAL_DAYS,
   });
+}
+
+/**
+ * The super admin's number. Only theirs: they own the shop and the money
+ * comes out of their pocket, while an admin who happens to have the app open
+ * has no business receiving a billing message — and every extra recipient is
+ * another SMS bought.
+ *
+ * Lives here rather than in subscriptionJob because it is not a property of
+ * the nightly job: it is the answer to "who does a billing message go to",
+ * which the payment path needs as much as the reminder path does.
+ */
+export async function ownerPhone(workspaceId: number): Promise<string | null> {
+  return runWithWorkspace(workspaceId, async () => {
+    const owner = await prisma.user.findFirst({
+      where: { isActive: true, role: { name: "super_admin" } },
+      orderBy: { id: "asc" },
+      select: { username: true },
+    });
+
+    return owner?.username ?? null;
+  });
+}
+
+/**
+ * Sends one message to a workspace's owner, and never lets it matter.
+ *
+ * For the paths where the message is a courtesy rather than the point: a
+ * customer whose card went through, and a referrer who has just earned
+ * thirty days. Neither transaction may be undone because sms.ir was
+ * unreachable, so every failure is swallowed — but every failure is also
+ * LOGGED, which is the half that was missing. Debt 40 was invisible for a
+ * month precisely because nothing anywhere said a word about it.
+ *
+ * ⚠️ Deliberately NOT used by subscriptionJob's notify(). That path writes a
+ * ledger row between finding the number and sending, so it cannot collapse
+ * into one call: a workspace with no super admin would claim the row and the
+ * message would never go.
+ */
+export async function notifyOwner(
+  workspaceId: number,
+  template: SmsTemplate,
+  parameters: Record<string, string> = {},
+): Promise<boolean> {
+  try {
+    const phone = await ownerPhone(workspaceId);
+
+    if (!phone) {
+      console.error(
+        `workspace ${workspaceId} has no active super admin; ${template} not sent`,
+      );
+      return false;
+    }
+
+    await sendTemplate(phone, template, parameters);
+    return true;
+  } catch (error) {
+    console.error(
+      `sms ${template} to workspace ${workspaceId} failed:`,
+      error instanceof SmsError
+        ? `status ${String(error.providerStatus)}: ${error.message}`
+        : errorMessage(error),
+    );
+    return false;
+  }
 }

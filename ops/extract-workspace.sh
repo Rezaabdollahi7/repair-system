@@ -97,7 +97,8 @@ log "shifting ids by $OFFSET"
 #
 # workspaces goes last, so the cascade lands on rows whose own ids have
 # already settled.
-for table in users customers categories items devices device_images \
+for table in users customers categories items warehouses item_stocks \
+             devices device_images \
              device_assignments services inventory_transactions \
              purchase_invoices purchase_invoice_items \
              sale_invoices sale_invoice_items \

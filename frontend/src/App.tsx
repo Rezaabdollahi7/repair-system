@@ -15,6 +15,7 @@ import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
 import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
+import WarehouseList from "./pages/WarehouseList";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import Dashboard from "./pages/Dashboard";
@@ -142,6 +143,7 @@ function App() {
                           element={<PersonnelDetail />}
                         />
                         <Route path="items" element={<ItemList />} />
+                        <Route path="warehouses" element={<WarehouseList />} />
                         <Route
                           path="purchase-invoices"
                           element={<PurchaseInvoiceList />}

@@ -383,6 +383,28 @@ export interface CategoryBody {
 }
 
 /**
+ * A warehouse (14.10), snake_case like most of the API. `item_count` and
+ * `stock_value` are what it holds now: the number of different items with
+ * stock on its shelves and their cost at each item's moving average.
+ */
+export interface Warehouse {
+  id: number;
+  name: string;
+  is_default: boolean;
+  is_active: boolean;
+  note: string | null;
+  item_count: number;
+  stock_value: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WarehouseBody {
+  name: string;
+  note?: string | null;
+}
+
+/**
  * Items answer in camelCase too — except `sell_price`, which the create and
  * update bodies take in snake_case while the response gives `sellPrice`.
  * Left as it is.

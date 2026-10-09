@@ -29,6 +29,7 @@ import {
   SunIcon,
   MoonIcon,
   ChevronDownIcon,
+  BuildingStorefrontIcon,
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
 import { jalaliToday } from "../utils/jalali";
@@ -89,6 +90,12 @@ const MENU: MenuSection[] = [
         name: "انبار و کالاها",
         path: "/items",
         icon: CubeIcon,
+        adminOnly: true,
+      },
+      {
+        name: "انبارها",
+        path: "/warehouses",
+        icon: BuildingStorefrontIcon,
         adminOnly: true,
       },
       {

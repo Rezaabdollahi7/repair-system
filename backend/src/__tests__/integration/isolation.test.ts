@@ -102,6 +102,27 @@ const resources: Resource[] = [
     updateBody: { name: "قطعات ویرایش‌شده" },
   },
   {
+    name: "warehouses",
+    path: "/api/warehouses",
+    create: async (workspaceId) => {
+      const row = await owner.warehouse.create({
+        // The same name in both workspaces on purpose: Warehouse.name is
+        // unique per workspace, not globally.
+        data: { workspaceId, name: "تعمیرات" },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.warehouse.count({ where: { id } })) === 1,
+    updateBody: { name: "تعمیرات ویرایش‌شده" },
+    // The list is the only read, and there is no DELETE route at all: a
+    // warehouse is deactivated, never removed (14.10). The default and
+    // status endpoints are checked in integration/warehouses.test.ts.
+    skipGetOne: true,
+    skipDelete: true,
+  },
+  {
     name: "services",
     path: "/api/services",
     create: async (workspaceId) => {

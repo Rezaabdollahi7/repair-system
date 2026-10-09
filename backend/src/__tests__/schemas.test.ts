@@ -2,6 +2,10 @@ import { deviceCreateSchema } from "../schemas/device";
 import { purchaseInvoiceCreateSchema } from "../schemas/purchaseInvoice";
 import { paginationQuerySchema, quantitySchema } from "../schemas/common";
 import { itemCreateSchema, quickPurchaseSchema } from "../schemas/item";
+import {
+  warehouseBodySchema,
+  warehouseStatusSchema,
+} from "../schemas/warehouse";
 
 describe("optional date fields", () => {
   // Date inputs submit "" when cleared. z.coerce.date() turns that into an
@@ -94,6 +98,32 @@ describe("a quick purchase", () => {
   it("refuses a zero price, which is how free stock used to get in", () => {
     expect(
       quickPurchaseSchema.safeParse({ quantity: 1, unit_price: 0 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("warehouseBodySchema", () => {
+  it("trims the name and turns an empty note into null", () => {
+    expect(
+      warehouseBodySchema.parse({ name: "  تعمیرات ", note: "  " }),
+    ).toEqual({ name: "تعمیرات", note: null });
+  });
+
+  it("refuses an empty or overlong name", () => {
+    expect(warehouseBodySchema.safeParse({ name: "  " }).success).toBe(false);
+    expect(
+      warehouseBodySchema.safeParse({ name: "ا".repeat(61) }).success,
+    ).toBe(false);
+  });
+});
+
+describe("warehouseStatusSchema", () => {
+  it("takes a real boolean only", () => {
+    expect(warehouseStatusSchema.safeParse({ is_active: false }).success).toBe(
+      true,
+    );
+    expect(
+      warehouseStatusSchema.safeParse({ is_active: "false" }).success,
     ).toBe(false);
   });
 });

@@ -125,6 +125,7 @@ export async function buildWorkbook(): Promise<Buffer> {
   const saleInvoices = await prisma.saleInvoice.findMany({
     orderBy: { invoiceDate: "desc" },
     include: {
+      warehouse: { select: { name: true } },
       items: { include: { item: { select: { code: true, name: true } } } },
     },
   });
@@ -132,6 +133,7 @@ export async function buildWorkbook(): Promise<Buffer> {
   const purchaseInvoices = await prisma.purchaseInvoice.findMany({
     orderBy: { invoiceDate: "desc" },
     include: {
+      warehouse: { select: { name: true } },
       items: { include: { item: { select: { code: true, name: true } } } },
     },
   });
@@ -139,10 +141,25 @@ export async function buildWorkbook(): Promise<Buffer> {
   const repairInvoices = await prisma.repairInvoice.findMany({
     orderBy: { invoiceDate: "desc" },
     include: {
+      warehouse: { select: { name: true } },
       device: {
         select: { receptionNumber: true, deviceName: true, brand: true },
       },
       items: true,
+    },
+  });
+
+  // What each warehouse holds (14.10). Rows at zero are left out: an item
+  // that once passed through a warehouse keeps a row there, and a sheet of
+  // zeros answers nothing.
+  const stocks = await prisma.itemStock.findMany({
+    where: { quantity: { gt: 0 } },
+    orderBy: [{ warehouseId: "asc" }, { itemId: "asc" }],
+    include: {
+      warehouse: { select: { name: true, isActive: true } },
+      item: {
+        select: { code: true, name: true, unit: true, avgPurchasePrice: true },
+      },
     },
   });
 
@@ -229,12 +246,49 @@ export async function buildWorkbook(): Promise<Buffer> {
 
   addSheet(
     book,
+    "موجودی انبارها",
+    [
+      { header: "انبار", key: "warehouse", width: 20 },
+      { header: "کد کالا", key: "code", width: 18 },
+      { header: "نام کالا", key: "name", width: 34 },
+      { header: "واحد", key: "unit", width: 10 },
+      { header: "موجودی", key: "quantity", width: 12 },
+      { header: "محل نگهداری", key: "location", width: 16 },
+      {
+        header: "میانگین قیمت خرید",
+        key: "avgPrice",
+        width: 18,
+        numFmt: MONEY,
+      },
+      { header: "ارزش موجودی", key: "value", width: 18, numFmt: MONEY },
+    ],
+    stocks.map((stock) => {
+      const quantity = stock.quantity.toNumber();
+      const avgPrice = stock.item.avgPurchasePrice.toNumber();
+      return {
+        warehouse: stock.warehouse.isActive
+          ? stock.warehouse.name
+          : `${stock.warehouse.name} (غیرفعال)`,
+        code: stock.item.code,
+        name: stock.item.name,
+        unit: stock.item.unit,
+        quantity,
+        location: stock.location ?? "",
+        avgPrice,
+        value: Math.round(quantity * avgPrice * 100) / 100,
+      };
+    }),
+  );
+
+  addSheet(
+    book,
     "فاکتور فروش",
     [
       { header: "شماره فاکتور", key: "number", width: 16 },
       { header: "مشتری", key: "customer", width: 24 },
       { header: "شماره تماس", key: "phone", width: 16 },
       { header: "تاریخ", key: "date", width: 14 },
+      { header: "انبار", key: "warehouse", width: 16 },
       { header: "مبلغ کل", key: "total", width: 16, numFmt: MONEY },
       { header: "پرداخت شده", key: "paid", width: 16, numFmt: MONEY },
       { header: "مانده", key: "remaining", width: 16, numFmt: MONEY },
@@ -246,6 +300,7 @@ export async function buildWorkbook(): Promise<Buffer> {
       customer: invoice.customerName,
       phone: invoice.customerPhone ?? "",
       date: toJalali(invoice.invoiceDate),
+      warehouse: invoice.warehouse.name,
       total: invoice.totalAmount.toNumber(),
       paid: invoice.paidAmount.toNumber(),
       remaining: invoice.totalAmount.toNumber() - invoice.paidAmount.toNumber(),
@@ -261,6 +316,7 @@ export async function buildWorkbook(): Promise<Buffer> {
       { header: "شماره فاکتور", key: "number", width: 16 },
       { header: "فروشنده", key: "supplier", width: 28 },
       { header: "تاریخ", key: "date", width: 14 },
+      { header: "انبار", key: "warehouse", width: 16 },
       { header: "مبلغ کل", key: "total", width: 16, numFmt: MONEY },
       { header: "پرداخت شده", key: "paid", width: 16, numFmt: MONEY },
       { header: "مانده", key: "remaining", width: 16, numFmt: MONEY },
@@ -271,6 +327,7 @@ export async function buildWorkbook(): Promise<Buffer> {
       number: invoice.invoiceNumber,
       supplier: invoice.supplierName ?? "",
       date: toJalali(invoice.invoiceDate),
+      warehouse: invoice.warehouse.name,
       total: invoice.totalAmount.toNumber(),
       paid: invoice.paidAmount.toNumber(),
       remaining: invoice.totalAmount.toNumber() - invoice.paidAmount.toNumber(),
@@ -288,6 +345,7 @@ export async function buildWorkbook(): Promise<Buffer> {
       { header: "دستگاه", key: "device", width: 24 },
       { header: "مشتری", key: "customer", width: 24 },
       { header: "تاریخ", key: "date", width: 14 },
+      { header: "انبار", key: "warehouse", width: 16 },
       { header: "جمع اقلام", key: "subtotal", width: 16, numFmt: MONEY },
       { header: "تخفیف", key: "discount", width: 14, numFmt: MONEY },
       { header: "مالیات", key: "tax", width: 14, numFmt: MONEY },
@@ -303,6 +361,7 @@ export async function buildWorkbook(): Promise<Buffer> {
       device: invoice.device.deviceName,
       customer: invoice.customerName,
       date: toJalali(invoice.invoiceDate),
+      warehouse: invoice.warehouse.name,
       subtotal: invoice.subtotal.toNumber(),
       discount: invoice.discountAmount.toNumber(),
       tax: invoice.taxAmount.toNumber(),
@@ -325,6 +384,7 @@ export async function buildWorkbook(): Promise<Buffer> {
         kind: "خرید",
         number: invoice.invoiceNumber,
         date: toJalali(invoice.invoiceDate),
+        warehouse: invoice.warehouse.name,
         code: line.item.code,
         name: line.item.name,
         quantity: line.quantity.toNumber(),
@@ -340,6 +400,7 @@ export async function buildWorkbook(): Promise<Buffer> {
         kind: "فروش",
         number: invoice.invoiceNumber,
         date: toJalali(invoice.invoiceDate),
+        warehouse: invoice.warehouse.name,
         // A custom line points at no catalogue item, so it carries the name
         // it was written with and no code.
         code: line.item?.code ?? "",
@@ -357,6 +418,7 @@ export async function buildWorkbook(): Promise<Buffer> {
         kind: "تعمیر",
         number: invoice.invoiceNumber,
         date: toJalali(invoice.invoiceDate),
+        warehouse: invoice.warehouse.name,
         code: "",
         name: line.name,
         quantity: line.quantity.toNumber(),
@@ -373,6 +435,7 @@ export async function buildWorkbook(): Promise<Buffer> {
       { header: "نوع فاکتور", key: "kind", width: 12 },
       { header: "شماره فاکتور", key: "number", width: 16 },
       { header: "تاریخ", key: "date", width: 14 },
+      { header: "انبار", key: "warehouse", width: 16 },
       { header: "کد کالا", key: "code", width: 18 },
       { header: "شرح", key: "name", width: 34 },
       { header: "تعداد", key: "quantity", width: 10 },

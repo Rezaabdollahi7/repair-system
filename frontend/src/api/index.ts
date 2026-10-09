@@ -23,6 +23,8 @@ import type {
   DeviceAssignment,
   Category,
   CategoryBody,
+  Warehouse,
+  WarehouseBody,
   ItemCreateBody,
   Item,
   ItemForInvoice,
@@ -345,6 +347,18 @@ export const updateCategory = (id: Id, data: CategoryBody) =>
   api.put<Category>(`/categories/${id}`, data);
 export const deleteCategory = (id: Id) =>
   api.delete<MessageResponse>(`/categories/${id}`);
+
+// Warehouses (14.10). No delete: a warehouse is deactivated, and only once
+// it holds nothing — the server refuses otherwise and says why.
+export const getWarehouses = () => api.get<Warehouse[]>("/warehouses");
+export const createWarehouse = (data: WarehouseBody) =>
+  api.post<Warehouse>("/warehouses", data);
+export const updateWarehouse = (id: Id, data: WarehouseBody) =>
+  api.put<Warehouse>(`/warehouses/${id}`, data);
+export const setDefaultWarehouse = (id: Id) =>
+  api.post<Warehouse>(`/warehouses/${id}/default`);
+export const setWarehouseActive = (id: Id, isActive: boolean) =>
+  api.put<Warehouse>(`/warehouses/${id}/status`, { is_active: isActive });
 // Items
 export const getItems = (params?: QueryParams) =>
   api.get<PaginatedWithLimit<Item>>("/items", { params });

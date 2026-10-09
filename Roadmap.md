@@ -1625,6 +1625,128 @@ and the UI has settled, so an hour of video does not go stale in a month.
 - **Editing:** DaVinci Resolve (free) or CapCut — OBS only records
 - **Every video:** Persian subtitles generated from the script, and a five-second closing frame with «شروع ۳۰ روز رایگان»
 
+## Phase 14 — Inventory: warehouses, stock documents, kardex
+
+The inventory module works for a shop that never makes a mistake and never
+has two people at the counter. It has no answer for the shelf disagreeing
+with the screen, and several of its numbers are quietly wrong. This phase
+makes the stock figure something a shop can trust and audit, then builds
+the documents a real stockroom needs on top of it.
+
+**What is wrong today** (found reading the code, 8 October 2026):
+
+- Every stock write is read-then-write with no lock — purchase, sale and
+  repair lines, quick purchase and quick sale (the last two even read
+  *outside* their transaction). Two sales of the last unit both pass the
+  check and one decrement is lost.
+- `Math.max(0, …)` clamps the column while the ledger logs the full
+  quantity, so `current_stock = SUM(inventory_transactions)` silently
+  breaks.
+- Opening stock is a zero-priced quick purchase: it drags the moving
+  average towards zero, burns a `PUR-` number on a 0-rial invoice, and is a
+  second request whose failure is only `console.error`-ed.
+- Repair invoices: `Math.round` on a decimal quantity (0.4 moves nothing),
+  issued → draft is allowed (issue again = deducted twice), draft → paid
+  skips the deduction, and issuing never checks stock.
+- Profit uses today's average cost, not the cost at the moment of sale, so
+  past margins move every time an item is restocked.
+- The item form has no sell-price field, although the column exists.
+- Stock is `Int` while the units list offers متر, کیلوگرم and لیتر.
+
+### Decisions (agreed 9 October 2026)
+
+| Topic | Decision |
+|---|---|
+| Warehouses | **Multi-warehouse from the start.** Every workspace gets «انبار اصلی»; a shop with one active warehouse never sees a warehouse picker |
+| Warehouse on invoices | Chosen on the **invoice header**, not per line |
+| Cost method | Weighted moving average, **per item** across all warehouses; a transfer does not change cost. No FIFO, but every outgoing movement stores its `unit_cost` so nothing is painted into a corner |
+| Negative stock | **Never.** Refused with a clear message — including deleting or editing a purchase invoice whose goods were already sold |
+| Minimum stock | Per item (total of all warehouses), as today |
+| Decimal quantities | Yes, in 14A. A per-item «کسری» flag, defaulted from the unit (متر / کیلوگرم / لیتر) but editable; whole-number items reject fractions |
+| Opening stock | Entered with the item, in one request; **unit cost required when quantity > 0**; its own movement type, no invoice, no number |
+| Sale price on invoices | Defaults to the item's sell price; the user may change it |
+| Repair invoice | issued → draft is blocked (correct an issued invoice by cancelling it); draft → paid deducts stock like issuing. In the UI «پیش‌نویس» becomes **«پیش‌فاکتور»** |
+| Who runs stock documents | Admin and super admin (counts, adjustments, transfers) |
+| Adjustments | Applied immediately; reason, user and time are on the ledger. No approval step |
+| Transfers | One step: out of the source and into the destination in one transaction |
+| Stock count | Partial (by category), blind count, mobile-first counting page with per-row autosave, printable count sheet |
+| Item detail | A page, `/items/:id`, **fully replacing** `ItemDetailModal` |
+| Kardex order | By entry time, with the document date shown beside it — the running balance stays continuous even when an invoice is back-dated |
+| Document numbers | Current format kept (`PUR-0001`); new kinds `ADJ`, `CNT`, `TRF`, `RET` use the same per-workspace gap-free counter. No year in the number |
+| Production data | Accounts exist, no invoices yet: the migration keeps items and their stock; no historical-cost backfill is needed |
+
+**The ledger is the stock.** `inventory_transactions` stays the one stock
+movement table (no parallel `stock_movements`), becomes append-only like
+`sms_wallet_transactions`, and gains warehouse, before/after quantity,
+reason, document date and unit cost. One service writes it; nothing else
+touches `current_stock`, `avg_purchase_price` or `item_stocks`.
+
+Deliberately out of scope: FIFO and cost layers; four separate
+min/max/reorder-point/reorder-quantity fields; supplier SKU and lead time;
+per-warehouse minimums; a year in document numbers; two-step transfers.
+
+### Sprint 14A — Foundation (everything else depends on it)
+
+- [ ] 14.1 Migration: `warehouses` (one default per workspace via a partial unique index; no DELETE grant — deactivate only) and `item_stocks` (item × warehouse quantity, optional shelf `location`). `items.current_stock` and `min_stock`, and the quantity on all three invoice-line tables, become `Decimal(14,3)`; `items.is_fractional`. `warehouse_id` on the three invoice headers. `unit_cost` on sale and repair lines. `inventory_transactions`: `warehouse_id`, decimal quantity, `unit_cost`, `before_quantity`/`after_quantity`, `reason`, `occurred_at`, the wider type enum (`opening, purchase, sale, repair_use, adjustment, count, transfer_out, transfer_in, purchase_return, sale_return, reversal`) and reason enum (`count, damage, loss, found, entry_error, internal_use, return_from_use, other`); `REVOKE UPDATE, DELETE`. Workspace counters `adj_seq`, `cnt_seq`, `trf_seq`. RLS policy on every new table
+- [ ] 14.2 Backfill in the same migration: «انبار اصلی» per workspace, an `item_stocks` row per item from `current_stock`, `warehouse_id` on existing rows; where `current_stock ≠ SUM(ledger)`, one `adjustment / entry_error` movement «تطبیق هنگام مهاجرت» so the invariant holds from day one
+- [ ] 14.3 Around the schema: `populateWorkspace` creates the default warehouse; test helpers (`seedTwoWorkspaces`, `newWorkspace.test.ts`); `workspaceDeletion.ts` (ledger leaves `DELETION_ORDER` — FK cascades still remove it — and the new counters reset); `ops/extract-workspace.sh` id-shift list; the export workbook gains warehouse columns and a per-warehouse stock sheet
+- [ ] 14.4 `utils/stock.ts` — `applyStockMovements(tx, workspaceId, { document, lines })`, the only writer. Runs inside `runInWorkspaceTransaction`; locks `items` and `item_stocks` rows `FOR UPDATE` in a fixed `(item, warehouse)` order so two invoices cannot deadlock; computes the average with the existing `utils/avgPurchasePrice.ts`; throws `InsufficientStockError` rather than going below zero; returns each line's `unit_cost` and before/after
+- [ ] 14.5 Purchase invoices on the service. Lines and header read inside the transaction; editing or deleting an invoice whose stock has been sold is refused with the item named
+- [ ] 14.6 Sale invoices on the service, storing `unit_cost` per line; `assertStockAvailable` goes (the service is the check). Default line price = item sell price, editable
+- [ ] 14.7 Repair invoices on the service: decimal quantity without rounding, stock checked on issue, issued → draft blocked, draft → paid deducts, inventory `item_id` validated against the workspace, `unit_cost` stored. «پیش‌نویس» → «پیش‌فاکتور» in the UI
+- [ ] 14.8 Items: quick purchase and quick sale on the service, inside one transaction, with a warehouse. Create accepts opening stock + unit cost (required when > 0) + warehouse in the same request and transaction. `GET /items/:id` returns stock per warehouse
+- [ ] 14.9 Reports: profit from the stored `unit_cost`; stock report filterable by warehouse
+- [ ] 14.10 Warehouses: API (admin) and `/warehouses` page — create, rename, set default, deactivate only at zero stock. The picker is hidden while one warehouse is active
+- [ ] 14.11 Frontend decimals and pickers: `formatQuantity` (Persian digits, «٫»), quantity inputs stepped by `is_fractional`, warehouse picker on the three invoice headers, item form with sell price, «کسری» flag and opening stock + cost + warehouse
+- [ ] 14.12 Tests. Unit: the service with a hand-rolled tx; controller tests mock `utils/stock`. Integration (real database): `current_stock = SUM(item_stocks) = SUM(ledger)` after every scenario; N concurrent sales of the last unit → exactly one succeeds; two invoices locking items in opposite order; UPDATE/DELETE on the ledger refused for `dofixo_app` while an item delete still cascades; the repair-invoice transitions; the migration backfill; warehouses in `isolation.test.ts`
+- [ ] 14.13 An «Inventory» section in `CLAUDE.md`, in the style of the SMS wallet's: the one-writer rule, lock order, no-negative rule, cost per item
+
+### Sprint 14B — Stock documents
+
+- [ ] 14.14 Stock adjustment (`ADJ`): warehouse, date, description; per line item, ± quantity, reason, note (required for «سایر»). Applied on save
+- [ ] 14.15 Stock count (`CNT`): `draft → applied | cancelled`, scoped to a warehouse and optionally a category. Each line keeps the system quantity at the moment *that line* was counted; applying posts `counted − system_at_count` as a `count` movement, warning first about items that moved since. Blind mode hides the system quantity. A mobile-first counting page saving each row as it is entered, and a printable count sheet
+- [ ] 14.16 Transfer (`TRF`): from, to, lines; `transfer_out` + `transfer_in` in one transaction. In the menu only while more than one warehouse is active
+
+### Sprint 14C — Item page, kardex, reports
+
+- [ ] 14.17 A Tabs component (the codebase has none)
+- [ ] 14.18 `/items/:id` replacing `ItemDetailModal` (template: `CustomerDetail`, `usePageCrumb`, a `useGoToItem` beside `useGoToCustomer`); every `openItemDetail` call site navigates instead, closing the modal stack when called from an invoice modal. Tabs: نمای کلی · کاردکس · خرید و فروش · قیمت‌ها · تغییرات
+- [ ] 14.19 Kardex: entry order with document date, in / out / balance, warehouse and date filters, every row linked to its document
+- [ ] 14.20 Price statistics: last, lowest, highest and average purchase price, from purchase lines
+- [ ] 14.21 Stock movement report (گردش کالا): opening balance, totals per movement type, closing balance — per item and per warehouse
+- [ ] 14.22 Stock report additions: per-warehouse view, items with no movement for N days, slow sellers
+
+### Sprint 14D — Suppliers and returns
+
+- [ ] 14.23 `suppliers` (name, phone, note); `purchase_invoices.supplier_id`, keeping `supplier_name` for old rows; a main supplier per item; amount owed per supplier from purchase invoices
+- [ ] 14.24 Purchase return (`RET`) against its purchase invoice, leaving at that line's own cost
+- [ ] 14.25 Sale return (`RET`) against its sale invoice, coming back at the cost it left at
+
+### Sprint 14E — Reordering and reservation
+
+- [ ] 14.26 `target_stock` on items; `min_stock` labelled «نقطه سفارش» in the UI. Order quantity = target − available
+- [ ] 14.27 «پیشنهاد خرید» page grouped by main supplier: prefills a purchase invoice, or prints/shares the list
+- [ ] 14.28 Reservation: inventory lines of پیش‌فاکتور repair invoices, summed rather than kept as a counter; «قابل فروش» = on hand − reserved, shown on forms and the item page
+
+### Sprint 14F — Audit and extras
+
+- [ ] 14.29 `audit_logs`, append-only: who, what, when, before/after — invoice edits and deletes, item price and minimum changes. Feeds the item page's «تغییرات» tab
+- [ ] 14.30 Lock date in settings: documents dated before it can be edited or deleted by the super admin only
+- [ ] 14.31 Purchase unit with a conversion factor (۱ کارتن = ۲۴ عدد); stock always in the base unit
+- [ ] 14.32 Item photo (`lib/storage.ts` + `lib/imageProfile.ts`, as device photos)
+- [ ] 14.33 Colleague price (قیمت همکار) beside the sell price
+
+### Candidates — not yet agreed
+
+Raised while reviewing the module; each needs a yes before it gets a number.
+
+- Excel import of the item catalogue — the biggest onboarding barrier for a shop with hundreds of parts
+- A technician view of availability («موجود هست / نیست», no prices), on the pattern of `GET /api/sms/capability`
+- Part compatibility with device models, and quality grade (اورجینال، سرویس‌پک، های‌کپی)
+- Serial / IMEI tracking per unit, and warranty on installed parts
+- Customer-supplied parts on a repair invoice, and salvaged parts from unrepairable devices
+- Barcodes: a field, camera or USB scanning, label printing
+
 ## How to use this with Claude Code
 
 - Point Claude Code at one task at a time (e.g. "Read CLAUDE.md and ROADMAP.md, then do task 1.3").
@@ -1634,5 +1756,7 @@ and the UI has settled, so an hour of video does not go stale in a month.
   something worth deploying. Phase 8 stays last.
 - Phase 13 depends on none of the others: its work happens in the landing repo, and it borrows
   only the demo workspace and screenshot scripts from this one.
+- Phase 14 runs in sprint order. 14A comes first because every later document posts through
+  its stock service; 14C–14F can be reordered among themselves once 14B is in.
 - After finishing a task, update this file: flip `[ ]` to `[x]` (or `[~]` if partially done) so the
   roadmap always reflects real progress.

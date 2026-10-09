@@ -40,6 +40,12 @@ const PAYMENT_STATUS: Record<string, string> = {
   pending: "در انتظار پرداخت",
 };
 
+const COUNT_STATUS: Record<string, string> = {
+  draft: "در حال شمارش",
+  applied: "اعمال‌شده",
+  cancelled: "لغو‌شده",
+};
+
 const REPAIR_STATUS: Record<string, string> = {
   draft: "پیش‌فاکتور",
   issued: "صادر شده",
@@ -169,6 +175,18 @@ export async function buildWorkbook(): Promise<Buffer> {
     include: {
       warehouse: { select: { name: true } },
       lines: {
+        orderBy: { id: "asc" },
+        include: { item: { select: { code: true, name: true, unit: true } } },
+      },
+    },
+  });
+
+  const stockCounts = await prisma.stockCount.findMany({
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: {
+      warehouse: { select: { name: true } },
+      lines: {
+        where: { countedQuantity: { not: null } },
         orderBy: { id: "asc" },
         include: { item: { select: { code: true, name: true, unit: true } } },
       },
@@ -422,6 +440,46 @@ export async function buildWorkbook(): Promise<Buffer> {
           note: line.note ?? adjustment.description ?? "",
           unitCost,
           value: Math.round(quantity * unitCost * 100) / 100,
+        };
+      }),
+    ),
+  );
+
+  // Every counted line of every stock count (14.15), with the count's
+  // status: a draft's lines are what has been counted so far, an applied
+  // count's differences are what reached the ledger.
+  addSheet(
+    book,
+    "انبارگردانی",
+    [
+      { header: "شماره", key: "number", width: 14 },
+      { header: "وضعیت", key: "status", width: 12 },
+      { header: "انبار", key: "warehouse", width: 16 },
+      { header: "کد کالا", key: "code", width: 18 },
+      { header: "نام کالا", key: "name", width: 30 },
+      { header: "واحد", key: "unit", width: 10 },
+      { header: "موجودی سیستم", key: "system", width: 14 },
+      { header: "شمارش", key: "counted", width: 12 },
+      { header: "اختلاف", key: "difference", width: 12 },
+      { header: "تاریخ شمارش", key: "countedAt", width: 14 },
+      { header: "توضیح", key: "note", width: 30 },
+    ],
+    stockCounts.flatMap((count) =>
+      count.lines.map((line) => {
+        const counted = line.countedQuantity!.toNumber();
+        const system = line.systemQuantity!.toNumber();
+        return {
+          number: count.number,
+          status: COUNT_STATUS[count.status] ?? count.status,
+          warehouse: count.warehouse.name,
+          code: line.item.code,
+          name: line.item.name,
+          unit: line.item.unit,
+          system,
+          counted,
+          difference: Math.round((counted - system) * 1000) / 1000,
+          countedAt: toJalali(line.countedAt),
+          note: line.note ?? "",
         };
       }),
     ),

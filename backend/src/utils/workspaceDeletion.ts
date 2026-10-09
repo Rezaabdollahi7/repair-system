@@ -63,6 +63,8 @@ export const DELETION_ORDER = [
   // with RESTRICT. The ledger rows they wrote leave with the items.
   "stockAdjustmentLine",
   "stockAdjustment",
+  "stockCountLine",
+  "stockCount",
   "itemStock",
   "item",
   "warehouse",

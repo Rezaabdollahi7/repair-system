@@ -103,6 +103,12 @@ async function furnish(side: "a" | "b") {
     ],
   });
 
+  const count = await api("post", "/api/stock-counts").send({});
+  await api(
+    "put",
+    `/api/stock-counts/${count.body.id}/lines/${count.body.lines[0].id}`,
+  ).send({ counted_quantity: 7 });
+
   await owner.referralCode.create({
     data: { workspaceId, code: `CODE-${side.toUpperCase()}` },
   });
@@ -139,6 +145,7 @@ describe("deleteWorkspaceData", () => {
     for (const model of [
       "referralCode",
       "stockAdjustment",
+      "stockCountLine",
       "repairInvoice",
       "item",
       "warehouse",

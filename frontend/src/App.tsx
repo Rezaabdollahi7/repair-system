@@ -17,6 +17,8 @@ import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
 import WarehouseList from "./pages/WarehouseList";
 import StockAdjustmentList from "./pages/StockAdjustmentList";
+import StockCountList from "./pages/StockCountList";
+import StockCountDetail from "./pages/StockCountDetail";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import Dashboard from "./pages/Dashboard";
@@ -148,6 +150,17 @@ function App() {
                         <Route
                           path="stock-adjustments"
                           element={<StockAdjustmentList />}
+                        />
+                        <Route
+                          path="stock-counts"
+                          element={<StockCountList />}
+                        />
+                        {/* A page, not a modal: counted for an hour on a
+                            phone, linked to a colleague, and «back» has to
+                            mean the list. */}
+                        <Route
+                          path="stock-counts/:id"
+                          element={<StockCountDetail />}
                         />
                         <Route
                           path="purchase-invoices"

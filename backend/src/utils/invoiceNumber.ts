@@ -15,6 +15,7 @@ export const INVOICE_PREFIXES = {
   // Stock documents (phase 14) share the mechanism — same per-workspace,
   // gap-free counter, same format, no year (agreed 9 October).
   adjustment: "ADJ",
+  count: "CNT",
 } as const;
 
 export type InvoiceKind = keyof typeof INVOICE_PREFIXES;
@@ -81,6 +82,15 @@ export async function nextInvoiceNumber(
         select: { adjustmentSeq: true },
       });
       seq = row.adjustmentSeq;
+      break;
+    }
+    case "count": {
+      const row = await tx.workspace.update({
+        where: { id: workspaceId },
+        data: { countSeq: { increment: 1 } },
+        select: { countSeq: true },
+      });
+      seq = row.countSeq;
       break;
     }
   }

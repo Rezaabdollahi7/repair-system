@@ -53,6 +53,17 @@ enum StockMovementReason {
   @@map("stock_movement_reason")
 }
 
+/// A stock count's life (14.15): counted while `draft`, then either posted
+/// to the ledger (`applied`) or abandoned (`cancelled`). Neither of the last
+/// two goes back.
+enum StockCountStatus {
+  draft
+  applied
+  cancelled
+
+  @@map("stock_count_status")
+}
+
 enum RepairInvoiceStatus {
   draft
   issued
@@ -141,6 +152,8 @@ model Workspace {
   inventoryTransactions InventoryTransaction[]
   stockAdjustments      StockAdjustment[]
   stockAdjustmentLines  StockAdjustmentLine[]
+  stockCounts           StockCount[]
+  stockCountLines       StockCountLine[]
   purchaseInvoices      PurchaseInvoice[]
   purchaseInvoiceItems  PurchaseInvoiceItem[]
   saleInvoices          SaleInvoice[]
@@ -210,6 +223,9 @@ model User {
   assignmentsMade        DeviceAssignment[]     @relation("AssignmentAuthor")
   inventoryTransactions  InventoryTransaction[]
   stockAdjustments       StockAdjustment[]
+  stockCountsCreated     StockCount[]           @relation("StockCountAuthor")
+  stockCountsApplied     StockCount[]           @relation("StockCountApplier")
+  stockCountLinesCounted StockCountLine[]
   purchaseInvoices       PurchaseInvoice[]
   saleInvoices           SaleInvoice[]
   repairInvoicesCreated  RepairInvoice[]        @relation("RepairInvoiceAuthor")
@@ -439,7 +455,8 @@ model Category {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  items Item[]
+  items       Item[]
+  stockCounts StockCount[]
 
   // Unique within a workspace rather than globally: one shop naming a
   // category shouldn't stop every other shop from using that name.
@@ -478,6 +495,7 @@ model Item {
   stocks               ItemStock[]
   transactions         InventoryTransaction[]
   stockAdjustmentLines StockAdjustmentLine[]
+  stockCountLines      StockCountLine[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
   saleInvoiceItems     SaleInvoiceItem[]
 
@@ -510,6 +528,7 @@ model Warehouse {
   stocks           ItemStock[]
   transactions     InventoryTransaction[]
   stockAdjustments StockAdjustment[]
+  stockCounts      StockCount[]
   purchaseInvoices PurchaseInvoice[]
   saleInvoices     SaleInvoice[]
   repairInvoices   RepairInvoice[]
@@ -599,6 +618,85 @@ model StockAdjustmentLine {
   @@index([adjustmentId])
   @@index([itemId])
   @@map("stock_adjustment_lines")
+}
+
+/// A stock count, CNT-0001 (14.15): the shelf counted against the system,
+/// one warehouse at a time and optionally one category.
+///
+/// Lines are written when the count is opened — one per active item in
+/// scope — and filled in as the shop counts. Each line keeps the system's
+/// quantity *at the moment that line was counted*, because a count takes
+/// hours and the shop keeps selling: applying posts counted − that snapshot,
+/// so a sale made after the shelf was counted is neither undone nor
+/// counted twice.
+model StockCount {
+  id          Int              @id @default(autoincrement())
+  workspaceId Int              @map("workspace_id")
+  /// CNT-0001, from Workspace.countSeq.
+  number      String
+  warehouseId Int              @map("warehouse_id")
+  /// The scope, if the count is partial. Kept as a reference only: the lines
+  /// are what was actually counted.
+  categoryId  Int?             @map("category_id")
+  /// Blind: the counter is not shown what the system expects, so they count
+  /// the shelf rather than confirm a number.
+  blind       Boolean          @default(false)
+  status      StockCountStatus @default(draft)
+  description String?
+  createdBy   Int?             @map("created_by")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  /// When it was posted — also the ledger's occurredAt.
+  appliedAt   DateTime?        @map("applied_at")
+  appliedBy   Int?             @map("applied_by")
+  cancelledAt DateTime?        @map("cancelled_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author    User?     @relation("StockCountAuthor", fields: [createdBy], references: [id], onDelete: SetNull)
+  applier   User?     @relation("StockCountApplier", fields: [appliedBy], references: [id], onDelete: SetNull)
+
+  lines StockCountLine[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([warehouseId])
+  @@index([categoryId])
+  @@index([createdBy])
+  @@index([appliedBy])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id              Int       @id @default(autoincrement())
+  workspaceId     Int       @map("workspace_id")
+  countId         Int       @map("count_id")
+  itemId          Int       @map("item_id")
+  /// What the shelf held; NULL until counted.
+  countedQuantity Decimal?  @map("counted_quantity") @db.Decimal(14, 3)
+  /// What the system said for this warehouse at countedAt. NULL until counted.
+  systemQuantity  Decimal?  @map("system_quantity") @db.Decimal(14, 3)
+  countedAt       DateTime? @map("counted_at")
+  countedBy       Int?      @map("counted_by")
+  note            String?
+  /// Written when the count is applied: the difference posted (NULL when it
+  /// was zero or the line was never counted) and the cost it moved at.
+  appliedQuantity Decimal?  @map("applied_quantity") @db.Decimal(14, 3)
+  unitCost        Decimal?  @map("unit_cost") @db.Decimal(18, 2)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  count     StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  item      Item       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  counter   User?      @relation(fields: [countedBy], references: [id], onDelete: SetNull)
+
+  @@unique([countId, itemId])
+  @@index([workspaceId])
+  @@index([itemId])
+  @@index([countedBy])
+  @@map("stock_count_lines")
 }
 
 model InventoryTransaction {

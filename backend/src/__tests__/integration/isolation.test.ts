@@ -143,6 +143,25 @@ const resources: Resource[] = [
     skipDelete: true,
   },
   {
+    name: "stock counts",
+    path: "/api/stock-counts",
+    create: async (workspaceId) => {
+      const warehouseId = await defaultWarehouseOf(workspaceId);
+      const row = await owner.stockCount.create({
+        data: { workspaceId, warehouseId, number: "CNT-0001" },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.stockCount.count({ where: { id } })) === 1,
+    // Lines are written one at a time under /:id/lines/:lineId, and a count
+    // is cancelled, never deleted; stockCounts.test.ts covers both, and
+    // another workspace's line answering 404.
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
     name: "services",
     path: "/api/services",
     create: async (workspaceId) => {

@@ -626,12 +626,30 @@ describe("itemController.update", () => {
 });
 
 describe("itemController.remove", () => {
+  it("refuses when the item is on a stock count, even one with no movement", async () => {
+    db.item.findFirst.mockResolvedValue({
+      _count: {
+        transactions: 0,
+        purchaseInvoiceItems: 0,
+        saleInvoiceItems: 0,
+        stockCountLines: 1,
+      },
+    });
+
+    const res = mockResponse();
+    await controller.remove(mockRequest({ params: { id: 1 } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.item.delete).not.toHaveBeenCalled();
+  });
+
   it("refuses when the item appears on an invoice, not just in transactions", async () => {
     db.item.findFirst.mockResolvedValue({
       _count: {
         transactions: 0,
         purchaseInvoiceItems: 1,
         saleInvoiceItems: 0,
+        stockCountLines: 0,
       },
     });
 
@@ -648,6 +666,7 @@ describe("itemController.remove", () => {
         transactions: 0,
         purchaseInvoiceItems: 0,
         saleInvoiceItems: 0,
+        stockCountLines: 0,
       },
     });
     db.item.delete.mockResolvedValue({ id: 1 });

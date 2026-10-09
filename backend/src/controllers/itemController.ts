@@ -502,6 +502,9 @@ export const remove = async (req: Request, res: Response) => {
             transactions: true,
             purchaseInvoiceItems: true,
             saleInvoiceItems: true,
+            // A count line names its item with Restrict, and an item that has
+            // never moved can still be on an open count (14.15).
+            stockCountLines: true,
           },
         },
       },
@@ -518,7 +521,8 @@ export const remove = async (req: Request, res: Response) => {
     const references =
       item._count.transactions +
       item._count.purchaseInvoiceItems +
-      item._count.saleInvoiceItems;
+      item._count.saleInvoiceItems +
+      item._count.stockCountLines;
 
     if (references > 0) {
       return res.status(400).json({

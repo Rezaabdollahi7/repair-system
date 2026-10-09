@@ -31,6 +31,7 @@ import {
   ChevronDownIcon,
   BuildingStorefrontIcon,
   AdjustmentsHorizontalIcon,
+  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
 import { jalaliToday } from "../utils/jalali";
@@ -103,6 +104,12 @@ const MENU: MenuSection[] = [
         name: "اصلاح موجودی",
         path: "/stock-adjustments",
         icon: AdjustmentsHorizontalIcon,
+        adminOnly: true,
+      },
+      {
+        name: "انبارگردانی",
+        path: "/stock-counts",
+        icon: ClipboardDocumentCheckIcon,
         adminOnly: true,
       },
       {

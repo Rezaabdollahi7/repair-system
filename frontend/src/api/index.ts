@@ -28,6 +28,11 @@ import type {
   StockAdjustment,
   StockAdjustmentCreateBody,
   StockAdjustmentDetail,
+  StockCount,
+  StockCountCreateBody,
+  StockCountDetail,
+  StockCountLine,
+  StockCountReview,
   ItemCreateBody,
   Item,
   ItemForInvoice,
@@ -373,6 +378,30 @@ export const getStockAdjustment = (id: Id) =>
   api.get<StockAdjustmentDetail>(`/stock-adjustments/${id}`);
 export const createStockAdjustment = (data: StockAdjustmentCreateBody) =>
   api.post<StockAdjustmentDetail>("/stock-adjustments", data);
+
+// Stock counts (14.15). A line is saved on its own as the shop counts; the
+// count is applied once, after the review, or cancelled. No delete.
+export const getStockCounts = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<StockCount>>("/stock-counts", { params });
+export const getStockCount = (id: Id) =>
+  api.get<StockCountDetail>(`/stock-counts/${id}`);
+export const createStockCount = (data: StockCountCreateBody) =>
+  api.post<StockCountDetail>("/stock-counts", data);
+export const updateStockCountLine = (
+  id: Id,
+  lineId: Id,
+  data: { counted_quantity: number | null; note?: string | null },
+) => api.put<StockCountLine>(`/stock-counts/${id}/lines/${lineId}`, data);
+export const addStockCountLine = (id: Id, itemId: Id) =>
+  api.post<StockCountLine>(`/stock-counts/${id}/lines`, { item_id: itemId });
+export const getStockCountReview = (id: Id) =>
+  api.get<StockCountReview>(`/stock-counts/${id}/review`);
+export const applyStockCount = (id: Id, acknowledgeMoved: boolean) =>
+  api.post<StockCountDetail>(`/stock-counts/${id}/apply`, {
+    acknowledge_moved: acknowledgeMoved,
+  });
+export const cancelStockCount = (id: Id) =>
+  api.post<StockCountDetail>(`/stock-counts/${id}/cancel`);
 // Items
 export const getItems = (params?: QueryParams) =>
   api.get<PaginatedWithLimit<Item>>("/items", { params });

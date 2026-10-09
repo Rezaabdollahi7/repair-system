@@ -12,14 +12,7 @@ const WHOLE = /^\d*$/;
 // Three places, the most the columns hold (14.1).
 const FRACTION = /^\d*(\.\d{0,3})?$/;
 
-function parse(text: string): number {
-  const value = Number(text);
-  return text === "" || text === "." || isNaN(value) ? 0 : value;
-}
-
-interface QuantityInputProps {
-  value: number;
-  onChange: (value: number) => void;
+interface BaseProps {
   /** The item's own setting. A whole-number item takes no decimal point. */
   fractional: boolean;
   className?: string;
@@ -27,7 +20,25 @@ interface QuantityInputProps {
   disabled?: boolean;
   "aria-label"?: string;
   placeholder?: string;
+  onBlur?: () => void;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }
+
+/**
+ * Two shapes. The usual one treats an empty field as zero. The nullable one
+ * — a stock count's line (14.15) — keeps «not entered» apart from «0»,
+ * because a counted empty shelf and a shelf nobody has counted yet are
+ * different answers.
+ */
+type QuantityInputProps = BaseProps &
+  (
+    | { nullable?: false; value: number; onChange: (value: number) => void }
+    | {
+        nullable: true;
+        value: number | null;
+        onChange: (value: number | null) => void;
+      }
+  );
 
 /**
  * A quantity field that takes «۰٫۴» as readily as «0.4» (14.11).
@@ -40,25 +51,39 @@ interface QuantityInputProps {
  * other than a quantity (a letter, a fourth decimal, any decimal on a
  * whole-number item) is simply not taken.
  */
-export default function QuantityInput({
-  value,
-  onChange,
-  fractional,
-  className,
-  id,
-  disabled,
-  placeholder,
-  "aria-label": ariaLabel,
-}: QuantityInputProps) {
-  const [text, setText] = useState(value ? String(value) : "");
-  const [seen, setSeen] = useState(value);
+export default function QuantityInput(props: QuantityInputProps) {
+  const {
+    fractional,
+    className,
+    id,
+    disabled,
+    placeholder,
+    onBlur,
+    onKeyDown,
+    "aria-label": ariaLabel,
+  } = props;
+  const nullable = props.nullable === true;
+
+  const toText = (value: number | null) =>
+    value === null ? "" : nullable ? String(value) : value ? String(value) : "";
+  const fromText = (text: string): number | null =>
+    text === "" || text === "."
+      ? nullable
+        ? null
+        : 0
+      : isNaN(Number(text))
+        ? 0
+        : Number(text);
+
+  const [text, setText] = useState(toText(props.value));
+  const [seen, setSeen] = useState<number | null>(props.value);
 
   // The parent changed the value itself — a line reset, an invoice loaded.
   // Adjusted during render rather than in an effect, as React recommends
   // for state derived from a prop.
-  if (value !== seen) {
-    setSeen(value);
-    if (parse(text) !== value) setText(value ? String(value) : "");
+  if (props.value !== seen) {
+    setSeen(props.value);
+    if (fromText(text) !== props.value) setText(toText(props.value));
   }
 
   return (
@@ -72,13 +97,16 @@ export default function QuantityInput({
       disabled={disabled}
       placeholder={placeholder}
       aria-label={ariaLabel}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
       onChange={(e) => {
         const next = normalizeDigits(e.target.value.trim());
         if (!(fractional ? FRACTION : WHOLE).test(next)) return;
         setText(next);
-        const parsed = parse(next);
+        const parsed = fromText(next);
         setSeen(parsed);
-        onChange(parsed);
+        if (props.nullable === true) props.onChange(parsed);
+        else props.onChange(parsed ?? 0);
       }}
       className={className}
     />

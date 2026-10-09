@@ -19,6 +19,7 @@ const subscriptionRoutes = require("./subscription");
 const smsRoutes = require("./sms");
 const warehouseRoutes = require("./warehouses");
 const stockAdjustmentRoutes = require("./stockAdjustments");
+const stockCountRoutes = require("./stockCounts");
 
 router.use("/auth", authRoutes);
 router.use("/devices", deviceRoutes);
@@ -37,5 +38,6 @@ router.use("/subscription", subscriptionRoutes);
 router.use("/sms", smsRoutes);
 router.use("/warehouses", warehouseRoutes);
 router.use("/stock-adjustments", stockAdjustmentRoutes);
+router.use("/stock-counts", stockCountRoutes);
 
 module.exports = router;

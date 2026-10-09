@@ -468,6 +468,96 @@ export interface StockAdjustmentCreateBody {
   lines: StockAdjustmentLineBody[];
 }
 
+export type StockCountStatus = "draft" | "applied" | "cancelled";
+
+/** A stock count, CNT-0001 (14.15). */
+export interface StockCount {
+  id: number;
+  number: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  category_id: number | null;
+  category_name: string | null;
+  blind: boolean;
+  status: StockCountStatus;
+  description: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  applied_at: string | null;
+  applied_by_name: string | null;
+  cancelled_at: string | null;
+  line_count: number;
+  counted_count: number;
+}
+
+/**
+ * A line as the counting screen sees it. `expected_quantity` and
+ * `difference` are null while a blind count is still being counted — the
+ * server withholds them, so nothing in the payload gives them away.
+ */
+export interface StockCountLine {
+  id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  item_is_fractional: boolean;
+  category_name: string | null;
+  location: string | null;
+  counted_quantity: number | null;
+  counted_at: string | null;
+  counted_by_name: string | null;
+  note: string | null;
+  expected_quantity: number | null;
+  difference: number | null;
+  applied_quantity: number | null;
+  unit_cost: number | null;
+}
+
+export interface StockCountDetail extends StockCount {
+  lines: StockCountLine[];
+}
+
+export interface StockCountCreateBody {
+  warehouse_id?: number | null;
+  category_id?: number | null;
+  blind: boolean;
+  description?: string | null;
+}
+
+/** GET /stock-counts/:id/review — every counted line against its snapshot. */
+export interface StockCountReviewLine {
+  line_id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  counted_quantity: number;
+  system_quantity: number;
+  difference: number;
+  current_quantity: number;
+  /** The item moved in this warehouse after its line was counted. */
+  moved_since: boolean;
+  value: number;
+  counted_at: string;
+}
+
+export interface StockCountReview {
+  lines: StockCountReviewLine[];
+  summary: {
+    line_count: number;
+    counted_count: number;
+    uncounted_count: number;
+    matching_count: number;
+    surplus_count: number;
+    shortage_count: number;
+    surplus_value: number;
+    shortage_value: number;
+    moved_count: number;
+  };
+}
+
 /**
  * Items answer in camelCase too — except `sell_price`, which the create and
  * update bodies take in snake_case while the response gives `sellPrice`.

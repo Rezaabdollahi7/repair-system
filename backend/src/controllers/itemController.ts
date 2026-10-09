@@ -20,6 +20,7 @@ import type {
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
 import { averageAfterAdding } from "../utils/avgPurchasePrice";
+import { defaultWarehouseId } from "../utils/warehouse";
 
 const itemInclude = {
   category: { select: { name: true } },
@@ -40,8 +41,8 @@ function toItemResponse(item: ItemWithCategory) {
     name: item.name,
     code: item.code,
     unit: item.unit,
-    minStock: item.minStock,
-    currentStock: item.currentStock,
+    minStock: item.minStock.toNumber(),
+    currentStock: item.currentStock.toNumber(),
     avgPurchasePrice: item.avgPurchasePrice.toNumber(),
     description: item.description,
     isActive: item.isActive,
@@ -200,9 +201,14 @@ export const getLowStock = async (req: Request, res: Response) => {
     });
 
     const lowStock = items
-      .filter((item) => item.currentStock <= item.minStock)
+      .filter(
+        (item) => item.currentStock.toNumber() <= item.minStock.toNumber(),
+      )
       .sort(
-        (a, b) => b.minStock - b.currentStock - (a.minStock - a.currentStock),
+        (a, b) =>
+          b.minStock.toNumber() -
+          b.currentStock.toNumber() -
+          (a.minStock.toNumber() - a.currentStock.toNumber()),
       );
 
     res.json(lowStock.map(toItemResponse));
@@ -245,7 +251,7 @@ export const searchForInvoice = async (req: Request, res: Response) => {
         code: item.code,
         name: item.name,
         unit: item.unit,
-        current_stock: item.currentStock,
+        current_stock: item.currentStock.toNumber(),
         avg_purchase_price: item.avgPurchasePrice.toNumber(),
         sell_price: item.sellPrice.toNumber(),
         category_name: item.category?.name ?? null,
@@ -309,7 +315,7 @@ export const getTransactions = async (req: Request, res: Response) => {
       id: tx.id,
       item_id: tx.itemId,
       type: tx.type,
-      quantity: tx.quantity,
+      quantity: tx.quantity.toNumber(),
       unit_price: tx.unitPrice.toNumber(),
       reference_id: tx.referenceId,
       reference_type: tx.referenceType,
@@ -465,14 +471,14 @@ export const quickPurchase = async (req: Request, res: Response) => {
     }
 
     const totalAmount = body.quantity * body.unit_price;
-    const newStock = item.currentStock + body.quantity;
+    const newStock = item.currentStock.toNumber() + body.quantity;
 
     // The same arithmetic a purchase-invoice line runs, from the same
     // module: a quick purchase is a one-line purchase invoice and had no
     // business computing the average its own way.
     const newAvgPrice = averageAfterAdding({
       avg: item.avgPurchasePrice.toNumber(),
-      stock: item.currentStock,
+      stock: item.currentStock.toNumber(),
       quantity: body.quantity,
       unitPrice: body.unit_price,
     });
@@ -484,9 +490,11 @@ export const quickPurchase = async (req: Request, res: Response) => {
       workspaceId,
       async (tx) => {
         const number = await nextInvoiceNumber(tx, workspaceId, "purchase");
+        const warehouseId = await defaultWarehouseId(tx, workspaceId);
         const invoice = await tx.purchaseInvoice.create({
           data: {
             workspaceId,
+            warehouseId,
             invoiceNumber: number,
             supplierName: "خرید سریع",
             totalAmount,
@@ -517,6 +525,7 @@ export const quickPurchase = async (req: Request, res: Response) => {
           data: {
             workspaceId,
             itemId: id,
+            warehouseId,
             type: "purchase",
             quantity: body.quantity,
             unitPrice: body.unit_price,
@@ -558,9 +567,9 @@ export const quickSale = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "کالا یافت نشد" });
     }
 
-    if (item.currentStock < body.quantity) {
+    if (item.currentStock.toNumber() < body.quantity) {
       return res.status(400).json({
-        error: `موجودی کافی نیست. موجودی فعلی: ${item.currentStock}`,
+        error: `موجودی کافی نیست. موجودی فعلی: ${item.currentStock.toNumber()}`,
       });
     }
 
@@ -573,15 +582,17 @@ export const quickSale = async (req: Request, res: Response) => {
       sellPrice > 0 ? sellPrice : item.avgPurchasePrice.toNumber();
 
     const totalAmount = body.quantity * unitPrice;
-    const newStock = item.currentStock - body.quantity;
+    const newStock = item.currentStock.toNumber() - body.quantity;
 
     const invoiceNumber = await runInWorkspaceTransaction(
       workspaceId,
       async (tx) => {
         const number = await nextInvoiceNumber(tx, workspaceId, "sale");
+        const warehouseId = await defaultWarehouseId(tx, workspaceId);
         const invoice = await tx.saleInvoice.create({
           data: {
             workspaceId,
+            warehouseId,
             invoiceNumber: number,
             customerName: body.customer_name ?? "فروش سریع",
             totalAmount,
@@ -612,6 +623,7 @@ export const quickSale = async (req: Request, res: Response) => {
           data: {
             workspaceId,
             itemId: id,
+            warehouseId,
             type: "sale",
             // Negative, matching how the ledger records outgoing stock.
             quantity: -body.quantity,

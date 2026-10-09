@@ -220,8 +220,8 @@ export async function buildWorkbook(): Promise<Buffer> {
       name: item.name,
       category: item.category?.name ?? "",
       unit: item.unit,
-      stock: item.currentStock,
-      minStock: item.minStock,
+      stock: item.currentStock.toNumber(),
+      minStock: item.minStock.toNumber(),
       avgPrice: item.avgPurchasePrice.toNumber(),
       sellPrice: item.sellPrice.toNumber(),
     })),
@@ -327,7 +327,7 @@ export async function buildWorkbook(): Promise<Buffer> {
         date: toJalali(invoice.invoiceDate),
         code: line.item.code,
         name: line.item.name,
-        quantity: line.quantity,
+        quantity: line.quantity.toNumber(),
         unitPrice: line.unitPrice.toNumber(),
         total: line.totalPrice.toNumber(),
       });
@@ -344,7 +344,7 @@ export async function buildWorkbook(): Promise<Buffer> {
         // it was written with and no code.
         code: line.item?.code ?? "",
         name: line.item?.name ?? line.name ?? "",
-        quantity: line.quantity,
+        quantity: line.quantity.toNumber(),
         unitPrice: line.unitPrice.toNumber(),
         total: line.totalPrice.toNumber(),
       });

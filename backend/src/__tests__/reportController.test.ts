@@ -59,8 +59,8 @@ function itemRow(overrides: Record<string, unknown> = {}) {
     code: "C-100",
     name: "خازن",
     unit: "عدد",
-    currentStock: 20,
-    minStock: 5,
+    currentStock: decimal(20),
+    minStock: decimal(5),
     avgPurchasePrice: decimal(1000),
     category: { name: "قطعات" },
     ...overrides,
@@ -73,7 +73,7 @@ beforeEach(() => {
 
 describe("reportController.getStockReport", () => {
   it("marks an item with no stock as critical", async () => {
-    db.item.findMany.mockResolvedValue([itemRow({ currentStock: 0 })]);
+    db.item.findMany.mockResolvedValue([itemRow({ currentStock: decimal(0) })]);
 
     const res = mockResponse();
     await controller.getStockReport(mockRequest({ query: {} }), res);
@@ -83,7 +83,7 @@ describe("reportController.getStockReport", () => {
 
   it("marks an item at its minimum as low, not good", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ currentStock: 5, minStock: 5 }),
+      itemRow({ currentStock: decimal(5), minStock: decimal(5) }),
     ]);
 
     const res = mockResponse();
@@ -94,9 +94,9 @@ describe("reportController.getStockReport", () => {
 
   it("keeps only low and critical items when asked", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ id: 1, currentStock: 20, minStock: 5 }),
-      itemRow({ id: 2, currentStock: 0, minStock: 5 }),
-      itemRow({ id: 3, currentStock: 3, minStock: 5 }),
+      itemRow({ id: 1, currentStock: decimal(20), minStock: decimal(5) }),
+      itemRow({ id: 2, currentStock: decimal(0), minStock: decimal(5) }),
+      itemRow({ id: 3, currentStock: decimal(3), minStock: decimal(5) }),
     ]);
 
     const res = mockResponse();
@@ -112,8 +112,12 @@ describe("reportController.getStockReport", () => {
 
   it("values the inventory at each item's average purchase price", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ currentStock: 20, avgPurchasePrice: decimal(1000) }),
-      itemRow({ id: 2, currentStock: 5, avgPurchasePrice: decimal(2000) }),
+      itemRow({ currentStock: decimal(20), avgPurchasePrice: decimal(1000) }),
+      itemRow({
+        id: 2,
+        currentStock: decimal(5),
+        avgPurchasePrice: decimal(2000),
+      }),
     ]);
 
     const res = mockResponse();
@@ -148,7 +152,7 @@ describe("reportController.getPurchaseReport", () => {
         totalAmount: decimal(30000),
         paidAmount: decimal(10000),
         paymentStatus: "partial",
-        items: [{ quantity: 4 }, { quantity: 6 }],
+        items: [{ quantity: decimal(4) }, { quantity: decimal(6) }],
       },
     ]);
 
@@ -210,7 +214,7 @@ describe("reportController.getSaleReport", () => {
         totalAmount: decimal(50000),
         paidAmount: decimal(50000),
         paymentStatus: "paid",
-        items: [{ quantity: 2 }],
+        items: [{ quantity: decimal(2) }],
       },
     ]);
 
@@ -255,7 +259,7 @@ describe("reportController.getProfitReport", () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
       {
         itemId: 1,
-        _sum: { quantity: 10, totalPrice: decimal(50000) },
+        _sum: { quantity: decimal(10), totalPrice: decimal(50000) },
       },
     ]);
     db.item.findMany.mockResolvedValue([
@@ -276,7 +280,7 @@ describe("reportController.getProfitReport", () => {
 
   it("costs items from the caller's own catalogue", async () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 1, totalPrice: decimal(1000) } },
+      { itemId: 1, _sum: { quantity: decimal(1), totalPrice: decimal(1000) } },
     ]);
     db.item.findMany.mockResolvedValue([]);
 
@@ -292,8 +296,8 @@ describe("reportController.getProfitReport", () => {
 
   it("orders the most profitable item first", async () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 1, totalPrice: decimal(1000) } },
-      { itemId: 2, _sum: { quantity: 1, totalPrice: decimal(9000) } },
+      { itemId: 1, _sum: { quantity: decimal(1), totalPrice: decimal(1000) } },
+      { itemId: 2, _sum: { quantity: decimal(1), totalPrice: decimal(9000) } },
     ]);
     db.item.findMany.mockResolvedValue([
       { id: 1, name: "الف", code: "A", avgPurchasePrice: decimal(0) },
@@ -312,7 +316,7 @@ describe("reportController.getProfitReport", () => {
 
   it("reports a zero margin rather than dividing by zero", async () => {
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 0, totalPrice: decimal(0) } },
+      { itemId: 1, _sum: { quantity: decimal(0), totalPrice: decimal(0) } },
     ]);
     db.item.findMany.mockResolvedValue([
       { id: 1, name: "خازن", code: "C-100", avgPurchasePrice: decimal(0) },
@@ -411,9 +415,9 @@ describe("reportController.getDashboardStats", () => {
   it("counts low stock by comparing each item's two columns", async () => {
     stubDashboard();
     db.item.findMany.mockResolvedValue([
-      { currentStock: 20, minStock: 5 },
-      { currentStock: 2, minStock: 5 },
-      { currentStock: 5, minStock: 5 },
+      { currentStock: decimal(20), minStock: decimal(5) },
+      { currentStock: decimal(2), minStock: decimal(5) },
+      { currentStock: decimal(5), minStock: decimal(5) },
     ]);
 
     const res = mockResponse();
@@ -444,10 +448,21 @@ describe("reportController.getDashboardStats", () => {
   it("attaches item names to the top sellers", async () => {
     stubDashboard();
     db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: 12, totalPrice: decimal(90000) } },
+      {
+        itemId: 1,
+        _sum: { quantity: decimal(12), totalPrice: decimal(90000) },
+      },
     ]);
+    // One mock serves both item reads on the dashboard — the low-stock count
+    // and the top sellers' names — so the row carries what each needs.
     db.item.findMany.mockResolvedValue([
-      { id: 1, name: "خازن", code: "C-100" },
+      {
+        id: 1,
+        name: "خازن",
+        code: "C-100",
+        currentStock: decimal(20),
+        minStock: decimal(5),
+      },
     ]);
 
     const res = mockResponse();

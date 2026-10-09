@@ -18,6 +18,9 @@ jest.mock("../lib/prisma", () => {
     // with workspaceId now, which findUnique can't express.
     item: { findFirst: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
+    warehouse: {
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 4 }),
+    },
   };
 
   return {
@@ -529,7 +532,7 @@ describe("repairInvoiceController.changeStatus", () => {
       paidAmount: decimal(0),
       items: lines,
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 10 });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(10) });
 
     await controller.changeStatus(
       mockRequest({ params: { id: 5 }, body: { status: "issued" } }, 3),
@@ -544,7 +547,7 @@ describe("repairInvoiceController.changeStatus", () => {
       db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
     ).toMatchObject({
       workspaceId: WORKSPACE_ID,
-      type: "sale",
+      type: "repair_use",
       quantity: -3,
       referenceId: 5,
       referenceType: "repair_invoice",
@@ -559,7 +562,7 @@ describe("repairInvoiceController.changeStatus", () => {
       paidAmount: decimal(0),
       items: lines,
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 7 });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
 
     await controller.changeStatus(
       mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
@@ -571,7 +574,7 @@ describe("repairInvoiceController.changeStatus", () => {
     });
     expect(
       db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
-    ).toMatchObject({ type: "adjustment", quantity: 3 });
+    ).toMatchObject({ type: "reversal", quantity: 3 });
   });
 
   it("moves no stock when cancelling a draft", async () => {
@@ -597,7 +600,7 @@ describe("repairInvoiceController.changeStatus", () => {
       paidAmount: decimal(0),
       items: lines,
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 7 });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
 
     await controller.changeStatus(
       mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
@@ -617,7 +620,7 @@ describe("repairInvoiceController.changeStatus", () => {
       paidAmount: decimal(200000),
       items: lines,
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 7 });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
 
     await controller.changeStatus(
       mockRequest({ params: { id: 5 }, body: { status: "cancelled" } }, 3),
@@ -772,7 +775,7 @@ describe("repairInvoiceController.remove", () => {
         },
       ],
     });
-    db.__tx.item.findFirst.mockResolvedValue({ currentStock: 7 });
+    db.__tx.item.findFirst.mockResolvedValue({ currentStock: decimal(7) });
 
     await controller.remove(
       mockRequest({ params: { id: 5 } }, 3),

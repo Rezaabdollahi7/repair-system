@@ -11,6 +11,9 @@ jest.mock("../lib/prisma", () => {
     saleInvoiceItem: { create: jest.fn() },
     item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
     inventoryTransaction: { create: jest.fn() },
+    warehouse: {
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 4 }),
+    },
   };
 
   return {
@@ -97,8 +100,8 @@ function itemRow(overrides: Record<string, unknown> = {}) {
     name: "خازن",
     code: "C-100",
     unit: "عدد",
-    minStock: 5,
-    currentStock: 20,
+    minStock: decimal(5),
+    currentStock: decimal(20),
     avgPurchasePrice: decimal(1000),
     description: null,
     isActive: true,
@@ -271,9 +274,9 @@ describe("itemController.search", () => {
 describe("itemController.getLowStock", () => {
   it("keeps only items at or below their minimum", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ id: 1, currentStock: 20, minStock: 5 }),
-      itemRow({ id: 2, currentStock: 3, minStock: 5 }),
-      itemRow({ id: 3, currentStock: 5, minStock: 5 }),
+      itemRow({ id: 1, currentStock: decimal(20), minStock: decimal(5) }),
+      itemRow({ id: 2, currentStock: decimal(3), minStock: decimal(5) }),
+      itemRow({ id: 3, currentStock: decimal(5), minStock: decimal(5) }),
     ]);
 
     const res = mockResponse();
@@ -286,9 +289,9 @@ describe("itemController.getLowStock", () => {
 
   it("orders by how far below the minimum each item is", async () => {
     db.item.findMany.mockResolvedValue([
-      itemRow({ id: 1, currentStock: 4, minStock: 5 }),
-      itemRow({ id: 2, currentStock: 0, minStock: 10 }),
-      itemRow({ id: 3, currentStock: 2, minStock: 5 }),
+      itemRow({ id: 1, currentStock: decimal(4), minStock: decimal(5) }),
+      itemRow({ id: 2, currentStock: decimal(0), minStock: decimal(10) }),
+      itemRow({ id: 3, currentStock: decimal(2), minStock: decimal(5) }),
     ]);
 
     const res = mockResponse();
@@ -363,7 +366,7 @@ describe("itemController.getTransactions", () => {
         id: 10,
         itemId: 1,
         type: "purchase",
-        quantity: 5,
+        quantity: decimal(5),
         unitPrice: decimal(1000),
         referenceId: 7,
         referenceType: "purchase_invoice",
@@ -375,7 +378,7 @@ describe("itemController.getTransactions", () => {
         id: 11,
         itemId: 1,
         type: "adjustment",
-        quantity: -2,
+        quantity: decimal(-2),
         unitPrice: decimal(0),
         referenceId: null,
         referenceType: null,
@@ -551,7 +554,7 @@ describe("itemController.quickPurchase", () => {
   it("recalculates the weighted average purchase price", async () => {
     // 20 units at 1000 plus 10 at 2000 = 40000 over 30 units.
     db.item.findFirst.mockResolvedValue({
-      currentStock: 20,
+      currentStock: decimal(20),
       avgPurchasePrice: decimal(1000),
     });
 
@@ -568,7 +571,7 @@ describe("itemController.quickPurchase", () => {
 
   it("records the ledger entry against the invoice and the acting user", async () => {
     db.item.findFirst.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -591,7 +594,7 @@ describe("itemController.quickPurchase", () => {
 
   it("does everything inside one transaction", async () => {
     db.item.findFirst.mockResolvedValue({
-      currentStock: 0,
+      currentStock: decimal(0),
       avgPurchasePrice: decimal(0),
     });
 
@@ -614,7 +617,7 @@ describe("itemController.quickSale", () => {
 
   it("refuses to sell more than is in stock", async () => {
     db.item.findFirst.mockResolvedValue({
-      currentStock: 3,
+      currentStock: decimal(3),
       sellPrice: decimal(1500),
       avgPurchasePrice: decimal(1000),
     });
@@ -631,7 +634,7 @@ describe("itemController.quickSale", () => {
 
   it("sells at the item's sale price", async () => {
     db.item.findFirst.mockResolvedValue({
-      currentStock: 10,
+      currentStock: decimal(10),
       sellPrice: decimal(1500),
       avgPurchasePrice: decimal(1000),
     });
@@ -649,7 +652,7 @@ describe("itemController.quickSale", () => {
 
   it("falls back to the purchase price when no sale price is set", async () => {
     db.item.findFirst.mockResolvedValue({
-      currentStock: 10,
+      currentStock: decimal(10),
       sellPrice: decimal(0),
       avgPurchasePrice: decimal(1000),
     });
@@ -667,7 +670,7 @@ describe("itemController.quickSale", () => {
 
   it("records the stock movement as a negative quantity", async () => {
     db.item.findFirst.mockResolvedValue({
-      currentStock: 10,
+      currentStock: decimal(10),
       sellPrice: decimal(1500),
       avgPurchasePrice: decimal(1000),
     });

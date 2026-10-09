@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "../../app";
 import prisma from "../../lib/prisma";
 import {
+  defaultWarehouseOf,
   disconnectOwner,
   owner,
   seedTwoWorkspaces,
@@ -146,7 +147,11 @@ const resources: Resource[] = [
     path: "/api/purchase-invoices",
     create: async (workspaceId) => {
       const row = await owner.purchaseInvoice.create({
-        data: { workspaceId, invoiceNumber: "PUR-20260810-001" },
+        data: {
+          workspaceId,
+          invoiceNumber: "PUR-20260810-001",
+          warehouseId: await defaultWarehouseOf(workspaceId),
+        },
         select: { id: true },
       });
       return row.id;
@@ -162,7 +167,11 @@ const resources: Resource[] = [
     path: "/api/sale-invoices",
     create: async (workspaceId) => {
       const row = await owner.saleInvoice.create({
-        data: { workspaceId, invoiceNumber: "SAL-20260810-001" },
+        data: {
+          workspaceId,
+          invoiceNumber: "SAL-20260810-001",
+          warehouseId: await defaultWarehouseOf(workspaceId),
+        },
         select: { id: true },
       });
       return row.id;
@@ -185,6 +194,7 @@ const resources: Resource[] = [
           workspaceId,
           invoiceNumber: "INV-20260810-0001",
           deviceId: device.id,
+          warehouseId: await defaultWarehouseOf(workspaceId),
         },
         select: { id: true },
       });

@@ -20,6 +20,7 @@ import type {
 } from "../schemas/purchaseInvoice";
 import { dateFilter } from "../utils/dateRange";
 import { workspaceIdOf } from "../utils/workspace";
+import { defaultWarehouseId } from "../utils/warehouse";
 
 function toInvoiceResponse(invoice: PurchaseInvoice) {
   return {
@@ -80,6 +81,7 @@ async function writeLines(
   lines: LineInput[],
   actorId: number | null,
   workspaceId: number,
+  warehouseId: number,
 ): Promise<void> {
   for (const line of lines) {
     const totalPrice = line.quantity * line.unit_price;
@@ -106,10 +108,10 @@ async function writeLines(
     await tx.item.update({
       where: { id: line.item_id },
       data: {
-        currentStock: item.currentStock + line.quantity,
+        currentStock: item.currentStock.toNumber() + line.quantity,
         avgPurchasePrice: averageAfterAdding({
           avg: item.avgPurchasePrice.toNumber(),
-          stock: item.currentStock,
+          stock: item.currentStock.toNumber(),
           quantity: line.quantity,
           unitPrice: line.unit_price,
         }),
@@ -120,6 +122,7 @@ async function writeLines(
       data: {
         workspaceId,
         itemId: line.item_id,
+        warehouseId,
         type: "purchase",
         quantity: line.quantity,
         unitPrice: line.unit_price,
@@ -147,12 +150,19 @@ async function writeLines(
 async function reverseLines(
   tx: Prisma.TransactionClient,
   invoiceId: number,
-  lines: { itemId: number; quantity: number; unitPrice: Prisma.Decimal }[],
+  lines: {
+    itemId: number;
+    quantity: Prisma.Decimal;
+    unitPrice: Prisma.Decimal;
+  }[],
   note: string,
   actorId: number | null,
   workspaceId: number,
+  warehouseId: number,
 ): Promise<void> {
   for (const line of lines) {
+    const quantity = line.quantity.toNumber();
+
     const item = await tx.item.findFirstOrThrow({
       where: { id: line.itemId, workspaceId },
       select: { currentStock: true, avgPurchasePrice: true },
@@ -163,11 +173,11 @@ async function reverseLines(
       data: {
         // Clamped at zero, as before: the stock may already have been sold
         // on, and a negative figure would be worse than an inexact one.
-        currentStock: Math.max(0, item.currentStock - line.quantity),
+        currentStock: Math.max(0, item.currentStock.toNumber() - quantity),
         avgPurchasePrice: averageAfterRemoving({
           avg: item.avgPurchasePrice.toNumber(),
-          stock: item.currentStock,
-          quantity: line.quantity,
+          stock: item.currentStock.toNumber(),
+          quantity,
           unitPrice: line.unitPrice.toNumber(),
         }),
       },
@@ -177,8 +187,9 @@ async function reverseLines(
       data: {
         workspaceId,
         itemId: line.itemId,
-        type: "adjustment",
-        quantity: -line.quantity,
+        warehouseId,
+        type: "reversal",
+        quantity: -quantity,
         referenceId: invoiceId,
         referenceType: "purchase_invoice",
         note,
@@ -266,7 +277,7 @@ export const getById = async (req: Request, res: Response) => {
         id: line.id,
         invoice_id: line.invoiceId,
         item_id: line.itemId,
-        quantity: line.quantity,
+        quantity: line.quantity.toNumber(),
         unit_price: line.unitPrice.toNumber(),
         total_price: line.totalPrice.toNumber(),
         created_at: line.createdAt.toISOString(),
@@ -310,6 +321,7 @@ export const create = async (req: Request, res: Response) => {
           workspaceId,
           invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "purchase"),
           supplierName: body.supplier_name,
+          warehouseId: await defaultWarehouseId(tx, workspaceId),
           invoiceDate: body.invoice_date ?? new Date(),
           totalAmount,
           paidAmount,
@@ -319,7 +331,14 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, created.id, body.items, actorId, workspaceId);
+      await writeLines(
+        tx,
+        created.id,
+        body.items,
+        actorId,
+        workspaceId,
+        created.warehouseId,
+      );
 
       return created;
     });
@@ -373,6 +392,7 @@ export const update = async (req: Request, res: Response) => {
         "ویرایش فاکتور خرید",
         actorId,
         workspaceId,
+        existing.warehouseId,
       );
 
       await tx.purchaseInvoiceItem.deleteMany({ where: { invoiceId: id } });
@@ -389,7 +409,14 @@ export const update = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, id, body.items, actorId, workspaceId);
+      await writeLines(
+        tx,
+        id,
+        body.items,
+        actorId,
+        workspaceId,
+        existing.warehouseId,
+      );
     });
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
@@ -462,6 +489,7 @@ export const remove = async (req: Request, res: Response) => {
         "حذف فاکتور خرید",
         actorId,
         workspaceId,
+        invoice.warehouseId,
       );
 
       // The lines go with it via onDelete: Cascade.

@@ -56,11 +56,14 @@ export const getStockReport = async (req: Request, res: Response) => {
       code: item.code,
       name: item.name,
       unit: item.unit,
-      current_stock: item.currentStock,
-      min_stock: item.minStock,
+      current_stock: item.currentStock.toNumber(),
+      min_stock: item.minStock.toNumber(),
       avg_purchase_price: item.avgPurchasePrice.toNumber(),
       category_name: item.category?.name ?? null,
-      stock_status: stockStatus(item.currentStock, item.minStock),
+      stock_status: stockStatus(
+        item.currentStock.toNumber(),
+        item.minStock.toNumber(),
+      ),
     }));
 
     const data =
@@ -114,7 +117,7 @@ export const getPurchaseReport = async (req: Request, res: Response) => {
       payment_status: invoice.paymentStatus,
       item_count: invoice.items.length,
       total_quantity: invoice.items.reduce(
-        (sum, line) => sum + line.quantity,
+        (sum, line) => sum + line.quantity.toNumber(),
         0,
       ),
     }));
@@ -164,7 +167,7 @@ export const getSaleReport = async (req: Request, res: Response) => {
       payment_status: invoice.paymentStatus,
       item_count: invoice.items.length,
       total_quantity: invoice.items.reduce(
-        (sum, line) => sum + line.quantity,
+        (sum, line) => sum + line.quantity.toNumber(),
         0,
       ),
     }));
@@ -228,7 +231,7 @@ export const getProfitReport = async (req: Request, res: Response) => {
     const data = grouped
       .map((row) => {
         const item = itemsById.get(row.itemId as number);
-        const quantity = row._sum?.quantity ?? 0;
+        const quantity = row._sum?.quantity?.toNumber() ?? 0;
         const revenue = row._sum?.totalPrice?.toNumber() ?? 0;
 
         // Cost uses the item's current average purchase price, not the price
@@ -470,7 +473,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const topItemsById = new Map(topItemRecords.map((item) => [item.id, item]));
 
     const lowStockCount = items.filter(
-      (item) => item.currentStock <= item.minStock,
+      (item) => item.currentStock.toNumber() <= item.minStock.toNumber(),
     ).length;
 
     // Accepts undefined as well: Prisma types an aggregate's _sum as
@@ -559,7 +562,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         id: tx.id,
         item_id: tx.itemId,
         type: tx.type,
-        quantity: tx.quantity,
+        quantity: tx.quantity.toNumber(),
         unit_price: tx.unitPrice.toNumber(),
         created_at: tx.createdAt.toISOString(),
         item_name: tx.item.name,
@@ -571,7 +574,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
           id: row.itemId,
           name: item?.name ?? null,
           code: item?.code ?? null,
-          sold_quantity: row._sum.quantity ?? 0,
+          sold_quantity: row._sum.quantity?.toNumber() ?? 0,
           revenue: amount(row._sum.totalPrice),
         };
       }),

@@ -16,6 +16,7 @@ import type {
 } from "../schemas/saleInvoice";
 import { dateFilter } from "../utils/dateRange";
 import { workspaceIdOf } from "../utils/workspace";
+import { defaultWarehouseId } from "../utils/warehouse";
 
 const deviceSelect = {
   device: {
@@ -175,7 +176,7 @@ export const getById = async (req: Request, res: Response) => {
         id: line.id,
         invoice_id: line.invoiceId,
         item_id: line.itemId,
-        quantity: line.quantity,
+        quantity: line.quantity.toNumber(),
         unit_price: line.unitPrice.toNumber(),
         total_price: line.totalPrice.toNumber(),
         created_at: line.createdAt.toISOString(),
@@ -184,7 +185,7 @@ export const getById = async (req: Request, res: Response) => {
         // the old COALESCE(i.name, sii.name).
         item_name: line.item?.name ?? line.name,
         item_unit: line.item?.unit ?? line.unit,
-        current_stock: line.item?.currentStock ?? null,
+        current_stock: line.item?.currentStock.toNumber() ?? null,
       })),
     });
   } catch (error) {
@@ -231,8 +232,8 @@ async function assertStockAvailable(
       return `کالا با شناسه ${line.item_id} یافت نشد`;
     }
 
-    if (item.currentStock < line.quantity) {
-      return `موجودی کالای "${item.name}" کافی نیست. موجودی فعلی: ${item.currentStock}`;
+    if (item.currentStock.toNumber() < line.quantity) {
+      return `موجودی کالای "${item.name}" کافی نیست. موجودی فعلی: ${item.currentStock.toNumber()}`;
     }
   }
 
@@ -249,6 +250,7 @@ async function writeLines(
   lines: LineInput[],
   actorId: number | null,
   workspaceId: number,
+  warehouseId: number,
 ): Promise<void> {
   for (const line of lines) {
     const totalPrice = line.quantity * line.unit_price;
@@ -276,13 +278,16 @@ async function writeLines(
 
     await tx.item.update({
       where: { id: line.item_id },
-      data: { currentStock: Math.max(0, item.currentStock - line.quantity) },
+      data: {
+        currentStock: Math.max(0, item.currentStock.toNumber() - line.quantity),
+      },
     });
 
     await tx.inventoryTransaction.create({
       data: {
         workspaceId,
         itemId: line.item_id,
+        warehouseId,
         type: "sale",
         quantity: -line.quantity,
         unitPrice: line.unit_price,
@@ -305,13 +310,15 @@ async function writeLines(
 async function returnLinesToStock(
   tx: Prisma.TransactionClient,
   invoiceId: number,
-  lines: { itemId: number | null; quantity: number }[],
+  lines: { itemId: number | null; quantity: Prisma.Decimal }[],
   note: string,
   actorId: number | null,
   workspaceId: number,
+  warehouseId: number,
 ): Promise<void> {
   for (const line of lines) {
     if (line.itemId === null) continue;
+    const quantity = line.quantity.toNumber();
 
     const item = await tx.item.findFirstOrThrow({
       where: { id: line.itemId, workspaceId },
@@ -320,15 +327,16 @@ async function returnLinesToStock(
 
     await tx.item.update({
       where: { id: line.itemId },
-      data: { currentStock: item.currentStock + line.quantity },
+      data: { currentStock: item.currentStock.toNumber() + quantity },
     });
 
     await tx.inventoryTransaction.create({
       data: {
         workspaceId,
         itemId: line.itemId,
-        type: "adjustment",
-        quantity: line.quantity,
+        warehouseId,
+        type: "reversal",
+        quantity,
         referenceId: invoiceId,
         referenceType: "sale_invoice",
         note,
@@ -361,6 +369,7 @@ export const create = async (req: Request, res: Response) => {
         data: {
           workspaceId,
           invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "sale"),
+          warehouseId: await defaultWarehouseId(tx, workspaceId),
           customerId: body.customer_id ?? null,
           customerName: body.customer_name,
           customerPhone: body.customer_phone,
@@ -374,7 +383,14 @@ export const create = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, invoice.id, lines, actorId, workspaceId);
+      await writeLines(
+        tx,
+        invoice.id,
+        lines,
+        actorId,
+        workspaceId,
+        invoice.warehouseId,
+      );
 
       return { invoice };
     });
@@ -431,6 +447,7 @@ export const update = async (req: Request, res: Response) => {
         "ویرایش فاکتور فروش",
         actorId,
         workspaceId,
+        existing.warehouseId,
       );
 
       const stockError = await assertStockAvailable(tx, lines, workspaceId);
@@ -456,7 +473,14 @@ export const update = async (req: Request, res: Response) => {
         },
       });
 
-      await writeLines(tx, id, lines, actorId, workspaceId);
+      await writeLines(
+        tx,
+        id,
+        lines,
+        actorId,
+        workspaceId,
+        existing.warehouseId,
+      );
     });
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
@@ -536,6 +560,7 @@ export const remove = async (req: Request, res: Response) => {
         "ابطال فاکتور فروش",
         actorId,
         workspaceId,
+        invoice.warehouseId,
       );
 
       // The lines go with it via onDelete: Cascade.

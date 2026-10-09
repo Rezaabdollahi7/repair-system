@@ -51,6 +51,8 @@ export interface SeededWorkspace {
   workspaceId: number;
   userId: number;
   token: string;
+  /** The default warehouse populateWorkspace would have created. */
+  warehouseId: number;
 }
 
 export interface TwoWorkspaces {
@@ -122,6 +124,14 @@ export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
       select: { id: true },
     });
 
+    // What populateWorkspace gives every workspace, and what every invoice
+    // and stock movement now points at. Without it the first purchase in a
+    // suite fails looking for a default warehouse.
+    const warehouse = await owner.warehouse.create({
+      data: { workspaceId: workspace.id, name: "انبار اصلی", isDefault: true },
+      select: { id: true },
+    });
+
     // Minted directly rather than through /auth/login: what these tests are
     // about is what a valid token can reach, not how it was obtained.
     const token = jwt.sign(
@@ -136,7 +146,12 @@ export async function seedTwoWorkspaces(): Promise<TwoWorkspaces> {
       { expiresIn: "1h" },
     );
 
-    return { workspaceId: workspace.id, userId: user.id, token };
+    return {
+      workspaceId: workspace.id,
+      userId: user.id,
+      token,
+      warehouseId: warehouse.id,
+    };
   }
 
   return {
@@ -261,4 +276,17 @@ export async function seedDevice(
   return owner.device.create({
     data: { ...data, workspaceId, receptionNumber: workspace.deviceSeq },
   });
+}
+
+/**
+ * The default warehouse of a workspace seeded above — for fixtures that hold
+ * only a workspace id and need to write an invoice, which every invoice now
+ * points at.
+ */
+export async function defaultWarehouseOf(workspaceId: number): Promise<number> {
+  const warehouse = await owner.warehouse.findFirstOrThrow({
+    where: { workspaceId, isDefault: true },
+    select: { id: true },
+  });
+  return warehouse.id;
 }

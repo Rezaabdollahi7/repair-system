@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "../../app";
 import prisma from "../../lib/prisma";
 import {
+  defaultWarehouseOf,
   disconnectOwner,
   owner,
   seedDevice,
@@ -223,6 +224,7 @@ describe("dashboard", () => {
       data: {
         workspaceId: other,
         invoiceNumber: "SAL-20260810-001",
+        warehouseId: await defaultWarehouseOf(other),
         totalAmount: 500000,
         paidAmount: 500000,
       },
@@ -231,6 +233,7 @@ describe("dashboard", () => {
       data: {
         workspaceId: other,
         invoiceNumber: "PUR-20260810-001",
+        warehouseId: await defaultWarehouseOf(other),
         totalAmount: 300000,
       },
     });
@@ -378,6 +381,7 @@ describe("customer overview and notes", () => {
         workspaceId: workspaces.b.workspaceId,
         invoiceNumber: "REP-B001",
         deviceId: device.id,
+        warehouseId: workspaces.b.warehouseId,
         customerId: customer.id,
         totalAmount: 5_000_000,
         paidAmount: 5_000_000,

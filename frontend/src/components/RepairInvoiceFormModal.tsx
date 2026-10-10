@@ -24,6 +24,7 @@ import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import QuantityInput from "./QuantityInput";
+import NumberInput from "./NumberInput";
 import WarehouseSelect from "./WarehouseSelect";
 import { useWarehouses } from "../utils/warehouses";
 import ItemFormModal from "./ItemFormModal";
@@ -362,6 +363,13 @@ export default function RepairInvoiceFormModal({
     }));
   };
 
+  // The number fields report a number (or null for an empty field), not an
+  // event; an empty one means zero on this form.
+  const setNumber = (
+    name: "warranty_months" | "discount_value" | "tax_rate",
+    value: number | null,
+  ) => setFormData((prev) => ({ ...prev, [name]: value ?? 0 }));
+
   const handleAddItem = (type: RepairLineType) => {
     const base: FormLine = {
       item_type: type,
@@ -652,12 +660,12 @@ export default function RepairInvoiceFormModal({
                   <label className="block text-body-sm font-medium text-text-primary mb-1.5">
                     گارانتی (ماه)
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     name="warranty_months"
                     value={formData.warranty_months}
-                    onChange={handleInputChange}
-                    min="0"
+                    separators={false}
+                    aria-label="گارانتی (ماه)"
+                    onChange={(value) => setNumber("warranty_months", value)}
                     className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                   />
                 </div>
@@ -868,17 +876,18 @@ export default function RepairInvoiceFormModal({
                               <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                 قیمت واحد (ریال)
                               </label>
-                              <input
-                                type="number"
+                              <NumberInput
                                 value={item.unit_price}
-                                onChange={(e) =>
+                                zeroAsEmpty
+                                placeholder="۰"
+                                aria-label="قیمت واحد"
+                                onChange={(value) =>
                                   handleItemChange(
                                     index,
                                     "unit_price",
-                                    parseFloat(e.target.value) || 0,
+                                    value ?? 0,
                                   )
                                 }
-                                min="0"
                                 className="w-full border border-border-field rounded-field px-1 sm:px-2 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                               />
                             </div>
@@ -960,12 +969,17 @@ export default function RepairInvoiceFormModal({
                       </select>
                       {formData.discount_type && (
                         <>
-                          <input
-                            type="number"
+                          <NumberInput
                             name="discount_value"
                             value={formData.discount_value}
-                            onChange={handleInputChange}
-                            min="0"
+                            // A percentage may be 12.5; an amount is rials.
+                            decimals={
+                              formData.discount_type === "percentage" ? 2 : 0
+                            }
+                            aria-label="مقدار تخفیف"
+                            onChange={(value) =>
+                              setNumber("discount_value", value)
+                            }
                             className="mt-2 w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                           />
                           <div className="mt-2 flex justify-between text-body-sm">
@@ -984,14 +998,13 @@ export default function RepairInvoiceFormModal({
                       <label className="block text-body-sm font-medium text-text-primary mb-1.5">
                         مالیات (٪)
                       </label>
-                      <input
-                        type="number"
+                      <NumberInput
                         name="tax_rate"
                         value={formData.tax_rate}
-                        onChange={handleInputChange}
-                        min="0"
-                        max="100"
-                        step="0.5"
+                        decimals={2}
+                        separators={false}
+                        aria-label="مالیات (٪)"
+                        onChange={(value) => setNumber("tax_rate", value)}
                         className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                       />
                       <div className="mt-2 flex justify-between text-body-sm">

@@ -436,6 +436,7 @@ export const deleteItem = (id: Id) =>
 export const searchItems = (params?: QueryParams) =>
   api.get<PaginatedWithLimit<Item>>("/items/search", { params });
 export const getLowStockItems = () => api.get<Item[]>("/items/low-stock");
+export const getItemUnits = () => api.get<string[]>("/items/units");
 export const getItemTransactions = (id: Id, params?: QueryParams) =>
   api.get<PaginatedWithLimit<InventoryTransaction>>(
     `/items/${id}/transactions`,

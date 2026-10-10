@@ -18,6 +18,7 @@ import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { reasonsFor } from "../utils/adjustmentReason";
 import { useWarehouses } from "../utils/warehouses";
 import { modalPanel } from "../motion";
+import NumberInput from "./NumberInput";
 import type {
   AdjustmentReason,
   Item,
@@ -458,19 +459,13 @@ export default function StockAdjustmentFormModal({
                           <label className={labelClass}>
                             بهای هر واحد (اختیاری، ریال)
                           </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            dir="ltr"
-                            value={line.unit_cost}
-                            onChange={(e) =>
-                              updateLine(index, {
-                                unit_cost:
-                                  e.target.value === ""
-                                    ? ""
-                                    : Number(e.target.value),
-                              })
+                          <NumberInput
+                            value={
+                              line.unit_cost === "" ? null : line.unit_cost
+                            }
+                            aria-label="بهای هر واحد"
+                            onChange={(value) =>
+                              updateLine(index, { unit_cost: value ?? "" })
                             }
                             placeholder={
                               item

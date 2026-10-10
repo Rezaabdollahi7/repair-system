@@ -8,6 +8,7 @@ import { errorText } from "../utils/errors";
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { useWarehouses } from "../utils/warehouses";
 import type { Item } from "../types/api";
+import NumberInput from "./NumberInput";
 
 /*
  * The item's two quick operations — a purchase without an invoice form and
@@ -112,11 +113,10 @@ export function QuickPurchaseModal({
               <label className="block text-body-sm font-medium text-text-primary mb-1">
                 قیمت واحد (ریال)
               </label>
-              <input
-                type="number"
-                min="0"
+              <NumberInput
                 value={price}
-                onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
+                aria-label="قیمت واحد"
+                onChange={(value) => setPrice(value ?? 0)}
                 className="w-full border border-border-field rounded-field px-3 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 required
               />

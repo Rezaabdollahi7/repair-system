@@ -12,8 +12,10 @@ import type {
 } from "../types/api";
 import { modalPanel } from "../motion";
 import QuantityInput from "./QuantityInput";
+import NumberInput from "./NumberInput";
 import WarehouseSelect from "./WarehouseSelect";
-import { UNIT_OPTIONS, isFractionalByDefault } from "../utils/units";
+import { isFractionalByDefault } from "../utils/units";
+import UnitSelect from "./UnitSelect";
 import { formatQuantity } from "../utils/formatters";
 import { useWarehouses } from "../utils/warehouses";
 
@@ -347,20 +349,24 @@ export default function ItemFormModal({
               >
                 واحد شمارش <Required />
               </label>
-              <select
+              <UnitSelect
                 id="item-unit"
-                name="unit"
                 value={formData.unit}
-                onChange={handleChange}
+                onChange={(unit) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    unit,
+                    // Metres, kilos and litres are measured, not counted —
+                    // offered as a default the user can still undo.
+                    isFractional: fractionalTouched
+                      ? prev.isFractional
+                      : isFractionalByDefault(unit),
+                  }));
+                  clearError("unit");
+                }}
                 disabled={loading}
                 className={fieldClass(errors.unit)}
-              >
-                {UNIT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              />
               <FieldError message={errors.unit} />
               <label className="mt-2 flex items-start gap-2 cursor-pointer w-fit">
                 <input
@@ -393,18 +399,19 @@ export default function ItemFormModal({
               >
                 قیمت فروش (ریال)
               </label>
-              <input
+              <NumberInput
                 id="item-sell-price"
-                type="number"
                 name="sellPrice"
-                value={formData.sellPrice}
-                onChange={handleChange}
+                value={
+                  formData.sellPrice === "" ? null : Number(formData.sellPrice)
+                }
+                onChange={(value) => {
+                  setFormData((prev) => ({ ...prev, sellPrice: value ?? "" }));
+                  clearError("sellPrice");
+                }}
                 disabled={loading}
-                min="0"
-                step="1000"
-                dir="ltr"
                 className={fieldClass(errors.sellPrice)}
-                placeholder="0"
+                placeholder="۰"
               />
               <FieldError message={errors.sellPrice} />
               <p className="mt-1 text-body-xs text-text-secondary">
@@ -430,7 +437,7 @@ export default function ItemFormModal({
                   clearError("minStock");
                 }}
                 disabled={loading}
-                placeholder="0"
+                placeholder="۰"
                 className={fieldClass(errors.minStock)}
               />
               <FieldError message={errors.minStock} />
@@ -499,7 +506,7 @@ export default function ItemFormModal({
                       clearError("openingCost");
                     }}
                     disabled={loading}
-                    placeholder="0"
+                    placeholder="۰"
                     className={fieldClass(errors.openingStock)}
                   />
                 </div>
@@ -517,21 +524,15 @@ export default function ItemFormModal({
                       </>
                     )}
                   </label>
-                  <input
+                  <NumberInput
                     id="item-opening-cost"
-                    type="number"
-                    value={openingCost}
-                    onChange={(e) => {
-                      setOpeningCost(
-                        e.target.value === "" ? "" : Number(e.target.value),
-                      );
+                    value={openingCost === "" ? null : Number(openingCost)}
+                    onChange={(value) => {
+                      setOpeningCost(value ?? "");
                       clearError("openingCost");
                     }}
                     disabled={loading || openingStock <= 0}
-                    min="0"
-                    step="1000"
-                    dir="ltr"
-                    placeholder="0"
+                    placeholder="۰"
                     className={`${fieldClass(errors.openingCost)} disabled:opacity-50`}
                   />
                   <FieldError message={errors.openingCost} />

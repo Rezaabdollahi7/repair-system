@@ -25,6 +25,8 @@ import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import QuantityInput from "./QuantityInput";
+import NumberInput from "./NumberInput";
+import UnitSelect from "./UnitSelect";
 import WarehouseSelect from "./WarehouseSelect";
 import { useWarehouses } from "../utils/warehouses";
 import ItemFormModal from "./ItemFormModal";
@@ -39,16 +41,6 @@ import type {
 } from "../types/api";
 import { modalPanel } from "../motion";
 import LineItemTypeChip from "./LineItemTypeChip";
-
-const UNIT_OPTIONS = [
-  { value: "عدد", label: "عدد" },
-  { value: "متر", label: "متر" },
-  { value: "کیلوگرم", label: "کیلوگرم" },
-  { value: "بسته", label: "بسته" },
-  { value: "کارتن", label: "کارتن" },
-  { value: "لیتر", label: "لیتر" },
-  { value: "دستگاه", label: "دستگاه" },
-];
 
 /**
  * A line as the form holds it. An inventory line points at the catalogue; a
@@ -924,23 +916,14 @@ export default function SaleInvoiceFormModal({
                                 <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   واحد
                                 </label>
-                                <select
+                                <UnitSelect
                                   value={item.unit}
-                                  onChange={(e) =>
-                                    handleItemChange(
-                                      index,
-                                      "unit",
-                                      e.target.value,
-                                    )
+                                  aria-label="واحد"
+                                  onChange={(unit) =>
+                                    handleItemChange(index, "unit", unit)
                                   }
                                   className="w-full border border-border-field rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-                                >
-                                  {UNIT_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                />
                                 <p className="mt-0.5 text-[10px] text-text-secondary opacity-0">
                                   white space
                                 </p>
@@ -951,18 +934,18 @@ export default function SaleInvoiceFormModal({
                                 <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                                   قیمت واحد (ریال)
                                 </label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   value={item.unit_price}
-                                  onChange={(e) =>
+                                  zeroAsEmpty
+                                  placeholder="۰"
+                                  aria-label="قیمت واحد"
+                                  onChange={(value) =>
                                     handleItemChange(
                                       index,
                                       "unit_price",
-                                      parseInt(e.target.value) || 0,
+                                      value ?? 0,
                                     )
                                   }
-                                  min="0"
-                                  step="1000"
                                   className="w-full border border-border-field rounded-field px-1 py-1.5 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                                 />
                                 <p className="mt-0.5 text-[10px] text-text-secondary opacity-0">
@@ -1033,13 +1016,16 @@ export default function SaleInvoiceFormModal({
                       <label className="block text-body-sm font-medium text-text-primary mb-1.5">
                         مبلغ دریافتی (ریال)
                       </label>
-                      <input
-                        type="number"
+                      <NumberInput
                         name="paid_amount"
                         value={formData.paid_amount}
-                        onChange={handleInputChange}
-                        min="0"
-                        step="1000"
+                        aria-label="مبلغ دریافتی"
+                        onChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            paid_amount: value ?? 0,
+                          }))
+                        }
                         className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border"}`}
                       />
                       {errors.paid_amount && (

@@ -168,6 +168,28 @@ export const getById = async (req: Request, res: Response) => {
   }
 };
 
+// GET /api/items/units
+//
+// The units this shop has already counted something in, beside the defaults
+// the frontend offers. A unit is just the text on an item — there is no
+// table of them — so a unit a shop adds ("حلقه", "شاخه") joins the list the
+// moment the first item is saved with it.
+export const getUnits = async (req: Request, res: Response) => {
+  try {
+    const rows = await prisma.item.findMany({
+      where: { workspaceId: workspaceIdOf(req) },
+      distinct: ["unit"],
+      select: { unit: true },
+      orderBy: { unit: "asc" },
+    });
+    res.json(
+      rows.map((row) => row.unit.trim()).filter((unit) => unit.length > 0),
+    );
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 // GET /api/items/search
 export const search = async (req: Request, res: Response) => {
   try {
@@ -523,8 +545,7 @@ export const getTrade = async (req: Request, res: Response) => {
     ]
       .sort(
         (a, b) =>
-          b.invoice_date.localeCompare(a.invoice_date) ||
-          b.line_id - a.line_id,
+          b.invoice_date.localeCompare(a.invoice_date) || b.line_id - a.line_id,
       )
       .slice(0, TRADE_ROWS);
 
@@ -718,8 +739,7 @@ export const getKardex = async (req: Request, res: Response) => {
         reference_id: row.referenceId,
         document_number:
           row.referenceType && row.referenceId
-            ? (numbers.get(`${row.referenceType}:${row.referenceId}`) ??
-              null)
+            ? (numbers.get(`${row.referenceType}:${row.referenceId}`) ?? null)
             : null,
         note: row.note,
         created_by_name:

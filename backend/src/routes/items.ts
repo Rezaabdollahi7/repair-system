@@ -35,6 +35,7 @@ router.get(
   ctrl.searchForInvoice,
 );
 router.get("/low-stock", ctrl.getLowStock);
+router.get("/units", ctrl.getUnits);
 
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getById);
 router.get(

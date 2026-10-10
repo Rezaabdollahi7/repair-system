@@ -245,6 +245,7 @@ async function lockInvoice(
     select: {
       status: true,
       warehouseId: true,
+      invoiceDate: true,
       totalAmount: true,
       paidAmount: true,
       items: {
@@ -265,18 +266,28 @@ async function lockInvoice(
 /**
  * Takes the invoice's parts and records on each line the cost it left at,
  * which is what a margin on this repair is later measured against.
+ *
+ * The movements carry the invoice's own date, as every other document's do
+ * (the ledger's occurred_at is the document's date): an invoice dated last
+ * week and issued today counts in last week's kardex and movement report,
+ * the same week its revenue counts in.
  */
 async function takeParts(
   tx: Prisma.TransactionClient,
   id: number,
-  invoice: { warehouseId: number; items: StoredLine[] },
+  invoice: { warehouseId: number; invoiceDate: Date; items: StoredLine[] },
   actorId: number | null,
   workspaceId: number,
 ): Promise<void> {
   const moved = await applyStockMovements(
     tx,
     workspaceId,
-    { referenceType: REFERENCE_TYPE, referenceId: id, actorId },
+    {
+      referenceType: REFERENCE_TYPE,
+      referenceId: id,
+      occurredAt: invoice.invoiceDate,
+      actorId,
+    },
     takeMovements(invoice.items, invoice.warehouseId),
   );
 
@@ -289,6 +300,11 @@ async function takeParts(
   }
 }
 
+/**
+ * Puts the parts back on cancel — dated now, not the invoice's date, like a
+ * deleted sale invoice's reversal: a cancellation in Aban must not change
+ * the figures of a Mehr that has already been reported.
+ */
 async function returnParts(
   tx: Prisma.TransactionClient,
   id: number,

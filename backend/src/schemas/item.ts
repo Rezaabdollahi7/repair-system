@@ -84,7 +84,12 @@ export const itemCreateSchema = z
   .object({
     code: z.string().trim().min(1, "کد کالا الزامی است"),
     name: z.string().trim().min(1, "نام کالا الزامی است"),
-    unit: z.string().trim().min(1, "واحد کالا الزامی است"),
+    unit: z
+      .string()
+      .trim()
+      .min(1, "واحد کالا الزامی است")
+      // A shop may name its own units (حلقه، شاخه); a sentence is not one.
+      .max(20, "نام واحد حداکثر ۲۰ نویسه است"),
     categoryId: z.coerce.number().int().positive().nullable().optional(),
     minStock: minStockSchema.default(0),
     description: optionalText,
@@ -125,7 +130,12 @@ export const itemUpdateSchema = z
   .object({
     code: z.string().trim().min(1, "کد کالا الزامی است"),
     name: z.string().trim().min(1, "نام کالا الزامی است"),
-    unit: z.string().trim().min(1, "واحد کالا الزامی است"),
+    unit: z
+      .string()
+      .trim()
+      .min(1, "واحد کالا الزامی است")
+      // A shop may name its own units (حلقه، شاخه); a sentence is not one.
+      .max(20, "نام واحد حداکثر ۲۰ نویسه است"),
     categoryId: z.coerce.number().int().positive().nullable(),
     minStock: minStockSchema,
     description: optionalText,

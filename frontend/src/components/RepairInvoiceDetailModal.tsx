@@ -42,6 +42,7 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
 import RepairInvoiceStatusBadge from "./RepairInvoiceStatusBadge";
 import { repairOutstanding } from "../utils/invoiceStatus";
 import LineItemTypeChip from "./LineItemTypeChip";
+import NumberInput from "./NumberInput";
 
 interface RepairInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -618,12 +619,12 @@ export default function RepairInvoiceDetailModal({
                   <label className="block text-body-sm font-medium text-text-primary mb-2">
                     مبلغ (ریال)
                   </label>
-                  <input
-                    type="number"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    min="1"
-                    max={outstanding}
+                  <NumberInput
+                    value={paymentAmount === "" ? null : Number(paymentAmount)}
+                    aria-label="مبلغ پرداخت"
+                    onChange={(value) =>
+                      setPaymentAmount(value === null ? "" : String(value))
+                    }
                     className="w-full border border-border-field rounded-field px-4 py-2 bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                     required
                     autoFocus

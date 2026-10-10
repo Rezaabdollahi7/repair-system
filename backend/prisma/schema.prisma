@@ -1074,6 +1074,12 @@ model Settings {
   defaultWarrantyMonths Int     @default(3) @map("default_warranty_months")
   invoicePrefix         String  @default("INV-") @map("invoice_prefix")
 
+  /// Which unit the shop reads money in: "toman" (the default) or "rial".
+  /// Display only — every amount is stored in rials whatever this says, so
+  /// switching it changes no figure, only how the screens print it. A CHECK
+  /// in the migration holds it to the two values.
+  currencyUnit String @default("toman") @map("currency_unit")
+
   /// Off until a workshop turns it on. A shop that upgrades and discovers it
   /// has been texting its customers is a worse first impression than one
   /// that has to find a switch.

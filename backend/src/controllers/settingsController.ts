@@ -62,6 +62,7 @@ async function toSettingsResponse(settings: Settings) {
     default_tax_rate: settings.defaultTaxRate.toNumber(),
     default_warranty_months: settings.defaultWarrantyMonths,
     invoice_prefix: settings.invoicePrefix,
+    currency_unit: settings.currencyUnit,
     invoice_footer_text: settings.invoiceFooterText,
     created_at: settings.createdAt.toISOString(),
     updated_at: settings.updatedAt.toISOString(),
@@ -102,6 +103,7 @@ export const getSettings = async (req: Request, res: Response) => {
         default_tax_rate: 0,
         default_warranty_months: 3,
         invoice_prefix: "INV-",
+        currency_unit: "toman",
         sale_invoice_paper_size: "A5",
         sale_invoice_show_logo: true,
         sale_invoice_show_company_info: true,
@@ -142,6 +144,9 @@ export const updateSettings = async (req: Request, res: Response) => {
     }
     if (body.default_warranty_months !== undefined) {
       data.defaultWarrantyMonths = body.default_warranty_months;
+    }
+    if (body.currency_unit !== undefined) {
+      data.currencyUnit = body.currency_unit;
     }
     if (body.invoice_prefix !== undefined) {
       data.invoicePrefix = body.invoice_prefix;

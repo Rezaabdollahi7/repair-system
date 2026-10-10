@@ -22,6 +22,10 @@ export const settingsUpdateSchema = z
     default_tax_rate: z.coerce.number().min(0).max(100),
     default_warranty_months: z.coerce.number().int().min(0),
     invoice_prefix: z.string().trim().min(1),
+    // Display only: amounts are stored in rials either way.
+    currency_unit: z.enum(["toman", "rial"], {
+      message: "واحد پول باید تومان یا ریال باشد",
+    }),
     invoice_footer_text: optionalText,
     sale_invoice_paper_size: z.string().trim().min(1),
     sale_invoice_show_logo: flexibleBoolean,

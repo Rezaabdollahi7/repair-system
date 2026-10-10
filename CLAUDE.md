@@ -78,7 +78,8 @@ frontend/   React SPA (Vite)
   every ledger type), `units.ts`, `warehouses.ts` (`useWarehouses`, which
   decides whether a warehouse picker shows at all), and `formatQuantity` in
   `formatters.ts`. Quantity fields are `components/QuantityInput.tsx`, never
-  a bare `type="number"`
+  a bare `type="number"`; money fields are `components/MoneyInput.tsx`, never
+  a bare `NumberInput` — see **Money unit** below
 - `src/index.css` — the design tokens, and the only file with raw colour
   values in it. See **Design System** below
 - `src/motion/` — the shared framer-motion variants (`modalPanel`,
@@ -171,6 +172,21 @@ Key entities:
 
 All Persian/Jalali date handling uses `jalaali-js`; dates are stored in Gregorian in the DB and
 converted at the application layer for display.
+
+**Money unit (10 October).** Every amount is stored, sent and received in
+**rials**, always. `settings.currency_unit` — `toman` (default, also for the
+workshops that existed before it) or `rial` — only says how the screens print
+it. `frontend/src/utils/currency.ts` is the one place that converts:
+`formatPersianCurrency` / `formatPersianCompact` divide on the way out (and
+round to the whole unit), `MoneyInput` multiplies on the way in (and takes one
+decimal in تومان, so a stored ۱۲٬۳۴۵ ریال survives an edit), and
+`currencyLabel()` is the word beside a figure or in a column heading.
+`CurrencyGate` in the layout loads the unit before any page renders and
+remounts the pages when it changes. ⚠️ A page doing its own `/ 10`, or a
+money field that is a bare `NumberInput`, is the bug this design exists to
+prevent. Dofixo's own prices (subscription, SMS wallet) are not the shop's
+money: always تومان, and those pages do not use this. The Excel export stays
+in rials and says so in its money headings.
 
 ## Current Tech Stack
 
@@ -547,6 +563,26 @@ digits and «٫» and refuses a decimal point on a whole-number item, and
 transaction: an `opening` movement, unit cost required when the quantity is
 above zero. It used to be a zero-priced quick purchase, which drew a PUR-
 number and dragged the average towards nothing.
+
+**Every field of an item is editable, the opening balance included**
+(10 October, reported by a workshop that typed ۱۰۰ میلیون for ۱۰). The edit
+form sends the opening as it should stand; `correctOpening` in
+`itemController.ts` posts a new `opening` and a `reversal` of the old one,
+in one call to the service, both dated with the original opening and
+carrying `reference_type = 'item_opening'` with the id of the opening row
+they replace — which is how the live opening is found
+(`liveOpening`). The reversal leaves at the old cost while all of the
+opening is still on the shelf; once some has been sold it leaves at a blend
+weighted by how much of the opening's value is left (`openingRetention`),
+which lands the average exactly where a corrected history would have put it.
+Taking the full old value out would have driven it to zero.
+
+**An item can be deleted unless a document names it**: an invoice of any
+kind (a پیش‌فاکتور included — a repair line's `item_id` is not a foreign
+key), an adjustment, a count or a transfer. The refusal says which and how
+many. Its own opening and its corrections do not count; those ledger rows,
+and its `item_stocks`, leave with it through ON DELETE CASCADE, which runs
+as the table owner — the ledger stays append-only for `dofixo_app`.
 
 **A shop with one warehouse never sees the concept.** Every document has a
 `warehouse_id` on its header (never per line); omitted, the server uses the

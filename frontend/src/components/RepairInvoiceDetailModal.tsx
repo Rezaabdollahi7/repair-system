@@ -42,7 +42,8 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
 import RepairInvoiceStatusBadge from "./RepairInvoiceStatusBadge";
 import { repairOutstanding } from "../utils/invoiceStatus";
 import LineItemTypeChip from "./LineItemTypeChip";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
+import { currencyLabel } from "../utils/currency";
 
 interface RepairInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -363,13 +364,15 @@ export default function RepairInvoiceDetailModal({
                           <div className="flex justify-between mb-2 text-text-primary">
                             <span>جمع کل:</span>
                             <span className="font-bold">
-                              {formatPersianCurrency(invoice.total_amount)} ریال
+                              {formatPersianCurrency(invoice.total_amount)}{" "}
+                              {currencyLabel()}
                             </span>
                           </div>
                           <div className="flex justify-between mb-2 text-text-primary">
                             <span>پرداخت شده:</span>
                             <span className="text-success-fg">
-                              {formatPersianCurrency(invoice.paid_amount)} ریال
+                              {formatPersianCurrency(invoice.paid_amount)}{" "}
+                              {currencyLabel()}
                             </span>
                           </div>
                           <div className="flex justify-between pt-2 border-t border-border text-text-primary">
@@ -381,7 +384,8 @@ export default function RepairInvoiceDetailModal({
                                   : "text-success-fg"
                               }
                             >
-                              {formatPersianCurrency(outstanding)} ریال
+                              {formatPersianCurrency(outstanding)}{" "}
+                              {currencyLabel()}
                             </span>
                           </div>
                         </div>
@@ -495,7 +499,8 @@ export default function RepairInvoiceDetailModal({
                                 جمع کل:
                               </td>
                               <td className="px-4 py-3 text-body-sm font-medium text-text-primary whitespace-nowrap tabular-nums">
-                                {formatPersianCurrency(invoice.subtotal)} ریال
+                                {formatPersianCurrency(invoice.subtotal)}{" "}
+                                {currencyLabel()}
                               </td>
                             </tr>
                             {invoice.discount_amount > 0 && (
@@ -511,7 +516,7 @@ export default function RepairInvoiceDetailModal({
                                   {formatPersianCurrency(
                                     invoice.discount_amount,
                                   )}{" "}
-                                  ریال
+                                  {currencyLabel()}
                                 </td>
                               </tr>
                             )}
@@ -525,7 +530,7 @@ export default function RepairInvoiceDetailModal({
                                 </td>
                                 <td className="px-4 py-3 text-body-sm text-primary whitespace-nowrap tabular-nums">
                                   +{formatPersianCurrency(invoice.tax_amount)}{" "}
-                                  ریال
+                                  {currencyLabel()}
                                 </td>
                               </tr>
                             )}
@@ -538,7 +543,7 @@ export default function RepairInvoiceDetailModal({
                               </td>
                               <td className="px-4 py-3 text-body-sm font-bold text-primary whitespace-nowrap tabular-nums">
                                 {formatPersianCurrency(invoice.total_amount)}{" "}
-                                ریال
+                                {currencyLabel()}
                               </td>
                             </tr>
                           </tfoot>
@@ -570,7 +575,8 @@ export default function RepairInvoiceDetailModal({
                               </div>
                               <div>
                                 <p className="font-medium text-text-primary">
-                                  {formatPersianCurrency(payment.amount)} ریال
+                                  {formatPersianCurrency(payment.amount)}{" "}
+                                  {currencyLabel()}
                                 </p>
                                 <p className="text-body-xs text-text-secondary">
                                   {payment.payment_method === "cash"
@@ -617,9 +623,9 @@ export default function RepairInvoiceDetailModal({
               <div className="space-y-4">
                 <div>
                   <label className="block text-body-sm font-medium text-text-primary mb-2">
-                    مبلغ (ریال)
+                    مبلغ ({currencyLabel()})
                   </label>
-                  <NumberInput
+                  <MoneyInput
                     value={paymentAmount === "" ? null : Number(paymentAmount)}
                     aria-label="مبلغ پرداخت"
                     onChange={(value) =>

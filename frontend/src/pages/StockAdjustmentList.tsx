@@ -30,6 +30,7 @@ import {
   trClickable,
 } from "../utils/tableClasses";
 import type { Id, QueryParams, StockAdjustment } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 const iconSize = "w-[1.15rem] h-[1.15rem]";
 
@@ -246,8 +247,8 @@ export default function StockAdjustmentList() {
                     <th className={th}>تاریخ</th>
                     {warehouses.showPicker && <th className={th}>انبار</th>}
                     <th className={th}>ردیف‌ها</th>
-                    <th className={th}>ورود (ریال)</th>
-                    <th className={th}>خروج (ریال)</th>
+                    <th className={th}>ورود ({currencyLabel()})</th>
+                    <th className={th}>خروج ({currencyLabel()})</th>
                     <th className={th}>توضیح</th>
                     <th className={th}>ثبت‌کننده</th>
                     <th className={th}>عملیات</th>

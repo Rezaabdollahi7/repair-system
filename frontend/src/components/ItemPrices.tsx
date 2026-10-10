@@ -29,6 +29,7 @@ import type {
   ItemPricePoint,
   ItemPrices as ItemPricesData,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface ItemPricesProps {
   itemId: number;
@@ -61,7 +62,7 @@ function PriceTile({
       </div>
       <p className="text-body-md sm:text-title-sm font-bold text-text-primary tabular-nums">
         {amount !== null && amount !== undefined
-          ? `${formatPersianCurrency(amount)} ریال`
+          ? `${formatPersianCurrency(amount)} ${currencyLabel()}`
           : "—"}
       </p>
       {point ? (
@@ -161,7 +162,7 @@ export default function ItemPrices({ itemId, unit, version }: ItemPricesProps) {
           <div>
             <dt className="text-text-secondary">بهای موجودی فعلی</dt>
             <dd className="font-bold text-text-primary tabular-nums mt-1">
-              {formatPersianCurrency(data.current_average)} ریال
+              {formatPersianCurrency(data.current_average)} {currencyLabel()}
             </dd>
             <dd className="text-body-xs text-text-muted mt-0.5">
               میانگین متحرکِ آنچه در انبار مانده
@@ -171,7 +172,7 @@ export default function ItemPrices({ itemId, unit, version }: ItemPricesProps) {
             <dt className="text-text-secondary">قیمت فروش</dt>
             <dd className="font-bold text-text-primary tabular-nums mt-1">
               {data.sell_price
-                ? `${formatPersianCurrency(data.sell_price)} ریال`
+                ? `${formatPersianCurrency(data.sell_price)} ${currencyLabel()}`
                 : "تعیین نشده"}
             </dd>
           </div>
@@ -188,7 +189,7 @@ export default function ItemPrices({ itemId, unit, version }: ItemPricesProps) {
             >
               {margin === null
                 ? "—"
-                : `${formatPersianCurrency(Math.abs(margin))} ریال${margin < 0 ? " زیان" : ""}`}
+                : `${formatPersianCurrency(Math.abs(margin))} ${currencyLabel()}${margin < 0 ? " زیان" : ""}`}
             </dd>
             {margin !== null && (
               <dd className="text-body-xs text-text-muted mt-0.5 tabular-nums">
@@ -201,7 +202,7 @@ export default function ItemPrices({ itemId, unit, version }: ItemPricesProps) {
             <dt className="text-text-secondary">میانگین قیمت فروش</dt>
             <dd className="font-bold text-text-primary tabular-nums mt-1">
               {sale.average !== null
-                ? `${formatPersianCurrency(sale.average)} ریال`
+                ? `${formatPersianCurrency(sale.average)} ${currencyLabel()}`
                 : "—"}
             </dd>
             {sale.last && (
@@ -233,7 +234,7 @@ export default function ItemPrices({ itemId, unit, version }: ItemPricesProps) {
                     <th className={th}>فاکتور</th>
                     <th className={th}>تأمین‌کننده</th>
                     <th className={th}>مقدار</th>
-                    <th className={th}>قیمت واحد (ریال)</th>
+                    <th className={th}>قیمت واحد ({currencyLabel()})</th>
                   </tr>
                 </thead>
                 <tbody className={tbody}>

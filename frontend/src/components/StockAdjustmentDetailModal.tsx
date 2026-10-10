@@ -26,6 +26,7 @@ import {
   tr,
 } from "../utils/tableClasses";
 import type { Id, StockAdjustmentDetail } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface StockAdjustmentDetailModalProps {
   adjustmentId: Id;
@@ -130,7 +131,7 @@ export default function StockAdjustmentDetailModal({
                 />
                 <InfoRow
                   label="ارزش ورود / خروج"
-                  value={`${formatPersianCurrency(adjustment.value_in)} / ${formatPersianCurrency(adjustment.value_out)} ریال`}
+                  value={`${formatPersianCurrency(adjustment.value_in)} / ${formatPersianCurrency(adjustment.value_out)} ${currencyLabel()}`}
                 />
                 <InfoRow label="توضیح" value={adjustment.description ?? "—"} />
               </div>
@@ -164,7 +165,8 @@ export default function StockAdjustmentDetailModal({
                   <p className="text-body-xs text-text-muted mt-1 tabular-nums">
                     {formatPersianCurrency(line.unit_cost)} ×{" "}
                     {formatQuantity(Math.abs(line.quantity))} ={" "}
-                    {formatPersianCurrency(Math.abs(line.value))} ریال
+                    {formatPersianCurrency(Math.abs(line.value))}{" "}
+                    {currencyLabel()}
                   </p>
                 </li>
               ))}
@@ -179,8 +181,8 @@ export default function StockAdjustmentDetailModal({
                       <th className={th}>مقدار</th>
                       <th className={th}>دلیل</th>
                       <th className={th}>توضیح</th>
-                      <th className={th}>بهای واحد (ریال)</th>
-                      <th className={th}>ارزش (ریال)</th>
+                      <th className={th}>بهای واحد ({currencyLabel()})</th>
+                      <th className={th}>ارزش ({currencyLabel()})</th>
                     </tr>
                   </thead>
                   <tbody className={tbody}>

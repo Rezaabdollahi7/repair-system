@@ -33,6 +33,7 @@ import type {
   KardexRow,
   QueryParams,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface ItemKardexProps {
   itemId: number;
@@ -234,7 +235,7 @@ export default function ItemKardex({
                       <th className={th}>ورود</th>
                       <th className={th}>خروج</th>
                       <th className={th}>مانده</th>
-                      <th className={th}>بهای واحد (ریال)</th>
+                      <th className={th}>بهای واحد ({currencyLabel()})</th>
                       <th className={th}>شرح</th>
                     </tr>
                   </thead>

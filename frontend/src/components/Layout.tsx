@@ -41,6 +41,7 @@ import { toPersianDigits } from "../utils/formatters";
 import { useWarehouses } from "../utils/warehouses";
 import { roleStyleOf } from "../utils/roleStatus";
 import StatusPill from "./StatusPill";
+import CurrencyGate from "./CurrencyGate";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -879,7 +880,9 @@ export default function Layout() {
             animate="visible"
           >
             <BreadcrumbProvider value={{ crumb, setCrumb }}>
-              <Outlet />
+              <CurrencyGate>
+                <Outlet />
+              </CurrencyGate>
             </BreadcrumbProvider>
           </motion.div>
         </main>

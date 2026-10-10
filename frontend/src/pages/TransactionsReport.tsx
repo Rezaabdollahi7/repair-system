@@ -26,6 +26,7 @@ import {
 } from "../utils/tableClasses";
 import type { DashboardTransaction } from "../types/api";
 import { movementTypeOf } from "../utils/movementType";
+import { currencyLabel } from "../utils/currency";
 
 /** Labels and colours are shared with every list of movements (14.11). */
 const typeOf = movementTypeOf;
@@ -180,7 +181,7 @@ export default function TransactionsReport() {
                       <p className="text-body-xs text-text-muted mt-2 tabular-nums">
                         {formatPersianCurrency(tx.unit_price)} × ‏
                         {formatQuantity(Math.abs(tx.quantity))} ={" "}
-                        {formatPersianCurrency(lineTotal(tx))} ریال
+                        {formatPersianCurrency(lineTotal(tx))} {currencyLabel()}
                       </p>
                     )}
                   </div>
@@ -198,8 +199,8 @@ export default function TransactionsReport() {
                     <th className={th}>نوع</th>
                     <th className={th}>کالا</th>
                     <th className={th}>تعداد</th>
-                    <th className={th}>قیمت واحد (ریال)</th>
-                    <th className={th}>جمع (ریال)</th>
+                    <th className={th}>قیمت واحد ({currencyLabel()})</th>
+                    <th className={th}>جمع ({currencyLabel()})</th>
                   </tr>
                 </thead>
                 <tbody className={tbody}>

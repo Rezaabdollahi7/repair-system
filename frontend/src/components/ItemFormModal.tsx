@@ -12,12 +12,13 @@ import type {
 } from "../types/api";
 import { modalPanel } from "../motion";
 import QuantityInput from "./QuantityInput";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
 import WarehouseSelect from "./WarehouseSelect";
 import { isFractionalByDefault } from "../utils/units";
 import UnitSelect from "./UnitSelect";
 import { formatQuantity } from "../utils/formatters";
 import { useWarehouses } from "../utils/warehouses";
+import { currencyLabel } from "../utils/currency";
 
 /**
  * `currentStock` and `stocks` are display-only and read in edit mode; stock
@@ -98,12 +99,13 @@ export default function ItemFormModal({
   // overriding it.
   const [fractionalTouched, setFractionalTouched] = useState(false);
 
-  // Opening stock (create only, 14.8): quantity, what each unit cost, and
-  // where it sits — sent with the item in one request.
+  // Opening stock (14.8): quantity, what each unit cost, and where it sits —
+  // sent with the item in one request. Editable afterwards too: a cost typed
+  // with one zero too many used to be there for good.
   const [openingStock, setOpeningStock] = useState(0);
   const [openingCost, setOpeningCost] = useState<number | string>("");
   const [openingWarehouse, setOpeningWarehouse] = useState<number | null>(null);
-  const warehouses = useWarehouses(openingWarehouse, isOpen && !isEditMode);
+  const warehouses = useWarehouses(openingWarehouse, isOpen);
 
   useEffect(() => {
     if (isOpen) {
@@ -127,6 +129,9 @@ export default function ItemFormModal({
               currentStock: item.currentStock || 0,
               stocks: item.stocks,
             });
+            setOpeningStock(item.opening?.quantity ?? 0);
+            setOpeningCost(item.opening?.unitCost ?? "");
+            setOpeningWarehouse(item.opening?.warehouseId ?? null);
             setFractionalTouched(true);
           })
           .catch(() => {
@@ -180,7 +185,7 @@ export default function ItemFormModal({
       newErrors.minStock = "حداقل موجودی نمی‌تواند منفی باشد";
     if (formData.sellPrice !== "" && Number(formData.sellPrice) < 0)
       newErrors.sellPrice = "قیمت فروش نمی‌تواند منفی باشد";
-    if (!isEditMode && openingStock > 0 && !(Number(openingCost) > 0)) {
+    if (openingStock > 0 && !(Number(openingCost) > 0)) {
       // The server refuses it too (14.8): stock with no cost would value the
       // shelf, and every later margin, at nothing.
       newErrors.openingCost = "بهای خرید هر واحد را وارد کنید";
@@ -209,7 +214,14 @@ export default function ItemFormModal({
       };
 
       if (isEditMode && itemId) {
-        await updateItem(itemId, payload);
+        // The opening goes back every time; the server corrects it only when
+        // it differs from what is on the ledger.
+        await updateItem(itemId, {
+          ...payload,
+          openingStock,
+          openingCost: openingStock > 0 ? Number(openingCost) : null,
+          warehouseId: openingWarehouse,
+        });
         toast.success("کالا با موفقیت ویرایش شد");
       } else {
         // One request, one transaction: the item and its opening stock land
@@ -397,9 +409,9 @@ export default function ItemFormModal({
                 htmlFor="item-sell-price"
                 className="block text-body-sm font-medium text-text-primary mb-2"
               >
-                قیمت فروش (ریال)
+                قیمت فروش ({currencyLabel()})
               </label>
-              <NumberInput
+              <MoneyInput
                 id="item-sell-price"
                 name="sellPrice"
                 value={
@@ -471,85 +483,85 @@ export default function ItemFormModal({
                   </ul>
                 )}
                 <p className="mt-2 text-body-xs text-text-secondary">
-                  برای تغییر موجودی از بخش فاکتور خرید یا فروش استفاده کنید
+                  خرید، فروش و مصرف بعدی از فاکتورها و اسناد انبار ثبت می‌شوند؛
+                  اینجا فقط موجودی اولیه را می‌توان اصلاح کرد
                 </p>
               </div>
             )}
           </div>
 
-          {/* Opening stock, only when creating */}
-          {!isEditMode && (
-            <fieldset className="mt-6 border border-border rounded-field p-4">
-              <legend className="px-2 text-body-sm font-bold text-text-primary">
-                موجودی اولیه
-              </legend>
-              <p className="text-body-xs text-text-secondary mb-4">
-                اگر از این کالا از قبل در انبار دارید، مقدار و بهای خرید هر واحد
-                را وارد کنید تا ارزش انبار و سود فروش‌های بعدی درست حساب شود.
-              </p>
-              <div
-                className={`grid grid-cols-1 gap-4 ${warehouses.showPicker ? "md:grid-cols-3" : "md:grid-cols-2"}`}
-              >
-                <div>
-                  <label
-                    htmlFor="item-opening-stock"
-                    className="block text-body-sm font-medium text-text-primary mb-2"
-                  >
-                    مقدار
-                  </label>
-                  <QuantityInput
-                    id="item-opening-stock"
-                    value={openingStock}
-                    fractional={formData.isFractional}
-                    onChange={(value) => {
-                      setOpeningStock(value);
-                      clearError("openingCost");
-                    }}
-                    disabled={loading}
-                    placeholder="۰"
-                    className={fieldClass(errors.openingStock)}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="item-opening-cost"
-                    className="block text-body-sm font-medium text-text-primary mb-2"
-                  >
-                    بهای خرید هر واحد (ریال)
-                    {openingStock > 0 && (
-                      <>
-                        {" "}
-                        <Required />
-                      </>
-                    )}
-                  </label>
-                  <NumberInput
-                    id="item-opening-cost"
-                    value={openingCost === "" ? null : Number(openingCost)}
-                    onChange={(value) => {
-                      setOpeningCost(value ?? "");
-                      clearError("openingCost");
-                    }}
-                    disabled={loading || openingStock <= 0}
-                    placeholder="۰"
-                    className={`${fieldClass(errors.openingCost)} disabled:opacity-50`}
-                  />
-                  <FieldError message={errors.openingCost} />
-                </div>
-
-                {warehouses.showPicker && (
-                  <WarehouseSelect
-                    id="item-opening-warehouse"
-                    options={warehouses.options}
-                    value={openingWarehouse}
-                    defaultWarehouse={warehouses.defaultWarehouse}
-                    onChange={setOpeningWarehouse}
-                  />
-                )}
+          {/* Opening stock: entered with the item, correctable afterwards */}
+          <fieldset className="mt-6 border border-border rounded-field p-4">
+            <legend className="px-2 text-body-sm font-bold text-text-primary">
+              موجودی اولیه
+            </legend>
+            <p className="text-body-xs text-text-secondary mb-4">
+              {isEditMode
+                ? "اگر مقدار یا بهای موجودی اولیه را اشتباه وارد کرده‌اید، اینجا اصلاحش کنید. خرید و فروش‌های بعدی سر جایشان می‌مانند و اصلاح در کاردکس کالا ثبت می‌شود."
+                : "اگر از این کالا از قبل در انبار دارید، مقدار و بهای خرید هر واحد را وارد کنید تا ارزش انبار و سود فروش‌های بعدی درست حساب شود."}
+            </p>
+            <div
+              className={`grid grid-cols-1 gap-4 ${warehouses.showPicker ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+            >
+              <div>
+                <label
+                  htmlFor="item-opening-stock"
+                  className="block text-body-sm font-medium text-text-primary mb-2"
+                >
+                  مقدار
+                </label>
+                <QuantityInput
+                  id="item-opening-stock"
+                  value={openingStock}
+                  fractional={formData.isFractional}
+                  onChange={(value) => {
+                    setOpeningStock(value);
+                    clearError("openingCost");
+                  }}
+                  disabled={loading}
+                  placeholder="۰"
+                  className={fieldClass(errors.openingStock)}
+                />
               </div>
-            </fieldset>
-          )}
+
+              <div>
+                <label
+                  htmlFor="item-opening-cost"
+                  className="block text-body-sm font-medium text-text-primary mb-2"
+                >
+                  بهای خرید هر واحد ({currencyLabel()})
+                  {openingStock > 0 && (
+                    <>
+                      {" "}
+                      <Required />
+                    </>
+                  )}
+                </label>
+                <MoneyInput
+                  id="item-opening-cost"
+                  value={openingCost === "" ? null : Number(openingCost)}
+                  onChange={(value) => {
+                    setOpeningCost(value ?? "");
+                    clearError("openingCost");
+                  }}
+                  disabled={loading || openingStock <= 0}
+                  placeholder="۰"
+                  className={`${fieldClass(errors.openingCost)} disabled:opacity-50`}
+                />
+                <FieldError message={errors.openingCost} />
+              </div>
+
+              {warehouses.showPicker && (
+                <WarehouseSelect
+                  id="item-opening-warehouse"
+                  options={warehouses.options}
+                  value={openingWarehouse}
+                  defaultWarehouse={warehouses.defaultWarehouse}
+                  onChange={setOpeningWarehouse}
+                />
+              )}
+            </div>
+          </fieldset>
 
           {/* Description */}
           <div className="mt-6">

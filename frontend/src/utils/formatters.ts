@@ -1,3 +1,5 @@
+import { fromRials } from "./currency";
+
 /**
  * فرمت شماره تماس فارسی
  * 09219811980 → ۰۹۲۱۹۸۱۱۹۸۰
@@ -28,14 +30,21 @@ export function toPersianDigits(
 }
 
 /**
- * فرمت مبلغ با اعداد فارسی
+ * A stored amount — always rials — in the shop's chosen unit, with Persian
+ * digits grouped in threes: ۱٬۲۳۴٬۵۰۰ ریال reads ۱۲۳٬۴۵۰ in تومان. The unit
+ * word is the caller's (currencyLabel()), so a table can put it once in the
+ * heading. Rounded to the whole unit, as rials always were: an average cost
+ * of ۹۰۸٬۰۲۵ ریال prints ۹۰٬۸۰۳ تومان, not ۹۰٬۸۰۲٫۵ — a decimal on a figure
+ * in the millions is noise. A money field still takes the tenth
+ * (MoneyInput), so editing a price never changes it.
  */
 export function formatPersianCurrency(
   amount: string | number | null | undefined,
 ): string {
   if (amount === null || amount === undefined || amount === "") return "—";
-  const num = Math.round(Number(amount));
-  if (isNaN(num)) return "—";
+  const rials = Math.round(Number(amount));
+  if (isNaN(rials)) return "—";
+  const num = fromRials(rials);
 
   /*
    * The sign is written out rather than left to toLocaleString, so a negative
@@ -44,12 +53,14 @@ export function formatPersianCurrency(
    * bidi reorders around a Persian number. Losses show up in the profit
    * report and in the dashboard's net figure, so this is not hypothetical.
    */
-  const sign = num < 0 ? "−" : "";
-  return sign + toPersianDigits(Math.abs(num).toLocaleString("en-US"));
+  const rounded = Math.round(num);
+  const sign = rounded < 0 ? "−" : "";
+  return sign + toPersianDigits(Math.abs(rounded).toLocaleString("en-US"));
 }
 
 /**
- * A rial amount shortened to three significant characters plus a unit.
+ * A stored (rial) amount, in the shop's unit, shortened to three significant
+ * characters plus a magnitude.
  *
  * Chart axes and legends cannot carry `۱۲٬۴۵۰٬۰۰۰` — at the size an axis
  * label is set, a nine-character number either overlaps its neighbour or
@@ -64,8 +75,9 @@ export function formatPersianCompact(
   amount: string | number | null | undefined,
 ): string {
   if (amount === null || amount === undefined || amount === "") return "—";
-  const num = Number(amount);
-  if (isNaN(num)) return "—";
+  if (isNaN(Number(amount))) return "—";
+  // In the shop's unit, like formatPersianCurrency beside it.
+  const num = fromRials(Number(amount));
 
   const sign = num < 0 ? "−" : "";
   const abs = Math.abs(num);

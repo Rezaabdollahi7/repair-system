@@ -8,7 +8,8 @@ import { errorText } from "../utils/errors";
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { useWarehouses } from "../utils/warehouses";
 import type { Item } from "../types/api";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
+import { currencyLabel } from "../utils/currency";
 
 /*
  * The item's two quick operations — a purchase without an invoice form and
@@ -111,9 +112,9 @@ export function QuickPurchaseModal({
             )}
             <div>
               <label className="block text-body-sm font-medium text-text-primary mb-1">
-                قیمت واحد (ریال)
+                قیمت واحد ({currencyLabel()})
               </label>
-              <NumberInput
+              <MoneyInput
                 value={price}
                 aria-label="قیمت واحد"
                 onChange={(value) => setPrice(value ?? 0)}
@@ -125,7 +126,7 @@ export function QuickPurchaseModal({
               <div className="flex justify-between text-body-sm text-text-primary">
                 <span>جمع کل:</span>
                 <span className="font-medium">
-                  {formatPersianCurrency(quantity * price)} ریال
+                  {formatPersianCurrency(quantity * price)} {currencyLabel()}
                 </span>
               </div>
             </div>

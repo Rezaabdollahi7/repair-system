@@ -35,11 +35,12 @@ import { modalPanel } from "../motion";
  */
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import QuantityInput from "./QuantityInput";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
 import UnitSelect from "./UnitSelect";
 import WarehouseSelect from "./WarehouseSelect";
 import { useWarehouses } from "../utils/warehouses";
 import { isFractionalByDefault } from "../utils/units";
+import { currencyLabel } from "../utils/currency";
 
 /** An option carrying the item's own price, so picking one prefills it. */
 interface ItemOption extends SelectOption {
@@ -244,7 +245,7 @@ export default function PurchaseInvoiceFormModal({
   const itemOptions: ItemOption[] = items.map((item) => ({
     value: item.id,
     label: `[${item.code}] ${item.name}`,
-    subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | میانگین قیمت: ${formatPersianCurrency(item.avgPurchasePrice)} ریال`,
+    subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | میانگین قیمت: ${formatPersianCurrency(item.avgPurchasePrice)} ${currencyLabel()}`,
     avgPrice: item.avgPurchasePrice,
     unit: item.unit,
     fractional: item.isFractional,
@@ -623,9 +624,9 @@ export default function PurchaseInvoiceFormModal({
                           </div>
                           <div className="col-span-2 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
-                              قیمت واحد (ریال)
+                              قیمت واحد ({currencyLabel()})
                             </label>
-                            <NumberInput
+                            <MoneyInput
                               value={item.unit_price}
                               zeroAsEmpty
                               placeholder="۰"
@@ -647,7 +648,7 @@ export default function PurchaseInvoiceFormModal({
                           </div>
                           <div className="col-span-2 sm:col-span-2">
                             <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
-                              جمع (ریال)
+                              جمع ({currencyLabel()})
                             </label>
                             <div className="px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-text-primary">
                               {formatPersianCurrency(
@@ -684,7 +685,9 @@ export default function PurchaseInvoiceFormModal({
 
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 text-body-sm sm:text-base border-b border-border">
-                    <span className="text-text-secondary">جمع کل (ریال):</span>
+                    <span className="text-text-secondary">
+                      جمع کل ({currencyLabel()}):
+                    </span>
                     <span className="font-medium text-text-primary">
                       {formatPersianCurrency(calculateTotal())}
                     </span>
@@ -692,9 +695,9 @@ export default function PurchaseInvoiceFormModal({
 
                   <div>
                     <label className="block text-body-sm font-medium text-text-primary mb-1.5">
-                      مبلغ پرداختی (ریال)
+                      مبلغ پرداختی ({currencyLabel()})
                     </label>
-                    <NumberInput
+                    <MoneyInput
                       name="paid_amount"
                       value={formData.paid_amount}
                       aria-label="مبلغ پرداختی"
@@ -714,7 +717,9 @@ export default function PurchaseInvoiceFormModal({
                   </div>
 
                   <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base font-bold">
-                    <span className="text-text-primary">مانده (ریال):</span>
+                    <span className="text-text-primary">
+                      مانده ({currencyLabel()}):
+                    </span>
                     <span
                       className={`${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
                     >

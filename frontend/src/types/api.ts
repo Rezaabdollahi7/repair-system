@@ -628,6 +628,15 @@ export interface Item {
   isFractional: boolean;
   /** GET /items/:id only: the stock in each warehouse that has held it. */
   stocks?: ItemWarehouseStock[];
+  /**
+   * GET /items/:id only: the opening balance as it now stands, after any
+   * correction — what the edit form shows. Null when the item opened empty.
+   */
+  opening?: {
+    quantity: number;
+    unitCost: number | null;
+    warehouseId: number;
+  } | null;
 }
 
 export interface ItemWarehouseStock {
@@ -649,9 +658,11 @@ export interface ItemCreateBody {
   sell_price?: number;
   isFractional?: boolean;
   /**
-   * Create only (14.8): stock already on the shelf, posted as an opening
-   * movement in the same request. `openingCost` is required when it is
-   * above zero; `warehouseId` defaults to the workspace's default.
+   * Stock already on the shelf, posted as an opening movement in the same
+   * request (14.8). `openingCost` is required when it is above zero;
+   * `warehouseId` defaults to the workspace's default. On an update it is
+   * the balance the item should open with, and the server posts the
+   * correction — nothing at all when it is sent back unchanged.
    */
   openingStock?: number;
   openingCost?: number | null;
@@ -1106,6 +1117,8 @@ export interface AppSettings {
   default_tax_rate?: number;
   default_warranty_months?: number;
   invoice_prefix?: string | null;
+  /** The unit money is shown in (utils/currency). Amounts stay in rials. */
+  currency_unit?: "toman" | "rial";
   invoice_footer_text?: string | null;
   created_at?: string;
   updated_at?: string;

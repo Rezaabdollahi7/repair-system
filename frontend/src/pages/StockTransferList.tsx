@@ -31,6 +31,7 @@ import {
   trClickable,
 } from "../utils/tableClasses";
 import type { Id, QueryParams, StockTransfer } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 const iconSize = "w-[1.15rem] h-[1.15rem]";
 
@@ -212,7 +213,7 @@ export default function StockTransferList() {
                   )}
                   <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-border-subtle text-body-xs">
                     <span className="tabular-nums">
-                      {formatPersianCurrency(row.value)} ریال
+                      {formatPersianCurrency(row.value)} {currencyLabel()}
                     </span>
                     <span className="text-text-muted">
                       {row.created_by_name ?? "—"}
@@ -232,7 +233,7 @@ export default function StockTransferList() {
                     <th className={th}>تاریخ</th>
                     <th className={th}>مسیر</th>
                     <th className={th}>ردیف‌ها</th>
-                    <th className={th}>ارزش (ریال)</th>
+                    <th className={th}>ارزش ({currencyLabel()})</th>
                     <th className={th}>توضیح</th>
                     <th className={th}>ثبت‌کننده</th>
                     <th className={th}>عملیات</th>

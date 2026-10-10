@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getSettings, updateSettings, uploadSettingImage } from "../api";
+import { setCurrencyUnit } from "../utils/currency";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { Link, Navigate } from "react-router-dom";
@@ -143,6 +144,7 @@ const EMPTY_SETTINGS: SettingsForm = {
   default_tax_rate: 0,
   default_warranty_months: 3,
   invoice_prefix: "INV-",
+  currency_unit: "toman",
   invoice_footer_text: "",
   sale_invoice_paper_size: "A5",
   sale_invoice_show_logo: true,
@@ -230,6 +232,9 @@ export default function Settings() {
       // one.
       await updateSettings(settings);
       toast.success("تنظیمات با موفقیت ذخیره شد");
+      // Once saved, not before: every figure in the app is reprinted in the
+      // new unit (CurrencyGate remounts the pages, this one included).
+      setCurrencyUnit(settings.currency_unit ?? "toman");
     } catch {
       toast.error("خطا در ذخیره تنظیمات");
     } finally {
@@ -484,6 +489,30 @@ export default function Settings() {
                   onChange={handleChange}
                   className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="settings-currency-unit"
+                  className="block text-body-sm font-medium text-text-primary mb-2"
+                >
+                  واحد پول
+                </label>
+                <select
+                  id="settings-currency-unit"
+                  name="currency_unit"
+                  value={settings.currency_unit ?? "toman"}
+                  onChange={handleChange}
+                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
+                >
+                  <option value="toman">تومان</option>
+                  <option value="rial">ریال</option>
+                </select>
+                <p className="mt-1 text-body-xs text-text-secondary">
+                  همه‌ی قیمت‌ها و مبلغ‌های برنامه با این واحد نمایش داده و وارد
+                  می‌شوند. هر تومان ده ریال است؛ تغییر واحد هیچ رقمی را عوض
+                  نمی‌کند.
+                </p>
               </div>
 
               <div>

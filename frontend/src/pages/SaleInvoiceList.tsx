@@ -55,6 +55,7 @@ import {
 } from "../utils/tableClasses";
 import type { SaleInvoiceFilters } from "../components/SaleInvoiceFilterPanel";
 import type { PaymentStatus, QueryParams, SaleInvoice } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /** Mirrors the table and the phone cards so the page does not jump. */
 function InvoiceListSkeleton() {
@@ -516,9 +517,9 @@ export default function SaleInvoiceList() {
                     <th className={th}>مشتری</th>
                     <th className={th}>تلفن</th>
                     <th className={th}>تاریخ</th>
-                    <th className={th}>مبلغ کل (ریال)</th>
-                    <th className={th}>پرداخت شده (ریال)</th>
-                    <th className={th}>مانده (ریال)</th>
+                    <th className={th}>مبلغ کل ({currencyLabel()})</th>
+                    <th className={th}>پرداخت شده ({currencyLabel()})</th>
+                    <th className={th}>مانده ({currencyLabel()})</th>
                     <th className={th}>وضعیت</th>
                     <th className={th}>عملیات</th>
                   </tr>

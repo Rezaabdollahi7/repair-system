@@ -21,7 +21,8 @@ import type { Id, PurchaseInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
 import InfoRow from "./InfoRow";
 import PaymentStatusBadge from "./PaymentStatusBadge";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
+import { currencyLabel } from "../utils/currency";
 
 interface PurchaseInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -199,7 +200,8 @@ export default function PurchaseInvoiceDetailModal({
                         <div className="flex justify-between mb-2">
                           <span className="text-text-secondary">جمع کل:</span>
                           <span className="font-bold text-text-primary">
-                            {formatPersianCurrency(invoice.total_amount)} ریال
+                            {formatPersianCurrency(invoice.total_amount)}{" "}
+                            {currencyLabel()}
                           </span>
                         </div>
                         <div className="flex justify-between mb-2">
@@ -207,7 +209,8 @@ export default function PurchaseInvoiceDetailModal({
                             پرداخت شده:
                           </span>
                           <span className="text-success-fg">
-                            {formatPersianCurrency(invoice.paid_amount)} ریال
+                            {formatPersianCurrency(invoice.paid_amount)}{" "}
+                            {currencyLabel()}
                           </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-border">
@@ -218,7 +221,7 @@ export default function PurchaseInvoiceDetailModal({
                             {formatPersianCurrency(
                               invoice.total_amount - invoice.paid_amount,
                             )}{" "}
-                            ریال
+                            {currencyLabel()}
                           </span>
                         </div>
                       </div>
@@ -229,7 +232,7 @@ export default function PurchaseInvoiceDetailModal({
                             بروزرسانی پرداخت
                           </label>
                           <div className="flex gap-2">
-                            <NumberInput
+                            <MoneyInput
                               value={
                                 paymentAmount === ""
                                   ? null
@@ -327,7 +330,8 @@ export default function PurchaseInvoiceDetailModal({
                             جمع کل:
                           </td>
                           <td className="px-4 py-3 text-body-sm font-bold text-text-primary">
-                            {formatPersianCurrency(invoice.total_amount)} ریال
+                            {formatPersianCurrency(invoice.total_amount)}{" "}
+                            {currencyLabel()}
                           </td>
                         </tr>
                       </tfoot>

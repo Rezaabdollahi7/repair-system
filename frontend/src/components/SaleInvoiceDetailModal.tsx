@@ -31,7 +31,8 @@ import type { Id, SaleInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
 import InfoRow from "./InfoRow";
 import PaymentStatusBadge from "./PaymentStatusBadge";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
+import { currencyLabel } from "../utils/currency";
 
 interface SaleInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -370,7 +371,7 @@ export default function SaleInvoiceDetailModal({
                                 colSpan={5}
                                 className="border border-border px-3 py-2 text-left font-medium text-text-primary"
                               >
-                                جمع کل (ریال):
+                                جمع کل ({currencyLabel()}):
                               </td>
                               <td className="border border-border px-3 py-2 text-body-sm font-bold text-left text-text-primary">
                                 {formatPersianCurrency(invoice.total_amount)}
@@ -393,7 +394,7 @@ export default function SaleInvoiceDetailModal({
                     <div className="space-y-3">
                       <div className="flex justify-between py-2 text-body-sm border-b border-border">
                         <span className="text-text-secondary">
-                          جمع کل (ریال):
+                          جمع کل ({currencyLabel()}):
                         </span>
                         <span className="font-bold text-text-primary">
                           {formatPersianCurrency(invoice.total_amount)}
@@ -402,7 +403,7 @@ export default function SaleInvoiceDetailModal({
 
                       <div className="flex justify-between py-2 text-body-sm border-b border-border">
                         <span className="text-success-fg">
-                          دریافت شده (ریال):
+                          دریافت شده ({currencyLabel()}):
                         </span>
                         <span className="font-medium text-success-fg">
                           {formatPersianCurrency(invoice.paid_amount)}
@@ -410,7 +411,9 @@ export default function SaleInvoiceDetailModal({
                       </div>
 
                       <div className="flex justify-between py-2 text-body-sm font-bold border-t border-border">
-                        <span className="text-text-primary">مانده (ریال):</span>
+                        <span className="text-text-primary">
+                          مانده ({currencyLabel()}):
+                        </span>
                         <span
                           className={
                             invoice.total_amount - invoice.paid_amount > 0
@@ -428,10 +431,10 @@ export default function SaleInvoiceDetailModal({
                     {invoice.payment_status !== "paid" && (
                       <div className="mt-4 pt-4 border-t border-border">
                         <label className="block text-body-sm font-medium text-text-primary mb-2">
-                          بروزرسانی پرداخت (ریال)
+                          بروزرسانی پرداخت ({currencyLabel()})
                         </label>
                         <div className="flex gap-2">
-                          <NumberInput
+                          <MoneyInput
                             value={
                               paymentAmount === ""
                                 ? null

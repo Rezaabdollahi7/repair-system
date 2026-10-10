@@ -18,12 +18,13 @@ import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { reasonsFor } from "../utils/adjustmentReason";
 import { useWarehouses } from "../utils/warehouses";
 import { modalPanel } from "../motion";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
 import type {
   AdjustmentReason,
   Item,
   StockAdjustmentDetail,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /** A line as the form holds it, before it is sent. */
 interface FormLine {
@@ -92,7 +93,7 @@ export default function StockAdjustmentFormModal({
   const itemOptions: SelectOption[] = items.map((item) => ({
     value: item.id,
     label: `[${item.code}] ${item.name}`,
-    subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | میانگین بها: ${formatPersianCurrency(item.avgPurchasePrice)} ریال`,
+    subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | میانگین بها: ${formatPersianCurrency(item.avgPurchasePrice)} ${currencyLabel()}`,
   }));
 
   const updateLine = (index: number, patch: Partial<FormLine>) => {
@@ -457,9 +458,9 @@ export default function StockAdjustmentFormModal({
                       {line.direction === "in" && (
                         <div className="col-span-6 sm:col-span-4">
                           <label className={labelClass}>
-                            بهای هر واحد (اختیاری، ریال)
+                            بهای هر واحد (اختیاری، {currencyLabel()})
                           </label>
-                          <NumberInput
+                          <MoneyInput
                             value={
                               line.unit_cost === "" ? null : line.unit_cost
                             }
@@ -487,10 +488,10 @@ export default function StockAdjustmentFormModal({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-body-sm tabular-nums">
               <span className="text-success-fg">
-                ورود: {formatPersianCurrency(valueIn)} ریال
+                ورود: {formatPersianCurrency(valueIn)} {currencyLabel()}
               </span>
               <span className="text-danger-fg">
-                خروج: {formatPersianCurrency(valueOut)} ریال
+                خروج: {formatPersianCurrency(valueOut)} {currencyLabel()}
               </span>
             </div>
             <p className="text-body-xs text-text-secondary">

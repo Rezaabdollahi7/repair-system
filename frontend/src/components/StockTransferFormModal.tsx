@@ -19,6 +19,7 @@ import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { useWarehouses } from "../utils/warehouses";
 import { modalPanel } from "../motion";
 import type { Item, StockTransferDetail } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /** A line as the form holds it, before it is sent. */
 interface FormLine {
@@ -410,7 +411,8 @@ export default function StockTransferFormModal({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-body-sm text-text-primary tabular-nums">
-              ارزش کالاهای منتقل‌شده: {formatPersianCurrency(value)} ریال
+              ارزش کالاهای منتقل‌شده: {formatPersianCurrency(value)}{" "}
+              {currencyLabel()}
             </p>
             <p className="text-body-xs text-text-secondary">
               موجودی کل و میانگین بها تغییر نمی‌کند؛ فقط جای کالا عوض می‌شود.

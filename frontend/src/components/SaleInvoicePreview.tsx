@@ -8,6 +8,7 @@ import {
 } from "../utils/formatters";
 import PrintPreviewModal from "./PrintPreviewModal";
 import type { AppSettings, SaleInvoiceDetail } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface SaleInvoicePreviewProps {
   invoice: SaleInvoiceDetail | null;
@@ -302,7 +303,8 @@ export default function SaleInvoicePreview({
                 <td
                   className={`border border-border px-1 py-1 text-left text-primary ${fontSize.small}`}
                 >
-                  {formatPersianCurrency(invoice.total_amount)} ریال
+                  {formatPersianCurrency(invoice.total_amount)}{" "}
+                  {currencyLabel()}
                 </td>
               </tr>
             </tfoot>

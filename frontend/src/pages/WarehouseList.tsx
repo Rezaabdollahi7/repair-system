@@ -40,6 +40,7 @@ import {
   tr,
 } from "../utils/tableClasses";
 import type { Warehouse } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 const iconSize = "w-[1.15rem] h-[1.15rem]";
 
@@ -83,7 +84,9 @@ function itemCount(count: number): string {
 }
 
 function stockValue(value: number): string {
-  return value === 0 ? "—" : `${formatPersianCurrency(value)} ریال`;
+  return value === 0
+    ? "—"
+    : `${formatPersianCurrency(value)} ${currencyLabel()}`;
 }
 
 /**

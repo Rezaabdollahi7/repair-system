@@ -14,6 +14,7 @@ import {
 } from "./chartKit";
 import { SERIES } from "../../utils/chartSeries";
 import { useElementWidth } from "./useElementWidth";
+import { currencyLabel, fromRials, toRials } from "../../utils/currency";
 
 export interface TrendPoint {
   /** `YYYY-MM-DD`, a UTC day key, oldest first. */
@@ -41,15 +42,24 @@ const GUTTER = 44;
  * of them needed a fifth of a phone-width card before the plot got any. The
  * unit goes above the axis; the labels are bare numbers.
  *
- * Full rial amounts are still what the tooltip and the table show — nothing
- * here is the only place a figure appears.
+ * Full amounts are still what the tooltip and the table show — nothing here
+ * is the only place a figure appears.
+ *
+ * The values are rials and the axis speaks the shop's unit, so the divisor
+ * is the magnitude times the rials in one shown unit: a «میلیون تومان» line
+ * sits at ten million rials.
  */
 function unitOf(ceiling: number): { divisor: number; name: string } {
-  if (ceiling >= 1_000_000_000)
-    return { divisor: 1_000_000_000, name: "میلیارد ریال" };
-  if (ceiling >= 1_000_000) return { divisor: 1_000_000, name: "میلیون ریال" };
-  if (ceiling >= 1_000) return { divisor: 1_000, name: "هزار ریال" };
-  return { divisor: 1, name: "ریال" };
+  const rialsPerUnit = toRials(1);
+  const shown = fromRials(ceiling);
+  const label = currencyLabel();
+  if (shown >= 1_000_000_000)
+    return { divisor: 1_000_000_000 * rialsPerUnit, name: `میلیارد ${label}` };
+  if (shown >= 1_000_000)
+    return { divisor: 1_000_000 * rialsPerUnit, name: `میلیون ${label}` };
+  if (shown >= 1_000)
+    return { divisor: 1_000 * rialsPerUnit, name: `هزار ${label}` };
+  return { divisor: rialsPerUnit, name: label };
 }
 
 /** A gridline's value in that unit: `۱۵۰`, or `۱٫۵` when the step is fractional. */
@@ -165,7 +175,7 @@ export default function TrendChart({ series }: { series: TrendPoint[] }) {
       title: jalaliDayAndMonth(point.date),
       rows: LINES.map((line) => ({
         label: line.label,
-        value: `${formatPersianCurrency(point[line.key])} ریال`,
+        value: `${formatPersianCurrency(point[line.key])} ${currencyLabel()}`,
         color: line.color,
       })),
     });
@@ -200,7 +210,7 @@ export default function TrendChart({ series }: { series: TrendPoint[] }) {
             width={width}
             height={HEIGHT}
             role="img"
-            aria-label={`روند درآمد روزانه؛ جمع تعمیر ${formatPersianCompact(totals.repair)} ریال و جمع فروش ${formatPersianCompact(totals.sale)} ریال.`}
+            aria-label={`روند درآمد روزانه؛ جمع تعمیر ${formatPersianCompact(totals.repair)} ${currencyLabel()} و جمع فروش ${formatPersianCompact(totals.sale)} ${currencyLabel()}.`}
             className="block overflow-visible"
             /*
              * LTR inside the SVG, even though the page is RTL.

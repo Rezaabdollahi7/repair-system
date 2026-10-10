@@ -35,6 +35,7 @@ import type {
   ProfitReport as ProfitReportData,
   QueryParams,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface DateRange {
   from_date: string;
@@ -200,7 +201,7 @@ export default function ProfitReport() {
         .map((row) => ({
           label: row.item_name ?? "—",
           value: row.profit,
-          display: `${formatPersianCompact(row.profit)} ریال`,
+          display: `${formatPersianCompact(row.profit)} ${currencyLabel()}`,
         })),
     [rows],
   );
@@ -260,17 +261,17 @@ export default function ProfitReport() {
             >
               <SummaryTile
                 label={profitable ? "سود خالص" : "زیان خالص"}
-                value={`${formatPersianCurrency(report.summary.total_profit)} ریال`}
+                value={`${formatPersianCurrency(report.summary.total_profit)} ${currencyLabel()}`}
                 hint={`حاشیه ${formatPersianPercent(report.summary.profit_margin)}`}
                 tone={profitable ? "accent" : "danger"}
               />
               <SummaryTile
                 label="کل فروش"
-                value={`${formatPersianCurrency(report.summary.total_revenue)} ریال`}
+                value={`${formatPersianCurrency(report.summary.total_revenue)} ${currencyLabel()}`}
               />
               <SummaryTile
                 label="بهای تمام‌شده"
-                value={`${formatPersianCurrency(report.summary.total_cost)} ریال`}
+                value={`${formatPersianCurrency(report.summary.total_cost)} ${currencyLabel()}`}
               />
               <SummaryTile
                 label="حاشیه سود"
@@ -429,9 +430,9 @@ export default function ProfitReport() {
                         <th className={th}>کد</th>
                         <th className={th}>نام کالا</th>
                         <th className={th}>تعداد فروش</th>
-                        <th className={th}>درآمد (ریال)</th>
-                        <th className={th}>هزینه (ریال)</th>
-                        <th className={th}>سود (ریال)</th>
+                        <th className={th}>درآمد ({currencyLabel()})</th>
+                        <th className={th}>هزینه ({currencyLabel()})</th>
+                        <th className={th}>سود ({currencyLabel()})</th>
                         <th className={th}>حاشیه سود</th>
                       </tr>
                     </thead>

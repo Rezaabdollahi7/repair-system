@@ -53,6 +53,7 @@ import {
   trClickable,
 } from "../utils/tableClasses";
 import type { Category, Item, QueryParams } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /** Mirrors the table and the phone cards so the page does not jump. */
 function ItemListSkeleton() {
@@ -456,7 +457,7 @@ export default function ItemList() {
                     <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-border-subtle">
                       <span className="text-body-xs text-text-muted tabular-nums">
                         {item.avgPurchasePrice
-                          ? `میانگین خرید ${formatPersianCurrency(item.avgPurchasePrice)} ریال`
+                          ? `میانگین خرید ${formatPersianCurrency(item.avgPurchasePrice)} ${currencyLabel()}`
                           : "قیمت خریدی ثبت نشده"}
                       </span>
                       {rowActions(item)}
@@ -477,7 +478,7 @@ export default function ItemList() {
                     <th className={th}>دسته‌بندی</th>
                     <th className={th}>موجودی</th>
                     <th className={th}>حداقل</th>
-                    <th className={th}>قیمت میانگین (ریال)</th>
+                    <th className={th}>قیمت میانگین ({currencyLabel()})</th>
                     <th className={th}>عملیات</th>
                   </tr>
                 </thead>
@@ -575,13 +576,17 @@ export default function ItemList() {
               limit,
             );
           } catch (error) {
-            toast.error(errorText(error, "خطا در حذف کالا"));
+            // The server names the documents that keep the item; a sentence
+            // that long needs longer than a toast's default to be read.
+            toast.error(errorText(error, "خطا در حذف کالا"), {
+              duration: 8000,
+            });
           } finally {
             setDeleting(false);
           }
         }}
         title="حذف کالا"
-        message={`آیا از حذف کالای "${deleteTarget?.name}" مطمئن هستید؟ این عملیات قابل بازگشت نیست.`}
+        message={`آیا از حذف کالای "${deleteTarget?.name}" مطمئن هستید؟ موجودی و کاردکس آن هم حذف می‌شود و این عملیات قابل بازگشت نیست. کالایی که در فاکتور یا سند انبار ثبت شده باشد حذف نمی‌شود.`}
         confirmText="حذف"
         variant="danger"
         loading={deleting}

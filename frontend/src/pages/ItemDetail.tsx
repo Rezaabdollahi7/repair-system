@@ -58,6 +58,7 @@ import {
   trClickable,
 } from "../utils/tableClasses";
 import type { Item, ItemTrade, ItemTradeRow } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /*
  * The tabs this page has today. «تغییرات» (14.29) joins the list when the
@@ -246,7 +247,7 @@ function Overview({
                 label="قیمت فروش"
                 value={
                   item.sellPrice
-                    ? `${formatPersianCurrency(item.sellPrice)} ریال`
+                    ? `${formatPersianCurrency(item.sellPrice)} ${currencyLabel()}`
                     : "—"
                 }
               />
@@ -254,7 +255,7 @@ function Overview({
                 label="میانگین بهای خرید"
                 value={
                   item.avgPurchasePrice
-                    ? `${formatPersianCurrency(item.avgPurchasePrice)} ریال`
+                    ? `${formatPersianCurrency(item.avgPurchasePrice)} ${currencyLabel()}`
                     : "—"
                 }
               />
@@ -368,19 +369,19 @@ function Trade({ item }: { item: Item }) {
           icon={ShoppingCartIcon}
           label="خریده‌شده"
           value={quantity(totals.purchase.quantity)}
-          detail={`${toPersianDigits(totals.purchase.lines)} فاکتور · ${formatPersianCurrency(totals.purchase.amount)} ریال`}
+          detail={`${toPersianDigits(totals.purchase.lines)} فاکتور · ${formatPersianCurrency(totals.purchase.amount)} ${currencyLabel()}`}
         />
         <Stat
           icon={BanknotesIcon}
           label="فروخته‌شده"
           value={quantity(totals.sale.quantity)}
-          detail={`${toPersianDigits(totals.sale.lines)} فاکتور · ${formatPersianCurrency(totals.sale.amount)} ریال`}
+          detail={`${toPersianDigits(totals.sale.lines)} فاکتور · ${formatPersianCurrency(totals.sale.amount)} ${currencyLabel()}`}
         />
         <Stat
           icon={WrenchScrewdriverIcon}
           label="مصرف در تعمیر"
           value={quantity(totals.repair.quantity)}
-          detail={`${toPersianDigits(totals.repair.lines)} فاکتور صادرشده · ${formatPersianCurrency(totals.repair.amount)} ریال`}
+          detail={`${toPersianDigits(totals.repair.lines)} فاکتور صادرشده · ${formatPersianCurrency(totals.repair.amount)} ${currencyLabel()}`}
         />
       </div>
 
@@ -397,8 +398,8 @@ function Trade({ item }: { item: Item }) {
                   <th className={th}>تاریخ</th>
                   <th className={th}>طرف حساب</th>
                   <th className={th}>مقدار</th>
-                  <th className={th}>قیمت واحد (ریال)</th>
-                  <th className={th}>جمع (ریال)</th>
+                  <th className={th}>قیمت واحد ({currencyLabel()})</th>
+                  <th className={th}>جمع ({currencyLabel()})</th>
                   <th className={th}>وضعیت</th>
                 </tr>
               </thead>
@@ -524,8 +525,8 @@ export default function ItemDetail() {
       toast.success("کالا حذف شد");
       navigate("/items");
     } catch (error) {
-      // The server refuses an item that has ever moved, and says so.
-      toast.error(errorText(error, "خطا در حذف کالا"));
+      // The server refuses an item a document still names, and says which.
+      toast.error(errorText(error, "خطا در حذف کالا"), { duration: 8000 });
       setConfirmDelete(false);
     } finally {
       setDeleting(false);
@@ -622,17 +623,17 @@ export default function ItemDetail() {
         />
         <Stat
           icon={ScaleIcon}
-          label="میانگین بها (ریال)"
+          label={`میانگین بها (${currencyLabel()})`}
           value={formatPersianCurrency(item.avgPurchasePrice)}
         />
         <Stat
           icon={TagIcon}
-          label="قیمت فروش (ریال)"
+          label={`قیمت فروش (${currencyLabel()})`}
           value={item.sellPrice ? formatPersianCurrency(item.sellPrice) : "—"}
         />
         <Stat
           icon={BanknotesIcon}
-          label="ارزش موجودی (ریال)"
+          label={`ارزش موجودی (${currencyLabel()})`}
           value={formatPersianCurrency(
             Math.round(item.currentStock * item.avgPurchasePrice),
           )}

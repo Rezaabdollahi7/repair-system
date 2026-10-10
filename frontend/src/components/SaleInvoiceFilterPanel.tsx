@@ -15,7 +15,8 @@ import type { PaymentStatus } from "../types/api";
 import { backdrop, modalPanel } from "../motion";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 import { PAYMENT_STATUSES } from "../utils/invoiceStatus";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
+import { currencyLabel } from "../utils/currency";
 
 /**
  * The filter state this panel edits. Exported because SaleInvoiceList owns
@@ -324,9 +325,9 @@ export default function SaleInvoiceFilterPanel({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-body-xs text-text-secondary mb-1">
-                    از مبلغ (ریال)
+                    از مبلغ ({currencyLabel()})
                   </label>
-                  <NumberInput
+                  <MoneyInput
                     value={
                       filters.amount_from ? Number(filters.amount_from) : null
                     }
@@ -339,9 +340,9 @@ export default function SaleInvoiceFilterPanel({
                 </div>
                 <div>
                   <label className="block text-body-xs text-text-secondary mb-1">
-                    تا مبلغ (ریال)
+                    تا مبلغ ({currencyLabel()})
                   </label>
-                  <NumberInput
+                  <MoneyInput
                     value={filters.amount_to ? Number(filters.amount_to) : null}
                     onChange={(value) =>
                       onChange({ ...filters, amount_to: value ?? "" })

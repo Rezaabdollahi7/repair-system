@@ -36,6 +36,7 @@ import type {
   StockReportRow,
 } from "../types/api";
 import { useWarehouses } from "../utils/warehouses";
+import { currencyLabel } from "../utils/currency";
 
 type StockView = "all" | "idle" | "slow";
 
@@ -242,7 +243,7 @@ export default function StockReport() {
       .map(([label, value]) => ({
         label,
         value,
-        display: `${formatPersianCompact(value)} ریال`,
+        display: `${formatPersianCompact(value)} ${currencyLabel()}`,
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
@@ -416,7 +417,7 @@ export default function StockReport() {
                       ? "ارزش موجودی کم‌فروش"
                       : "ارزش کل موجودی"
                 }
-                value={`${formatPersianCurrency(report.summary.total_inventory_value)} ریال`}
+                value={`${formatPersianCurrency(report.summary.total_inventory_value)} ${currencyLabel()}`}
                 tone="accent"
               />
               <SummaryTile
@@ -572,7 +573,7 @@ export default function StockReport() {
                             {formatPersianCurrency(
                               heldHere(item) * item.avg_purchase_price,
                             )}{" "}
-                            ریال
+                            {currencyLabel()}
                           </span>
                         </div>
                       </div>
@@ -615,7 +616,7 @@ export default function StockReport() {
                             پوشش (روز)
                           </th>
                         )}
-                        <th className={th}>ارزش موجودی (ریال)</th>
+                        <th className={th}>ارزش موجودی ({currencyLabel()})</th>
                       </tr>
                     </thead>
                     <tbody className={tbody}>

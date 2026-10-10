@@ -22,6 +22,7 @@ import {
   tr,
 } from "../utils/tableClasses";
 import type { Id, StockTransferDetail } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface StockTransferDetailModalProps {
   transferId: Id;
@@ -117,7 +118,7 @@ export default function StockTransferDetailModal({
                 />
                 <InfoRow
                   label="ارزش"
-                  value={`${formatPersianCurrency(transfer.value)} ریال`}
+                  value={`${formatPersianCurrency(transfer.value)} ${currencyLabel()}`}
                 />
               </div>
               <div className="lg:col-span-2">
@@ -153,7 +154,7 @@ export default function StockTransferDetailModal({
                   <p className="text-body-xs text-text-muted mt-1 tabular-nums">
                     {formatPersianCurrency(line.unit_cost)} ×{" "}
                     {formatQuantity(line.quantity)} ={" "}
-                    {formatPersianCurrency(line.value)} ریال
+                    {formatPersianCurrency(line.value)} {currencyLabel()}
                   </p>
                 </li>
               ))}
@@ -167,8 +168,8 @@ export default function StockTransferDetailModal({
                       <th className={th}>کالا</th>
                       <th className={th}>مقدار</th>
                       <th className={th}>توضیح</th>
-                      <th className={th}>میانگین بها (ریال)</th>
-                      <th className={th}>ارزش (ریال)</th>
+                      <th className={th}>میانگین بها ({currencyLabel()})</th>
+                      <th className={th}>ارزش ({currencyLabel()})</th>
                     </tr>
                   </thead>
                   <tbody className={tbody}>

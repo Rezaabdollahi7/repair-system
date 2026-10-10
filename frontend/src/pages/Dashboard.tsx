@@ -39,6 +39,7 @@ import type {
   DashboardTopItem,
   DashboardTransaction,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /**
  * A tile's tint.
@@ -409,7 +410,7 @@ export default function Dashboard() {
     label: item.name ?? "—",
     meta: item.code ?? undefined,
     value: item.revenue,
-    display: `${formatPersianCompact(item.revenue)} ریال`,
+    display: `${formatPersianCompact(item.revenue)} ${currencyLabel()}`,
   }));
 
   /*
@@ -533,7 +534,7 @@ export default function Dashboard() {
           <MeterPill
             label="وصول این ماه"
             ratio={collectedRatio}
-            detail={`${formatPersianCompact(stats.repair_invoices.month_paid)} از ${formatPersianCompact(billed)} ریال`}
+            detail={`${formatPersianCompact(stats.repair_invoices.month_paid)} از ${formatPersianCompact(billed)} ${currencyLabel()}`}
             color={SERIES[2]}
           />
           <MeterPill
@@ -613,13 +614,13 @@ export default function Dashboard() {
           {/* The one accent tile on the screen. */}
           <StatCard
             label="درآمد این ماه"
-            value={`${formatPersianCurrency(stats.repair_invoices?.month_revenue || 0)} ریال`}
+            value={`${formatPersianCurrency(stats.repair_invoices?.month_revenue || 0)} ${currencyLabel()}`}
             icon={CalendarIcon}
             tone="accent"
           />
           <StatCard
             label="درآمد امروز"
-            value={`${formatPersianCurrency(stats.repair_invoices?.today_revenue || 0)} ریال`}
+            value={`${formatPersianCurrency(stats.repair_invoices?.today_revenue || 0)} ${currencyLabel()}`}
             icon={BanknotesIcon}
             tone="success"
           />
@@ -637,7 +638,7 @@ export default function Dashboard() {
             }
             hint={
               stats.repair_invoices?.issued_unpaid_amount
-                ? `${formatPersianCurrency(stats.repair_invoices.issued_unpaid_amount)} ریال وصول‌نشده`
+                ? `${formatPersianCurrency(stats.repair_invoices.issued_unpaid_amount)} ${currencyLabel()} وصول‌نشده`
                 : undefined
             }
             icon={ClockIcon}
@@ -716,25 +717,25 @@ export default function Dashboard() {
         <div className={TILE_GRID}>
           <StatCard
             label="فروش امروز"
-            value={`${formatPersianCurrency(stats.today.sale)} ریال`}
+            value={`${formatPersianCurrency(stats.today.sale)} ${currencyLabel()}`}
             icon={ArrowTrendingUpIcon}
             tone="success"
           />
           <StatCard
             label="خرید امروز"
-            value={`${formatPersianCurrency(stats.today.purchase)} ریال`}
+            value={`${formatPersianCurrency(stats.today.purchase)} ${currencyLabel()}`}
             icon={ArrowTrendingDownIcon}
             tone="warning"
           />
           <StatCard
             label="سود خالص امروز"
-            value={`${formatPersianCurrency(stats.today.net)} ریال`}
+            value={`${formatPersianCurrency(stats.today.net)} ${currencyLabel()}`}
             icon={CurrencyDollarIcon}
             tone={todayNetPositive ? "success" : "danger"}
           />
           <StatCard
             label="سود این ماه"
-            value={`${formatPersianCurrency(stats.month.net)} ریال`}
+            value={`${formatPersianCurrency(stats.month.net)} ${currencyLabel()}`}
             hint={`فروش ${formatPersianCompact(stats.month.sale)} — خرید ${formatPersianCompact(stats.month.purchase)}`}
             icon={CurrencyDollarIcon}
             tone={monthNetPositive ? "success" : "danger"}

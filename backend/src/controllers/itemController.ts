@@ -22,7 +22,12 @@ import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
 import { dateFilter } from "../utils/dateRange";
 import { lineTotals } from "../utils/invoiceTotals";
-import { applyStockMovements, StockError } from "../utils/stock";
+import {
+  applyStockMovements,
+  InsufficientStockError,
+  StockError,
+  type StockLine,
+} from "../utils/stock";
 import { resolveWarehouseId } from "../utils/warehouse";
 
 const itemInclude = {
@@ -58,6 +63,254 @@ function toItemResponse(item: ItemWithCategory) {
 }
 
 const DUPLICATE_CODE = { error: "این کد کالا قبلاً ثبت شده است" };
+
+// ── Opening balance ──────────────────────────────────────────
+
+/**
+ * The reference type on a correction of an item's opening balance. Both rows
+ * a correction writes — the new opening and the reversal of the old one —
+ * carry it, with the id of the opening row being replaced. That id is what
+ * marks an opening as superseded: the ledger is append-only, so the old row
+ * stays where it is and the reversal beside it says it no longer counts.
+ */
+const OPENING_REFERENCE = "item_opening";
+
+const OPENING_NOTE = "اصلاح موجودی اولیه";
+
+/** The ledger rows that make up an item's opening balance, newest first. */
+function openingRowsQuery(workspaceId: number, itemId: number) {
+  return {
+    where: {
+      workspaceId,
+      itemId,
+      OR: [
+        { type: "opening" as const },
+        { type: "reversal" as const, referenceType: OPENING_REFERENCE },
+      ],
+    },
+    orderBy: { id: "desc" as const },
+    select: {
+      id: true,
+      type: true,
+      quantity: true,
+      unitCost: true,
+      warehouseId: true,
+      referenceId: true,
+      occurredAt: true,
+    },
+  } satisfies Prisma.InventoryTransactionFindManyArgs;
+}
+
+type OpeningRow = Prisma.InventoryTransactionGetPayload<
+  ReturnType<typeof openingRowsQuery>
+>;
+
+/**
+ * The opening balance that still counts: the newest opening row no reversal
+ * points at. Null when the item opened with nothing, or its opening has been
+ * corrected down to nothing.
+ */
+function liveOpening(rows: OpeningRow[]): OpeningRow | null {
+  const superseded = new Set(
+    rows.filter((row) => row.type === "reversal").map((row) => row.referenceId),
+  );
+  return (
+    rows.find((row) => row.type === "opening" && !superseded.has(row.id)) ??
+    null
+  );
+}
+
+/**
+ * Movements that leave or arrive at the moving average rather than at a cost
+ * of their own. A sale, a part on a repair, a count or a breakage takes its
+ * share of every unit's value with it; a purchase, an opening, a reversal or
+ * a return brings or removes a fixed amount. A transfer is a pair at the
+ * average whose two halves cancel. An adjustment *in* may or may not have
+ * named its cost, and the ledger cannot tell which; it is read as fixed.
+ */
+const AT_AVERAGE = new Set([
+  "sale",
+  "repair_use",
+  "count",
+  "transfer_out",
+  "transfer_in",
+]);
+
+/**
+ * How much of an opening's value is still on the shelf, as a fraction.
+ *
+ * Under a moving average every unit is alike, so each movement at the
+ * average keeps the same fraction of every layer of value: ten opened, three
+ * sold, and seven-tenths of what the opening was worth is still in the stock
+ * — whatever was bought before or after. Walked from the opening forwards,
+ * on the item's total, which is what the average is kept over.
+ */
+async function openingRetention(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  itemId: number,
+  openingId: number,
+): Promise<number> {
+  const before = await tx.inventoryTransaction.aggregate({
+    where: { workspaceId, itemId, id: { lte: openingId } },
+    _sum: { quantity: true },
+  });
+  const after = await tx.inventoryTransaction.findMany({
+    where: { workspaceId, itemId, id: { gt: openingId } },
+    orderBy: { id: "asc" },
+    select: { type: true, quantity: true },
+  });
+
+  let stock = before._sum.quantity?.toNumber() ?? 0;
+  let retention = 1;
+  for (const row of after) {
+    const quantity = row.quantity.toNumber();
+    const atAverage =
+      AT_AVERAGE.has(row.type) || (row.type === "adjustment" && quantity < 0);
+    if (atAverage && stock > 0) {
+      retention *= Math.max(0, stock + quantity) / stock;
+    }
+    stock += quantity;
+  }
+  return retention;
+}
+
+/**
+ * Brings an item's opening balance to what the edit form now says.
+ *
+ * Written the way a purchase invoice edit is: the new opening goes in, then
+ * the old one comes out, in one call to the stock service. Adding first means
+ * an item whose opening stock has partly been sold can still be corrected —
+ * ten in, three sold, edited from ۱۰۰ میلیون to ۱۰ — without dipping below
+ * zero on the way. Both rows stay on the kardex, dated with the original
+ * opening, so a period report reads the corrected figure and the history
+ * still shows it was corrected.
+ *
+ * ⚠️ The old opening does not always come out at the cost it came in at.
+ * While all of it is still on the shelf it does, and the average lands
+ * exactly where it would have stood had the right cost been typed. Once some
+ * has been sold, the sold units took the old cost with them — onto their
+ * invoice lines, where it stays — so taking the whole old value back out
+ * would remove value the shelf no longer holds: in the example above, the
+ * average went to zero. It leaves instead at a blend, the old cost for the
+ * share still on the shelf and the new one for the rest, which is exactly
+ * the average a corrected history would have reached.
+ */
+async function correctOpening(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  item: { id: number; name: string; createdAt: Date },
+  actorId: number | null,
+  target: {
+    quantity: number;
+    unitCost: number | null | undefined;
+    warehouseId: number | null | undefined;
+  },
+): Promise<void> {
+  const live = liveOpening(
+    await tx.inventoryTransaction.findMany(
+      openingRowsQuery(workspaceId, item.id),
+    ),
+  );
+
+  const warehouseId =
+    target.quantity > 0
+      ? await resolveWarehouseId(
+          tx,
+          workspaceId,
+          target.warehouseId ?? live?.warehouseId,
+        )
+      : null;
+
+  const unchanged = live
+    ? live.quantity.toNumber() === target.quantity &&
+      (live.unitCost?.toNumber() ?? 0) === (target.unitCost ?? 0) &&
+      live.warehouseId === warehouseId
+    : target.quantity === 0;
+  if (unchanged) return;
+
+  let reversalCost = live?.unitCost?.toNumber();
+  if (live && reversalCost !== undefined) {
+    const retention = await openingRetention(tx, workspaceId, item.id, live.id);
+    if (retention < 1) {
+      // What the units that are not the opening's any more are worth now:
+      // the corrected cost, or — when the opening is being removed — the
+      // shelf's own average.
+      const replacement =
+        target.quantity > 0
+          ? target.unitCost!
+          : await currentAverage(tx, workspaceId, item.id);
+      reversalCost = retention * reversalCost + (1 - retention) * replacement;
+    }
+  }
+
+  const lines: StockLine[] = [];
+  if (target.quantity > 0) {
+    lines.push({
+      itemId: item.id,
+      warehouseId: warehouseId!,
+      quantity: target.quantity,
+      type: "opening",
+      unitCost: target.unitCost!,
+      note: OPENING_NOTE,
+    });
+  }
+  if (live) {
+    lines.push({
+      itemId: item.id,
+      warehouseId: live.warehouseId,
+      quantity: -live.quantity.toNumber(),
+      type: "reversal",
+      unitCost: reversalCost,
+      note: OPENING_NOTE,
+    });
+  }
+
+  try {
+    await applyStockMovements(
+      tx,
+      workspaceId,
+      {
+        referenceType: OPENING_REFERENCE,
+        referenceId: live?.id ?? null,
+        occurredAt: live?.occurredAt ?? item.createdAt,
+        actorId,
+      },
+      lines,
+    );
+  } catch (error) {
+    // The service's own message names quantities but not why they matter
+    // here: the only way a correction runs short is stock that has already
+    // left the warehouse it opened in.
+    if (error instanceof InsufficientStockError) {
+      throw new StockError(
+        `بخشی از موجودی اولیه‌ی «${item.name}» فروخته، مصرف یا جابه‌جا شده است؛ ` +
+          `با این تغییر موجودی انبار منفی می‌شود (موجودی فعلی آن انبار: ${toPersianDigits(error.available)}).`,
+      );
+    }
+    throw error;
+  }
+}
+
+/** The item's average, read under the lock the stock service will take
+ * anyway — items first, as its lock order says. */
+async function currentAverage(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  itemId: number,
+): Promise<number> {
+  const rows = await tx.$queryRaw<{ avg: Prisma.Decimal | string }[]>`
+    SELECT avg_purchase_price AS avg FROM items
+    WHERE id = ${itemId} AND workspace_id = ${workspaceId}
+    FOR UPDATE`;
+  return Number(rows[0]?.avg ?? 0);
+}
+
+const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+
+function toPersianDigits(value: number | string): string {
+  return String(value).replace(/\d/g, (d) => PERSIAN_DIGITS[Number(d)]);
+}
 
 /**
  * The where fragment for one stock bucket.
@@ -151,8 +404,22 @@ export const getById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "کالا یافت نشد" });
     }
 
+    const opening = liveOpening(
+      await prisma.inventoryTransaction.findMany(
+        openingRowsQuery(item.workspaceId, item.id),
+      ),
+    );
+
     res.json({
       ...toItemResponse(item),
+      // What the edit form shows in its opening-stock fields.
+      opening: opening
+        ? {
+            quantity: opening.quantity.toNumber(),
+            unitCost: opening.unitCost?.toNumber() ?? null,
+            warehouseId: opening.warehouseId,
+          }
+        : null,
       // Where the total is kept. Rows at zero stay: a warehouse that has held
       // the item is one the shop may look for it in.
       stocks: item.stocks.map((stock) => ({
@@ -965,31 +1232,15 @@ export const create = async (req: Request, res: Response) => {
 };
 
 // PUT /api/items/:id
+//
+// Every field the create form takes, the opening balance included.
 export const update = async (req: Request, res: Response) => {
   try {
     const valid = (req as ValidatedRequest).valid;
     const { id } = valid.params as IdParam;
     const body = valid.body as ItemUpdateBody;
-
-    const existing = await prisma.item.findFirst({
-      where: { id, workspaceId: workspaceIdOf(req) },
-      select: { id: true, currentStock: true },
-    });
-    if (!existing) {
-      return res.status(404).json({ error: "کالا یافت نشد" });
-    }
-
-    // An item can stop being fractional only while what it holds is whole:
-    // 2.5 metres of a "whole-number" item could never be moved again.
-    if (
-      body.isFractional === false &&
-      !Number.isInteger(existing.currentStock.toNumber())
-    ) {
-      return res.status(400).json({
-        error:
-          "موجودی این کالا کسری است؛ تا وقتی موجودی عدد صحیح نشده، نمی‌توان آن را غیرکسری کرد",
-      });
-    }
+    const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
     const data: Prisma.ItemUpdateInput = {};
     if (body.code !== undefined) data.code = body.code;
@@ -1006,66 +1257,228 @@ export const update = async (req: Request, res: Response) => {
           : { connect: { id: body.categoryId } };
     }
 
-    const item = await prisma.item.update({
-      where: { id },
-      data,
-      include: itemInclude,
+    // One transaction: a correction the stock refuses must not leave the
+    // name and price saved without it, as if the edit had half worked.
+    const item = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      const existing = await tx.item.findFirst({
+        where: { id, workspaceId },
+        select: { id: true, name: true, createdAt: true },
+      });
+      if (!existing) throw new ItemNotFound();
+
+      // The fields first, so a correction is checked against the item as it
+      // is about to be — 2.5 metres of opening stock on an item being made
+      // fractional in the same save.
+      if (Object.keys(data).length > 0) {
+        await tx.item.update({ where: { id }, data });
+      }
+
+      if (body.openingStock !== undefined) {
+        await correctOpening(
+          tx,
+          workspaceId,
+          { ...existing, name: body.name ?? existing.name },
+          actorId,
+          {
+            quantity: body.openingStock,
+            unitCost: body.openingCost,
+            warehouseId: body.warehouseId,
+          },
+        );
+      }
+
+      const saved = await tx.item.findFirstOrThrow({
+        where: { id, workspaceId },
+        include: itemInclude,
+      });
+
+      // Checked against the stock after any correction. An item can stop
+      // being fractional only while what it holds is whole: 2.5 metres of a
+      // "whole-number" item could never be moved again.
+      if (
+        body.isFractional === false &&
+        !Number.isInteger(saved.currentStock.toNumber())
+      ) {
+        throw new StockError(
+          "موجودی این کالا کسری است؛ تا وقتی موجودی عدد صحیح نشده، نمی‌توان آن را غیرکسری کرد",
+        );
+      }
+
+      return saved;
     });
 
     res.json(toItemResponse(item));
   } catch (error) {
+    if (error instanceof ItemNotFound) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
     if (isUniqueConstraintError(error)) {
       return res.status(400).json(DUPLICATE_CODE);
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
 
+class ItemInUse extends Error {}
+
+/**
+ * Where an item is still named, in words a shop reads — or null when it is
+ * named nowhere and may go.
+ *
+ * Its own opening balance does not count, nor any correction of it: those
+ * rows belong to the item and leave with it. What keeps it is a document —
+ * an invoice of any kind, a پیش‌فاکتور included, or a stock document — since
+ * each of those is a record the shop keeps, and would be left naming an item
+ * that no longer exists. Anything else on the ledger is the last check: a
+ * movement with no document behind it is still a movement.
+ */
+async function whereItemIsUsed(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  itemId: number,
+): Promise<string | null> {
+  const where = { workspaceId, itemId };
+  const distinctCount = async (rows: Promise<unknown[]>): Promise<number> =>
+    (await rows).length;
+
+  const counts: [number, string][] = [
+    [
+      await distinctCount(
+        tx.purchaseInvoiceItem.findMany({
+          where,
+          distinct: ["invoiceId"],
+          select: { invoiceId: true },
+        }),
+      ),
+      "فاکتور خرید",
+    ],
+    [
+      await distinctCount(
+        tx.saleInvoiceItem.findMany({
+          where,
+          distinct: ["invoiceId"],
+          select: { invoiceId: true },
+        }),
+      ),
+      "فاکتور فروش",
+    ],
+    [
+      // Not a relation — a repair line's item_id may name a service — so a
+      // پیش‌فاکتور, which has moved no stock yet, would otherwise be left
+      // pointing at nothing and fail on the day it is issued.
+      await distinctCount(
+        tx.repairInvoiceItem.findMany({
+          where: { ...where, itemType: "inventory" },
+          distinct: ["invoiceId"],
+          select: { invoiceId: true },
+        }),
+      ),
+      "فاکتور تعمیر",
+    ],
+    [
+      await distinctCount(
+        tx.stockAdjustmentLine.findMany({
+          where,
+          distinct: ["adjustmentId"],
+          select: { adjustmentId: true },
+        }),
+      ),
+      "سند اصلاح موجودی",
+    ],
+    [
+      await distinctCount(
+        tx.stockCountLine.findMany({
+          where,
+          distinct: ["countId"],
+          select: { countId: true },
+        }),
+      ),
+      "انبارگردانی",
+    ],
+    [
+      await distinctCount(
+        tx.stockTransferLine.findMany({
+          where,
+          distinct: ["transferId"],
+          select: { transferId: true },
+        }),
+      ),
+      "سند انتقال",
+    ],
+  ];
+
+  const used = counts
+    .filter(([count]) => count > 0)
+    .map(([count, label]) => `${toPersianDigits(count)} ${label}`);
+
+  if (used.length > 0) {
+    const list =
+      used.length === 1
+        ? used[0]
+        : `${used.slice(0, -1).join("، ")} و ${used[used.length - 1]}`;
+    return (
+      `این کالا در ${list} ثبت شده و قابل حذف نیست؛ ` +
+      "آن سندها سابقه‌ی کارگاه‌اند و باید همچنان نام این کالا را نشان دهند."
+    );
+  }
+
+  const otherMovements = await tx.inventoryTransaction.count({
+    where: {
+      ...where,
+      NOT: {
+        OR: [
+          { type: "opening" },
+          { type: "reversal", referenceType: OPENING_REFERENCE },
+        ],
+      },
+    },
+  });
+  if (otherMovements > 0) {
+    return "این کالا در کاردکس گردش ثبت‌شده دارد و قابل حذف نیست.";
+  }
+
+  return null;
+}
+
 // DELETE /api/items/:id
+//
+// Allowed for an item no document names — typically one entered by mistake,
+// opening stock and all. Its stock rows and its own ledger rows go with it.
 export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
+    const workspaceId = workspaceIdOf(req);
 
-    const item = await prisma.item.findFirst({
-      where: { id, workspaceId: workspaceIdOf(req) },
-      select: {
-        _count: {
-          select: {
-            transactions: true,
-            purchaseInvoiceItems: true,
-            saleInvoiceItems: true,
-            // A count line names its item with Restrict, and an item that has
-            // never moved can still be on an open count (14.15).
-            stockCountLines: true,
-          },
-        },
-      },
+    await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      // Locked, as the stock service locks it: a sale of this item arriving
+      // while it is being checked waits for the answer instead of slipping in
+      // between the check and the delete.
+      const locked = await tx.$queryRaw<{ id: number }[]>`
+        SELECT id FROM items
+        WHERE id = ${id} AND workspace_id = ${workspaceId}
+        FOR UPDATE`;
+      if (locked.length === 0) throw new ItemNotFound();
+
+      const reason = await whereItemIsUsed(tx, workspaceId, id);
+      if (reason) throw new ItemInUse(reason);
+
+      // item_stocks and inventory_transactions follow through ON DELETE
+      // CASCADE, which Postgres runs as the tables' owner — the ledger stays
+      // append-only for dofixo_app, and still cannot outlive its item.
+      await tx.item.delete({ where: { id } });
     });
-
-    if (!item) {
-      return res.status(404).json({ error: "کالا یافت نشد" });
-    }
-
-    // The old check only counted transactions. Invoice lines are counted too
-    // because the schema restricts those relations, so deleting an item that
-    // appears on an invoice would otherwise fail as a constraint error rather
-    // than an explanation.
-    const references =
-      item._count.transactions +
-      item._count.purchaseInvoiceItems +
-      item._count.saleInvoiceItems +
-      item._count.stockCountLines;
-
-    if (references > 0) {
-      return res.status(400).json({
-        error: "این کالا در تراکنش‌ها استفاده شده و قابل حذف نیست",
-      });
-    }
-
-    await prisma.item.delete({ where: { id } });
 
     res.json({ message: "کالا با موفقیت حذف شد" });
   } catch (error) {
+    if (error instanceof ItemNotFound) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+    if (error instanceof ItemInUse) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };

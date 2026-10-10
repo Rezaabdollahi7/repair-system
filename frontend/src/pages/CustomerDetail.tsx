@@ -50,6 +50,7 @@ import type {
   CustomerTimelineEntry,
   CustomerTimelineEvent,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 /* ── Section shell ─────────────────────────────────────────────────── */
 
@@ -188,7 +189,7 @@ function TimelineEntry({ entry }: { entry: CustomerTimelineEntry }) {
                 )}
                 {event.amount !== undefined && (
                   <span className="text-body-xs text-text-secondary tabular-nums">
-                    {formatPersianCurrency(event.amount)} ریال
+                    {formatPersianCurrency(event.amount)} {currencyLabel()}
                   </span>
                 )}
                 <span className="ms-auto text-body-xs text-text-muted">
@@ -482,7 +483,7 @@ export default function CustomerDetail() {
         />
         <Stat
           icon={BanknotesIcon}
-          label="کل پرداختی (ریال)"
+          label={`کل پرداختی (${currencyLabel()})`}
           value={formatPersianCurrency(summary.total_paid)}
         />
         <Stat
@@ -610,8 +611,8 @@ export default function CustomerDetail() {
                     <th className={th}>شماره فاکتور</th>
                     <th className={th}>نوع</th>
                     <th className={th}>تاریخ</th>
-                    <th className={th}>مبلغ کل (ریال)</th>
-                    <th className={th}>پرداخت‌شده (ریال)</th>
+                    <th className={th}>مبلغ کل ({currencyLabel()})</th>
+                    <th className={th}>پرداخت‌شده ({currencyLabel()})</th>
                     <th className={th}>وضعیت</th>
                   </tr>
                 </thead>

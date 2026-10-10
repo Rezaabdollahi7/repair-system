@@ -77,8 +77,12 @@ function addSheet(
     views: [{ rightToLeft: true, state: "frozen", ySplit: 1 }],
   });
 
-  sheet.columns = columns.map(({ header, key, width }) => ({
-    header,
+  sheet.columns = columns.map(({ header, key, width, numFmt }) => ({
+    // The export is the stored data, and amounts are stored in rials —
+    // whatever unit the shop reads them in on screen (settings.currency_unit).
+    // Said in the heading, so a shop that thinks in tomans does not read
+    // every figure ten times too large.
+    header: numFmt === MONEY ? `${header} (ریال)` : header,
     key,
     width,
   }));

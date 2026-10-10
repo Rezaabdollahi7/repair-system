@@ -141,11 +141,36 @@ export const itemUpdateSchema = z
     description: optionalText,
     sell_price: z.coerce.number().min(0),
     isFractional: z.boolean(),
+    // The opening balance, as the create form took it — editable because a
+    // shop that typed ۱۰۰ میلیون for ۱۰ had no way back but to delete the
+    // item, and could not do that either once it had stock. Sent as the
+    // balance the item should open with; the controller works out the
+    // correction (itemController → correctOpening).
+    openingStock: z.coerce
+      .number()
+      .min(0)
+      .refine((value) => /^\d+(\.\d{1,3})?$/.test(String(value)), {
+        message: "موجودی اولیه حداکثر سه رقم اعشار می‌پذیرد",
+      }),
+    openingCost: z.coerce.number().min(0).nullable(),
+    warehouseId: warehouseIdSchema,
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, {
     message: "هیچ فیلدی برای ویرایش ارسال نشده",
-  });
+  })
+  .refine(
+    (body) =>
+      body.openingStock === undefined ||
+      body.openingStock === 0 ||
+      (body.openingCost !== null &&
+        body.openingCost !== undefined &&
+        body.openingCost > 0),
+    {
+      message: "برای موجودی اولیه، بهای خرید هر واحد الزامی است",
+      path: ["openingCost"],
+    },
+  );
 
 export type ItemUpdateBody = z.infer<typeof itemUpdateSchema>;
 

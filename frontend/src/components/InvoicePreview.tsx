@@ -8,6 +8,7 @@ import {
 } from "../utils/formatters";
 import PrintPreviewModal from "./PrintPreviewModal";
 import type { AppSettings, RepairInvoiceDetail } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface InvoicePreviewProps {
   invoice: RepairInvoiceDetail | null;
@@ -254,7 +255,7 @@ export default function InvoicePreview({
             <Total
               label="مبلغ قابل پرداخت"
               tone="grand"
-              value={`${formatPersianCurrency(invoice.total_amount)} ریال`}
+              value={`${formatPersianCurrency(invoice.total_amount)} ${currencyLabel()}`}
             />
           </div>
         </div>

@@ -30,6 +30,7 @@ import type {
   StockCountReview,
   StockCountReviewLine,
 } from "../types/api";
+import { currencyLabel } from "../utils/currency";
 
 interface StockCountReviewModalProps {
   count: StockCountDetail;
@@ -172,13 +173,13 @@ export default function StockCountReviewModal({
               <Tile
                 label="اضافه"
                 value={toPersianDigits(summary.surplus_count)}
-                detail={`${formatPersianCurrency(summary.surplus_value)} ریال`}
+                detail={`${formatPersianCurrency(summary.surplus_value)} ${currencyLabel()}`}
                 tone="success"
               />
               <Tile
                 label="کسری"
                 value={toPersianDigits(summary.shortage_count)}
-                detail={`${formatPersianCurrency(summary.shortage_value)} ریال`}
+                detail={`${formatPersianCurrency(summary.shortage_value)} ${currencyLabel()}`}
                 tone="danger"
               />
             </div>
@@ -234,7 +235,7 @@ export default function StockCountReviewModal({
                         <th className={th}>سیستم (لحظه‌ی شمارش)</th>
                         <th className={th}>شمارش</th>
                         <th className={th}>اختلاف</th>
-                        <th className={th}>ارزش (ریال)</th>
+                        <th className={th}>ارزش ({currencyLabel()})</th>
                       </tr>
                     </thead>
                     <tbody className={tbody}>

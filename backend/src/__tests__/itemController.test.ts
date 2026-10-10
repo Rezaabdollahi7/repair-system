@@ -15,8 +15,24 @@ jest.mock("../lib/prisma", () => {
       create: jest.fn(),
       findFirst: jest.fn(),
       findFirstOrThrow: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
+    inventoryTransaction: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+      aggregate: jest.fn(),
+    },
+    repairInvoiceItem: { findMany: jest.fn() },
+    stockAdjustmentLine: { findMany: jest.fn() },
+    stockCountLine: { findMany: jest.fn() },
+    stockTransferLine: { findMany: jest.fn() },
+    $queryRaw: jest.fn(),
   };
+  // findMany on the two invoice-line delegates the quick paths already mock
+  // with create — the delete check reads them too.
+  Object.assign(tx.purchaseInvoiceItem, { findMany: jest.fn() });
+  Object.assign(tx.saleInvoiceItem, { findMany: jest.fn() });
 
   return {
     __esModule: true,
@@ -65,6 +81,12 @@ const db = prisma as unknown as {
     saleInvoice: Record<string, jest.Mock>;
     saleInvoiceItem: Record<string, jest.Mock>;
     item: Record<string, jest.Mock>;
+    inventoryTransaction: Record<string, jest.Mock>;
+    repairInvoiceItem: Record<string, jest.Mock>;
+    stockAdjustmentLine: Record<string, jest.Mock>;
+    stockCountLine: Record<string, jest.Mock>;
+    stockTransferLine: Record<string, jest.Mock>;
+    $queryRaw: jest.Mock;
   };
 };
 
@@ -557,9 +579,25 @@ describe("itemController.create", () => {
 });
 
 describe("itemController.update", () => {
+  const CREATED = new Date("2026-09-01T08:00:00.000Z");
+
+  beforeEach(() => {
+    db.__tx.item.findFirst.mockResolvedValue({
+      id: 1,
+      name: "LCD",
+      createdAt: CREATED,
+    });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue(
+      itemRow({ currentStock: decimal(4) }),
+    );
+    db.__tx.inventoryTransaction.findMany.mockResolvedValue([]);
+  });
+
   it("refuses to make an item whole while it holds a fraction", async () => {
     // 2.5 metres of a whole-number item could never be moved again.
-    db.item.findFirst.mockResolvedValue({ id: 1, currentStock: decimal(2.5) });
+    db.__tx.item.findFirstOrThrow.mockResolvedValue(
+      itemRow({ currentStock: decimal(2.5) }),
+    );
 
     const res = mockResponse();
     await controller.update(
@@ -568,51 +606,44 @@ describe("itemController.update", () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(db.item.update).not.toHaveBeenCalled();
   });
 
   it("lets a whole stock become whole-number", async () => {
-    db.item.findFirst.mockResolvedValue({ id: 1, currentStock: decimal(3) });
-    db.item.update.mockResolvedValue(itemRow());
-
+    const res = mockResponse();
     await controller.update(
       mockRequest({ params: { id: 1 }, body: { isFractional: false } }),
-      mockResponse(),
+      res,
     );
 
-    expect(db.item.update.mock.calls[0][0].data).toEqual({
+    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
       isFractional: false,
     });
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it("leaves absent fields untouched", async () => {
-    db.item.findFirst.mockResolvedValue({ id: 1, currentStock: decimal(4) });
-    db.item.update.mockResolvedValue(itemRow());
-
     await controller.update(
       mockRequest({ params: { id: 1 }, body: { minStock: 8 } }),
       mockResponse(),
     );
 
-    expect(db.item.update.mock.calls[0][0].data).toEqual({ minStock: 8 });
+    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({ minStock: 8 });
+    expect(applyMovements).not.toHaveBeenCalled();
   });
 
   it("disconnects the category when categoryId is null", async () => {
-    db.item.findFirst.mockResolvedValue({ id: 1, currentStock: decimal(4) });
-    db.item.update.mockResolvedValue(itemRow());
-
     await controller.update(
       mockRequest({ params: { id: 1 }, body: { categoryId: null } }),
       mockResponse(),
     );
 
-    expect(db.item.update.mock.calls[0][0].data).toEqual({
+    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
       category: { disconnect: true },
     });
   });
 
-  it("returns 404 without attempting the update", async () => {
-    db.item.findFirst.mockResolvedValue(null);
+  it("returns 404 for an item it cannot find in this workspace", async () => {
+    db.__tx.item.findFirst.mockResolvedValue(null);
 
     const res = mockResponse();
     await controller.update(
@@ -620,61 +651,250 @@ describe("itemController.update", () => {
       res,
     );
 
+    expect(db.__tx.item.findFirst.mock.calls[0][0].where).toEqual({
+      id: 9,
+      workspaceId: WORKSPACE_ID,
+    });
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(runInTx).not.toHaveBeenCalled();
+    expect(db.__tx.item.update).not.toHaveBeenCalled();
+  });
+
+  describe("the opening balance", () => {
+    const OPENED = new Date("2026-09-01T08:00:05.000Z");
+    const opening = {
+      id: 70,
+      type: "opening",
+      quantity: decimal(10),
+      unitCost: decimal(100_000_000),
+      warehouseId: MAIN_WAREHOUSE,
+      referenceId: null,
+      occurredAt: OPENED,
+    };
+
+    beforeEach(() => {
+      // Ten on the books when the opening was written.
+      db.__tx.inventoryTransaction.aggregate.mockResolvedValue({
+        _sum: { quantity: decimal(10) },
+      });
+    });
+
+    it("puts the corrected opening in before taking the old one out, at its own cost", async () => {
+      db.__tx.inventoryTransaction.findMany.mockResolvedValue([opening]);
+
+      await controller.update(
+        mockRequest(
+          {
+            params: { id: 1 },
+            body: { openingStock: 10, openingCost: 10_000_000 },
+          },
+          3,
+        ),
+        mockResponse(),
+      );
+
+      expect(applyMovements.mock.calls[0][2]).toEqual({
+        referenceType: "item_opening",
+        referenceId: 70,
+        occurredAt: OPENED,
+        actorId: 3,
+      });
+      expect(applyMovements.mock.calls[0][3]).toEqual([
+        {
+          itemId: 1,
+          warehouseId: MAIN_WAREHOUSE,
+          quantity: 10,
+          type: "opening",
+          unitCost: 10_000_000,
+          note: "اصلاح موجودی اولیه",
+        },
+        {
+          itemId: 1,
+          warehouseId: MAIN_WAREHOUSE,
+          quantity: -10,
+          type: "reversal",
+          unitCost: 100_000_000,
+          note: "اصلاح موجودی اولیه",
+        },
+      ]);
+    });
+
+    it("takes the old opening out at a blend once some of it has been sold", async () => {
+      // Ten opened at ۱۰۰ میلیون, three sold since: seven-tenths of the old
+      // value is still on the shelf, and only that much leaves at the old
+      // cost. Taking all of it out used to drive the average to zero.
+      db.__tx.inventoryTransaction.findMany
+        .mockResolvedValueOnce([opening])
+        .mockResolvedValueOnce([{ type: "sale", quantity: decimal(-3) }]);
+
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { openingStock: 10, openingCost: 10_000_000 },
+        }),
+        mockResponse(),
+      );
+
+      const reversal = applyMovements.mock.calls[0][3][1];
+      expect(reversal.type).toBe("reversal");
+      expect(reversal.unitCost).toBeCloseTo(73_000_000, 2);
+    });
+
+    it("moves nothing when the opening is sent back as it was", async () => {
+      db.__tx.inventoryTransaction.findMany.mockResolvedValue([opening]);
+
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { name: "LCD A10", openingStock: 10, openingCost: 100_000_000 },
+        }),
+        mockResponse(),
+      );
+
+      expect(applyMovements).not.toHaveBeenCalled();
+    });
+
+    it("ignores an opening a correction has already replaced", async () => {
+      // 70 was corrected by 71 (the new opening) and 72 (its reversal).
+      db.__tx.inventoryTransaction.findMany.mockResolvedValue([
+        { ...opening, id: 72, type: "reversal", referenceId: 70 },
+        { ...opening, id: 71, unitCost: decimal(10_000_000), referenceId: 70 },
+        opening,
+      ]);
+
+      await controller.update(
+        mockRequest({ params: { id: 1 }, body: { openingStock: 0 } }),
+        mockResponse(),
+      );
+
+      expect(applyMovements.mock.calls[0][2]).toMatchObject({
+        referenceId: 71,
+      });
+      expect(applyMovements.mock.calls[0][3]).toEqual([
+        expect.objectContaining({
+          type: "reversal",
+          quantity: -10,
+          unitCost: 10_000_000,
+        }),
+      ]);
+    });
+
+    it("dates an opening added later with the day the item was created", async () => {
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { openingStock: 5, openingCost: 2000 },
+        }),
+        mockResponse(),
+      );
+
+      expect(applyMovements.mock.calls[0][2]).toMatchObject({
+        referenceId: null,
+        occurredAt: CREATED,
+      });
+      expect(applyMovements.mock.calls[0][3]).toHaveLength(1);
+    });
+
+    it("explains a correction that would take back stock already gone", async () => {
+      db.__tx.inventoryTransaction.findMany.mockResolvedValue([opening]);
+      applyMovements.mockRejectedValueOnce(
+        new InsufficientStockError(1, "LCD", 3, 10),
+      );
+
+      const res = mockResponse();
+      await controller.update(
+        mockRequest({
+          params: { id: 1 },
+          body: { openingStock: 2, openingCost: 100_000_000 },
+        }),
+        res,
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toContain(
+        "بخشی از موجودی اولیه‌ی «LCD»",
+      );
+    });
   });
 });
 
 describe("itemController.remove", () => {
+  beforeEach(() => {
+    db.__tx.$queryRaw.mockResolvedValue([{ id: 1 }]);
+    for (const delegate of [
+      db.__tx.purchaseInvoiceItem,
+      db.__tx.saleInvoiceItem,
+      db.__tx.repairInvoiceItem,
+      db.__tx.stockAdjustmentLine,
+      db.__tx.stockCountLine,
+      db.__tx.stockTransferLine,
+    ]) {
+      delegate.findMany.mockResolvedValue([]);
+    }
+    db.__tx.inventoryTransaction.count.mockResolvedValue(0);
+  });
+
+  it("deletes an item no document names, opening stock and all", async () => {
+    const res = mockResponse();
+    await controller.remove(mockRequest({ params: { id: 1 } }), res);
+
+    expect(db.__tx.item.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it("says which documents keep it, counting each invoice once", async () => {
+    db.__tx.saleInvoiceItem.findMany.mockResolvedValue([
+      { invoiceId: 4 },
+      { invoiceId: 5 },
+    ]);
+    db.__tx.repairInvoiceItem.findMany.mockResolvedValue([{ invoiceId: 9 }]);
+
+    const res = mockResponse();
+    await controller.remove(mockRequest({ params: { id: 1 } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toContain(
+      "در ۲ فاکتور فروش و ۱ فاکتور تعمیر ثبت شده و قابل حذف نیست",
+    );
+    expect(db.__tx.item.delete).not.toHaveBeenCalled();
+  });
+
+  it("looks for repair lines among parts only", async () => {
+    await controller.remove(mockRequest({ params: { id: 1 } }), mockResponse());
+
+    expect(db.__tx.repairInvoiceItem.findMany.mock.calls[0][0].where).toEqual({
+      workspaceId: WORKSPACE_ID,
+      itemId: 1,
+      itemType: "inventory",
+    });
+  });
+
   it("refuses when the item is on a stock count, even one with no movement", async () => {
-    db.item.findFirst.mockResolvedValue({
-      _count: {
-        transactions: 0,
-        purchaseInvoiceItems: 0,
-        saleInvoiceItems: 0,
-        stockCountLines: 1,
-      },
-    });
+    db.__tx.stockCountLine.findMany.mockResolvedValue([{ countId: 2 }]);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 1 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(db.item.delete).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].error).toContain("۱ انبارگردانی");
   });
 
-  it("refuses when the item appears on an invoice, not just in transactions", async () => {
-    db.item.findFirst.mockResolvedValue({
-      _count: {
-        transactions: 0,
-        purchaseInvoiceItems: 1,
-        saleInvoiceItems: 0,
-        stockCountLines: 0,
-      },
-    });
+  it("refuses a movement with no document behind it", async () => {
+    db.__tx.inventoryTransaction.count.mockResolvedValue(1);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 1 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(runInTx).not.toHaveBeenCalled();
+    expect(db.__tx.item.delete).not.toHaveBeenCalled();
   });
 
-  it("deletes an item nothing references", async () => {
-    db.item.findFirst.mockResolvedValue({
-      _count: {
-        transactions: 0,
-        purchaseInvoiceItems: 0,
-        saleInvoiceItems: 0,
-        stockCountLines: 0,
-      },
-    });
-    db.item.delete.mockResolvedValue({ id: 1 });
+  it("returns 404 for an item it cannot find in this workspace", async () => {
+    db.__tx.$queryRaw.mockResolvedValue([]);
 
     const res = mockResponse();
-    await controller.remove(mockRequest({ params: { id: 1 } }), res);
+    await controller.remove(mockRequest({ params: { id: 9 } }), res);
 
-    expect(db.item.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 });
 
@@ -799,7 +1019,7 @@ describe("itemController.quickSale", () => {
   });
 
   it("refuses to sell more than is in stock, naming the item", async () => {
-    applyMovements.mockRejectedValue(
+    applyMovements.mockRejectedValueOnce(
       new InsufficientStockError(1, "خازن", 3, 4),
     );
 

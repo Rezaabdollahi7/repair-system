@@ -25,7 +25,7 @@ import SearchableSelect from "./SearchableSelect";
 import PersianDatePicker from "./PersianDatePicker";
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import QuantityInput from "./QuantityInput";
-import NumberInput from "./NumberInput";
+import MoneyInput from "./MoneyInput";
 import UnitSelect from "./UnitSelect";
 import WarehouseSelect from "./WarehouseSelect";
 import { useWarehouses } from "../utils/warehouses";
@@ -41,6 +41,7 @@ import type {
 } from "../types/api";
 import { modalPanel } from "../motion";
 import LineItemTypeChip from "./LineItemTypeChip";
+import { currencyLabel } from "../utils/currency";
 
 /**
  * A line as the form holds it. An inventory line points at the catalogue; a
@@ -401,8 +402,8 @@ export default function SaleInvoiceFormModal({
     label: `[${item.code}] ${item.name}`,
     subLabel: `موجودی: ${formatQuantity(item.currentStock)} ${item.unit} | ${
       item.sellPrice > 0
-        ? `قیمت فروش: ${formatPersianCurrency(item.sellPrice)} ریال`
-        : `میانگین قیمت خرید: ${formatPersianCurrency(item.avgPurchasePrice || 0)} ریال`
+        ? `قیمت فروش: ${formatPersianCurrency(item.sellPrice)} ${currencyLabel()}`
+        : `میانگین قیمت خرید: ${formatPersianCurrency(item.avgPurchasePrice || 0)} ${currencyLabel()}`
     }`,
     stock: item.currentStock,
     unit: item.unit,
@@ -932,9 +933,9 @@ export default function SaleInvoiceFormModal({
                               {/* قیمت واحد */}
                               <div className="col-span-2 sm:col-span-2">
                                 <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
-                                  قیمت واحد (ریال)
+                                  قیمت واحد ({currencyLabel()})
                                 </label>
-                                <NumberInput
+                                <MoneyInput
                                   value={item.unit_price}
                                   zeroAsEmpty
                                   placeholder="۰"
@@ -961,7 +962,7 @@ export default function SaleInvoiceFormModal({
                               {/* جمع - بزرگ‌تر */}
                               <div className="col-span-4 sm:col-span-2">
                                 <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
-                                  جمع (ریال)
+                                  جمع ({currencyLabel()})
                                 </label>
                                 <div className="w-full px-1 py-1.5 text-body-xs sm:text-body-sm font-medium bg-surface border border-border rounded-field text-left text-text-primary">
                                   {formatPersianCurrency(
@@ -1005,7 +1006,7 @@ export default function SaleInvoiceFormModal({
                   <div className="space-y-3">
                     <div className="flex justify-between py-2 text-body-sm sm:text-base border-b border-border">
                       <span className="text-text-secondary">
-                        جمع کل (ریال):
+                        جمع کل ({currencyLabel()}):
                       </span>
                       <span className="font-medium text-text-primary">
                         {formatPersianCurrency(calculateTotal())}
@@ -1014,9 +1015,9 @@ export default function SaleInvoiceFormModal({
 
                     <div>
                       <label className="block text-body-sm font-medium text-text-primary mb-1.5">
-                        مبلغ دریافتی (ریال)
+                        مبلغ دریافتی ({currencyLabel()})
                       </label>
-                      <NumberInput
+                      <MoneyInput
                         name="paid_amount"
                         value={formData.paid_amount}
                         aria-label="مبلغ دریافتی"
@@ -1036,7 +1037,9 @@ export default function SaleInvoiceFormModal({
                     </div>
 
                     <div className="flex justify-between py-2 border-t border-border text-body-sm sm:text-base font-bold">
-                      <span className="text-text-primary">مانده (ریال):</span>
+                      <span className="text-text-primary">
+                        مانده ({currencyLabel()}):
+                      </span>
                       <span
                         className={`${calculateRemaining() > 0 ? "text-danger-fg" : "text-success-fg"}`}
                       >

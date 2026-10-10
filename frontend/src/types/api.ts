@@ -721,6 +721,49 @@ export interface ItemTrade {
   truncated: boolean;
 }
 
+/**
+ * GET /items/:id/kardex (14.19) — one ledger row. `balance` is the item's
+ * total after this row, or the warehouse's when the kardex is filtered to
+ * one; it is fixed in entry order, so a date filter never changes it.
+ */
+export interface KardexRow {
+  id: number;
+  type: string;
+  reason: string | null;
+  /** The document's date. */
+  occurred_at: string;
+  /** When the row was entered — the kardex's order. */
+  created_at: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  /** Signed: positive in, negative out. */
+  quantity: number;
+  unit_cost: number | null;
+  unit_price: number;
+  balance: number;
+  reference_type: string | null;
+  reference_id: number | null;
+  document_number: string | null;
+  note: string | null;
+  created_by_name: string | null;
+}
+
+export interface ItemKardex {
+  data: KardexRow[];
+  summary: {
+    /** The balance just before the first row in range. */
+    opening: number;
+    total_in: number;
+    total_out: number;
+    /** The balance after the last row in range. */
+    closing: number;
+  };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 /** GET /items/search/for-invoice — snake_case, also unlike its neighbours. */
 export interface ItemForInvoice {
   id: number;

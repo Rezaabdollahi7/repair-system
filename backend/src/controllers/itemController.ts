@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
-import type { Prisma } from "../generated/prisma/client";
+import { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage, isUniqueConstraintError } from "../utils/errors";
@@ -11,6 +11,7 @@ import type {
   ItemCreateBody,
   ItemListQuery,
   ItemSearchQuery,
+  ItemKardexQuery,
   ItemTransactionsQuery,
   ItemUpdateBody,
   QuickPurchaseBody,
@@ -19,6 +20,7 @@ import type {
 } from "../schemas/item";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
+import { dateFilter } from "../utils/dateRange";
 import { lineTotals } from "../utils/invoiceTotals";
 import { applyStockMovements, StockError } from "../utils/stock";
 import { resolveWarehouseId } from "../utils/warehouse";
@@ -552,6 +554,188 @@ export const getTrade = async (req: Request, res: Response) => {
       truncated:
         purchases.length + sales.length + repairs.length > rows.length ||
         [purchases, sales, repairs].some((list) => list.length === TRADE_ROWS),
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+/**
+ * The number a ledger row's document is known by, per reference type. The
+ * ledger's reference is polymorphic and carries no foreign key, so each
+ * kind is looked up in its own table — one query per kind on the page.
+ */
+async function documentNumbers(
+  workspaceId: number,
+  rows: { referenceType: string | null; referenceId: number | null }[],
+): Promise<Map<string, string>> {
+  const idsOf = (type: string) => [
+    ...new Set(
+      rows
+        .filter((row) => row.referenceType === type && row.referenceId)
+        .map((row) => row.referenceId as number),
+    ),
+  ];
+  const where = (ids: number[]) => ({ id: { in: ids }, workspaceId });
+
+  const [purchases, sales, repairs, adjustments, counts, transfers] =
+    await Promise.all([
+      prisma.purchaseInvoice.findMany({
+        where: where(idsOf("purchase_invoice")),
+        select: { id: true, invoiceNumber: true },
+      }),
+      prisma.saleInvoice.findMany({
+        where: where(idsOf("sale_invoice")),
+        select: { id: true, invoiceNumber: true },
+      }),
+      prisma.repairInvoice.findMany({
+        where: where(idsOf("repair_invoice")),
+        select: { id: true, invoiceNumber: true },
+      }),
+      prisma.stockAdjustment.findMany({
+        where: where(idsOf("stock_adjustment")),
+        select: { id: true, number: true },
+      }),
+      prisma.stockCount.findMany({
+        where: where(idsOf("stock_count")),
+        select: { id: true, number: true },
+      }),
+      prisma.stockTransfer.findMany({
+        where: where(idsOf("stock_transfer")),
+        select: { id: true, number: true },
+      }),
+    ]);
+
+  const numbers = new Map<string, string>();
+  for (const row of purchases)
+    numbers.set(`purchase_invoice:${row.id}`, row.invoiceNumber);
+  for (const row of sales)
+    numbers.set(`sale_invoice:${row.id}`, row.invoiceNumber);
+  for (const row of repairs)
+    numbers.set(`repair_invoice:${row.id}`, row.invoiceNumber);
+  for (const row of adjustments)
+    numbers.set(`stock_adjustment:${row.id}`, row.number);
+  for (const row of counts) numbers.set(`stock_count:${row.id}`, row.number);
+  for (const row of transfers)
+    numbers.set(`stock_transfer:${row.id}`, row.number);
+  return numbers;
+}
+
+// GET /api/items/:id/kardex
+//
+// The kardex (14.19): one item's movements in the order they were entered,
+// each with its document's date beside it, what came in, what went out and
+// the balance after it — the item's total, or one warehouse's when the
+// kardex is filtered to one.
+//
+// The balance is a running sum over the whole ledger in entry order, worked
+// out before any date filter is applied, so it is always the true balance
+// after that row: a date range chooses which rows are shown, not what they
+// add up to. At this scale (hundreds of movements per item) summing in
+// JavaScript is cheaper than a window query and needs no raw SQL.
+export const getKardex = async (req: Request, res: Response) => {
+  try {
+    const valid = (req as ValidatedRequest).valid;
+    const { id } = valid.params as IdParam;
+    const query = valid.query as ItemKardexQuery;
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
+      select: { id: true },
+    });
+    if (!item) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const ledger = await prisma.inventoryTransaction.findMany({
+      where: {
+        workspaceId,
+        itemId: id,
+        ...(query.warehouse_id !== undefined
+          ? { warehouseId: query.warehouse_id }
+          : {}),
+      },
+      orderBy: { id: "asc" },
+      include: {
+        warehouse: { select: { name: true } },
+        author: { select: { fullName: true, username: true } },
+      },
+    });
+
+    // Decimal all the way: a float running sum of 0.1-metre movements
+    // drifts, and a kardex whose last balance disagrees with the shelf by
+    // 0.0000001 is a kardex nobody trusts.
+    let running = new Prisma.Decimal(0);
+    const withBalance = ledger.map((row) => {
+      running = running.plus(row.quantity);
+      return { row, balance: running };
+    });
+
+    const range = dateFilter(query.from_date, query.to_date);
+    const inRange = range
+      ? withBalance.filter(
+          ({ row }) =>
+            (!range.gte || row.occurredAt >= range.gte) &&
+            (!range.lte || row.occurredAt <= range.lte),
+        )
+      : withBalance;
+
+    let totalIn = new Prisma.Decimal(0);
+    let totalOut = new Prisma.Decimal(0);
+    for (const { row } of inRange) {
+      if (row.quantity.isPositive()) totalIn = totalIn.plus(row.quantity);
+      else totalOut = totalOut.minus(row.quantity);
+    }
+    const first = inRange[0];
+    const last = inRange[inRange.length - 1];
+
+    // Newest first on screen; the balances were fixed in entry order above.
+    const { page, limit } = query;
+    const pageRows = inRange
+      .slice()
+      .reverse()
+      .slice((page - 1) * limit, page * limit);
+    const numbers = await documentNumbers(
+      workspaceId,
+      pageRows.map(({ row }) => row),
+    );
+
+    res.json({
+      data: pageRows.map(({ row, balance }) => ({
+        id: row.id,
+        type: row.type,
+        reason: row.reason,
+        occurred_at: row.occurredAt.toISOString(),
+        created_at: row.createdAt.toISOString(),
+        warehouse_id: row.warehouseId,
+        warehouse_name: row.warehouse.name,
+        quantity: row.quantity.toNumber(),
+        unit_cost: row.unitCost?.toNumber() ?? null,
+        unit_price: row.unitPrice.toNumber(),
+        balance: balance.toNumber(),
+        reference_type: row.referenceType,
+        reference_id: row.referenceId,
+        document_number:
+          row.referenceType && row.referenceId
+            ? (numbers.get(`${row.referenceType}:${row.referenceId}`) ??
+              null)
+            : null,
+        note: row.note,
+        created_by_name:
+          row.author?.fullName?.trim() || row.author?.username || null,
+      })),
+      summary: {
+        // The balance just before the first row shown, and after the last.
+        opening: first ? first.balance.minus(first.row.quantity).toNumber() : 0,
+        total_in: totalIn.toNumber(),
+        total_out: totalOut.toNumber(),
+        closing: last ? last.balance.toNumber() : running.toNumber(),
+      },
+      total: inRange.length,
+      page,
+      limit,
+      totalPages: Math.ceil(inRange.length / limit),
     });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });

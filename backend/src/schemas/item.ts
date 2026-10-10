@@ -48,6 +48,18 @@ export const itemTransactionsQuerySchema = z.object({
 
 export type ItemTransactionsQuery = z.infer<typeof itemTransactionsQuerySchema>;
 
+// The kardex (14.19): one item's ledger, filtered by warehouse and by the
+// document's date.
+export const itemKardexQuerySchema = z.object({
+  warehouse_id: z.coerce.number().int().positive().optional(),
+  from_date: z.coerce.date().optional(),
+  to_date: z.coerce.date().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(200).default(50),
+});
+
+export type ItemKardexQuery = z.infer<typeof itemKardexQuerySchema>;
+
 export const invoiceSearchQuerySchema = z.object({
   q: z.string().trim().optional(),
   limit: z.coerce.number().int().positive().max(100).default(20),

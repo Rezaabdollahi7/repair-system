@@ -38,6 +38,7 @@ import type {
   StockCountReview,
   ItemCreateBody,
   ItemTrade,
+  ItemKardex,
   Item,
   ItemForInvoice,
   ItemUpdateBody,
@@ -420,6 +421,8 @@ export const getItems = (params?: QueryParams) =>
 export const getItem = (id: Id) => api.get<Item>(`/items/${id}`);
 export const getItemTrade = (id: Id) =>
   api.get<ItemTrade>(`/items/${id}/trade`);
+export const getItemKardex = (id: Id, params?: QueryParams) =>
+  api.get<ItemKardex>(`/items/${id}/kardex`, { params });
 export const createItem = (data: ItemCreateBody) =>
   api.post<Item>("/items", data);
 export const updateItem = (id: Id, data: ItemUpdateBody) =>

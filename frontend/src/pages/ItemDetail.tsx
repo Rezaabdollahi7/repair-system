@@ -17,13 +17,14 @@ import {
   TrashIcon,
   WrenchScrewdriverIcon,
 } from "@heroicons/react/24/outline";
-import { deleteItem, getItem, getItemTrade, getItemTransactions } from "../api";
+import { deleteItem, getItem, getItemTrade } from "../api";
 import { useModal } from "../context/ModalContext";
 import { usePageCrumb } from "../context/BreadcrumbContext";
 import ConfirmModal from "../components/ConfirmModal";
 import InfoRow from "../components/InfoRow";
 import StatusPill from "../components/StatusPill";
 import Tabs, { TabPanel, type TabItem } from "../components/Tabs";
+import ItemKardex from "../components/ItemKardex";
 import {
   QuickPurchaseModal,
   QuickSaleModal,
@@ -35,7 +36,6 @@ import {
   formatQuantity,
   toPersianDigits,
 } from "../utils/formatters";
-import { movementTypeOf } from "../utils/movementType";
 import { stockStatusOf } from "../utils/stockStatus";
 import { paymentStatusOf, repairInvoiceStatusOf } from "../utils/invoiceStatus";
 import { useTabParam } from "../utils/tabs";
@@ -55,12 +55,7 @@ import {
   tr,
   trClickable,
 } from "../utils/tableClasses";
-import type {
-  InventoryTransaction,
-  Item,
-  ItemTrade,
-  ItemTradeRow,
-} from "../types/api";
+import type { Item, ItemTrade, ItemTradeRow } from "../types/api";
 
 /*
  * The tabs this page has today. «قیمت‌ها» (14.20) and «تغییرات» (14.29)
@@ -315,128 +310,6 @@ function Overview({
           </Card>
         )}
       </div>
-    </div>
-  );
-}
-
-/* ── کاردکس ────────────────────────────────────────────────────────── */
-
-/**
- * The item's movements, newest first. In and out are two columns rather
- * than one signed figure: a «−» beside Persian digits lands on the wrong
- * side of them, and a column of one colour reads faster than a sign.
- * The full kardex — balance, filters, a link to every document — is 14.19.
- */
-function Kardex({
-  item,
-  warehouseNames,
-}: {
-  item: Item;
-  warehouseNames: Map<number, string> | null;
-}) {
-  const { openPurchaseInvoiceDetail } = useModal();
-  const [rows, setRows] = useState<InventoryTransaction[] | null>(null);
-  const [total, setTotal] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    getItemTransactions(item.id, { limit: 100 })
-      .then((res) => {
-        if (cancelled) return;
-        setRows(res.data.data);
-        setTotal(res.data.total);
-      })
-      .catch((error) => {
-        if (!cancelled) toast.error(errorText(error, "خطا در دریافت کاردکس"));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [item.id, item.currentStock]);
-
-  if (rows === null) {
-    return <div className="animate-pulse h-64 rounded-panel bg-surface" />;
-  }
-  if (rows.length === 0) {
-    return <EmptyNote>هنوز حرکتی برای این کالا ثبت نشده است.</EmptyNote>;
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className={tableCard}>
-        <div className={tableScroll}>
-          <table className="w-full min-w-[46rem]">
-            <thead className={thead}>
-              <tr>
-                <th className={th}>تاریخ</th>
-                <th className={th}>نوع</th>
-                {warehouseNames && <th className={th}>انبار</th>}
-                <th className={th}>ورود</th>
-                <th className={th}>خروج</th>
-                <th className={th}>بهای واحد (ریال)</th>
-                <th className={th}>شرح</th>
-              </tr>
-            </thead>
-            <tbody className={tbody}>
-              {rows.map((row) => {
-                const type = movementTypeOf(row.type);
-                const invoiceId = row.reference_id;
-                return (
-                  <tr key={row.id} className={tr}>
-                    <td className={`${tdMuted} tabular-nums`}>
-                      {formatPersianDate(row.occurred_at)}
-                    </td>
-                    <td className={tdBare}>
-                      <StatusPill
-                        label={type.label}
-                        color={type.color}
-                        tone={type.tone}
-                        size="sm"
-                      />
-                    </td>
-                    {warehouseNames && (
-                      <td className={tdMuted}>
-                        {warehouseNames.get(row.warehouse_id) ?? "—"}
-                      </td>
-                    )}
-                    <td className={`${td} tabular-nums text-success-fg`}>
-                      {row.quantity > 0 ? formatQuantity(row.quantity) : ""}
-                    </td>
-                    <td className={`${td} tabular-nums text-danger-fg`}>
-                      {row.quantity < 0
-                        ? formatQuantity(Math.abs(row.quantity))
-                        : ""}
-                    </td>
-                    <td className={`${tdMuted} tabular-nums`}>
-                      {row.unit_cost !== null
-                        ? formatPersianCurrency(row.unit_cost)
-                        : "—"}
-                    </td>
-                    <td className={tdMuted}>
-                      {row.purchase_invoice_number && invoiceId !== null ? (
-                        <button
-                          onClick={() => openPurchaseInvoiceDetail(invoiceId)}
-                          className="text-primary font-bold hover:underline cursor-pointer"
-                        >
-                          {row.purchase_invoice_number}
-                        </button>
-                      ) : (
-                        (row.note ?? "—")
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {total > rows.length && (
-        <p className="text-body-xs text-text-muted">
-          {toPersianDigits(rows.length)} حرکت آخر از {toPersianDigits(total)}{" "}
-          حرکت نشان داده شده است.
-        </p>
-      )}
     </div>
   );
 }
@@ -782,7 +655,12 @@ export default function ItemDetail() {
           />
         </TabPanel>
         <TabPanel idPrefix="item" id="kardex" active={tab === "kardex"}>
-          <Kardex item={item} warehouseNames={warehouseNames} />
+          <ItemKardex
+            itemId={item.id}
+            unit={item.unit}
+            version={item.currentStock}
+            warehouseNames={warehouseNames}
+          />
         </TabPanel>
         <TabPanel idPrefix="item" id="trade" active={tab === "trade"}>
           <Trade item={item} />

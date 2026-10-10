@@ -33,6 +33,7 @@ import {
   AdjustmentsHorizontalIcon,
   ClipboardDocumentCheckIcon,
   TruckIcon,
+  ArrowPathRoundedSquareIcon,
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
 import { jalaliToday } from "../utils/jalali";
@@ -153,6 +154,12 @@ const MENU: MenuSection[] = [
         name: "گزارش موجودی",
         path: "/reports/stock",
         icon: ChartBarIcon,
+        adminOnly: true,
+      },
+      {
+        name: "گردش کالا",
+        path: "/reports/movements",
+        icon: ArrowPathRoundedSquareIcon,
         adminOnly: true,
       },
       {

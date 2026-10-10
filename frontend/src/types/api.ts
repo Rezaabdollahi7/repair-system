@@ -1302,6 +1302,37 @@ export interface StockReport {
   };
 }
 
+/**
+ * GET /reports/movements (14.21) — گردش کالا, one row per item. Outgoing
+ * columns are positive quantities; `correction` (adjustment, count) and
+ * `other` (reversal, returns) keep their sign. `initial` is stock entered
+ * with the item.
+ */
+export interface MovementReportRow {
+  item_id: number;
+  code: string;
+  name: string;
+  unit: string;
+  category_name: string | null;
+  opening: number;
+  initial: number;
+  purchase: number;
+  sale: number;
+  repair_use: number;
+  transfer_in: number;
+  transfer_out: number;
+  correction: number;
+  other: number;
+  closing: number;
+  /** Anything moved during the period. */
+  moved: boolean;
+}
+
+export interface MovementReport {
+  data: MovementReportRow[];
+  summary: { item_count: number; moved_count: number };
+}
+
 export interface PurchaseReportRow {
   id: number;
   invoice_number: string;

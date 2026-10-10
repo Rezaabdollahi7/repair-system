@@ -79,6 +79,7 @@ import type {
   AppService,
   DashboardStats,
   StockReport,
+  MovementReport,
   PurchaseReport,
   SaleReport,
   ProfitReport,
@@ -488,6 +489,8 @@ export const quickSale = (id: Id, data: QuickSaleBody) =>
 // Reports
 export const getDashboardStats = () =>
   api.get<DashboardStats>("/reports/dashboard");
+export const getMovementReport = (params?: QueryParams) =>
+  api.get<MovementReport>("/reports/movements", { params });
 export const getStockReport = (params?: QueryParams) =>
   api.get<StockReport>("/reports/stock", { params });
 export const getPurchaseReport = (params?: QueryParams) =>

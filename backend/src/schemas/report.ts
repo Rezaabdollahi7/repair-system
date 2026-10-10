@@ -17,3 +17,14 @@ export const dateRangeQuerySchema = z.object({
 });
 
 export type DateRangeQuery = z.infer<typeof dateRangeQuerySchema>;
+
+// The stock movement report (14.21): a period, and optionally one warehouse
+// and one category.
+export const movementReportQuerySchema = z.object({
+  from_date: z.coerce.date().optional(),
+  to_date: z.coerce.date().optional(),
+  warehouse_id: z.coerce.number().int().positive().optional(),
+  category_id: z.coerce.number().int().positive().optional(),
+});
+
+export type MovementReportQuery = z.infer<typeof movementReportQuerySchema>;

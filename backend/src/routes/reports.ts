@@ -5,6 +5,7 @@ import { atLeast } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import {
   dateRangeQuerySchema,
+  movementReportQuerySchema,
   stockReportQuerySchema,
 } from "../schemas/report";
 
@@ -36,6 +37,11 @@ router.get(
   "/profit",
   validate({ query: dateRangeQuerySchema }),
   ctrl.getProfitReport,
+);
+router.get(
+  "/movements",
+  validate({ query: movementReportQuerySchema }),
+  ctrl.getMovementReport,
 );
 router.get("/dashboard", ctrl.getDashboardStats);
 

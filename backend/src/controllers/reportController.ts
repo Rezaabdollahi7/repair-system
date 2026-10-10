@@ -4,13 +4,18 @@ import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import {
   dateFilter,
+  endOfDay,
   lastDaysRange,
   monthRange,
   todayRange,
   utcDayKey,
 } from "../utils/dateRange";
 import { errorMessage } from "../utils/errors";
-import type { DateRangeQuery, StockReportQuery } from "../schemas/report";
+import type {
+  DateRangeQuery,
+  MovementReportQuery,
+  StockReportQuery,
+} from "../schemas/report";
 import { workspaceIdOf } from "../utils/workspace";
 
 type StockStatus = "critical" | "low" | "good";
@@ -363,6 +368,173 @@ export const getProfitReport = async (req: Request, res: Response) => {
 };
 
 // GET /api/reports/dashboard
+/**
+ * The columns of the movement report (14.21), and which ledger types feed
+ * each. In and out are kept apart rather than netted — a shop wants to see
+ * that ten came in and eight went out, not that two did. Stock entered with
+ * the item has its own column: for a shop that has just set up, it is most
+ * of what it holds. The two signed columns are corrections (adjustment,
+ * count) and the rest (a document taking itself back, returns), which can
+ * go either way.
+ */
+const MOVEMENT_COLUMNS = {
+  initial: ["opening"],
+  purchase: ["purchase"],
+  sale: ["sale"],
+  repair_use: ["repair_use"],
+  transfer_in: ["transfer_in"],
+  transfer_out: ["transfer_out"],
+  correction: ["adjustment", "count"],
+  other: ["reversal", "purchase_return", "sale_return"],
+} as const;
+
+type MovementColumn = keyof typeof MOVEMENT_COLUMNS;
+
+const COLUMN_OF = new Map<string, MovementColumn>(
+  (
+    Object.entries(MOVEMENT_COLUMNS) as [MovementColumn, readonly string[]][]
+  ).flatMap(([column, types]) => types.map((type) => [type, column] as const)),
+);
+
+// GET /api/reports/movements
+//
+// گردش کالا (14.21): for each item, what it held when the period began,
+// what moved during it — per kind of movement — and what it held at the
+// end. By the document's date (occurred_at), so a purchase entered today
+// for last week counts in last week. With a warehouse, every figure is that
+// warehouse's; without, the item's total, where a transfer appears on both
+// sides and nets to nothing.
+//
+// Two grouped queries over the ledger and no raw SQL: one for everything
+// before the period (the opening balance), one for the period by type.
+export const getMovementReport = async (req: Request, res: Response) => {
+  try {
+    const query = (req as ValidatedRequest).valid.query as MovementReportQuery;
+    const workspaceId = workspaceIdOf(req);
+
+    const scope: Prisma.InventoryTransactionWhereInput = {
+      workspaceId,
+      ...(query.warehouse_id !== undefined
+        ? { warehouseId: query.warehouse_id }
+        : {}),
+      ...(query.category_id !== undefined
+        ? { item: { categoryId: query.category_id } }
+        : {}),
+    };
+    const end = query.to_date ? endOfDay(query.to_date) : undefined;
+
+    const [before, during] = await Promise.all([
+      query.from_date
+        ? prisma.inventoryTransaction.groupBy({
+            by: ["itemId"],
+            where: { ...scope, occurredAt: { lt: query.from_date } },
+            _sum: { quantity: true },
+          })
+        : Promise.resolve([]),
+      prisma.inventoryTransaction.groupBy({
+        by: ["itemId", "type"],
+        where: {
+          ...scope,
+          ...(query.from_date || end
+            ? {
+                occurredAt: {
+                  ...(query.from_date ? { gte: query.from_date } : {}),
+                  ...(end ? { lte: end } : {}),
+                },
+              }
+            : {}),
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    const opening = new Map<number, number>(
+      before.map((row) => [row.itemId, row._sum.quantity?.toNumber() ?? 0]),
+    );
+    const moved = new Map<number, Record<MovementColumn, number>>();
+    for (const row of during) {
+      const column = COLUMN_OF.get(row.type) ?? "other";
+      const columns =
+        moved.get(row.itemId) ??
+        ({
+          initial: 0,
+          purchase: 0,
+          sale: 0,
+          repair_use: 0,
+          transfer_in: 0,
+          transfer_out: 0,
+          correction: 0,
+          other: 0,
+        } satisfies Record<MovementColumn, number>);
+      columns[column] = roundQuantity(
+        columns[column] + (row._sum.quantity?.toNumber() ?? 0),
+      );
+      moved.set(row.itemId, columns);
+    }
+
+    // Items that held something when the period began or moved during it.
+    const itemIds = [
+      ...new Set([
+        ...[...opening]
+          .filter(([, quantity]) => quantity !== 0)
+          .map(([id]) => id),
+        ...moved.keys(),
+      ]),
+    ];
+    const items = itemIds.length
+      ? await prisma.item.findMany({
+          where: { id: { in: itemIds }, workspaceId },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            unit: true,
+            category: { select: { name: true } },
+          },
+          orderBy: { name: "asc" },
+        })
+      : [];
+
+    const data = items.map((item) => {
+      const columns = moved.get(item.id);
+      const start = roundQuantity(opening.get(item.id) ?? 0);
+      const net = columns
+        ? Object.values(columns).reduce((sum, value) => sum + value, 0)
+        : 0;
+      return {
+        item_id: item.id,
+        code: item.code,
+        name: item.name,
+        unit: item.unit,
+        category_name: item.category?.name ?? null,
+        opening: start,
+        // Outgoing columns are reported as positive quantities; the two
+        // signed columns keep their sign.
+        initial: columns?.initial ?? 0,
+        purchase: columns?.purchase ?? 0,
+        sale: -(columns?.sale ?? 0) || 0,
+        repair_use: -(columns?.repair_use ?? 0) || 0,
+        transfer_in: columns?.transfer_in ?? 0,
+        transfer_out: -(columns?.transfer_out ?? 0) || 0,
+        correction: columns?.correction ?? 0,
+        other: columns?.other ?? 0,
+        closing: roundQuantity(start + net),
+        moved: columns !== undefined,
+      };
+    });
+
+    res.json({
+      data,
+      summary: {
+        item_count: data.length,
+        moved_count: data.filter((row) => row.moved).length,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const today = todayRange();

@@ -17,6 +17,7 @@ import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
 import WarehouseList from "./pages/WarehouseList";
 import ItemDetail from "./pages/ItemDetail";
+import MovementReport from "./pages/MovementReport";
 import StockAdjustmentList from "./pages/StockAdjustmentList";
 import StockCountList from "./pages/StockCountList";
 import StockCountDetail from "./pages/StockCountDetail";
@@ -200,6 +201,10 @@ function App() {
                             belongs in the controller. */}
                         <Route path="dashboard" element={<Dashboard />} />
                         <Route path="reports/stock" element={<StockReport />} />
+                        <Route
+                          path="reports/movements"
+                          element={<MovementReport />}
+                        />
                         <Route
                           path="reports/profit"
                           element={<ProfitReport />}

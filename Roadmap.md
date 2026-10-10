@@ -1714,7 +1714,7 @@ per-warehouse minimums; a year in document numbers; two-step transfers.
 - [x] 14.19 Kardex: entry order with document date, in / out / balance, warehouse and date filters, every row linked to its document
 - [x] 14.20 Price statistics: last, lowest, highest and average purchase price, from purchase lines
 - [x] 14.21 Stock movement report (گردش کالا): opening balance, totals per movement type, closing balance — per item and per warehouse
-- [ ] 14.22 Stock report additions: per-warehouse view, items with no movement for N days, slow sellers
+- [x] 14.22 Stock report additions: per-warehouse view, items with no movement for N days, slow sellers
 
 ### Sprint 14D — Suppliers and returns
 

@@ -7,6 +7,7 @@ import { useGoToItem } from "../utils/navigation";
 import {
   formatPersianCompact,
   formatPersianCurrency,
+  formatPersianDate,
   toPersianDigits,
   formatQuantity,
 } from "../utils/formatters";
@@ -36,12 +37,33 @@ import type {
 } from "../types/api";
 import { useWarehouses } from "../utils/warehouses";
 
+type StockView = "all" | "idle" | "slow";
+
 interface StockFilters {
   categoryId: string;
   lowStockOnly: boolean;
   /** "" for every warehouse (14.9 / 14.11). */
   warehouseId: string;
+  /** 14.22: everything, stock nothing has left, or stock leaving slowly. */
+  view: StockView;
+  /** The window the idle and slow views look back over. */
+  days: number;
+  /** 14.22: a column per warehouse. */
+  perWarehouse: boolean;
 }
+
+/*
+ * «راکد» is stock nothing has sold or used on a repair within the window —
+ * money sitting on the shelf, most of it first. «کم‌فروش» is stock that has
+ * moved, ranked by how many days the shelf would last at that pace.
+ */
+const VIEWS: { id: StockView; label: string }[] = [
+  { id: "all", label: "همه کالاها" },
+  { id: "idle", label: "راکد" },
+  { id: "slow", label: "کم‌فروش" },
+];
+
+const WINDOWS = [30, 60, 90, 180, 365];
 
 /**
  * What a row holds in the warehouse the report is filtered by, or in all of
@@ -56,6 +78,9 @@ const NO_FILTERS: StockFilters = {
   categoryId: "",
   lowStockOnly: false,
   warehouseId: "",
+  view: "all",
+  days: 90,
+  perWarehouse: false,
 };
 
 /**
@@ -162,6 +187,11 @@ export default function StockReport() {
     if (active.categoryId) params.categoryId = active.categoryId;
     if (active.lowStockOnly) params.lowStockOnly = true;
     if (active.warehouseId) params.warehouseId = active.warehouseId;
+    if (active.view !== "all") {
+      params.view = active.view;
+      params.days = active.days;
+    }
+    if (active.perWarehouse && !active.warehouseId) params.perWarehouse = true;
 
     getStockReport(params)
       .then((res) => setReport(res.data))
@@ -185,6 +215,13 @@ export default function StockReport() {
   const rows = useMemo(() => report?.data ?? [], [report]);
 
   const byWarehouse = filters.warehouseId !== "";
+  // A column per warehouse: only for a shop that has them, and not while
+  // the report is already narrowed to one.
+  const warehouseColumns =
+    filters.perWarehouse && warehouses.showPicker && !byWarehouse
+      ? warehouses.options.filter((w) => w.is_active)
+      : [];
+  const view = filters.view;
 
   /**
    * Inventory value per category, largest first.
@@ -212,7 +249,11 @@ export default function StockReport() {
   }, [rows]);
 
   const filtering =
-    filters.categoryId !== "" || filters.lowStockOnly || byWarehouse;
+    filters.categoryId !== "" ||
+    filters.lowStockOnly ||
+    byWarehouse ||
+    view !== "all" ||
+    filters.perWarehouse;
 
   return (
     <div dir="rtl">
@@ -282,6 +323,68 @@ export default function StockReport() {
             فقط کالاهای نیازمند سفارش
           </button>
 
+          <div
+            role="group"
+            aria-label="نما"
+            className="flex rounded-field border border-border bg-surface overflow-hidden"
+          >
+            {VIEWS.map((option) => (
+              <button
+                key={option.id}
+                onClick={() =>
+                  setFilters((current) => ({ ...current, view: option.id }))
+                }
+                aria-pressed={view === option.id}
+                className={`px-3.5 py-2.5 text-body-sm font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                  view === option.id
+                    ? "bg-primary text-primary-fg"
+                    : "text-text-secondary hover:bg-surface-alt"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {view !== "all" && (
+            <select
+              value={filters.days}
+              onChange={(e) =>
+                setFilters((current) => ({
+                  ...current,
+                  days: Number(e.target.value),
+                }))
+              }
+              aria-label="بازه"
+              className={toolbarSelect}
+            >
+              {WINDOWS.map((days) => (
+                <option key={days} value={days}>
+                  در {toPersianDigits(days)} روز اخیر
+                </option>
+              ))}
+            </select>
+          )}
+
+          {warehouses.showPicker && !byWarehouse && (
+            <button
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  perWarehouse: !current.perWarehouse,
+                }))
+              }
+              aria-pressed={filters.perWarehouse}
+              className={`px-3.5 py-2.5 rounded-field text-body-sm font-bold border transition-colors cursor-pointer ${
+                filters.perWarehouse
+                  ? "bg-info-soft border-info/45 text-info-fg"
+                  : "bg-surface border-border text-text-secondary hover:border-border-strong"
+              }`}
+            >
+              نمای انبارها
+            </button>
+          )}
+
           {filtering && (
             <button
               onClick={() => setFilters(NO_FILTERS)}
@@ -306,7 +409,13 @@ export default function StockReport() {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4"
             >
               <SummaryTile
-                label="ارزش کل موجودی"
+                label={
+                  view === "idle"
+                    ? "ارزش موجودی راکد"
+                    : view === "slow"
+                      ? "ارزش موجودی کم‌فروش"
+                      : "ارزش کل موجودی"
+                }
                 value={`${formatPersianCurrency(report.summary.total_inventory_value)} ریال`}
                 tone="accent"
               />
@@ -361,13 +470,17 @@ export default function StockReport() {
                 {filtering ? "کالایی با این فیلتر نیست" : "انبار خالی است"}
               </p>
               <p className="text-body-sm text-text-secondary mt-1 max-w-sm">
-                {filters.lowStockOnly
-                  ? "هیچ کالایی به حداقل موجودی نرسیده — چیزی برای سفارش نیست."
-                  : byWarehouse && filters.categoryId === ""
-                    ? "در این انبار کالایی با موجودی نیست."
-                    : filtering
-                      ? "دستهٔ دیگری را انتخاب کنید."
-                      : "پس از افزودن کالا، موجودی هر کدام اینجا گزارش می‌شود."}
+                {view === "idle"
+                  ? `همه‌ی کالاهای موجود در ${toPersianDigits(filters.days)} روز اخیر فروش یا مصرف داشته‌اند.`
+                  : view === "slow"
+                    ? `در ${toPersianDigits(filters.days)} روز اخیر کالایی فروخته یا مصرف نشده؛ نمای «راکد» را ببینید.`
+                    : filters.lowStockOnly
+                      ? "هیچ کالایی به حداقل موجودی نرسیده — چیزی برای سفارش نیست."
+                      : byWarehouse && filters.categoryId === ""
+                        ? "در این انبار کالایی با موجودی نیست."
+                        : filtering
+                          ? "دستهٔ دیگری را انتخاب کنید."
+                          : "پس از افزودن کالا، موجودی هر کدام اینجا گزارش می‌شود."}
               </p>
             </div>
           ) : (
@@ -436,6 +549,23 @@ export default function StockReport() {
                           )}
                         </div>
 
+                        {view !== "all" && (
+                          <p className="mt-2 text-body-xs text-text-secondary tabular-nums">
+                            {view === "idle"
+                              ? `آخرین فروش/مصرف: ${item.last_out_at ? formatPersianDate(item.last_out_at) : "هرگز"}`
+                              : `${formatQuantity(item.out_quantity ?? 0)} ${item.unit} در ${toPersianDigits(filters.days)} روز — پوشش ${toPersianDigits(item.days_of_cover ?? 0)} روز`}
+                          </p>
+                        )}
+                        {warehouseColumns.length > 0 && (
+                          <p className="mt-2 text-body-xs text-text-secondary tabular-nums">
+                            {warehouseColumns
+                              .map(
+                                (w) =>
+                                  `${w.name}: ${formatQuantity(item.warehouse_stocks?.[w.id] ?? 0)}`,
+                              )
+                              .join(" · ")}
+                          </p>
+                        )}
                         <div className="mt-3 pt-3 border-t border-border-subtle">
                           <span className="text-body-xs text-text-muted tabular-nums">
                             ارزش{" "}
@@ -463,7 +593,28 @@ export default function StockReport() {
                           {byWarehouse ? "موجودی کل" : "موجودی"}
                         </th>
                         {byWarehouse && <th className={th}>در این انبار</th>}
+                        {warehouseColumns.map((w) => (
+                          <th key={w.id} className={th}>
+                            {w.name}
+                          </th>
+                        ))}
                         <th className={th}>حداقل</th>
+                        {view === "idle" && (
+                          <th className={th}>آخرین فروش/مصرف</th>
+                        )}
+                        {view === "slow" && (
+                          <th className={th}>
+                            فروش/مصرف {toPersianDigits(filters.days)} روز
+                          </th>
+                        )}
+                        {view === "slow" && (
+                          <th
+                            className={th}
+                            title="موجودی فعلی با این سرعت فروش چند روز دوام می‌آورد"
+                          >
+                            پوشش (روز)
+                          </th>
+                        )}
                         <th className={th}>ارزش موجودی (ریال)</th>
                       </tr>
                     </thead>
@@ -504,9 +655,40 @@ export default function StockReport() {
                                 {formatQuantity(heldHere(item))} {item.unit}
                               </td>
                             )}
+                            {warehouseColumns.map((w) => {
+                              const quantity =
+                                item.warehouse_stocks?.[w.id] ?? 0;
+                              return (
+                                <td key={w.id} className={`${td} tabular-nums`}>
+                                  {quantity ? (
+                                    formatQuantity(quantity)
+                                  ) : (
+                                    <span className="text-text-muted">·</span>
+                                  )}
+                                </td>
+                              );
+                            })}
                             <td className={`${tdMuted} tabular-nums`}>
                               {formatQuantity(item.min_stock)} {item.unit}
                             </td>
+                            {view === "idle" && (
+                              <td className={`${tdMuted} tabular-nums`}>
+                                {item.last_out_at
+                                  ? formatPersianDate(item.last_out_at)
+                                  : "هرگز"}
+                              </td>
+                            )}
+                            {view === "slow" && (
+                              <td className={`${td} tabular-nums`}>
+                                {formatQuantity(item.out_quantity ?? 0)}{" "}
+                                {item.unit}
+                              </td>
+                            )}
+                            {view === "slow" && (
+                              <td className={`${td} font-bold tabular-nums`}>
+                                {toPersianDigits(item.days_of_cover ?? 0)}
+                              </td>
+                            )}
                             <td className={`${td} tabular-nums`}>
                               {formatPersianCurrency(
                                 heldHere(item) * item.avg_purchase_price,

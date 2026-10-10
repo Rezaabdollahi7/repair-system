@@ -7,6 +7,14 @@ export const stockReportQuerySchema = z.object({
   // Compared as a string because that's what the frontend sends; anything
   // else counts as false, as before.
   lowStockOnly: z.string().optional(),
+  // 14.22: «all» as before; «idle» — stock that has not been sold or used on
+  // a repair in `days`; «slow» — stock that has, ranked by how many days
+  // the shelf would last at that pace.
+  view: z.enum(["all", "idle", "slow"]).default("all"),
+  days: z.coerce.number().int().min(1).max(730).default(90),
+  // 14.22: each item's quantity in every warehouse, for a column per
+  // warehouse. Ignored with `warehouseId`, which already narrows to one.
+  perWarehouse: z.string().optional(),
 });
 
 export type StockReportQuery = z.infer<typeof stockReportQuerySchema>;

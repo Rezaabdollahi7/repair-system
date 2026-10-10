@@ -50,6 +50,8 @@ export const getStockReport = async (req: Request, res: Response) => {
     const query = (req as ValidatedRequest).valid.query as StockReportQuery;
     const workspaceId = workspaceIdOf(req);
     const warehouseId = query.warehouseId;
+    const perWarehouse =
+      warehouseId === undefined && query.perWarehouse === "true";
 
     if (warehouseId !== undefined) {
       const warehouse = await prisma.warehouse.findFirst({
@@ -88,10 +90,17 @@ export const getStockReport = async (req: Request, res: Response) => {
           ? {
               stocks: {
                 where: { warehouseId },
-                select: { quantity: true },
+                select: { quantity: true, warehouseId: true },
               },
             }
-          : {}),
+          : perWarehouse
+            ? {
+                stocks: {
+                  where: { quantity: { not: 0 } },
+                  select: { quantity: true, warehouseId: true },
+                },
+              }
+            : {}),
       },
     });
 
@@ -100,8 +109,11 @@ export const getStockReport = async (req: Request, res: Response) => {
     const rows = items.map((item) => {
       const currentStock = item.currentStock.toNumber();
       const minStock = item.minStock.toNumber();
-      const stocks = (item as { stocks?: { quantity: Prisma.Decimal }[] })
-        .stocks;
+      const stocks = (
+        item as {
+          stocks?: { quantity: Prisma.Decimal; warehouseId: number }[];
+        }
+      ).stocks;
       return {
         id: item.id,
         code: item.code,
@@ -116,6 +128,18 @@ export const getStockReport = async (req: Request, res: Response) => {
         avg_purchase_price: item.avgPurchasePrice.toNumber(),
         category_name: item.category?.name ?? null,
         stock_status: stockStatus(currentStock, minStock),
+        warehouse_stocks: perWarehouse
+          ? Object.fromEntries(
+              (stocks ?? []).map((stock) => [
+                stock.warehouseId,
+                stock.quantity.toNumber(),
+              ]),
+            )
+          : null,
+        // Filled in below for the idle and slow views.
+        out_quantity: null as number | null,
+        last_out_at: null as string | null,
+        days_of_cover: null as number | null,
       };
     });
 
@@ -126,10 +150,69 @@ export const getStockReport = async (req: Request, res: Response) => {
       rows.sort((a, b) => (a.warehouse_stock ?? 0) - (b.warehouse_stock ?? 0));
     }
 
-    const data =
+    let data =
       query.lowStockOnly === "true"
         ? rows.filter((row) => row.current_stock <= row.min_stock)
         : rows;
+
+    // 14.22. «Moving» means leaving the shop — sold, or fitted on a repair.
+    // A purchase or a transfer does not make stock any less idle.
+    // The schema defaults both; read defensively for callers that skip it.
+    const view = query.view ?? "all";
+    const days = query.days ?? 90;
+    if (view !== "all") {
+      const held = (row: (typeof rows)[number]) =>
+        row.warehouse_stock ?? row.current_stock;
+      const consumption: Prisma.InventoryTransactionWhereInput = {
+        workspaceId,
+        itemId: { in: data.map((row) => row.id) },
+        type: { in: ["sale", "repair_use"] },
+        ...(warehouseId !== undefined ? { warehouseId } : {}),
+      };
+      const since = lastDaysRange(days).gte;
+      const [recent, last] = await Promise.all([
+        prisma.inventoryTransaction.groupBy({
+          by: ["itemId"],
+          where: { ...consumption, occurredAt: { gte: since } },
+          _sum: { quantity: true },
+        }),
+        prisma.inventoryTransaction.groupBy({
+          by: ["itemId"],
+          where: consumption,
+          _max: { occurredAt: true },
+        }),
+      ]);
+      const outOf = new Map(
+        recent.map((row) => [
+          row.itemId,
+          -(row._sum.quantity?.toNumber() ?? 0),
+        ]),
+      );
+      const lastOf = new Map(
+        last.map((row) => [row.itemId, row._max.occurredAt]),
+      );
+
+      for (const row of data) {
+        const out = roundQuantity(outOf.get(row.id) ?? 0);
+        row.out_quantity = out;
+        row.last_out_at = lastOf.get(row.id)?.toISOString() ?? null;
+        // How many days the shelf lasts at the pace of the window.
+        row.days_of_cover =
+          out > 0 ? Math.round(held(row) / (out / days)) : null;
+      }
+
+      const value = (row: (typeof rows)[number]) =>
+        held(row) * row.avg_purchase_price;
+      data =
+        view === "idle"
+          ? data
+              .filter((row) => held(row) > 0 && row.out_quantity === 0)
+              // The money sitting still comes first.
+              .sort((a, b) => value(b) - value(a))
+          : data
+              .filter((row) => held(row) > 0 && (row.out_quantity ?? 0) > 0)
+              .sort((a, b) => (b.days_of_cover ?? 0) - (a.days_of_cover ?? 0));
+    }
 
     res.json({
       data,

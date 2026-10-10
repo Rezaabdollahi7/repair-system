@@ -1290,6 +1290,12 @@ export interface StockReportRow {
   avg_purchase_price: number;
   category_name: string | null;
   stock_status: StockStatus;
+  /** With `perWarehouse=true` (14.22): warehouse id → quantity; else null. */
+  warehouse_stocks: Record<string, number> | null;
+  /** The idle and slow views (14.22) only; null in «all». */
+  out_quantity: number | null;
+  last_out_at: string | null;
+  days_of_cover: number | null;
 }
 
 export interface StockReport {

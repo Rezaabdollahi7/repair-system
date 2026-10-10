@@ -160,7 +160,7 @@ describe("reportController.getStockReport with a warehouse", () => {
     });
     expect(args.select.stocks).toEqual({
       where: { warehouseId: 7 },
-      select: { quantity: true },
+      select: { quantity: true, warehouseId: true },
     });
   });
 

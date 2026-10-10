@@ -9,6 +9,7 @@ import {
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import ConfirmModal from "./ConfirmModal";
 import SaleInvoicePreview from "./SaleInvoicePreview";
 import {
@@ -44,7 +45,8 @@ export default function SaleInvoiceDetailModal({
   onClose,
 }: SaleInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
-  const { openItemDetail } = useModal();
+  const { closeAllModals } = useModal();
+  const goToItem = useGoToItem();
   const [invoice, setInvoice] = useState<SaleInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentAmount, setPaymentAmount] = useState<string | number>("");
@@ -332,9 +334,11 @@ export default function SaleInvoiceDetailModal({
                                   {item.item_id ? (
                                     <button
                                       onClick={() => {
-                                        onClose();
+                                        // The item is a page now: the whole
+                                        // stack closes before it opens.
+                                        closeAllModals();
                                         if (item.item_id)
-                                          openItemDetail(item.item_id);
+                                          goToItem(item.item_id);
                                       }}
                                       className="text-primary hover:underline"
                                     >

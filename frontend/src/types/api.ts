@@ -687,6 +687,40 @@ export interface InventoryTransaction {
   occurred_at: string;
 }
 
+/**
+ * GET /items/:id/trade (14.18) — the invoice lines that name an item, newest
+ * first. `status` is the payment status on a purchase or sale and the
+ * invoice's own status on a repair, where whether the part has left the
+ * shelf is the question.
+ */
+export interface ItemTradeRow {
+  kind: "purchase" | "sale" | "repair";
+  line_id: number;
+  invoice_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  /** The supplier on a purchase, the customer otherwise. */
+  party: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  status: string;
+}
+
+export interface ItemTradeTotal {
+  lines: number;
+  quantity: number;
+  amount: number;
+}
+
+export interface ItemTrade {
+  rows: ItemTradeRow[];
+  /** Over every line, not only the rows sent; repairs once issued. */
+  totals: Record<ItemTradeRow["kind"], ItemTradeTotal>;
+  /** More lines exist than the hundred sent. */
+  truncated: boolean;
+}
+
 /** GET /items/search/for-invoice — snake_case, also unlike its neighbours. */
 export interface ItemForInvoice {
   id: number;

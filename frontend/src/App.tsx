@@ -16,6 +16,7 @@ import CustomerList from "./pages/CustomerList";
 import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
 import WarehouseList from "./pages/WarehouseList";
+import ItemDetail from "./pages/ItemDetail";
 import StockAdjustmentList from "./pages/StockAdjustmentList";
 import StockCountList from "./pages/StockCountList";
 import StockCountDetail from "./pages/StockCountDetail";
@@ -147,6 +148,10 @@ function App() {
                           element={<PersonnelDetail />}
                         />
                         <Route path="items" element={<ItemList />} />
+                        {/* A page since 14.18: reached from the item list,
+                            two reports, the ledger and every invoice, and
+                            «back» has to mean the list. */}
+                        <Route path="items/:id" element={<ItemDetail />} />
                         <Route path="warehouses" element={<WarehouseList />} />
                         <Route
                           path="stock-adjustments"

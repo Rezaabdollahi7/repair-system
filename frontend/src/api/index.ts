@@ -37,6 +37,7 @@ import type {
   StockCountLine,
   StockCountReview,
   ItemCreateBody,
+  ItemTrade,
   Item,
   ItemForInvoice,
   ItemUpdateBody,
@@ -417,6 +418,8 @@ export const cancelStockCount = (id: Id) =>
 export const getItems = (params?: QueryParams) =>
   api.get<PaginatedWithLimit<Item>>("/items", { params });
 export const getItem = (id: Id) => api.get<Item>(`/items/${id}`);
+export const getItemTrade = (id: Id) =>
+  api.get<ItemTrade>(`/items/${id}/trade`);
 export const createItem = (data: ItemCreateBody) =>
   api.post<Item>("/items", data);
 export const updateItem = (id: Id, data: ItemUpdateBody) =>

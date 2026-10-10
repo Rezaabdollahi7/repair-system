@@ -3,7 +3,7 @@ import { getStockReport, getCategories } from "../api";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { CubeIcon } from "@heroicons/react/24/solid";
-import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import {
   formatPersianCompact,
   formatPersianCurrency,
@@ -148,7 +148,7 @@ export default function StockReport() {
   // choose between; until then every figure here is the one warehouse's.
   const warehouses = useWarehouses();
 
-  const { openItemDetail } = useModal();
+  const goToItem = useGoToItem();
 
   useEffect(() => {
     getCategories()
@@ -387,11 +387,11 @@ export default function StockReport() {
                       <div
                         role="button"
                         tabIndex={0}
-                        onClick={() => openItemDetail(item.id)}
+                        onClick={() => goToItem(item.id)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            openItemDetail(item.id);
+                            goToItem(item.id);
                           }
                         }}
                         className={`${rowCard} cursor-pointer hover:border-border-strong
@@ -473,7 +473,7 @@ export default function StockReport() {
                         return (
                           <tr
                             key={item.id}
-                            onClick={() => openItemDetail(item.id)}
+                            onClick={() => goToItem(item.id)}
                             className={trClickable}
                           >
                             <td

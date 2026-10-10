@@ -361,6 +361,203 @@ export const getTransactions = async (req: Request, res: Response) => {
   }
 };
 
+/** How many invoice lines the trade tab shows; the totals cover them all. */
+const TRADE_ROWS = 100;
+
+/** Repair invoices whose parts have left the shelf (14.6). */
+const REPAIR_MOVED: ("issued" | "paid")[] = ["issued", "paid"];
+
+// GET /api/items/:id/trade
+//
+// The item page's «خرید و فروش» tab (14.18): every invoice line that names
+// this item — bought, sold over the counter, fitted on a repair — newest
+// first, with a total per kind. The totals are aggregates over every line,
+// not sums of the rows returned, which stop at TRADE_ROWS.
+//
+// A repair line counts only once its invoice has been issued: a پیش‌فاکتور
+// has moved nothing, and a cancelled invoice has put its parts back. Both
+// are still listed, with their status, because the shop quoted that part.
+export const getTrade = async (req: Request, res: Response) => {
+  try {
+    const { id } = (req as ValidatedRequest).valid.params as IdParam;
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
+      select: { id: true },
+    });
+    if (!item) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const purchaseWhere = { itemId: id, workspaceId };
+    const saleWhere = { itemId: id, workspaceId };
+    // Repair lines are not a relation to items (itemId can name a service),
+    // so the type is part of the filter.
+    const repairWhere: Prisma.RepairInvoiceItemWhereInput = {
+      itemId: id,
+      itemType: "inventory",
+      workspaceId,
+    };
+    const newest = { invoice: { invoiceDate: "desc" as const } };
+
+    const [
+      purchases,
+      sales,
+      repairs,
+      purchaseTotals,
+      saleTotals,
+      repairTotals,
+    ] = await Promise.all([
+      prisma.purchaseInvoiceItem.findMany({
+        where: purchaseWhere,
+        orderBy: [newest, { id: "desc" }],
+        take: TRADE_ROWS,
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              supplierName: true,
+              paymentStatus: true,
+            },
+          },
+        },
+      }),
+      prisma.saleInvoiceItem.findMany({
+        where: saleWhere,
+        orderBy: [newest, { id: "desc" }],
+        take: TRADE_ROWS,
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              customerName: true,
+              paymentStatus: true,
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      prisma.repairInvoiceItem.findMany({
+        where: repairWhere,
+        orderBy: [newest, { id: "desc" }],
+        take: TRADE_ROWS,
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              customerName: true,
+              status: true,
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      prisma.purchaseInvoiceItem.aggregate({
+        where: purchaseWhere,
+        _count: true,
+        _sum: { quantity: true, totalPrice: true },
+      }),
+      prisma.saleInvoiceItem.aggregate({
+        where: saleWhere,
+        _count: true,
+        _sum: { quantity: true, totalPrice: true },
+      }),
+      prisma.repairInvoiceItem.aggregate({
+        where: {
+          ...repairWhere,
+          invoice: { status: { in: REPAIR_MOVED } },
+        },
+        _count: true,
+        _sum: { quantity: true, totalPrice: true },
+      }),
+    ]);
+
+    const rows = [
+      ...purchases.map((line) => ({
+        kind: "purchase" as const,
+        line_id: line.id,
+        invoice_id: line.invoice.id,
+        invoice_number: line.invoice.invoiceNumber,
+        invoice_date: line.invoice.invoiceDate.toISOString(),
+        party: line.invoice.supplierName,
+        quantity: line.quantity.toNumber(),
+        unit_price: line.unitPrice.toNumber(),
+        total_price: line.totalPrice.toNumber(),
+        status: line.invoice.paymentStatus,
+      })),
+      ...sales.map((line) => ({
+        kind: "sale" as const,
+        line_id: line.id,
+        invoice_id: line.invoice.id,
+        invoice_number: line.invoice.invoiceNumber,
+        invoice_date: line.invoice.invoiceDate.toISOString(),
+        party: line.invoice.customer?.name ?? line.invoice.customerName,
+        quantity: line.quantity.toNumber(),
+        unit_price: line.unitPrice.toNumber(),
+        total_price: line.totalPrice.toNumber(),
+        status: line.invoice.paymentStatus,
+      })),
+      ...repairs.map((line) => ({
+        kind: "repair" as const,
+        line_id: line.id,
+        invoice_id: line.invoice.id,
+        invoice_number: line.invoice.invoiceNumber,
+        invoice_date: line.invoice.invoiceDate.toISOString(),
+        party: line.invoice.customer?.name ?? line.invoice.customerName,
+        quantity: line.quantity.toNumber(),
+        unit_price: line.unitPrice.toNumber(),
+        total_price: line.totalPrice.toNumber(),
+        // The repair invoice's own status, not its payment: whether the part
+        // has left the shelf is the question this column answers.
+        status: line.invoice.status,
+      })),
+    ]
+      .sort(
+        (a, b) =>
+          b.invoice_date.localeCompare(a.invoice_date) ||
+          b.line_id - a.line_id,
+      )
+      .slice(0, TRADE_ROWS);
+
+    const total = (aggregate: {
+      _count: number;
+      _sum: {
+        quantity: Prisma.Decimal | null;
+        totalPrice: Prisma.Decimal | null;
+      };
+    }) => ({
+      lines: aggregate._count,
+      quantity: aggregate._sum.quantity?.toNumber() ?? 0,
+      amount: aggregate._sum.totalPrice?.toNumber() ?? 0,
+    });
+
+    const totals = {
+      purchase: total(purchaseTotals),
+      sale: total(saleTotals),
+      repair: total(repairTotals),
+    };
+
+    res.json({
+      rows,
+      totals,
+      // More lines exist than were sent; the page says so rather than
+      // letting a short list pass for the whole history.
+      truncated:
+        purchases.length + sales.length + repairs.length > rows.length ||
+        [purchases, sales, repairs].some((list) => list.length === TRADE_ROWS),
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 // POST /api/items
 export const create = async (req: Request, res: Response) => {
   try {

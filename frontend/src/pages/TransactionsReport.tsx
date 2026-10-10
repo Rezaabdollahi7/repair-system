@@ -4,7 +4,7 @@ import { getDashboardStats } from "../api";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { ArrowRightIcon, ClockIcon } from "@heroicons/react/24/solid";
-import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import StatusPill from "../components/StatusPill";
 import {
   formatPersianCurrency,
@@ -65,7 +65,7 @@ export default function TransactionsReport() {
   // does, not a full transaction history.
   const [transactions, setTransactions] = useState<DashboardTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const { openItemDetail } = useModal();
+  const goToItem = useGoToItem();
 
   useEffect(() => {
     getDashboardStats()
@@ -127,11 +127,11 @@ export default function TransactionsReport() {
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => openItemDetail(tx.item_id)}
+                    onClick={() => goToItem(tx.item_id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        openItemDetail(tx.item_id);
+                        goToItem(tx.item_id);
                       }
                     }}
                     className={`${rowCard} cursor-pointer hover:border-border-strong
@@ -209,7 +209,7 @@ export default function TransactionsReport() {
                     return (
                       <tr
                         key={tx.id}
-                        onClick={() => openItemDetail(tx.item_id)}
+                        onClick={() => goToItem(tx.item_id)}
                         className={trClickable}
                       >
                         <td

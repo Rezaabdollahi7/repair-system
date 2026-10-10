@@ -83,6 +83,11 @@ frontend/   React SPA (Vite)
   values in it. See **Design System** below
 - `src/motion/` — the shared framer-motion variants (`modalPanel`,
   `staggerContainer`, `staggerItem`)
+- `components/Tabs.tsx` (14.17) — the one tab row: WAI-ARIA keyboard
+  handling, arrows following the reading direction, a sliding underline,
+  sideways scroll on a phone. Its panel is `TabPanel`, which renders only
+  while selected. `useTabParam` in `utils/tabs.ts` keeps the tab in
+  `?tab=…`, replacing the history entry rather than pushing one
 
 **Detail screens: page or modal?** A record reached from one list, glanced
 at and dismissed, is a modal — that is most of them. A record reached from
@@ -93,6 +98,10 @@ than «wherever you came from». A page names itself to the shell through
 `usePageCrumb` (`BreadcrumbContext`) — the header derives every other title
 from the sidebar entry whose path matches, which for `/customers/5` would
 read «مشتریان». The `parent` in that crumb becomes the link back.
+`/items/:id` (14.18) became a page for the same reason — the item list, two
+reports, the ledger and every invoice open it — and an invoice modal that
+links to it closes the whole stack first (`useGoToItem`), so no modal is
+left standing over the new screen.
 
 ## Domain Model (current feature set)
 
@@ -576,9 +585,16 @@ document and both stay on the record.
   in `utils/warehouses.ts` is what makes the entry appear the moment the
   second is added.
 
-**Still to come**, in `Roadmap.md` phase 14: the item page and kardex
-(14C), suppliers and returns (14D), reorder and reservations (14E), audit
-and period lock (14F).
+**The item page** (`/items/:id`, 14.18) has three tabs today — نمای کلی,
+کاردکس, خرید و فروش. «قیمت‌ها» (14.20) and «تغییرات» (14.29) are added to
+its `TABS` list when the figures behind them exist, not before.
+`GET /items/:id/trade` answers the third: the invoice lines naming the item,
+newest first and capped at a hundred, with per-kind totals aggregated over
+all of them — a repair line counted only once its invoice is issued.
+
+**Still to come**, in `Roadmap.md` phase 14: the full kardex, price
+statistics and reports (rest of 14C), suppliers and returns (14D), reorder
+and reservations (14E), audit and period lock (14F).
 
 ### Database migration
 

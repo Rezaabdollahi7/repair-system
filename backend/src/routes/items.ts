@@ -42,6 +42,12 @@ router.get(
   ctrl.getTransactions,
 );
 
+router.get(
+  "/:id/trade",
+  validate({ params: idParamSchema }),
+  ctrl.getTrade,
+);
+
 router.post("/", validate({ body: itemCreateSchema }), ctrl.create);
 router.put(
   "/:id",

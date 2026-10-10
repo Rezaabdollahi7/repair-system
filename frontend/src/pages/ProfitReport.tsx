@@ -8,7 +8,7 @@ import {
   ChartBarIcon,
 } from "@heroicons/react/24/solid";
 import PersianDatePicker from "../components/PersianDatePicker";
-import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import {
   formatPersianCompact,
   formatPersianCurrency,
@@ -154,7 +154,7 @@ function MarginCell({ margin }: { margin: number }) {
 export default function ProfitReport() {
   const [report, setReport] = useState<ProfitReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { openItemDetail } = useModal();
+  const goToItem = useGoToItem();
   const [dateRange, setDateRange] = useState<DateRange>({
     from_date: "",
     to_date: "",
@@ -342,12 +342,12 @@ export default function ProfitReport() {
                         role="button"
                         tabIndex={0}
                         onClick={() => {
-                          if (item.item_id) openItemDetail(item.item_id);
+                          if (item.item_id) goToItem(item.item_id);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            if (item.item_id) openItemDetail(item.item_id);
+                            if (item.item_id) goToItem(item.item_id);
                           }
                         }}
                         className={`${rowCard} cursor-pointer hover:border-border-strong
@@ -440,7 +440,7 @@ export default function ProfitReport() {
                         <tr
                           key={item.item_id ?? item.item_code}
                           onClick={() => {
-                            if (item.item_id) openItemDetail(item.item_id);
+                            if (item.item_id) goToItem(item.item_id);
                           }}
                           className={trClickable}
                         >

@@ -49,6 +49,11 @@ router.get(
   ctrl.getKardex,
 );
 router.get(
+  "/:id/prices",
+  validate({ params: idParamSchema }),
+  ctrl.getPrices,
+);
+router.get(
   "/:id/trade",
   validate({ params: idParamSchema }),
   ctrl.getTrade,

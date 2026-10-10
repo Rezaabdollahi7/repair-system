@@ -39,6 +39,7 @@ import type {
   ItemCreateBody,
   ItemTrade,
   ItemKardex,
+  ItemPrices,
   Item,
   ItemForInvoice,
   ItemUpdateBody,
@@ -421,6 +422,8 @@ export const getItems = (params?: QueryParams) =>
 export const getItem = (id: Id) => api.get<Item>(`/items/${id}`);
 export const getItemTrade = (id: Id) =>
   api.get<ItemTrade>(`/items/${id}/trade`);
+export const getItemPrices = (id: Id) =>
+  api.get<ItemPrices>(`/items/${id}/prices`);
 export const getItemKardex = (id: Id, params?: QueryParams) =>
   api.get<ItemKardex>(`/items/${id}/kardex`, { params });
 export const createItem = (data: ItemCreateBody) =>

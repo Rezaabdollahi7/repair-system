@@ -1712,7 +1712,7 @@ per-warehouse minimums; a year in document numbers; two-step transfers.
 - [x] 14.17 A Tabs component (the codebase has none)
 - [x] 14.18 `/items/:id` replacing `ItemDetailModal` (template: `CustomerDetail`, `usePageCrumb`, a `useGoToItem` beside `useGoToCustomer`); every `openItemDetail` call site navigates instead, closing the modal stack when called from an invoice modal. Tabs: نمای کلی · کاردکس · خرید و فروش · قیمت‌ها · تغییرات. Shipped with the first three; «قیمت‌ها» and «تغییرات» join with 14.20 and 14.29, when the figures behind them exist
 - [x] 14.19 Kardex: entry order with document date, in / out / balance, warehouse and date filters, every row linked to its document
-- [ ] 14.20 Price statistics: last, lowest, highest and average purchase price, from purchase lines
+- [x] 14.20 Price statistics: last, lowest, highest and average purchase price, from purchase lines
 - [ ] 14.21 Stock movement report (گردش کالا): opening balance, totals per movement type, closing balance — per item and per warehouse
 - [ ] 14.22 Stock report additions: per-warehouse view, items with no movement for N days, slow sellers
 

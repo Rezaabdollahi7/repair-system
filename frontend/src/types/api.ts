@@ -764,6 +764,43 @@ export interface ItemKardex {
   totalPages: number;
 }
 
+/** One purchase line, as the prices tab names it (14.20). */
+export interface ItemPricePoint {
+  price: number;
+  quantity: number;
+  invoice_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  supplier: string | null;
+}
+
+/** GET /items/:id/prices (14.20). */
+export interface ItemPrices {
+  purchase: {
+    lines: number;
+    quantity: number;
+    last: ItemPricePoint | null;
+    lowest: ItemPricePoint | null;
+    highest: ItemPricePoint | null;
+    /** Weighted by quantity: total paid over units bought. */
+    average: number | null;
+  };
+  sale: {
+    average: number | null;
+    last: {
+      price: number;
+      invoice_id: number;
+      invoice_number: string;
+      invoice_date: string;
+    } | null;
+  };
+  /** The moving average: what the stock on hand costs. */
+  current_average: number;
+  sell_price: number;
+  /** The last twenty purchases, newest first. */
+  history: ItemPricePoint[];
+}
+
 /** GET /items/search/for-invoice — snake_case, also unlike its neighbours. */
 export interface ItemForInvoice {
   id: number;

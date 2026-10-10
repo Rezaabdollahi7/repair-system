@@ -8,6 +8,7 @@ import {
   BanknotesIcon,
   BuildingStorefrontIcon,
   ClipboardDocumentListIcon,
+  CurrencyDollarIcon,
   CubeIcon,
   ExclamationTriangleIcon,
   PencilSquareIcon,
@@ -25,6 +26,7 @@ import InfoRow from "../components/InfoRow";
 import StatusPill from "../components/StatusPill";
 import Tabs, { TabPanel, type TabItem } from "../components/Tabs";
 import ItemKardex from "../components/ItemKardex";
+import ItemPrices from "../components/ItemPrices";
 import {
   QuickPurchaseModal,
   QuickSaleModal,
@@ -58,17 +60,18 @@ import {
 import type { Item, ItemTrade, ItemTradeRow } from "../types/api";
 
 /*
- * The tabs this page has today. «قیمت‌ها» (14.20) and «تغییرات» (14.29)
- * join the list when the figures behind them exist — a tab that only says
- * «به‌زودی» is a promise in the middle of a working screen.
+ * The tabs this page has today. «تغییرات» (14.29) joins the list when the
+ * audit log behind it exists — a tab that only says «به‌زودی» is a promise
+ * in the middle of a working screen.
  */
-const TAB_IDS = ["overview", "kardex", "trade"] as const;
+const TAB_IDS = ["overview", "kardex", "trade", "prices"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 const TABS: TabItem<TabId>[] = [
   { id: "overview", label: "نمای کلی", icon: CubeIcon },
   { id: "kardex", label: "کاردکس", icon: ClipboardDocumentListIcon },
   { id: "trade", label: "خرید و فروش", icon: ShoppingCartIcon },
+  { id: "prices", label: "قیمت‌ها", icon: CurrencyDollarIcon },
 ];
 
 /* ── Pieces ────────────────────────────────────────────────────────── */
@@ -664,6 +667,13 @@ export default function ItemDetail() {
         </TabPanel>
         <TabPanel idPrefix="item" id="trade" active={tab === "trade"}>
           <Trade item={item} />
+        </TabPanel>
+        <TabPanel idPrefix="item" id="prices" active={tab === "prices"}>
+          <ItemPrices
+            itemId={item.id}
+            unit={item.unit}
+            version={item.currentStock}
+          />
         </TabPanel>
       </motion.div>
 

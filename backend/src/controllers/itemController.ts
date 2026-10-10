@@ -742,6 +742,137 @@ export const getKardex = async (req: Request, res: Response) => {
   }
 };
 
+/** How many past purchases the prices tab lists. */
+const PRICE_HISTORY = 20;
+
+// GET /api/items/:id/prices
+//
+// The item page's «قیمت‌ها» tab (14.20): what the shop has paid for it —
+// the last, lowest and highest purchase price, each with the invoice it
+// came from, and the average — next to what the stock on hand costs now
+// (the moving average) and what it sells for.
+//
+// The purchase average is weighted by quantity — total paid over units
+// bought — so ten units at one price and one at another average as eleven
+// units do, not as two invoices. It is a different figure from the moving
+// average on the item, which is the cost of what is still on the shelf.
+export const getPrices = async (req: Request, res: Response) => {
+  try {
+    const { id } = (req as ValidatedRequest).valid.params as IdParam;
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
+      select: { avgPurchasePrice: true, sellPrice: true },
+    });
+    if (!item) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const where = { itemId: id, workspaceId };
+    const invoice = {
+      select: {
+        id: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        supplierName: true,
+      },
+    };
+    const byDate = [
+      { invoice: { invoiceDate: "desc" as const } },
+      { id: "desc" as const },
+    ];
+
+    const [totals, lowest, highest, history, saleTotals, lastSale] =
+      await Promise.all([
+        prisma.purchaseInvoiceItem.aggregate({
+          where,
+          _count: true,
+          _sum: { quantity: true, totalPrice: true },
+        }),
+        prisma.purchaseInvoiceItem.findFirst({
+          where,
+          orderBy: [{ unitPrice: "asc" }, ...byDate],
+          include: { invoice },
+        }),
+        prisma.purchaseInvoiceItem.findFirst({
+          where,
+          orderBy: [{ unitPrice: "desc" }, ...byDate],
+          include: { invoice },
+        }),
+        prisma.purchaseInvoiceItem.findMany({
+          where,
+          orderBy: byDate,
+          take: PRICE_HISTORY,
+          include: { invoice },
+        }),
+        prisma.saleInvoiceItem.aggregate({
+          where,
+          _sum: { quantity: true, totalPrice: true },
+        }),
+        prisma.saleInvoiceItem.findFirst({
+          where,
+          orderBy: byDate,
+          include: {
+            invoice: {
+              select: { id: true, invoiceNumber: true, invoiceDate: true },
+            },
+          },
+        }),
+      ]);
+
+    type Line = NonNullable<typeof lowest>;
+    const point = (line: Line | null) =>
+      line
+        ? {
+            price: line.unitPrice.toNumber(),
+            quantity: line.quantity.toNumber(),
+            invoice_id: line.invoice.id,
+            invoice_number: line.invoice.invoiceNumber,
+            invoice_date: line.invoice.invoiceDate.toISOString(),
+            supplier: line.invoice.supplierName,
+          }
+        : null;
+
+    const average = (sum: {
+      quantity: Prisma.Decimal | null;
+      totalPrice: Prisma.Decimal | null;
+    }) =>
+      sum.quantity && sum.totalPrice && !sum.quantity.isZero()
+        ? Math.round(sum.totalPrice.dividedBy(sum.quantity).toNumber())
+        : null;
+
+    res.json({
+      purchase: {
+        lines: totals._count,
+        quantity: totals._sum.quantity?.toNumber() ?? 0,
+        last: point(history[0] ?? null),
+        lowest: point(lowest),
+        highest: point(highest),
+        average: average(totals._sum),
+      },
+      sale: {
+        // A line's total is after its discount, so this is what a unit
+        // actually sold for on average.
+        average: average(saleTotals._sum),
+        last: lastSale
+          ? {
+              price: lastSale.unitPrice.toNumber(),
+              invoice_id: lastSale.invoice.id,
+              invoice_number: lastSale.invoice.invoiceNumber,
+              invoice_date: lastSale.invoice.invoiceDate.toISOString(),
+            }
+          : null,
+      },
+      current_average: item.avgPurchasePrice.toNumber(),
+      sell_price: item.sellPrice.toNumber(),
+      history: history.map((line) => point(line)!),
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 // POST /api/items
 export const create = async (req: Request, res: Response) => {
   try {

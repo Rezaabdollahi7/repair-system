@@ -169,6 +169,26 @@ describe("issuing a repair invoice", () => {
     await expectStockConsistent(lcd);
   });
 
+  it("dates the parts on the ledger with the invoice, not with the click", async () => {
+    // An invoice dated last month and issued today used its parts last
+    // month — the kardex and the movement report read occurred_at.
+    const lcd = await stockedItem("LCD", 5, 1_000_000);
+    const res = await api("post", "/api/repair-invoices").send({
+      device_id: deviceId,
+      invoice_date: "2026-09-01T08:00:00.000Z",
+      items: [partLine(lcd, 1)],
+    });
+    expect(res.status).toBe(201);
+
+    await setStatus(res.body.id, "issued");
+
+    const row = await owner.inventoryTransaction.findFirstOrThrow({
+      where: { itemId: lcd, type: "repair_use" },
+    });
+    expect(row.occurredAt.toISOString()).toBe("2026-09-01T08:00:00.000Z");
+    await expectStockConsistent(lcd);
+  });
+
   it("takes a fraction exactly rather than rounding it away", async () => {
     // 0.4 metres used to round to nothing.
     const wire = await stockedItem("W", 10, 20_000, { isFractional: true });

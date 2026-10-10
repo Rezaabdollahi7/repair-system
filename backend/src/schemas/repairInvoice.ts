@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { paginationQuerySchema } from "./common";
+import {
+  paginationQuerySchema,
+  quantitySchema,
+  warehouseIdSchema,
+} from "./common";
 
 export const repairInvoiceListQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().optional(),
@@ -30,7 +34,9 @@ const repairInvoiceLineSchema = z.object({
   item_id: z.coerce.number().int().positive().nullable().optional(),
   name: z.string().trim().min(1, "نام آیتم الزامی است"),
   description: optionalText,
-  quantity: z.coerce.number().positive().default(1),
+  // At most three decimal places, as the column holds (14.1); whether this
+  // part may be fractional at all is checked against the item.
+  quantity: quantitySchema("تعداد باید بیشتر از صفر باشد").default(1),
   unit: optionalText,
   // Left optional: an inventory line with no price falls back to the item's
   // sell price, which the controller resolves.
@@ -52,6 +58,9 @@ const repairInvoiceBodySchema = z.object({
   tax_rate: z.coerce.number().min(0).max(100).default(0),
   warranty_months: z.coerce.number().int().min(0).default(0),
   technician_id: z.coerce.number().int().positive().nullable().optional(),
+  // Where the parts come from when the invoice is issued; omitted, the
+  // workspace's default.
+  warehouse_id: warehouseIdSchema,
   notes: optionalText,
   items: z
     .array(repairInvoiceLineSchema)

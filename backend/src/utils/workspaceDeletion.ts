@@ -21,7 +21,10 @@ import { errorMessage } from "./errors";
  * Not on this list, on purpose: payments, subscription_events,
  * discount_code_uses and referrals. The ledger outlives the workspace, which
  * is the whole reason the row survives as a tombstone. referral_codes does
- * go — a link to a deleted workshop should stop working.
+ * go — a link to a deleted workshop should stop working. Until 9 October
+ * the application role had no DELETE on that table, so every run stopped
+ * here and rolled back; integration/workspaceDeletion.test.ts now runs the
+ * whole list against real rows so a grant cannot drift from it again.
  *
  * The three SMS money tables — sms_wallets, sms_wallet_transactions and
  * sms_topups — are ledger too and stay for the same reason. sms_messages
@@ -56,6 +59,14 @@ export const DELETION_ORDER = [
   "purchaseInvoice",
   "saleInvoice",
   "device",
+  // Before items and warehouses, which their lines and headers point at
+  // with RESTRICT. The ledger rows they wrote leave with the items.
+  "stockAdjustmentLine",
+  "stockAdjustment",
+  "stockCountLine",
+  "stockCount",
+  "stockTransferLine",
+  "stockTransfer",
   "itemStock",
   "item",
   "warehouse",

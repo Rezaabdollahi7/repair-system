@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { getSettings } from "../api";
 import { useReactToPrint } from "react-to-print";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import {
+  formatPersianCurrency,
+  toPersianDigits,
+  formatQuantity,
+} from "../utils/formatters";
 import PrintPreviewModal from "./PrintPreviewModal";
 import type { AppSettings, RepairInvoiceDetail } from "../types/api";
 
@@ -210,7 +214,7 @@ export default function InvoicePreview({
                   </td>
                   <td className={td}>{item.name}</td>
                   <td className={`${td} text-center`}>
-                    {toPersianDigits(item.quantity)}
+                    {formatQuantity(item.quantity)}
                   </td>
                   <td className={`${td} text-center text-text-secondary`}>
                     {item.unit}

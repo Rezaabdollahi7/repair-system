@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import * as controller from "../controllers/purchaseInvoiceController";
 import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
+import { applyStockMovements, InsufficientStockError } from "../utils/stock";
+import { resolveWarehouseId } from "../utils/warehouse";
 
 jest.mock("../lib/prisma", () => {
   const tx = {
@@ -11,15 +13,12 @@ jest.mock("../lib/prisma", () => {
       create: jest.fn(),
       delete: jest.fn(),
       update: jest.fn(),
+      findFirst: jest.fn(),
     },
-    purchaseInvoiceItem: { create: jest.fn(), deleteMany: jest.fn() },
-    // findFirstOrThrow rather than findUniqueOrThrow: the controller pairs
-    // the item id with workspaceId now, which findUnique can't express.
-    item: { findFirstOrThrow: jest.fn(), update: jest.fn() },
-    inventoryTransaction: { create: jest.fn() },
-    warehouse: {
-      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 4 }),
-    },
+    purchaseInvoiceItem: { createMany: jest.fn(), deleteMany: jest.fn() },
+    // The row lock an edit or delete takes before reading the invoice. One
+    // row back means the invoice exists in this workspace.
+    $queryRaw: jest.fn(),
   };
 
   return {
@@ -31,7 +30,6 @@ jest.mock("../lib/prisma", () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
-      item: { findMany: jest.fn() },
       __tx: tx,
     },
     // Named alongside the default export now that controllers import both.
@@ -42,17 +40,32 @@ jest.mock("../lib/prisma", () => {
   };
 });
 
+// The stock arithmetic and locking have their own suites (stock.test.ts and
+// integration/stock.test.ts). Here the question is only what this
+// controller asks the service to move — the error classes stay real so the
+// controller's instanceof checks still work.
+jest.mock("../utils/stock", () => ({
+  ...jest.requireActual("../utils/stock"),
+  applyStockMovements: jest.fn(),
+}));
+
+jest.mock("../utils/warehouse", () => ({
+  resolveWarehouseId: jest.fn(),
+}));
+
 const db = prisma as unknown as {
   purchaseInvoice: Record<string, jest.Mock>;
-  item: Record<string, jest.Mock>;
   __tx: {
     workspace: Record<string, jest.Mock>;
     purchaseInvoice: Record<string, jest.Mock>;
     purchaseInvoiceItem: Record<string, jest.Mock>;
-    item: Record<string, jest.Mock>;
-    inventoryTransaction: Record<string, jest.Mock>;
+    $queryRaw: jest.Mock;
   };
 };
+
+const applyMovements = applyStockMovements as unknown as jest.Mock;
+const resolveWarehouse = resolveWarehouseId as unknown as jest.Mock;
+const MAIN_WAREHOUSE = 4;
 
 const runInTx = runInWorkspaceTransaction as unknown as jest.Mock;
 
@@ -85,6 +98,7 @@ function invoiceRow(overrides: Record<string, unknown> = {}) {
     workspaceId: WORKSPACE_ID,
     invoiceNumber: "PUR-20260806-001",
     supplierName: "تأمین‌کننده",
+    warehouseId: MAIN_WAREHOUSE,
     invoiceDate: new Date("2026-08-06T00:00:00.000Z"),
     totalAmount: decimal(30000),
     paidAmount: decimal(30000),
@@ -101,6 +115,8 @@ const listQuery = { page: 1, limit: 10 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resolveWarehouse.mockResolvedValue(MAIN_WAREHOUSE);
+  applyMovements.mockResolvedValue([]);
 });
 
 describe("purchaseInvoiceController.getAll", () => {
@@ -230,6 +246,7 @@ describe("purchaseInvoiceController.getById", () => {
           item: { code: "C-100", name: "خازن", unit: "عدد" },
         },
       ],
+      warehouse: { name: "انبار اصلی" },
     });
 
     const res = mockResponse();
@@ -254,6 +271,7 @@ describe("purchaseInvoiceController.create", () => {
   const body = {
     supplier_name: "تأمین‌کننده",
     invoice_date: undefined,
+    warehouse_id: undefined,
     paid_amount: 30000,
     note: null,
     items: [{ item_id: 2, quantity: 10, unit_price: 3000 }],
@@ -264,40 +282,12 @@ describe("purchaseInvoiceController.create", () => {
     db.__tx.purchaseInvoice.create.mockResolvedValue(invoiceRow());
   });
 
-  it("names the missing item id rather than failing on a foreign key", async () => {
-    db.item.findMany.mockResolvedValue([]);
-
-    const res = mockResponse();
-    await controller.create(mockRequest({ body }, 3), res);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      error: "کالا با شناسه 2 یافت نشد",
-    });
-    expect(runInTx).not.toHaveBeenCalled();
-  });
-
-  it("treats an item from another workspace as missing", async () => {
-    db.item.findMany.mockResolvedValue([]);
-
-    await controller.create(mockRequest({ body }, 3), mockResponse());
-
-    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-    });
-  });
-
   it("derives the total from the lines and marks it paid", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
-
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
     expect(db.__tx.purchaseInvoice.create.mock.calls[0][0].data).toMatchObject({
       workspaceId: WORKSPACE_ID,
+      warehouseId: MAIN_WAREHOUSE,
       totalAmount: 30000,
       paidAmount: 30000,
       paymentStatus: "paid",
@@ -305,13 +295,28 @@ describe("purchaseInvoiceController.create", () => {
     });
   });
 
-  it("takes its number from its own workspace's counter", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
+  it("rounds a fractional line to whole rials", async () => {
+    // 2.5 metres at 1001 is 2502.5 — there is no half rial to store.
+    await controller.create(
+      mockRequest({
+        body: {
+          ...body,
+          paid_amount: 0,
+          items: [{ item_id: 2, quantity: 2.5, unit_price: 1001 }],
+        },
+      }),
+      mockResponse(),
+    );
 
+    expect(
+      db.__tx.purchaseInvoiceItem.createMany.mock.calls[0][0].data[0],
+    ).toMatchObject({ quantity: 2.5, totalPrice: 2503 });
+    expect(
+      db.__tx.purchaseInvoice.create.mock.calls[0][0].data.totalAmount,
+    ).toBe(2503);
+  });
+
+  it("takes its number from its own workspace's counter", async () => {
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
     // increment rather than a count: two concurrent requests could both read
@@ -328,12 +333,6 @@ describe("purchaseInvoiceController.create", () => {
   });
 
   it("marks a part payment as partial", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
-
     await controller.create(
       mockRequest({ body: { ...body, paid_amount: 10000 } }, 3),
       mockResponse(),
@@ -344,85 +343,78 @@ describe("purchaseInvoiceController.create", () => {
     ).toBe("partial");
   });
 
-  it("recalculates the weighted average purchase price", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    // 5 units at 1000 plus 10 at 3000 = 35000 over 15 units.
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(5),
-      avgPurchasePrice: decimal(1000),
-    });
-
-    await controller.create(mockRequest({ body }, 3), mockResponse());
-
-    expect(db.__tx.item.update.mock.calls[0][0].data).toEqual({
-      currentStock: 15,
-      avgPurchasePrice: 35000 / 15,
-    });
-  });
-
-  it("links the ledger entry to the invoice", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
-
-    await controller.create(mockRequest({ body }, 3), mockResponse());
-
-    expect(
-      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-      itemId: 2,
-      type: "purchase",
-      quantity: 10,
-      referenceId: 5,
-      referenceType: "purchase_invoice",
-      createdBy: 3,
-    });
-  });
-
-  it("builds each line's stock on the one before it", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow
-      .mockResolvedValueOnce({
-        currentStock: decimal(0),
-        avgPurchasePrice: decimal(0),
-      })
-      .mockResolvedValueOnce({
-        currentStock: decimal(10),
-        avgPurchasePrice: decimal(3000),
-      });
+  it("receives the goods into the warehouse it names", async () => {
+    resolveWarehouse.mockResolvedValue(7);
 
     await controller.create(
-      mockRequest(
-        {
-          body: {
-            ...body,
-            items: [
-              { item_id: 2, quantity: 10, unit_price: 3000 },
-              { item_id: 2, quantity: 5, unit_price: 3000 },
-            ],
-          },
-        },
-        3,
-      ),
+      mockRequest({ body: { ...body, warehouse_id: 7 } }),
       mockResponse(),
     );
 
-    const stockValues = db.__tx.item.update.mock.calls.map(
-      ([args]) => args.data.currentStock,
+    expect(resolveWarehouse).toHaveBeenCalledWith(
+      expect.anything(),
+      WORKSPACE_ID,
+      7,
     );
-    expect(stockValues).toEqual([10, 15]);
+    expect(
+      db.__tx.purchaseInvoice.create.mock.calls[0][0].data.warehouseId,
+    ).toBe(7);
+    expect(applyMovements.mock.calls[0][3][0].warehouseId).toBe(7);
+  });
+
+  it("brings each line in at the price paid, against this invoice", async () => {
+    await controller.create(mockRequest({ body }, 3), mockResponse());
+
+    const [, workspaceId, document, lines] = applyMovements.mock.calls[0];
+    expect(workspaceId).toBe(WORKSPACE_ID);
+    expect(document).toMatchObject({
+      referenceType: "purchase_invoice",
+      referenceId: 5,
+      actorId: 3,
+    });
+    // The price paid is the cost: it is what pulls the moving average.
+    expect(lines).toEqual([
+      {
+        itemId: 2,
+        warehouseId: MAIN_WAREHOUSE,
+        quantity: 10,
+        type: "purchase",
+        unitCost: 3000,
+        unitPrice: 3000,
+        note: "خرید از فاکتور",
+      },
+    ]);
+  });
+
+  it("dates the movement by the invoice, not by the clock", async () => {
+    const dated = new Date("2026-07-01T00:00:00.000Z");
+    db.__tx.purchaseInvoice.create.mockResolvedValue(
+      invoiceRow({ invoiceDate: dated }),
+    );
+
+    await controller.create(
+      mockRequest({ body: { ...body, invoice_date: dated } }),
+      mockResponse(),
+    );
+
+    expect(applyMovements.mock.calls[0][2].occurredAt).toEqual(dated);
+  });
+
+  it("answers 400 with the service's reason when it refuses", async () => {
+    applyMovements.mockRejectedValue(
+      new (jest.requireActual("../utils/stock").UnknownItemError)(2),
+    );
+
+    const res = mockResponse();
+    await controller.create(mockRequest({ body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "کالا با شناسه 2 یافت نشد",
+    });
   });
 
   it("does everything inside one transaction", async () => {
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
-
     await controller.create(mockRequest({ body }, 3), mockResponse());
 
     expect(runInTx).toHaveBeenCalledWith(WORKSPACE_ID, expect.any(Function));
@@ -470,24 +462,61 @@ describe("purchaseInvoiceController.updatePayment", () => {
   });
 });
 
+/** The invoice as lockInvoice reads it: found, with these lines. */
+function lockedInvoice(
+  items: {
+    itemId: number;
+    quantity: ReturnType<typeof decimal>;
+    unitPrice: ReturnType<typeof decimal>;
+  }[],
+  overrides: Record<string, unknown> = {},
+) {
+  db.__tx.$queryRaw.mockResolvedValue([{ id: 5 }]);
+  db.__tx.purchaseInvoice.findFirst.mockResolvedValue({
+    ...invoiceRow(overrides),
+    items,
+  });
+}
+
+function lockedNothing() {
+  db.__tx.$queryRaw.mockResolvedValue([]);
+}
+
+const tenAt3000 = {
+  itemId: 2,
+  quantity: decimal(10),
+  unitPrice: decimal(3000),
+};
+
 describe("purchaseInvoiceController.remove", () => {
   it("returns 404 for an invoice in another workspace", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(null);
+    lockedNothing();
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 9 } }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(runInTx).not.toHaveBeenCalled();
+    expect(applyMovements).not.toHaveBeenCalled();
+    expect(db.__tx.purchaseInvoice.delete).not.toHaveBeenCalled();
+  });
+
+  it("locks the invoice in this workspace before reading it", async () => {
+    // Two deletes used to read the invoice outside the transaction, both
+    // find it, and both put its goods back. Under the lock the second waits
+    // and then finds nothing.
+    lockedInvoice([tenAt3000]);
+
+    await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
+
+    const sql = db.__tx.$queryRaw.mock.calls[0][0].join("?");
+    expect(sql).toMatch(/FOR UPDATE/);
+    expect(db.__tx.$queryRaw.mock.calls[0].slice(1)).toEqual([5, WORKSPACE_ID]);
   });
 
   it("deletes an invoice that has no lines", async () => {
     // The old handler read the lines first and treated an empty result as
     // "not found", so such an invoice could never be removed.
-    db.purchaseInvoice.findFirst.mockResolvedValue({
-      ...invoiceRow(),
-      items: [],
-    });
+    lockedInvoice([]);
 
     const res = mockResponse();
     await controller.remove(mockRequest({ params: { id: 5 } }), res);
@@ -500,50 +529,50 @@ describe("purchaseInvoiceController.remove", () => {
     });
   });
 
-  it("reverses the stock each line added", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue({
-      ...invoiceRow(),
-      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) }],
-    });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(25),
-      avgPurchasePrice: decimal(3000),
-    });
+  it("takes each line back out at the price it was bought at", async () => {
+    lockedInvoice([tenAt3000]);
 
     await controller.remove(
       mockRequest({ params: { id: 5 } }, 3),
       mockResponse(),
     );
 
-    expect(db.__tx.item.update.mock.calls[0][0].data).toMatchObject({
-      currentStock: 15,
-    });
-    expect(
-      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-      type: "reversal",
-      quantity: -10,
+    const [, , document, lines] = applyMovements.mock.calls[0];
+    expect(document).toMatchObject({
+      referenceType: "purchase_invoice",
       referenceId: 5,
-      note: "حذف فاکتور خرید",
+      actorId: 3,
     });
+    // At the line's own price, not the current average — the only inverse
+    // that lands back on what the surviving stock cost.
+    expect(lines).toEqual([
+      {
+        itemId: 2,
+        warehouseId: MAIN_WAREHOUSE,
+        quantity: -10,
+        type: "reversal",
+        unitCost: 3000,
+        unitPrice: 3000,
+        note: "حذف فاکتور خرید",
+      },
+    ]);
   });
 
-  it("clamps the reversal at zero when the stock was already sold on", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue({
-      ...invoiceRow(),
-      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) }],
-    });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(4),
-      avgPurchasePrice: decimal(3000),
-    });
+  it("refuses, and says why, when the goods were already sold on", async () => {
+    // It used to clamp at zero and carry on, which left the ledger and the
+    // stock column disagreeing for good.
+    lockedInvoice([tenAt3000]);
+    applyMovements.mockRejectedValue(
+      new InsufficientStockError(2, "خازن", 4, 10),
+    );
 
-    await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
+    const res = mockResponse();
+    await controller.remove(mockRequest({ params: { id: 5 } }), res);
 
-    expect(db.__tx.item.update.mock.calls[0][0].data).toMatchObject({
-      currentStock: 0,
-    });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toContain("«خازن»");
+    expect(res.json.mock.calls[0][0].error).toContain("فروخته یا مصرف شده");
+    expect(db.__tx.purchaseInvoice.delete).not.toHaveBeenCalled();
   });
 });
 
@@ -551,155 +580,101 @@ describe("purchaseInvoiceController.update", () => {
   const body = {
     supplier_name: "تأمین‌کننده تازه",
     invoice_date: new Date("2026-09-01T00:00:00.000Z"),
+    warehouse_id: undefined,
     paid_amount: 0,
     note: null,
     items: [{ item_id: 2, quantity: 4, unit_price: 5000 }],
   };
 
-  function existingInvoice(
-    items: {
-      itemId: number;
-      quantity: ReturnType<typeof decimal>;
-      unitPrice: ReturnType<typeof decimal>;
-    }[],
-  ) {
-    return { ...invoiceRow(), items };
-  }
-
   it("returns 404 for an invoice in another workspace", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(null);
+    lockedNothing();
 
     const res = mockResponse();
     await controller.update(mockRequest({ params: { id: 9 }, body }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(runInTx).not.toHaveBeenCalled();
+    expect(applyMovements).not.toHaveBeenCalled();
   });
 
-  it("rejects an unknown item before touching any stock", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
-    db.item.findMany.mockResolvedValue([]);
+  it("puts the new lines in before taking the old ones out", async () => {
+    // Ten bought, five sold since, edited to twelve: taking the ten out first
+    // would fall below zero on the way to a valid fifteen.
+    lockedInvoice([tenAt3000]);
 
-    const res = mockResponse();
-    await controller.update(mockRequest({ params: { id: 5 }, body }), res);
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }, 3),
+      mockResponse(),
+    );
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      error: "کالا با شناسه 2 یافت نشد",
+    const lines = applyMovements.mock.calls[0][3];
+    expect(
+      lines.map((line: { type: string; quantity: number }) => [
+        line.type,
+        line.quantity,
+      ]),
+    ).toEqual([
+      ["purchase", 4],
+      ["reversal", -10],
+    ]);
+    expect(lines[1]).toMatchObject({
+      unitCost: 3000,
+      note: "ویرایش فاکتور خرید",
     });
-    // The check runs outside the transaction, so a bad edit leaves the
-    // warehouse exactly as it was.
-    expect(runInTx).not.toHaveBeenCalled();
   });
 
-  it("scopes the item check to this workspace", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
+  it("records both halves against this invoice", async () => {
+    lockedInvoice([tenAt3000]);
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body }, 3),
+      mockResponse(),
+    );
+
+    expect(applyMovements.mock.calls[0][2]).toMatchObject({
+      referenceType: "purchase_invoice",
+      referenceId: 5,
+      occurredAt: body.invoice_date,
+      actorId: 3,
     });
+  });
+
+  it("takes the old lines out of the warehouse they went into", async () => {
+    // The invoice moves to warehouse 7; its old goods leave warehouse 4.
+    lockedInvoice([tenAt3000]);
+    resolveWarehouse.mockResolvedValue(7);
+
+    await controller.update(
+      mockRequest({ params: { id: 5 }, body: { ...body, warehouse_id: 7 } }),
+      mockResponse(),
+    );
+
+    const lines = applyMovements.mock.calls[0][3];
+    expect(lines[0]).toMatchObject({ type: "purchase", warehouseId: 7 });
+    expect(lines[1]).toMatchObject({
+      type: "reversal",
+      warehouseId: MAIN_WAREHOUSE,
+    });
+    expect(
+      db.__tx.purchaseInvoice.update.mock.calls[0][0].data.warehouseId,
+    ).toBe(7);
+  });
+
+  it("keeps the warehouse when the edit names none", async () => {
+    lockedInvoice([tenAt3000]);
 
     await controller.update(
       mockRequest({ params: { id: 5 }, body }),
       mockResponse(),
     );
 
-    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-    });
-  });
-
-  it("takes the old lines out of stock before putting the new ones in", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(
-      existingInvoice([
-        { itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) },
-      ]),
-    );
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow
-      // the reversal reads the stock as it stands
-      .mockResolvedValueOnce({
-        currentStock: decimal(30),
-        avgPurchasePrice: decimal(3000),
-      })
-      // then the rewrite reads what the reversal left
-      .mockResolvedValueOnce({
-        currentStock: decimal(20),
-        avgPurchasePrice: decimal(4000),
-      });
-
-    await controller.update(
-      mockRequest({ params: { id: 5 }, body }, 3),
-      mockResponse(),
-    );
-
-    // 30 − 10 (the old line) then + 4 (the new one): an edit nets out to the
-    // difference rather than adding the line a second time.
-    expect(db.__tx.item.update.mock.calls[0][0].data).toMatchObject({
-      currentStock: 20,
-    });
-    expect(db.__tx.item.update.mock.calls[1][0].data).toMatchObject({
-      currentStock: 24,
-    });
-  });
-
-  it("records the reversal against this invoice", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(
-      existingInvoice([
-        { itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) },
-      ]),
-    );
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow
-      .mockResolvedValueOnce({
-        currentStock: decimal(30),
-        avgPurchasePrice: decimal(3000),
-      })
-      .mockResolvedValueOnce({
-        currentStock: decimal(20),
-        avgPurchasePrice: decimal(4000),
-      });
-
-    await controller.update(
-      mockRequest({ params: { id: 5 }, body }, 3),
-      mockResponse(),
-    );
-
+    expect(resolveWarehouse).not.toHaveBeenCalled();
     expect(
-      db.__tx.inventoryTransaction.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-      type: "reversal",
-      quantity: -10,
-      referenceId: 5,
-      referenceType: "purchase_invoice",
-      note: "ویرایش فاکتور خرید",
-      createdBy: 3,
-    });
-    // The stock history keeps both halves: the shop can see the invoice was
-    // edited rather than finding the original purchase silently rewritten.
-    expect(
-      db.__tx.inventoryTransaction.create.mock.calls[1][0].data,
-    ).toMatchObject({ type: "purchase", quantity: 4, referenceId: 5 });
+      db.__tx.purchaseInvoice.update.mock.calls[0][0].data.warehouseId,
+    ).toBe(MAIN_WAREHOUSE);
   });
 
   it("replaces the line rows rather than appending to them", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(
-      existingInvoice([
-        { itemId: 2, quantity: decimal(10), unitPrice: decimal(3000) },
-      ]),
-    );
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow
-      .mockResolvedValueOnce({
-        currentStock: decimal(30),
-        avgPurchasePrice: decimal(3000),
-      })
-      .mockResolvedValueOnce({
-        currentStock: decimal(20),
-        avgPurchasePrice: decimal(4000),
-      });
+    lockedInvoice([tenAt3000]);
 
     await controller.update(
       mockRequest({ params: { id: 5 }, body }),
@@ -709,16 +684,13 @@ describe("purchaseInvoiceController.update", () => {
     expect(db.__tx.purchaseInvoiceItem.deleteMany).toHaveBeenCalledWith({
       where: { invoiceId: 5 },
     });
-    expect(db.__tx.purchaseInvoiceItem.create).toHaveBeenCalledTimes(1);
+    expect(
+      db.__tx.purchaseInvoiceItem.createMany.mock.calls[0][0].data,
+    ).toHaveLength(1);
   });
 
   it("recomputes the total and the payment status from the new lines", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
+    lockedInvoice([]);
 
     await controller.update(
       mockRequest(
@@ -738,12 +710,7 @@ describe("purchaseInvoiceController.update", () => {
   });
 
   it("leaves the invoice number alone", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue(existingInvoice([]));
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(0),
-      avgPurchasePrice: decimal(0),
-    });
+    lockedInvoice([]);
 
     await controller.update(
       mockRequest({ params: { id: 5 }, body }),
@@ -757,67 +724,18 @@ describe("purchaseInvoiceController.update", () => {
     ).not.toHaveProperty("invoiceNumber");
     expect(db.__tx.workspace.update).not.toHaveBeenCalled();
   });
-});
 
-describe("purchaseInvoiceController — the average purchase price", () => {
-  it("takes the reversed lines back out of the average, not just the stock", async () => {
-    // Five units held at ۱۰۰۰, then this invoice bought ten at ۲۰۰۰:
-    // fifteen units averaging ۱۶۶۶٫۶۷. Deleting the invoice has to leave
-    // the five survivors at the ۱۰۰۰ they cost — the figure used to be left
-    // standing, and the stock report multiplies it by the quantity on hand.
-    db.purchaseInvoice.findFirst.mockResolvedValue({
-      ...invoiceRow(),
-      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(2000) }],
-    });
-    db.__tx.item.findFirstOrThrow.mockResolvedValue({
-      currentStock: decimal(15),
-      avgPurchasePrice: decimal(1666.6666666666667),
-    });
-
-    await controller.remove(mockRequest({ params: { id: 5 } }), mockResponse());
-
-    const written = db.__tx.item.update.mock.calls[0][0].data;
-    expect(written.currentStock).toBe(5);
-    expect(written.avgPurchasePrice).toBeCloseTo(1000, 6);
-  });
-
-  it("re-prices an edited line at what the shop now says it paid", async () => {
-    db.purchaseInvoice.findFirst.mockResolvedValue({
-      ...invoiceRow(),
-      items: [{ itemId: 2, quantity: decimal(10), unitPrice: decimal(2000) }],
-    });
-    db.item.findMany.mockResolvedValue([{ id: 2 }]);
-    db.__tx.item.findFirstOrThrow
-      // the reversal: 15 units at ۱۶۶۶٫۶۷ back down to 5 at ۱۰۰۰
-      .mockResolvedValueOnce({
-        currentStock: decimal(15),
-        avgPurchasePrice: decimal(1666.6666666666667),
-      })
-      // the rewrite reads what the reversal left
-      .mockResolvedValueOnce({
-        currentStock: decimal(5),
-        avgPurchasePrice: decimal(1000),
-      });
-
-    await controller.update(
-      mockRequest({
-        params: { id: 5 },
-        body: {
-          supplier_name: null,
-          invoice_date: new Date("2026-09-01T00:00:00.000Z"),
-          paid_amount: 0,
-          note: null,
-          items: [{ item_id: 2, quantity: 10, unit_price: 3000 }],
-        },
-      }),
-      mockResponse(),
+  it("refuses an edit that would leave sold goods unaccounted for", async () => {
+    lockedInvoice([tenAt3000]);
+    applyMovements.mockRejectedValue(
+      new InsufficientStockError(2, "خازن", 1, 10),
     );
 
-    // (5 × ۱۰۰۰ + 10 × ۳۰۰۰) ÷ 15. Reversing at the blended average instead
-    // would have landed on ۲۵۵۵٫۵۶.
-    const written = db.__tx.item.update.mock.calls[1][0].data;
-    expect(written.currentStock).toBe(15);
-    expect(written.avgPurchasePrice).toBeCloseTo(2333.333333, 4);
+    const res = mockResponse();
+    await controller.update(mockRequest({ params: { id: 5 }, body }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toContain("«خازن»");
   });
 });
 

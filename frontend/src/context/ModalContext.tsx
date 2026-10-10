@@ -12,7 +12,6 @@ import DeviceFormModal from "../components/DeviceFormModal";
 import CustomerFormModal from "../components/CustomerFormModal";
 import PersonnelFormModal from "../components/PersonnelFormModal";
 import ItemFormModal from "../components/ItemFormModal";
-import ItemDetailModal from "../components/ItemDetailModal";
 import SaleInvoiceDetailModal from "../components/SaleInvoiceDetailModal";
 import SaleInvoiceFormModal from "../components/SaleInvoiceFormModal";
 import PurchaseInvoiceDetailModal from "../components/PurchaseInvoiceDetailModal";
@@ -32,7 +31,6 @@ type ModalType =
   | "customerEdit"
   | "personnelEdit"
   | "itemEdit"
-  | "itemDetail"
   | "saleInvoiceDetail"
   | "saleInvoiceCreate"
   | "saleInvoiceEdit"
@@ -66,7 +64,6 @@ interface ModalContextValue {
   openCustomerEdit: (customerId: Id | null) => void;
   openPersonnelEdit: (personnelId: Id | null) => void;
   openItemEdit: (itemId: Id | null) => void;
-  openItemDetail: (itemId: Id) => void;
   openSaleInvoiceDetail: (invoiceId: Id) => void;
   openSaleInvoiceCreate: (deviceId?: Id | null) => void;
   openSaleInvoiceEdit: (invoiceId: Id) => void;
@@ -144,7 +141,8 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const openDeviceEdit = (deviceId: Id | null) =>
     openModal("deviceEdit", deviceId);
   const openItemEdit = (itemId: Id | null) => openModal("itemEdit", itemId);
-  const openItemDetail = (itemId: Id) => openModal("itemDetail", itemId);
+  // No openItemDetail: an item is a page since 14.18 — useGoToItem in
+  // utils/navigation.ts.
   /*
    * A customer's details are a page now, not a modal — `/customers/:id`.
    * What is left here is the one modal that page opens on the customer's
@@ -180,7 +178,6 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         openCustomerEdit,
         openPersonnelEdit,
         openItemEdit,
-        openItemDetail,
         openSaleInvoiceDetail,
         openSaleInvoiceCreate,
         openSaleInvoiceEdit, // ← اضافه شد
@@ -267,16 +264,6 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                 isOpen={true}
                 onClose={closeModal}
                 onSuccess={closeModal}
-                zIndex={zIndex}
-              />
-            );
-          case "itemDetail":
-            return (
-              <ItemDetailModal
-                key={`${modal.type}-${modal.id}-${index}`}
-                itemId={modal.id}
-                isOpen={true}
-                onClose={closeModal}
                 zIndex={zIndex}
               />
             );

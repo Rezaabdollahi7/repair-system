@@ -23,7 +23,23 @@ import type {
   DeviceAssignment,
   Category,
   CategoryBody,
+  Warehouse,
+  WarehouseBody,
+  StockAdjustment,
+  StockAdjustmentCreateBody,
+  StockAdjustmentDetail,
+  StockTransfer,
+  StockTransferCreateBody,
+  StockTransferDetail,
+  StockCount,
+  StockCountCreateBody,
+  StockCountDetail,
+  StockCountLine,
+  StockCountReview,
   ItemCreateBody,
+  ItemTrade,
+  ItemKardex,
+  ItemPrices,
   Item,
   ItemForInvoice,
   ItemUpdateBody,
@@ -63,6 +79,7 @@ import type {
   AppService,
   DashboardStats,
   StockReport,
+  MovementReport,
   PurchaseReport,
   SaleReport,
   ProfitReport,
@@ -345,10 +362,71 @@ export const updateCategory = (id: Id, data: CategoryBody) =>
   api.put<Category>(`/categories/${id}`, data);
 export const deleteCategory = (id: Id) =>
   api.delete<MessageResponse>(`/categories/${id}`);
+
+// Warehouses (14.10). No delete: a warehouse is deactivated, and only once
+// it holds nothing — the server refuses otherwise and says why.
+export const getWarehouses = () => api.get<Warehouse[]>("/warehouses");
+export const createWarehouse = (data: WarehouseBody) =>
+  api.post<Warehouse>("/warehouses", data);
+export const updateWarehouse = (id: Id, data: WarehouseBody) =>
+  api.put<Warehouse>(`/warehouses/${id}`, data);
+export const setDefaultWarehouse = (id: Id) =>
+  api.post<Warehouse>(`/warehouses/${id}/default`);
+export const setWarehouseActive = (id: Id, isActive: boolean) =>
+  api.put<Warehouse>(`/warehouses/${id}/status`, { is_active: isActive });
+
+// Stock adjustments (14.14). No update or delete: one is applied when saved,
+// and a mistake is corrected by another.
+export const getStockAdjustments = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<StockAdjustment>>("/stock-adjustments", {
+    params,
+  });
+export const getStockAdjustment = (id: Id) =>
+  api.get<StockAdjustmentDetail>(`/stock-adjustments/${id}`);
+export const createStockAdjustment = (data: StockAdjustmentCreateBody) =>
+  api.post<StockAdjustmentDetail>("/stock-adjustments", data);
+
+// Stock transfers (14.16) — the same three calls: no edit, no delete.
+export const getStockTransfers = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<StockTransfer>>("/stock-transfers", { params });
+export const getStockTransfer = (id: Id) =>
+  api.get<StockTransferDetail>(`/stock-transfers/${id}`);
+export const createStockTransfer = (data: StockTransferCreateBody) =>
+  api.post<StockTransferDetail>("/stock-transfers", data);
+
+// Stock counts (14.15). A line is saved on its own as the shop counts; the
+// count is applied once, after the review, or cancelled. No delete.
+export const getStockCounts = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<StockCount>>("/stock-counts", { params });
+export const getStockCount = (id: Id) =>
+  api.get<StockCountDetail>(`/stock-counts/${id}`);
+export const createStockCount = (data: StockCountCreateBody) =>
+  api.post<StockCountDetail>("/stock-counts", data);
+export const updateStockCountLine = (
+  id: Id,
+  lineId: Id,
+  data: { counted_quantity: number | null; note?: string | null },
+) => api.put<StockCountLine>(`/stock-counts/${id}/lines/${lineId}`, data);
+export const addStockCountLine = (id: Id, itemId: Id) =>
+  api.post<StockCountLine>(`/stock-counts/${id}/lines`, { item_id: itemId });
+export const getStockCountReview = (id: Id) =>
+  api.get<StockCountReview>(`/stock-counts/${id}/review`);
+export const applyStockCount = (id: Id, acknowledgeMoved: boolean) =>
+  api.post<StockCountDetail>(`/stock-counts/${id}/apply`, {
+    acknowledge_moved: acknowledgeMoved,
+  });
+export const cancelStockCount = (id: Id) =>
+  api.post<StockCountDetail>(`/stock-counts/${id}/cancel`);
 // Items
 export const getItems = (params?: QueryParams) =>
   api.get<PaginatedWithLimit<Item>>("/items", { params });
 export const getItem = (id: Id) => api.get<Item>(`/items/${id}`);
+export const getItemTrade = (id: Id) =>
+  api.get<ItemTrade>(`/items/${id}/trade`);
+export const getItemPrices = (id: Id) =>
+  api.get<ItemPrices>(`/items/${id}/prices`);
+export const getItemKardex = (id: Id, params?: QueryParams) =>
+  api.get<ItemKardex>(`/items/${id}/kardex`, { params });
 export const createItem = (data: ItemCreateBody) =>
   api.post<Item>("/items", data);
 export const updateItem = (id: Id, data: ItemUpdateBody) =>
@@ -411,6 +489,8 @@ export const quickSale = (id: Id, data: QuickSaleBody) =>
 // Reports
 export const getDashboardStats = () =>
   api.get<DashboardStats>("/reports/dashboard");
+export const getMovementReport = (params?: QueryParams) =>
+  api.get<MovementReport>("/reports/movements", { params });
 export const getStockReport = (params?: QueryParams) =>
   api.get<StockReport>("/reports/stock", { params });
 export const getPurchaseReport = (params?: QueryParams) =>

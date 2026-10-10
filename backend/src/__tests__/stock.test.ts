@@ -196,6 +196,18 @@ describe("planStockMovements — several lines", () => {
     expect(result.items.get(10)).toEqual({ stock: d(12), avgCost: 1100 });
   });
 
+  it("rounds the average once, not after every line", () => {
+    // Ten at 2000, then an edit: four in at 2500, the ten back out at 2000.
+    // Rounded between the lines this lands on 2500.01; carried at full
+    // precision it lands where the shop expects.
+    const result = plan(item({ stock: d(10), avgCost: 2000 }), [
+      line({ quantity: 4, type: "purchase", unitCost: 2500 }),
+      line({ quantity: -10, type: "reversal", unitCost: 2000 }),
+    ]);
+
+    expect(result.items.get(10)).toEqual({ stock: d(4), avgCost: 2500 });
+  });
+
   it("refuses the whole document when one line cannot be applied", () => {
     expect(() =>
       plan(item({ stock: d(2) }), [

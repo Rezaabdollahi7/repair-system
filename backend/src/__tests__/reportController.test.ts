@@ -8,7 +8,8 @@ jest.mock("../lib/prisma", () => ({
     item: { findMany: jest.fn(), count: jest.fn() },
     purchaseInvoice: { findMany: jest.fn(), aggregate: jest.fn() },
     saleInvoice: { findMany: jest.fn(), aggregate: jest.fn() },
-    saleInvoiceItem: { groupBy: jest.fn() },
+    saleInvoiceItem: { groupBy: jest.fn(), findMany: jest.fn() },
+    warehouse: { findFirst: jest.fn() },
     repairInvoice: {
       count: jest.fn(),
       aggregate: jest.fn(),
@@ -29,6 +30,7 @@ const db = prisma as unknown as {
   inventoryTransaction: Record<string, jest.Mock>;
   device: Record<string, jest.Mock>;
   deviceAssignment: Record<string, jest.Mock>;
+  warehouse: Record<string, jest.Mock>;
 };
 
 function decimal(value: number) {
@@ -141,6 +143,93 @@ describe("reportController.getStockReport", () => {
   });
 });
 
+describe("reportController.getStockReport with a warehouse", () => {
+  it("keeps only items that hold stock there", async () => {
+    db.warehouse.findFirst.mockResolvedValue({ id: 7 });
+    db.item.findMany.mockResolvedValue([]);
+
+    await controller.getStockReport(
+      mockRequest({ query: { warehouseId: 7 } }),
+      mockResponse(),
+    );
+
+    const args = db.item.findMany.mock.calls[0][0];
+    expect(args.where).toMatchObject({
+      workspaceId: WORKSPACE_ID,
+      stocks: { some: { warehouseId: 7, quantity: { gt: 0 } } },
+    });
+    expect(args.select.stocks).toEqual({
+      where: { warehouseId: 7 },
+      select: { quantity: true, warehouseId: true },
+    });
+  });
+
+  it("looks the warehouse up in the caller's workspace and 404s otherwise", async () => {
+    db.warehouse.findFirst.mockResolvedValue(null);
+
+    const res = mockResponse();
+    await controller.getStockReport(
+      mockRequest({ query: { warehouseId: 99 } }),
+      res,
+    );
+
+    expect(db.warehouse.findFirst.mock.calls[0][0].where).toEqual({
+      id: 99,
+      workspaceId: WORKSPACE_ID,
+    });
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(db.item.findMany).not.toHaveBeenCalled();
+  });
+
+  it("values the warehouse's quantity, shortest shelf first, status from the total", async () => {
+    db.warehouse.findFirst.mockResolvedValue({ id: 7 });
+    db.item.findMany.mockResolvedValue([
+      itemRow({
+        id: 1,
+        currentStock: decimal(20),
+        minStock: decimal(5),
+        avgPurchasePrice: decimal(1000),
+        stocks: [{ quantity: decimal(6) }],
+      }),
+      itemRow({
+        id: 2,
+        currentStock: decimal(30),
+        minStock: decimal(5),
+        avgPurchasePrice: decimal(2000),
+        stocks: [{ quantity: decimal(2) }],
+      }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getStockReport(
+      mockRequest({ query: { warehouseId: 7 } }),
+      res,
+    );
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.data.map((row: { id: number }) => row.id)).toEqual([2, 1]);
+    expect(body.data[0]).toMatchObject({
+      current_stock: 30,
+      warehouse_stock: 2,
+      // Two in this warehouse, thirty in all against a minimum of five.
+      stock_status: "good",
+    });
+    // 6 × 1000 + 2 × 2000, not the totals.
+    expect(body.summary.total_inventory_value).toBe(10000);
+  });
+
+  it("reports no warehouse figure without the filter", async () => {
+    db.item.findMany.mockResolvedValue([itemRow()]);
+
+    const res = mockResponse();
+    await controller.getStockReport(mockRequest({ query: {} }), res);
+
+    expect(res.json.mock.calls[0][0].data[0].warehouse_stock).toBeNull();
+    expect(db.warehouse.findFirst).not.toHaveBeenCalled();
+    expect(db.item.findMany.mock.calls[0][0].select.stocks).toBeUndefined();
+  });
+});
+
 describe("reportController.getPurchaseReport", () => {
   it("counts lines and sums quantities per invoice", async () => {
     db.purchaseInvoice.findMany.mockResolvedValue([
@@ -240,68 +329,146 @@ describe("reportController.getSaleReport", () => {
   });
 });
 
+function saleLine(overrides: Record<string, unknown> = {}) {
+  return {
+    itemId: 1,
+    quantity: decimal(1),
+    totalPrice: decimal(1000),
+    unitCost: decimal(0),
+    item: { name: "خازن", code: "C-100", avgPurchasePrice: decimal(0) },
+    ...overrides,
+  };
+}
+
 describe("reportController.getProfitReport", () => {
   it("ignores custom lines, which carry no known cost", async () => {
-    db.saleInvoiceItem.groupBy.mockResolvedValue([]);
+    db.saleInvoiceItem.findMany.mockResolvedValue([]);
 
     await controller.getProfitReport(
       mockRequest({ query: {} }),
       mockResponse(),
     );
 
-    expect(db.saleInvoiceItem.groupBy.mock.calls[0][0].where).toMatchObject({
+    expect(db.saleInvoiceItem.findMany.mock.calls[0][0].where).toMatchObject({
       workspaceId: WORKSPACE_ID,
       itemId: { not: null },
     });
   });
 
   it("computes profit and margin per item", async () => {
-    db.saleInvoiceItem.groupBy.mockResolvedValue([
-      {
-        itemId: 1,
-        _sum: { quantity: decimal(10), totalPrice: decimal(50000) },
-      },
-    ]);
-    db.item.findMany.mockResolvedValue([
-      { id: 1, name: "خازن", code: "C-100", avgPurchasePrice: decimal(2000) },
+    db.saleInvoiceItem.findMany.mockResolvedValue([
+      saleLine({
+        quantity: decimal(4),
+        totalPrice: decimal(20000),
+        unitCost: decimal(2000),
+      }),
+      saleLine({
+        quantity: decimal(6),
+        totalPrice: decimal(30000),
+        unitCost: decimal(2000),
+      }),
     ]);
 
     const res = mockResponse();
     await controller.getProfitReport(mockRequest({ query: {} }), res);
 
     // Revenue 50000 against a cost of 10 x 2000.
+    expect(res.json.mock.calls[0][0].data).toEqual([
+      expect.objectContaining({
+        item_id: 1,
+        total_quantity: 10,
+        total_revenue: 50000,
+        total_cost: 20000,
+        profit: 30000,
+        profit_margin: 60,
+      }),
+    ]);
+  });
+
+  it("costs each line at what it cost when it was sold, not at today's average", async () => {
+    // Sold at a cost of 1000; the item has since been restocked dearer.
+    db.saleInvoiceItem.findMany.mockResolvedValue([
+      saleLine({
+        quantity: decimal(2),
+        totalPrice: decimal(5000),
+        unitCost: decimal(1000),
+        item: { name: "خازن", code: "C-100", avgPurchasePrice: decimal(2400) },
+      }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getProfitReport(mockRequest({ query: {} }), res);
+
     expect(res.json.mock.calls[0][0].data[0]).toMatchObject({
-      total_revenue: 50000,
-      total_cost: 20000,
-      profit: 30000,
-      profit_margin: 60,
+      total_cost: 2000,
+      profit: 3000,
     });
   });
 
-  it("costs items from the caller's own catalogue", async () => {
-    db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: decimal(1), totalPrice: decimal(1000) } },
+  it("falls back to the current average for a line written before costs were stored", async () => {
+    db.saleInvoiceItem.findMany.mockResolvedValue([
+      saleLine({
+        quantity: decimal(2),
+        totalPrice: decimal(5000),
+        unitCost: null,
+        item: { name: "خازن", code: "C-100", avgPurchasePrice: decimal(1500) },
+      }),
     ]);
-    db.item.findMany.mockResolvedValue([]);
+
+    const res = mockResponse();
+    await controller.getProfitReport(mockRequest({ query: {} }), res);
+
+    expect(res.json.mock.calls[0][0].data[0].total_cost).toBe(3000);
+  });
+
+  it("does not leave floating-point dust on a fractional quantity", async () => {
+    db.saleInvoiceItem.findMany.mockResolvedValue([
+      saleLine({
+        quantity: decimal(0.4),
+        totalPrice: decimal(20000),
+        unitCost: decimal(30000),
+      }),
+      saleLine({
+        quantity: decimal(0.2),
+        totalPrice: decimal(10000),
+        unitCost: decimal(30000),
+      }),
+    ]);
+
+    const res = mockResponse();
+    await controller.getProfitReport(mockRequest({ query: {} }), res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.data[0]).toMatchObject({
+      total_quantity: 0.6,
+      total_cost: 18000,
+      profit: 12000,
+    });
+    expect(body.summary.total_cost).toBe(18000);
+  });
+
+  it("filters by the invoice's date", async () => {
+    db.saleInvoiceItem.findMany.mockResolvedValue([]);
 
     await controller.getProfitReport(
-      mockRequest({ query: {} }),
+      mockRequest({
+        query: {
+          from_date: new Date("2026-10-01T00:00:00Z"),
+          to_date: new Date("2026-10-09T00:00:00Z"),
+        },
+      }),
       mockResponse(),
     );
 
-    expect(db.item.findMany.mock.calls[0][0].where).toMatchObject({
-      workspaceId: WORKSPACE_ID,
-    });
+    expect(
+      db.saleInvoiceItem.findMany.mock.calls[0][0].where.invoice.invoiceDate,
+    ).toBeDefined();
   });
 
   it("orders the most profitable item first", async () => {
-    db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: decimal(1), totalPrice: decimal(1000) } },
-      { itemId: 2, _sum: { quantity: decimal(1), totalPrice: decimal(9000) } },
-    ]);
-    db.item.findMany.mockResolvedValue([
-      { id: 1, name: "الف", code: "A", avgPurchasePrice: decimal(0) },
-      { id: 2, name: "ب", code: "B", avgPurchasePrice: decimal(0) },
+    db.saleInvoiceItem.findMany.mockResolvedValue([
+      saleLine({ itemId: 1, totalPrice: decimal(1000) }),
+      saleLine({ itemId: 2, totalPrice: decimal(9000) }),
     ]);
 
     const res = mockResponse();
@@ -315,11 +482,8 @@ describe("reportController.getProfitReport", () => {
   });
 
   it("reports a zero margin rather than dividing by zero", async () => {
-    db.saleInvoiceItem.groupBy.mockResolvedValue([
-      { itemId: 1, _sum: { quantity: decimal(0), totalPrice: decimal(0) } },
-    ]);
-    db.item.findMany.mockResolvedValue([
-      { id: 1, name: "خازن", code: "C-100", avgPurchasePrice: decimal(0) },
+    db.saleInvoiceItem.findMany.mockResolvedValue([
+      saleLine({ quantity: decimal(0), totalPrice: decimal(0) }),
     ]);
 
     const res = mockResponse();

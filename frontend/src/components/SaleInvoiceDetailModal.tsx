@@ -9,6 +9,7 @@ import {
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import ConfirmModal from "./ConfirmModal";
 import SaleInvoicePreview from "./SaleInvoicePreview";
 import {
@@ -24,7 +25,7 @@ import {
 import {
   formatPersianCurrency,
   formatPersianPhone,
-  toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import type { Id, SaleInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
@@ -44,7 +45,8 @@ export default function SaleInvoiceDetailModal({
   onClose,
 }: SaleInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
-  const { openItemDetail } = useModal();
+  const { closeAllModals } = useModal();
+  const goToItem = useGoToItem();
   const [invoice, setInvoice] = useState<SaleInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentAmount, setPaymentAmount] = useState<string | number>("");
@@ -332,9 +334,11 @@ export default function SaleInvoiceDetailModal({
                                   {item.item_id ? (
                                     <button
                                       onClick={() => {
-                                        onClose();
+                                        // The item is a page now: the whole
+                                        // stack closes before it opens.
+                                        closeAllModals();
                                         if (item.item_id)
-                                          openItemDetail(item.item_id);
+                                          goToItem(item.item_id);
                                       }}
                                       className="text-primary hover:underline"
                                     >
@@ -345,7 +349,7 @@ export default function SaleInvoiceDetailModal({
                                   )}
                                 </td>
                                 <td className="border border-border px-3 py-2 text-body-sm text-center text-text-primary">
-                                  {toPersianDigits(item.quantity)}
+                                  {formatQuantity(item.quantity)}
                                 </td>
                                 <td className="border border-border px-3 py-2 text-body-sm text-center text-text-secondary">
                                   {item.item_unit || "—"}

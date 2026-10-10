@@ -4,13 +4,18 @@ import type { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import {
   dateFilter,
+  endOfDay,
   lastDaysRange,
   monthRange,
   todayRange,
   utcDayKey,
 } from "../utils/dateRange";
 import { errorMessage } from "../utils/errors";
-import type { DateRangeQuery, StockReportQuery } from "../schemas/report";
+import type {
+  DateRangeQuery,
+  MovementReportQuery,
+  StockReportQuery,
+} from "../schemas/report";
 import { workspaceIdOf } from "../utils/workspace";
 
 type StockStatus = "critical" | "low" | "good";
@@ -21,17 +26,52 @@ function stockStatus(currentStock: number, minStock: number): StockStatus {
   return "good";
 }
 
+// A quantity has three decimal places and a cost two (14.1). Sums of
+// products in floating point land a hair off — 0.4 × 30,000 is
+// 12,000.000000000002 — so each figure is rounded once, on the way out.
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function roundQuantity(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
 // GET /api/reports/stock
+//
+// With `warehouseId`, the report answers «what is in this warehouse and what
+// is it worth»: only items holding stock there, valued at that quantity, and
+// `warehouse_stock` beside the total. The status still compares the item's
+// total with its minimum, because the minimum is set per item across every
+// warehouse (14 decisions) — an item that lives in the main warehouse is not
+// «critical» for having none in the repairs one.
 export const getStockReport = async (req: Request, res: Response) => {
   try {
     const query = (req as ValidatedRequest).valid.query as StockReportQuery;
+    const workspaceId = workspaceIdOf(req);
+    const warehouseId = query.warehouseId;
+    const perWarehouse =
+      warehouseId === undefined && query.perWarehouse === "true";
+
+    if (warehouseId !== undefined) {
+      const warehouse = await prisma.warehouse.findFirst({
+        where: { id: warehouseId, workspaceId },
+        select: { id: true },
+      });
+      if (!warehouse) {
+        return res.status(404).json({ error: "انبار یافت نشد" });
+      }
+    }
 
     const where: Prisma.ItemWhereInput = {
       isActive: true,
-      workspaceId: workspaceIdOf(req),
+      workspaceId,
     };
     if (query.categoryId !== undefined) {
       where.categoryId = query.categoryId;
+    }
+    if (warehouseId !== undefined) {
+      where.stocks = { some: { warehouseId, quantity: { gt: 0 } } };
     }
 
     const items = await prisma.item.findMany({
@@ -46,30 +86,133 @@ export const getStockReport = async (req: Request, res: Response) => {
         minStock: true,
         avgPurchasePrice: true,
         category: { select: { name: true } },
+        ...(warehouseId !== undefined
+          ? {
+              stocks: {
+                where: { warehouseId },
+                select: { quantity: true, warehouseId: true },
+              },
+            }
+          : perWarehouse
+            ? {
+                stocks: {
+                  where: { quantity: { not: 0 } },
+                  select: { quantity: true, warehouseId: true },
+                },
+              }
+            : {}),
       },
     });
 
     // Both the status and the low-stock filter compare two columns against
     // each other, which Prisma can't express in where or orderBy.
-    const rows = items.map((item) => ({
-      id: item.id,
-      code: item.code,
-      name: item.name,
-      unit: item.unit,
-      current_stock: item.currentStock.toNumber(),
-      min_stock: item.minStock.toNumber(),
-      avg_purchase_price: item.avgPurchasePrice.toNumber(),
-      category_name: item.category?.name ?? null,
-      stock_status: stockStatus(
-        item.currentStock.toNumber(),
-        item.minStock.toNumber(),
-      ),
-    }));
+    const rows = items.map((item) => {
+      const currentStock = item.currentStock.toNumber();
+      const minStock = item.minStock.toNumber();
+      const stocks = (
+        item as {
+          stocks?: { quantity: Prisma.Decimal; warehouseId: number }[];
+        }
+      ).stocks;
+      return {
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        unit: item.unit,
+        current_stock: currentStock,
+        warehouse_stock:
+          warehouseId !== undefined
+            ? (stocks?.[0]?.quantity.toNumber() ?? 0)
+            : null,
+        min_stock: minStock,
+        avg_purchase_price: item.avgPurchasePrice.toNumber(),
+        category_name: item.category?.name ?? null,
+        stock_status: stockStatus(currentStock, minStock),
+        warehouse_stocks: perWarehouse
+          ? Object.fromEntries(
+              (stocks ?? []).map((stock) => [
+                stock.warehouseId,
+                stock.quantity.toNumber(),
+              ]),
+            )
+          : null,
+        // Filled in below for the idle and slow views.
+        out_quantity: null as number | null,
+        last_out_at: null as string | null,
+        days_of_cover: null as number | null,
+      };
+    });
 
-    const data =
+    // Within one warehouse the shortest shelf comes first, as the total does
+    // without a filter. Array.sort is stable, so the name order the query
+    // returned survives among equal quantities.
+    if (warehouseId !== undefined) {
+      rows.sort((a, b) => (a.warehouse_stock ?? 0) - (b.warehouse_stock ?? 0));
+    }
+
+    let data =
       query.lowStockOnly === "true"
         ? rows.filter((row) => row.current_stock <= row.min_stock)
         : rows;
+
+    // 14.22. «Moving» means leaving the shop — sold, or fitted on a repair.
+    // A purchase or a transfer does not make stock any less idle.
+    // The schema defaults both; read defensively for callers that skip it.
+    const view = query.view ?? "all";
+    const days = query.days ?? 90;
+    if (view !== "all") {
+      const held = (row: (typeof rows)[number]) =>
+        row.warehouse_stock ?? row.current_stock;
+      const consumption: Prisma.InventoryTransactionWhereInput = {
+        workspaceId,
+        itemId: { in: data.map((row) => row.id) },
+        type: { in: ["sale", "repair_use"] },
+        ...(warehouseId !== undefined ? { warehouseId } : {}),
+      };
+      const since = lastDaysRange(days).gte;
+      const [recent, last] = await Promise.all([
+        prisma.inventoryTransaction.groupBy({
+          by: ["itemId"],
+          where: { ...consumption, occurredAt: { gte: since } },
+          _sum: { quantity: true },
+        }),
+        prisma.inventoryTransaction.groupBy({
+          by: ["itemId"],
+          where: consumption,
+          _max: { occurredAt: true },
+        }),
+      ]);
+      const outOf = new Map(
+        recent.map((row) => [
+          row.itemId,
+          -(row._sum.quantity?.toNumber() ?? 0),
+        ]),
+      );
+      const lastOf = new Map(
+        last.map((row) => [row.itemId, row._max.occurredAt]),
+      );
+
+      for (const row of data) {
+        const out = roundQuantity(outOf.get(row.id) ?? 0);
+        row.out_quantity = out;
+        row.last_out_at = lastOf.get(row.id)?.toISOString() ?? null;
+        // How many days the shelf lasts at the pace of the window.
+        row.days_of_cover =
+          out > 0 ? Math.round(held(row) / (out / days)) : null;
+      }
+
+      const value = (row: (typeof rows)[number]) =>
+        held(row) * row.avg_purchase_price;
+      data =
+        view === "idle"
+          ? data
+              .filter((row) => held(row) > 0 && row.out_quantity === 0)
+              // The money sitting still comes first.
+              .sort((a, b) => value(b) - value(a))
+          : data
+              .filter((row) => held(row) > 0 && (row.out_quantity ?? 0) > 0)
+              .sort((a, b) => (b.days_of_cover ?? 0) - (a.days_of_cover ?? 0));
+    }
 
     res.json({
       data,
@@ -79,9 +222,14 @@ export const getStockReport = async (req: Request, res: Response) => {
           .length,
         critical_count: data.filter((row) => row.stock_status === "critical")
           .length,
-        total_inventory_value: data.reduce(
-          (sum, row) => sum + row.current_stock * row.avg_purchase_price,
-          0,
+        total_inventory_value: roundMoney(
+          data.reduce(
+            (sum, row) =>
+              sum +
+              (row.warehouse_stock ?? row.current_stock) *
+                row.avg_purchase_price,
+            0,
+          ),
         ),
       },
     });
@@ -190,6 +338,14 @@ export const getSaleReport = async (req: Request, res: Response) => {
 };
 
 // GET /api/reports/profit
+//
+// Each line is costed at the `unit_cost` it stored when it left the shelf
+// (14.6) — the item's average at that moment — so a margin reported today is
+// the margin that sale made, and restocking at a new price no longer rewrites
+// last month. Lines written before 14.6 carry no cost; they fall back to the
+// item's current average, which is all the old report ever had. Production
+// had no invoices when 14.1 shipped, so that fallback only ever meets
+// development and demo data.
 export const getProfitReport = async (req: Request, res: Response) => {
   try {
     const { from_date, to_date } = (req as ValidatedRequest).valid
@@ -198,63 +354,86 @@ export const getProfitReport = async (req: Request, res: Response) => {
     const invoiceDate = dateFilter(from_date, to_date);
     const workspaceId = workspaceIdOf(req);
 
+    // Lines rather than a groupBy: the cost is quantity × unit_cost per line,
+    // a product groupBy cannot sum. A period of one shop's sales is hundreds
+    // of rows, and [workspaceId, invoiceDate] is indexed.
+    //
     // Custom sale lines carry no item_id and so no known cost — the old
     // query's inner join excluded them, and they stay excluded here.
-    const grouped = await prisma.saleInvoiceItem.groupBy({
-      by: ["itemId"],
+    const lines = await prisma.saleInvoiceItem.findMany({
       where: {
         workspaceId,
         itemId: { not: null },
         ...(invoiceDate ? { invoice: { invoiceDate } } : {}),
       },
-      _sum: { quantity: true, totalPrice: true },
+      select: {
+        itemId: true,
+        quantity: true,
+        totalPrice: true,
+        unitCost: true,
+        item: {
+          select: { name: true, code: true, avgPurchasePrice: true },
+        },
+      },
     });
 
-    const itemIds = grouped
-      .map((row) => row.itemId)
-      .filter((id): id is number => id !== null);
+    const byItem = new Map<
+      number,
+      {
+        name: string | null;
+        code: string | null;
+        quantity: number;
+        revenue: number;
+        cost: number;
+      }
+    >();
 
-    const items = itemIds.length
-      ? await prisma.item.findMany({
-          where: { id: { in: itemIds }, workspaceId },
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            avgPurchasePrice: true,
-          },
-        })
-      : [];
+    for (const line of lines) {
+      const itemId = line.itemId as number;
+      const quantity = line.quantity.toNumber();
+      const unitCost =
+        line.unitCost?.toNumber() ??
+        line.item?.avgPurchasePrice.toNumber() ??
+        0;
 
-    const itemsById = new Map(items.map((item) => [item.id, item]));
+      const row = byItem.get(itemId) ?? {
+        name: line.item?.name ?? null,
+        code: line.item?.code ?? null,
+        quantity: 0,
+        revenue: 0,
+        cost: 0,
+      };
+      row.quantity += quantity;
+      row.revenue += line.totalPrice.toNumber();
+      row.cost += quantity * unitCost;
+      byItem.set(itemId, row);
+    }
 
-    const data = grouped
-      .map((row) => {
-        const item = itemsById.get(row.itemId as number);
-        const quantity = row._sum?.quantity?.toNumber() ?? 0;
-        const revenue = row._sum?.totalPrice?.toNumber() ?? 0;
-
-        // Cost uses the item's current average purchase price, not the price
-        // at the time of sale, so past margins shift when an item is
-        // restocked at a different price. Existing behaviour.
-        const cost = quantity * (item?.avgPurchasePrice.toNumber() ?? 0);
+    const data = [...byItem.entries()]
+      .map(([itemId, row]) => {
+        const quantity = roundQuantity(row.quantity);
+        const revenue = row.revenue;
+        const cost = roundMoney(row.cost);
+        const profit = roundMoney(revenue - cost);
 
         return {
-          item_id: row.itemId,
-          item_name: item?.name ?? null,
-          item_code: item?.code ?? null,
+          item_id: itemId,
+          item_name: row.name,
+          item_code: row.code,
           total_quantity: quantity,
           total_revenue: revenue,
           total_cost: cost,
-          profit: revenue - cost,
-          profit_margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+          profit,
+          profit_margin: revenue > 0 ? (profit / revenue) * 100 : 0,
         };
       })
       .sort((a, b) => b.profit - a.profit);
 
     const totalRevenue = data.reduce((sum, row) => sum + row.total_revenue, 0);
-    const totalCost = data.reduce((sum, row) => sum + row.total_cost, 0);
-    const totalProfit = totalRevenue - totalCost;
+    const totalCost = roundMoney(
+      data.reduce((sum, row) => sum + row.total_cost, 0),
+    );
+    const totalProfit = roundMoney(totalRevenue - totalCost);
 
     res.json({
       data,
@@ -272,6 +451,173 @@ export const getProfitReport = async (req: Request, res: Response) => {
 };
 
 // GET /api/reports/dashboard
+/**
+ * The columns of the movement report (14.21), and which ledger types feed
+ * each. In and out are kept apart rather than netted — a shop wants to see
+ * that ten came in and eight went out, not that two did. Stock entered with
+ * the item has its own column: for a shop that has just set up, it is most
+ * of what it holds. The two signed columns are corrections (adjustment,
+ * count) and the rest (a document taking itself back, returns), which can
+ * go either way.
+ */
+const MOVEMENT_COLUMNS = {
+  initial: ["opening"],
+  purchase: ["purchase"],
+  sale: ["sale"],
+  repair_use: ["repair_use"],
+  transfer_in: ["transfer_in"],
+  transfer_out: ["transfer_out"],
+  correction: ["adjustment", "count"],
+  other: ["reversal", "purchase_return", "sale_return"],
+} as const;
+
+type MovementColumn = keyof typeof MOVEMENT_COLUMNS;
+
+const COLUMN_OF = new Map<string, MovementColumn>(
+  (
+    Object.entries(MOVEMENT_COLUMNS) as [MovementColumn, readonly string[]][]
+  ).flatMap(([column, types]) => types.map((type) => [type, column] as const)),
+);
+
+// GET /api/reports/movements
+//
+// گردش کالا (14.21): for each item, what it held when the period began,
+// what moved during it — per kind of movement — and what it held at the
+// end. By the document's date (occurred_at), so a purchase entered today
+// for last week counts in last week. With a warehouse, every figure is that
+// warehouse's; without, the item's total, where a transfer appears on both
+// sides and nets to nothing.
+//
+// Two grouped queries over the ledger and no raw SQL: one for everything
+// before the period (the opening balance), one for the period by type.
+export const getMovementReport = async (req: Request, res: Response) => {
+  try {
+    const query = (req as ValidatedRequest).valid.query as MovementReportQuery;
+    const workspaceId = workspaceIdOf(req);
+
+    const scope: Prisma.InventoryTransactionWhereInput = {
+      workspaceId,
+      ...(query.warehouse_id !== undefined
+        ? { warehouseId: query.warehouse_id }
+        : {}),
+      ...(query.category_id !== undefined
+        ? { item: { categoryId: query.category_id } }
+        : {}),
+    };
+    const end = query.to_date ? endOfDay(query.to_date) : undefined;
+
+    const [before, during] = await Promise.all([
+      query.from_date
+        ? prisma.inventoryTransaction.groupBy({
+            by: ["itemId"],
+            where: { ...scope, occurredAt: { lt: query.from_date } },
+            _sum: { quantity: true },
+          })
+        : Promise.resolve([]),
+      prisma.inventoryTransaction.groupBy({
+        by: ["itemId", "type"],
+        where: {
+          ...scope,
+          ...(query.from_date || end
+            ? {
+                occurredAt: {
+                  ...(query.from_date ? { gte: query.from_date } : {}),
+                  ...(end ? { lte: end } : {}),
+                },
+              }
+            : {}),
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    const opening = new Map<number, number>(
+      before.map((row) => [row.itemId, row._sum.quantity?.toNumber() ?? 0]),
+    );
+    const moved = new Map<number, Record<MovementColumn, number>>();
+    for (const row of during) {
+      const column = COLUMN_OF.get(row.type) ?? "other";
+      const columns =
+        moved.get(row.itemId) ??
+        ({
+          initial: 0,
+          purchase: 0,
+          sale: 0,
+          repair_use: 0,
+          transfer_in: 0,
+          transfer_out: 0,
+          correction: 0,
+          other: 0,
+        } satisfies Record<MovementColumn, number>);
+      columns[column] = roundQuantity(
+        columns[column] + (row._sum.quantity?.toNumber() ?? 0),
+      );
+      moved.set(row.itemId, columns);
+    }
+
+    // Items that held something when the period began or moved during it.
+    const itemIds = [
+      ...new Set([
+        ...[...opening]
+          .filter(([, quantity]) => quantity !== 0)
+          .map(([id]) => id),
+        ...moved.keys(),
+      ]),
+    ];
+    const items = itemIds.length
+      ? await prisma.item.findMany({
+          where: { id: { in: itemIds }, workspaceId },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            unit: true,
+            category: { select: { name: true } },
+          },
+          orderBy: { name: "asc" },
+        })
+      : [];
+
+    const data = items.map((item) => {
+      const columns = moved.get(item.id);
+      const start = roundQuantity(opening.get(item.id) ?? 0);
+      const net = columns
+        ? Object.values(columns).reduce((sum, value) => sum + value, 0)
+        : 0;
+      return {
+        item_id: item.id,
+        code: item.code,
+        name: item.name,
+        unit: item.unit,
+        category_name: item.category?.name ?? null,
+        opening: start,
+        // Outgoing columns are reported as positive quantities; the two
+        // signed columns keep their sign.
+        initial: columns?.initial ?? 0,
+        purchase: columns?.purchase ?? 0,
+        sale: -(columns?.sale ?? 0) || 0,
+        repair_use: -(columns?.repair_use ?? 0) || 0,
+        transfer_in: columns?.transfer_in ?? 0,
+        transfer_out: -(columns?.transfer_out ?? 0) || 0,
+        correction: columns?.correction ?? 0,
+        other: columns?.other ?? 0,
+        closing: roundQuantity(start + net),
+        moved: columns !== undefined,
+      };
+    });
+
+    res.json({
+      data,
+      summary: {
+        item_count: data.length,
+        moved_count: data.filter((row) => row.moved).length,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const today = todayRange();
@@ -388,7 +734,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         where: { workspaceId },
         orderBy: { createdAt: "desc" },
         take: 10,
-        include: { item: { select: { name: true, code: true } } },
+        include: { item: { select: { name: true, code: true, unit: true } } },
       }),
       prisma.saleInvoiceItem.groupBy({
         by: ["itemId"],
@@ -567,6 +913,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         created_at: tx.createdAt.toISOString(),
         item_name: tx.item.name,
         item_code: tx.item.code,
+        // Quantities are decimal (14.1): «۲٫۵» needs «متر», not «عدد».
+        item_unit: tx.item.unit,
       })),
       top_items: topItemsGrouped.map((row) => {
         const item = topItemsById.get(row.itemId as number);

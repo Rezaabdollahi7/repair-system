@@ -3,6 +3,7 @@ import { getItems, deleteItem, getCategories, searchItems } from "../api";
 import Pagination, { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
 import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import CategoryManageModal from "../components/CategoryManageModal";
@@ -21,7 +22,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import StockStatusBadge from "../components/StockStatusBadge";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import { useDebounce } from "../utils/helpers";
 import { errorText } from "../utils/errors";
 import { staggerContainer, staggerItem } from "../motion";
@@ -92,7 +93,8 @@ export default function ItemList() {
   const [stockFilter, setStockFilter] = useState<StockStatusKey | "">("");
 
   const { isAtLeast } = useAuth();
-  const { openItemEdit, openItemDetail, refreshList } = useModal();
+  const { openItemEdit, refreshList } = useModal();
+  const goToItem = useGoToItem();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
@@ -206,7 +208,7 @@ export default function ItemList() {
       <button
         onClick={(e) => {
           e.stopPropagation();
-          openItemDetail(item.id);
+          goToItem(item.id);
         }}
         className={actionView}
         title="مشاهده جزئیات"
@@ -406,11 +408,11 @@ export default function ItemList() {
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => openItemDetail(item.id)}
+                    onClick={() => goToItem(item.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        openItemDetail(item.id);
+                        goToItem(item.id);
                       }
                     }}
                     className={`${rowCard} cursor-pointer hover:border-border-strong
@@ -447,7 +449,7 @@ export default function ItemList() {
                         unit={item.unit}
                       />
                       <span className="text-body-xs text-text-muted">
-                        حداقل {toPersianDigits(item.minStock || 0)} {item.unit}
+                        حداقل {formatQuantity(item.minStock || 0)} {item.unit}
                       </span>
                     </div>
 
@@ -488,7 +490,7 @@ export default function ItemList() {
                     return (
                       <tr
                         key={item.id}
-                        onClick={() => openItemDetail(item.id)}
+                        onClick={() => goToItem(item.id)}
                         className={trClickable}
                       >
                         {/* The stock state as a rule down the row's leading
@@ -521,7 +523,7 @@ export default function ItemList() {
                           />
                         </td>
                         <td className={`${tdMuted} tabular-nums`}>
-                          {toPersianDigits(item.minStock || 0)} {item.unit}
+                          {formatQuantity(item.minStock || 0)} {item.unit}
                         </td>
                         <td className={`${tdMuted} tabular-nums`}>
                           {item.avgPurchasePrice

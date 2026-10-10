@@ -6,6 +6,17 @@ import { AuthenticatedRequest } from "../types/request";
 import { errorMessage } from "../utils/errors";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { invoiceTotals, lineTotals } from "../utils/invoiceTotals";
+import {
+  applyStockMovements,
+  FractionalQuantityError,
+  StockError,
+  UnknownItemError,
+  type StockLine,
+} from "../utils/stock";
+import {
+  holdsStock,
+  repairInvoiceTransition,
+} from "../utils/repairInvoiceStatus";
 import persianToEnglish from "../utils/persianToEnglish";
 import type { IdParam } from "../schemas/common";
 import type {
@@ -16,7 +27,7 @@ import type {
   RepairInvoiceUpdateBody,
 } from "../schemas/repairInvoice";
 import { workspaceIdOf } from "../utils/workspace";
-import { defaultWarehouseId } from "../utils/warehouse";
+import { resolveWarehouseId } from "../utils/warehouse";
 
 type LineInput = RepairInvoiceCreateBody["items"][number];
 
@@ -49,6 +60,7 @@ function toInvoiceResponse(invoice: InvoiceRow) {
     customer_id: invoice.customerId,
     customer_name: invoice.customerName,
     customer_phone: invoice.customerPhone,
+    warehouse_id: invoice.warehouseId,
     invoice_date: invoice.invoiceDate.toISOString(),
     due_date: invoice.dueDate?.toISOString() ?? null,
     status: invoice.status,
@@ -76,29 +88,55 @@ function toInvoiceResponse(invoice: InvoiceRow) {
   };
 }
 
+function isInventoryLine(line: { item_type: string; item_id?: number | null }) {
+  return line.item_type === "inventory" && Boolean(line.item_id);
+}
+
 /**
- * Fills in the price and unit of any inventory line that arrived without
- * them, from the item's own record. Service lines carry their price from the
- * client and are left alone.
+ * Checks the inventory lines against the catalogue while the invoice is
+ * still a پیش‌فاکتور, and fills in the price and unit of any that arrived
+ * without them from the item's own record. Service lines carry their price
+ * from the client and are left alone.
+ *
+ * Checked now rather than at issue: an item from another workspace, or half
+ * a phone, is a mistake better reported while the form is still open than
+ * the day the invoice is issued. Until 14.7 an unknown id was skipped here
+ * and then skipped again at issue, so the line printed and took nothing.
  */
-async function resolveLinePrices(
+async function prepareInventoryLines(
   tx: Prisma.TransactionClient,
   lines: LineInput[],
   workspaceId: number,
 ): Promise<void> {
+  const ids = [
+    ...new Set(lines.filter(isInventoryLine).map((line) => line.item_id!)),
+  ];
+  if (ids.length === 0) return;
+
+  // Scoped, so an item id from another workspace reads as missing rather
+  // than lending its price to this invoice.
+  const items = await tx.item.findMany({
+    where: { id: { in: ids }, workspaceId },
+    select: {
+      id: true,
+      name: true,
+      unit: true,
+      sellPrice: true,
+      isFractional: true,
+    },
+  });
+  const byId = new Map(items.map((item) => [item.id, item]));
+
   for (const line of lines) {
-    if (line.item_type !== "inventory" || !line.item_id) continue;
-    if (line.unit_price) continue;
+    if (!isInventoryLine(line)) continue;
 
-    // Scoped, so an item id from another workspace can't lend its price to
-    // this invoice.
-    const item = await tx.item.findFirst({
-      where: { id: line.item_id, workspaceId },
-      select: { sellPrice: true, unit: true },
-    });
-    if (!item) continue;
+    const item = byId.get(line.item_id!);
+    if (!item) throw new UnknownItemError(line.item_id!);
+    if (!item.isFractional && !Number.isInteger(line.quantity)) {
+      throw new FractionalQuantityError(item.name);
+    }
 
-    line.unit_price = item.sellPrice.toNumber();
+    if (!line.unit_price) line.unit_price = item.sellPrice.toNumber();
     line.unit = line.unit ?? item.unit;
   }
 }
@@ -133,66 +171,146 @@ async function writeLines(
   }
 }
 
-interface StockLine {
+/** A line already on the invoice, as moving its parts needs it. */
+interface StoredLine {
+  id: number;
   itemType: string;
   itemId: number | null;
   quantity: Prisma.Decimal;
   unitPrice: Prisma.Decimal;
+  unitCost: Prisma.Decimal | null;
+}
+
+const REFERENCE_TYPE = "repair_invoice";
+
+function inventoryLines(lines: StoredLine[]) {
+  return lines.filter(
+    (line): line is StoredLine & { itemId: number } =>
+      line.itemType === "inventory" && line.itemId !== null,
+  );
 }
 
 /**
- * Moves stock for the inventory lines of an invoice. `direction` is -1 when
- * the invoice is issued and the parts leave the shelf, +1 when it's
- * cancelled and they come back.
+ * The parts leaving the shelf as the invoice is issued — the exact
+ * quantity, fractions included. Until 14.7 this rounded, so 0.4 metres of
+ * cable moved nothing and 0.6 moved a whole metre.
  */
-async function moveStock(
+function takeMovements(lines: StoredLine[], warehouseId: number): StockLine[] {
+  return inventoryLines(lines).map((line) => ({
+    itemId: line.itemId,
+    warehouseId,
+    quantity: -line.quantity.toNumber(),
+    type: "repair_use",
+    unitPrice: line.unitPrice.toNumber(),
+    note: "مصرف در فاکتور تعمیر",
+  }));
+}
+
+/** The parts coming back as an invoice that took them is voided, at the
+ * cost they left at. */
+function returnMovements(
+  lines: StoredLine[],
+  warehouseId: number,
+): StockLine[] {
+  return inventoryLines(lines).map((line) => ({
+    itemId: line.itemId,
+    warehouseId,
+    quantity: line.quantity.toNumber(),
+    type: "reversal",
+    unitCost: line.unitCost?.toNumber() ?? null,
+    unitPrice: line.unitPrice.toNumber(),
+    note: "ابطال فاکتور تعمیر - برگشت موجودی",
+  }));
+}
+
+/**
+ * The invoice and its lines, read under a row lock on the invoice — inside
+ * the transaction, so two people issuing the same invoice at once cannot
+ * both find it a پیش‌فاکتور and both take its parts.
+ */
+async function lockInvoice(
   tx: Prisma.TransactionClient,
-  invoiceId: number,
-  lines: StockLine[],
-  direction: -1 | 1,
-  note: string,
+  id: number,
+  workspaceId: number,
+) {
+  const locked = await tx.$queryRaw<{ id: number }[]>`
+    SELECT id FROM repair_invoices
+    WHERE id = ${id} AND workspace_id = ${workspaceId}
+    FOR UPDATE
+  `;
+  if (locked.length === 0) return null;
+
+  return tx.repairInvoice.findFirst({
+    where: { id, workspaceId },
+    select: {
+      status: true,
+      warehouseId: true,
+      totalAmount: true,
+      paidAmount: true,
+      items: {
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          itemType: true,
+          itemId: true,
+          quantity: true,
+          unitPrice: true,
+          unitCost: true,
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Takes the invoice's parts and records on each line the cost it left at,
+ * which is what a margin on this repair is later measured against.
+ */
+async function takeParts(
+  tx: Prisma.TransactionClient,
+  id: number,
+  invoice: { warehouseId: number; items: StoredLine[] },
   actorId: number | null,
   workspaceId: number,
-  warehouseId: number,
 ): Promise<void> {
-  for (const line of lines) {
-    if (line.itemType !== "inventory" || line.itemId === null) continue;
+  const moved = await applyStockMovements(
+    tx,
+    workspaceId,
+    { referenceType: REFERENCE_TYPE, referenceId: id, actorId },
+    takeMovements(invoice.items, invoice.warehouseId),
+  );
 
-    const quantity = Math.round(line.quantity.toNumber());
-    const item = await tx.item.findFirst({
-      where: { id: line.itemId, workspaceId },
-      select: { currentStock: true },
+  const lines = inventoryLines(invoice.items);
+  for (const [index, line] of lines.entries()) {
+    await tx.repairInvoiceItem.updateMany({
+      where: { id: line.id, workspaceId },
+      data: { unitCost: moved[index].unitCost },
     });
-    if (!item) continue;
+  }
+}
 
-    await tx.item.update({
-      where: { id: line.itemId },
-      data: {
-        currentStock: Math.max(
-          0,
-          item.currentStock.toNumber() + direction * quantity,
-        ),
-      },
-    });
+async function returnParts(
+  tx: Prisma.TransactionClient,
+  id: number,
+  invoice: { warehouseId: number; items: StoredLine[] },
+  actorId: number | null,
+  workspaceId: number,
+): Promise<void> {
+  await applyStockMovements(
+    tx,
+    workspaceId,
+    { referenceType: REFERENCE_TYPE, referenceId: id, actorId },
+    returnMovements(invoice.items, invoice.warehouseId),
+  );
+}
 
-    await tx.inventoryTransaction.create({
-      data: {
-        workspaceId,
-        itemId: line.itemId,
-        warehouseId,
-        // Parts used on the repair; putting them back is the invoice
-        // reversing its own movement, not a hand correction.
-        type: direction === -1 ? "repair_use" : "reversal",
-        quantity: direction * quantity,
-        unitPrice: line.unitPrice,
-        // Passed as null before while reference_type was still set, so parts
-        // consumed by a repair never showed the invoice in an item's history.
-        referenceId: invoiceId,
-        referenceType: "repair_invoice",
-        note,
-        createdBy: actorId,
-      },
-    });
+/** A refusal decided inside the transaction, answered after it. */
+class Refusal extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
   }
 }
 
@@ -361,7 +479,7 @@ export const create = async (req: Request, res: Response) => {
     const invoiceDate = body.invoice_date ?? new Date();
 
     const invoice = await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      await resolveLinePrices(tx, body.items, workspaceId);
+      await prepareInventoryLines(tx, body.items, workspaceId);
 
       const totals = invoiceTotals(
         body.items,
@@ -374,7 +492,12 @@ export const create = async (req: Request, res: Response) => {
         data: {
           workspaceId,
           invoiceNumber: await nextInvoiceNumber(tx, workspaceId, "repair"),
-          warehouseId: await defaultWarehouseId(tx, workspaceId),
+          // Where the parts will come from when it is issued.
+          warehouseId: await resolveWarehouseId(
+            tx,
+            workspaceId,
+            body.warehouse_id,
+          ),
           deviceId: body.device_id,
           customerId: device.customerId,
           customerName:
@@ -409,6 +532,9 @@ export const create = async (req: Request, res: Response) => {
       status: invoice.status,
     });
   } catch (error) {
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -421,26 +547,20 @@ export const update = async (req: Request, res: Response) => {
     const body = valid.body as RepairInvoiceUpdateBody;
 
     const workspaceId = workspaceIdOf(req);
-
-    const existing = await prisma.repairInvoice.findFirst({
-      where: { id, workspaceId },
-      select: { status: true },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
-    if (existing.status !== "draft") {
-      return res
-        .status(400)
-        .json({ error: "فقط فاکتورهای پیش‌نویس قابل ویرایش هستند" });
-    }
-
     const invoiceDate = body.invoice_date ?? new Date();
 
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      await resolveLinePrices(tx, body.items, workspaceId);
+      // Under the lock, so the invoice cannot be issued between this check
+      // and the line rewrite below — which would replace the lines of an
+      // invoice whose parts had already left.
+      const existing = await lockInvoice(tx, id, workspaceId);
+      if (!existing) throw new Refusal(404, "فاکتور یافت نشد");
+
+      if (existing.status !== "draft") {
+        throw new Refusal(400, "فقط پیش‌فاکتور قابل ویرایش است");
+      }
+
+      await prepareInventoryLines(tx, body.items, workspaceId);
       const totals = invoiceTotals(
         body.items,
         body.discount_type,
@@ -453,6 +573,15 @@ export const update = async (req: Request, res: Response) => {
         data: {
           customerName: body.customer_name,
           customerPhone: body.customer_phone,
+          ...(body.warehouse_id
+            ? {
+                warehouseId: await resolveWarehouseId(
+                  tx,
+                  workspaceId,
+                  body.warehouse_id,
+                ),
+              }
+            : {}),
           invoiceDate,
           dueDate: body.due_date ?? null,
           subtotal: totals.subtotal,
@@ -469,8 +598,8 @@ export const update = async (req: Request, res: Response) => {
         },
       });
 
-      // Draft invoices haven't touched stock yet, so replacing the lines
-      // needs no reversal.
+      // A پیش‌فاکتور has not touched stock yet, so replacing its lines needs
+      // no reversal.
       await tx.repairInvoiceItem.deleteMany({
         where: { invoiceId: id, workspaceId },
       });
@@ -479,6 +608,12 @@ export const update = async (req: Request, res: Response) => {
 
     res.json({ message: "فاکتور با موفقیت ویرایش شد" });
   } catch (error) {
+    if (error instanceof Refusal) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -492,103 +627,52 @@ export const changeStatus = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    const invoice = await prisma.repairInvoice.findFirst({
-      where: { id, workspaceId },
-      select: {
-        status: true,
-        warehouseId: true,
-        totalAmount: true,
-        paidAmount: true,
-        items: {
-          select: {
-            itemType: true,
-            itemId: true,
-            quantity: true,
-            unitPrice: true,
-          },
-        },
-      },
-    });
-
-    if (!invoice) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
-    if (invoice.status === "cancelled") {
-      return res
-        .status(400)
-        .json({ error: "فاکتور ابطال شده قابل تغییر نیست" });
-    }
-
-    if (invoice.status === "paid" && status !== "paid") {
-      return res
-        .status(400)
-        .json({ error: "فاکتور پرداخت شده قابل تغییر نیست" });
-    }
-
-    const totalAmount = invoice.totalAmount.toNumber();
-    const paidAmount = invoice.paidAmount.toNumber();
-
-    if (status === "paid" && paidAmount < totalAmount) {
-      return res.status(400).json({ error: "مبلغ پرداختی کافی نیست" });
-    }
-
-    const issuing = status === "issued" && invoice.status === "draft";
-    const cancelling =
-      status === "cancelled" &&
-      (invoice.status === "issued" || invoice.status === "paid");
-
-    /**
-     * A cancelled invoice owes nothing.
-     *
-     * This used to leave `paymentStatus` alone, so a voided invoice kept
-     * saying «در انتظار پرداخت» and kept reporting a balance the shop had no
-     * way to collect and no reason to. `totalAmount` and `paidAmount` are
-     * untouched — they are the historical record, and the payments table
-     * still holds every row — but the obligation is gone, and that is what
-     * `paymentStatus` describes.
-     *
-     * The column is a plain string rather than an enum, so the fourth value
-     * costs no migration. The dashboard's receivables already scoped
-     * themselves to `status: "issued"`, so those figures were never wrong;
-     * it was only the invoice's own display.
-     */
-    let paymentStatus: string | null = null;
-    if (status === "cancelled") {
-      paymentStatus = "cancelled";
-    } else if (status === "paid") {
-      paymentStatus = "paid";
-    } else if (paidAmount > 0 && paidAmount < totalAmount) {
-      paymentStatus = "partial";
-    } else if (paidAmount === 0) {
-      paymentStatus = "pending";
-    }
-
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      if (issuing) {
-        await moveStock(
-          tx,
-          id,
-          invoice.items,
-          -1,
-          "مصرف در فاکتور تعمیر",
-          actorId,
-          workspaceId,
-          invoice.warehouseId,
-        );
+      // Read under the lock: two people issuing the same invoice used to
+      // both find it a پیش‌فاکتور and both take its parts.
+      const invoice = await lockInvoice(tx, id, workspaceId);
+      if (!invoice) throw new Refusal(404, "فاکتور یافت نشد");
+
+      const transition = repairInvoiceTransition(invoice.status, status);
+      if (!transition.allowed) throw new Refusal(400, transition.error);
+
+      const totalAmount = invoice.totalAmount.toNumber();
+      const paidAmount = invoice.paidAmount.toNumber();
+
+      if (status === "paid" && paidAmount < totalAmount) {
+        throw new Refusal(400, "مبلغ پرداختی کافی نیست");
       }
 
-      if (cancelling) {
-        await moveStock(
-          tx,
-          id,
-          invoice.items,
-          1,
-          "ابطال فاکتور تعمیر - برگشت موجودی",
-          actorId,
-          workspaceId,
-          invoice.warehouseId,
-        );
+      /**
+       * A cancelled invoice owes nothing.
+       *
+       * This used to leave `paymentStatus` alone, so a voided invoice kept
+       * saying «در انتظار پرداخت» and kept reporting a balance the shop had
+       * no way to collect and no reason to. `totalAmount` and `paidAmount`
+       * are untouched — they are the historical record, and the payments
+       * table still holds every row — but the obligation is gone, and that
+       * is what `paymentStatus` describes.
+       *
+       * The column is a plain string rather than an enum, so the fourth
+       * value costs no migration. The dashboard's receivables already scoped
+       * themselves to `status: "issued"`, so those figures were never wrong;
+       * it was only the invoice's own display.
+       */
+      let paymentStatus: string | null = null;
+      if (status === "cancelled") {
+        paymentStatus = "cancelled";
+      } else if (status === "paid") {
+        paymentStatus = "paid";
+      } else if (paidAmount > 0 && paidAmount < totalAmount) {
+        paymentStatus = "partial";
+      } else if (paidAmount === 0) {
+        paymentStatus = "pending";
+      }
+
+      if (transition.stock === "take") {
+        await takeParts(tx, id, invoice, actorId, workspaceId);
+      } else if (transition.stock === "return") {
+        await returnParts(tx, id, invoice, actorId, workspaceId);
       }
 
       await tx.repairInvoice.update({
@@ -602,6 +686,12 @@ export const changeStatus = async (req: Request, res: Response) => {
 
     res.json({ message: `وضعیت فاکتور به ${status} تغییر کرد` });
   } catch (error) {
+    if (error instanceof Refusal) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -684,39 +774,14 @@ export const remove = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    const invoice = await prisma.repairInvoice.findFirst({
-      where: { id, workspaceId },
-      select: {
-        status: true,
-        warehouseId: true,
-        items: {
-          select: {
-            itemType: true,
-            itemId: true,
-            quantity: true,
-            unitPrice: true,
-          },
-        },
-      },
-    });
-
-    if (!invoice) {
-      return res.status(404).json({ error: "فاکتور یافت نشد" });
-    }
-
     await runInWorkspaceTransaction(workspaceId, async (tx) => {
-      // Only an issued or paid invoice ever took stock; a draft never did.
-      if (invoice.status === "issued" || invoice.status === "paid") {
-        await moveStock(
-          tx,
-          id,
-          invoice.items,
-          1,
-          "ابطال فاکتور تعمیر - برگشت موجودی",
-          actorId,
-          workspaceId,
-          invoice.warehouseId,
-        );
+      const invoice = await lockInvoice(tx, id, workspaceId);
+      if (!invoice) throw new Refusal(404, "فاکتور یافت نشد");
+
+      // Only an invoice holding its parts gives them back; a پیش‌فاکتور or
+      // a cancelled one never had them, or already returned them.
+      if (holdsStock(invoice.status)) {
+        await returnParts(tx, id, invoice, actorId, workspaceId);
       }
 
       // Lines and payments go with it via onDelete: Cascade.
@@ -725,6 +790,12 @@ export const remove = async (req: Request, res: Response) => {
 
     res.json({ message: "فاکتور با موفقیت حذف شد" });
   } catch (error) {
+    if (error instanceof Refusal) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };

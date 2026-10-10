@@ -21,6 +21,21 @@ export function useGoToCustomer() {
 }
 
 /**
+ * Opening an item (14.18).
+ *
+ * The item was a modal until it gained a kardex, a trade history and price
+ * figures — a screen a shop reads for a while, reached from the item list,
+ * the stock and profit reports, the ledger and every invoice. From inside
+ * an invoice modal, the caller closes the stack first: a page change under
+ * an open modal would leave the modal standing over the wrong screen.
+ */
+export function useGoToItem() {
+  const navigate = useNavigate();
+
+  return useCallback((itemId: Id) => navigate(`/items/${itemId}`), [navigate]);
+}
+
+/**
  * Opening a member of staff.
  *
  * Same story as the customer: reached from the personnel list and from a

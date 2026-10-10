@@ -9,13 +9,14 @@ import {
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import ConfirmModal from "./ConfirmModal";
 import {
   XMarkIcon,
   TrashIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/solid";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import type { Id, PurchaseInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
 import InfoRow from "./InfoRow";
@@ -35,7 +36,8 @@ export default function PurchaseInvoiceDetailModal({
   onClose,
 }: PurchaseInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
-  const { openItemDetail } = useModal();
+  const { closeAllModals } = useModal();
+  const goToItem = useGoToItem();
   const [invoice, setInvoice] = useState<PurchaseInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   // Starts as a string because the input owns it, then holds whatever the
@@ -286,8 +288,10 @@ export default function PurchaseInvoiceDetailModal({
                             <td className="px-4 py-3 text-body-sm">
                               <button
                                 onClick={() => {
-                                  onClose();
-                                  openItemDetail(item.item_id);
+                                  // The item is a page now: the whole stack
+                                  // closes before it opens.
+                                  closeAllModals();
+                                  goToItem(item.item_id);
                                 }}
                                 className="text-primary hover:underline"
                               >
@@ -295,7 +299,7 @@ export default function PurchaseInvoiceDetailModal({
                               </button>
                             </td>
                             <td className="px-4 py-3 text-body-sm text-text-primary">
-                              {toPersianDigits(item.quantity)}
+                              {formatQuantity(item.quantity)}
                             </td>
                             <td className="px-4 py-3 text-body-sm text-text-secondary">
                               {item.item_unit}

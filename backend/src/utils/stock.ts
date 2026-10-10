@@ -166,8 +166,13 @@ export function stockKey(itemId: number, warehouseId: number): string {
   return `${itemId}:${warehouseId}`;
 }
 
-/** avg_purchase_price is Decimal(18,2); planning at the same precision
- * means the figure carried to the next line is the one the row will hold. */
+/**
+ * avg_purchase_price and unit_cost are Decimal(18,2). Applied to what is
+ * written, never to what is carried between lines: rounding after every line
+ * lets the error build up across a document — an edit that adds four units
+ * at 2500 and takes ten at 2000 back out would land on 2500.01 rather than
+ * 2500.
+ */
 function toCostPrecision(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -279,7 +284,7 @@ export function planStockMovements(
 
     itemState.set(line.itemId, {
       stock: current.stock.plus(quantity),
-      avgCost: toCostPrecision(avgCost),
+      avgCost,
     });
     stockState.set(key, after);
 
@@ -304,7 +309,14 @@ export function planStockMovements(
 
   return {
     movements,
-    items: new Map([...itemState].filter(([id]) => touchedItems.has(id))),
+    items: new Map(
+      [...itemState]
+        .filter(([id]) => touchedItems.has(id))
+        .map(([id, state]) => [
+          id,
+          { stock: state.stock, avgCost: toCostPrecision(state.avgCost) },
+        ]),
+    ),
     stocks: new Map([...stockState].filter(([key]) => touchedStocks.has(key))),
   };
 }
@@ -375,13 +387,27 @@ export async function applyStockMovements(
     ]),
   );
 
-  // Not locked: a warehouse's own row never changes with stock, and one is
-  // only deactivated once it holds nothing.
-  const warehouseRows = await tx.warehouse.findMany({
-    where: { workspaceId, id: { in: warehouseIds } },
-    select: { id: true, name: true, isActive: true },
-  });
-  const warehouses = new Map(warehouseRows.map((row) => [row.id, row]));
+  // FOR SHARE, after the items: a warehouse is deactivated only once it
+  // holds nothing, and deactivating takes this row FOR UPDATE before it
+  // looks (14.10). Without the shared lock a purchase could read «active»,
+  // the deactivation could find the shelf empty and commit, and the
+  // purchase would then stock a warehouse nobody can pick any more.
+  // Movements share the lock among themselves, so they never queue on it.
+  const warehouseRows = await tx.$queryRaw<
+    { id: number; name: string; is_active: boolean }[]
+  >`
+    SELECT id, name, is_active
+    FROM warehouses
+    WHERE workspace_id = ${workspaceId} AND id = ANY(${warehouseIds}::int[])
+    ORDER BY id
+    FOR SHARE
+  `;
+  const warehouses = new Map<number, WarehouseState>(
+    warehouseRows.map((row) => [
+      row.id,
+      { id: row.id, name: row.name, isActive: row.is_active },
+    ]),
+  );
 
   // Unknown ids fail here, before the INSERT below could turn them into a
   // foreign key error with no explanation in it.

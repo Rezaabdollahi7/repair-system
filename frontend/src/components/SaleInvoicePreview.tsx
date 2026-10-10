@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { getSettings } from "../api";
 import { useReactToPrint } from "react-to-print";
-import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
+import {
+  formatPersianCurrency,
+  toPersianDigits,
+  formatQuantity,
+} from "../utils/formatters";
 import PrintPreviewModal from "./PrintPreviewModal";
 import type { AppSettings, SaleInvoiceDetail } from "../types/api";
 
@@ -267,7 +271,7 @@ export default function SaleInvoicePreview({
                   <td
                     className={`border border-border px-1 py-1 text-center ${fontSize.small} text-text-primary`}
                   >
-                    {toPersianDigits(item.quantity)}
+                    {formatQuantity(item.quantity)}
                   </td>
                   <td
                     className={`border border-border px-1 py-1 text-center ${fontSize.small} text-text-secondary`}

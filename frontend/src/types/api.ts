@@ -383,6 +383,228 @@ export interface CategoryBody {
 }
 
 /**
+ * A warehouse (14.10), snake_case like most of the API. `item_count` and
+ * `stock_value` are what it holds now: the number of different items with
+ * stock on its shelves and their cost at each item's moving average.
+ */
+export interface Warehouse {
+  id: number;
+  name: string;
+  is_default: boolean;
+  is_active: boolean;
+  note: string | null;
+  item_count: number;
+  stock_value: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WarehouseBody {
+  name: string;
+  note?: string | null;
+}
+
+/** Why the shelf was corrected by hand (14.14). `count` is the stock count's own. */
+export type AdjustmentReason =
+  | "damage"
+  | "loss"
+  | "found"
+  | "entry_error"
+  | "internal_use"
+  | "return_from_use"
+  | "other";
+
+/**
+ * A stock adjustment, ADJ-0001 (14.14). Applied when saved and never edited.
+ * `value_in` and `value_out` are rials at the cost each line moved at.
+ */
+export interface StockAdjustment {
+  id: number;
+  number: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  adjusted_at: string;
+  description: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  line_count: number;
+  value_in: number;
+  value_out: number;
+}
+
+export interface StockAdjustmentLine {
+  id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  /** Signed: positive onto the shelf, negative off it. */
+  quantity: number;
+  reason: AdjustmentReason;
+  note: string | null;
+  unit_cost: number;
+  value: number;
+}
+
+export interface StockAdjustmentDetail extends StockAdjustment {
+  lines: StockAdjustmentLine[];
+}
+
+export interface StockAdjustmentLineBody {
+  item_id: number;
+  direction: "in" | "out";
+  quantity: number;
+  reason: AdjustmentReason;
+  note?: string | null;
+  /** Stock coming in only; omitted, the item keeps its average. */
+  unit_cost?: number | null;
+}
+
+export interface StockAdjustmentCreateBody {
+  warehouse_id?: number | null;
+  adjusted_at?: string;
+  description?: string | null;
+  lines: StockAdjustmentLineBody[];
+}
+
+/**
+ * A transfer between two warehouses, TRF-0001 (14.16). Applied when saved
+ * and never edited. `value` is rials at the average the lines moved at —
+ * what was moved, not a change in what the stock is worth.
+ */
+export interface StockTransfer {
+  id: number;
+  number: string;
+  from_warehouse_id: number;
+  from_warehouse_name: string;
+  to_warehouse_id: number;
+  to_warehouse_name: string;
+  transferred_at: string;
+  description: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  line_count: number;
+  value: number;
+}
+
+export interface StockTransferLine {
+  id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  /** Always positive: the direction is the header's from → to. */
+  quantity: number;
+  unit_cost: number;
+  value: number;
+  note: string | null;
+}
+
+export interface StockTransferDetail extends StockTransfer {
+  lines: StockTransferLine[];
+}
+
+export interface StockTransferCreateBody {
+  from_warehouse_id: number;
+  to_warehouse_id: number;
+  transferred_at?: string;
+  description?: string | null;
+  lines: { item_id: number; quantity: number; note?: string | null }[];
+}
+
+export type StockCountStatus = "draft" | "applied" | "cancelled";
+
+/** A stock count, CNT-0001 (14.15). */
+export interface StockCount {
+  id: number;
+  number: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  category_id: number | null;
+  category_name: string | null;
+  blind: boolean;
+  status: StockCountStatus;
+  description: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  applied_at: string | null;
+  applied_by_name: string | null;
+  cancelled_at: string | null;
+  line_count: number;
+  counted_count: number;
+}
+
+/**
+ * A line as the counting screen sees it. `expected_quantity` and
+ * `difference` are null while a blind count is still being counted — the
+ * server withholds them, so nothing in the payload gives them away.
+ */
+export interface StockCountLine {
+  id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  item_is_fractional: boolean;
+  category_name: string | null;
+  location: string | null;
+  counted_quantity: number | null;
+  counted_at: string | null;
+  counted_by_name: string | null;
+  note: string | null;
+  expected_quantity: number | null;
+  difference: number | null;
+  applied_quantity: number | null;
+  unit_cost: number | null;
+}
+
+export interface StockCountDetail extends StockCount {
+  lines: StockCountLine[];
+}
+
+export interface StockCountCreateBody {
+  warehouse_id?: number | null;
+  category_id?: number | null;
+  blind: boolean;
+  description?: string | null;
+}
+
+/** GET /stock-counts/:id/review — every counted line against its snapshot. */
+export interface StockCountReviewLine {
+  line_id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  counted_quantity: number;
+  system_quantity: number;
+  difference: number;
+  current_quantity: number;
+  /** The item moved in this warehouse after its line was counted. */
+  moved_since: boolean;
+  value: number;
+  counted_at: string;
+}
+
+export interface StockCountReview {
+  lines: StockCountReviewLine[];
+  summary: {
+    line_count: number;
+    counted_count: number;
+    uncounted_count: number;
+    matching_count: number;
+    surplus_count: number;
+    shortage_count: number;
+    surplus_value: number;
+    shortage_value: number;
+    moved_count: number;
+  };
+}
+
+/**
  * Items answer in camelCase too — except `sell_price`, which the create and
  * update bodies take in snake_case while the response gives `sellPrice`.
  * Left as it is.
@@ -402,6 +624,18 @@ export interface Item {
   updatedAt: string;
   sellPrice: number;
   categoryName: string | null;
+  /** Moves by fractions — metres, kilos, litres (14.1). */
+  isFractional: boolean;
+  /** GET /items/:id only: the stock in each warehouse that has held it. */
+  stocks?: ItemWarehouseStock[];
+}
+
+export interface ItemWarehouseStock {
+  warehouseId: number;
+  warehouseName: string;
+  warehouseActive: boolean;
+  quantity: number;
+  location: string | null;
 }
 
 export interface ItemCreateBody {
@@ -413,6 +647,15 @@ export interface ItemCreateBody {
   description?: string | null;
   /** snake_case where the rest of the body is camelCase. */
   sell_price?: number;
+  isFractional?: boolean;
+  /**
+   * Create only (14.8): stock already on the shelf, posted as an opening
+   * movement in the same request. `openingCost` is required when it is
+   * above zero; `warehouseId` defaults to the workspace's default.
+   */
+  openingStock?: number;
+  openingCost?: number | null;
+  warehouseId?: number | null;
 }
 
 export type ItemUpdateBody = Partial<ItemCreateBody>;
@@ -435,6 +678,127 @@ export interface InventoryTransaction {
   created_by: number | null;
   created_at: string;
   purchase_invoice_number: string | null;
+  /** From 14.8: the ledger's own fields. */
+  unit_cost: number | null;
+  warehouse_id: number;
+  before_quantity: number | null;
+  after_quantity: number | null;
+  reason: string | null;
+  occurred_at: string;
+}
+
+/**
+ * GET /items/:id/trade (14.18) — the invoice lines that name an item, newest
+ * first. `status` is the payment status on a purchase or sale and the
+ * invoice's own status on a repair, where whether the part has left the
+ * shelf is the question.
+ */
+export interface ItemTradeRow {
+  kind: "purchase" | "sale" | "repair";
+  line_id: number;
+  invoice_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  /** The supplier on a purchase, the customer otherwise. */
+  party: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  status: string;
+}
+
+export interface ItemTradeTotal {
+  lines: number;
+  quantity: number;
+  amount: number;
+}
+
+export interface ItemTrade {
+  rows: ItemTradeRow[];
+  /** Over every line, not only the rows sent; repairs once issued. */
+  totals: Record<ItemTradeRow["kind"], ItemTradeTotal>;
+  /** More lines exist than the hundred sent. */
+  truncated: boolean;
+}
+
+/**
+ * GET /items/:id/kardex (14.19) — one ledger row. `balance` is the item's
+ * total after this row, or the warehouse's when the kardex is filtered to
+ * one; it is fixed in entry order, so a date filter never changes it.
+ */
+export interface KardexRow {
+  id: number;
+  type: string;
+  reason: string | null;
+  /** The document's date. */
+  occurred_at: string;
+  /** When the row was entered — the kardex's order. */
+  created_at: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  /** Signed: positive in, negative out. */
+  quantity: number;
+  unit_cost: number | null;
+  unit_price: number;
+  balance: number;
+  reference_type: string | null;
+  reference_id: number | null;
+  document_number: string | null;
+  note: string | null;
+  created_by_name: string | null;
+}
+
+export interface ItemKardex {
+  data: KardexRow[];
+  summary: {
+    /** The balance just before the first row in range. */
+    opening: number;
+    total_in: number;
+    total_out: number;
+    /** The balance after the last row in range. */
+    closing: number;
+  };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/** One purchase line, as the prices tab names it (14.20). */
+export interface ItemPricePoint {
+  price: number;
+  quantity: number;
+  invoice_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  supplier: string | null;
+}
+
+/** GET /items/:id/prices (14.20). */
+export interface ItemPrices {
+  purchase: {
+    lines: number;
+    quantity: number;
+    last: ItemPricePoint | null;
+    lowest: ItemPricePoint | null;
+    highest: ItemPricePoint | null;
+    /** Weighted by quantity: total paid over units bought. */
+    average: number | null;
+  };
+  sale: {
+    average: number | null;
+    last: {
+      price: number;
+      invoice_id: number;
+      invoice_number: string;
+      invoice_date: string;
+    } | null;
+  };
+  /** The moving average: what the stock on hand costs. */
+  current_average: number;
+  sell_price: number;
+  /** The last twenty purchases, newest first. */
+  history: ItemPricePoint[];
 }
 
 /** GET /items/search/for-invoice — snake_case, also unlike its neighbours. */
@@ -447,6 +811,7 @@ export interface ItemForInvoice {
   avg_purchase_price: number;
   sell_price: number;
   category_name: string | null;
+  is_fractional: boolean;
 }
 
 export interface QuickStockResponse {
@@ -459,11 +824,13 @@ export interface QuickPurchaseBody {
   quantity: number;
   unit_price: number;
   note?: string;
+  warehouse_id?: number | null;
 }
 
 export interface QuickSaleBody {
   quantity: number;
   customer_name?: string;
+  warehouse_id?: number | null;
 }
 
 /**
@@ -586,6 +953,8 @@ export interface PurchaseInvoice {
   paid_amount: number;
   payment_status: PaymentStatus;
   note: string | null;
+  /** Where the goods went in (14.1). */
+  warehouse_id: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -608,6 +977,7 @@ export interface PurchaseInvoiceLine {
 /** GET /purchase-invoices/:id — the invoice plus its lines. */
 export interface PurchaseInvoiceDetail extends PurchaseInvoice {
   items: PurchaseInvoiceLine[];
+  warehouse_name: string;
 }
 
 export interface PurchaseInvoiceCreateBody {
@@ -615,6 +985,8 @@ export interface PurchaseInvoiceCreateBody {
   invoice_date: string;
   paid_amount: number;
   note: string | null;
+  /** Omitted or null: the workspace's default warehouse. */
+  warehouse_id?: number | null;
   items: {
     item_id: number;
     quantity: number;
@@ -648,6 +1020,8 @@ export interface SaleInvoice {
   paid_amount: number;
   payment_status: PaymentStatus;
   note: string | null;
+  /** Where the goods were issued from (14.1). */
+  warehouse_id: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -698,6 +1072,8 @@ export interface SaleInvoiceCreateBody {
   invoice_date: string;
   paid_amount: number;
   note: string | null;
+  /** Omitted or null: the workspace's default warehouse. */
+  warehouse_id?: number | null;
   items: SaleInvoiceLineBody[];
 }
 
@@ -780,6 +1156,8 @@ export interface RepairInvoice {
   warranty_until: string | null;
   technician_id: number | null;
   notes: string | null;
+  /** Where the parts come from when it is issued (14.1). */
+  warehouse_id: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -855,6 +1233,8 @@ export interface RepairInvoiceCreateBody {
   discount_type: DiscountType | null;
   discount_value: number;
   notes: string;
+  /** Omitted or null: the workspace's default warehouse. */
+  warehouse_id?: number | null;
   items: RepairInvoiceLineBody[];
 }
 
@@ -904,10 +1284,18 @@ export interface StockReportRow {
   name: string;
   unit: string;
   current_stock: number;
+  /** That warehouse's quantity when the report is filtered by one; else null. */
+  warehouse_stock: number | null;
   min_stock: number;
   avg_purchase_price: number;
   category_name: string | null;
   stock_status: StockStatus;
+  /** With `perWarehouse=true` (14.22): warehouse id → quantity; else null. */
+  warehouse_stocks: Record<string, number> | null;
+  /** The idle and slow views (14.22) only; null in «all». */
+  out_quantity: number | null;
+  last_out_at: string | null;
+  days_of_cover: number | null;
 }
 
 export interface StockReport {
@@ -918,6 +1306,37 @@ export interface StockReport {
     critical_count: number;
     total_inventory_value: number;
   };
+}
+
+/**
+ * GET /reports/movements (14.21) — گردش کالا, one row per item. Outgoing
+ * columns are positive quantities; `correction` (adjustment, count) and
+ * `other` (reversal, returns) keep their sign. `initial` is stock entered
+ * with the item.
+ */
+export interface MovementReportRow {
+  item_id: number;
+  code: string;
+  name: string;
+  unit: string;
+  category_name: string | null;
+  opening: number;
+  initial: number;
+  purchase: number;
+  sale: number;
+  repair_use: number;
+  transfer_in: number;
+  transfer_out: number;
+  correction: number;
+  other: number;
+  closing: number;
+  /** Anything moved during the period. */
+  moved: boolean;
+}
+
+export interface MovementReport {
+  data: MovementReportRow[];
+  summary: { item_count: number; moved_count: number };
 }
 
 export interface PurchaseReportRow {
@@ -1005,6 +1424,7 @@ export interface DashboardTransaction {
   created_at: string;
   item_name: string;
   item_code: string;
+  item_unit: string;
 }
 
 export interface DashboardTopItem {

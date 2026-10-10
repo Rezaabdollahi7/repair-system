@@ -102,6 +102,93 @@ const resources: Resource[] = [
     updateBody: { name: "قطعات ویرایش‌شده" },
   },
   {
+    name: "warehouses",
+    path: "/api/warehouses",
+    create: async (workspaceId) => {
+      const row = await owner.warehouse.create({
+        // The same name in both workspaces on purpose: Warehouse.name is
+        // unique per workspace, not globally.
+        data: { workspaceId, name: "تعمیرات" },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.warehouse.count({ where: { id } })) === 1,
+    updateBody: { name: "تعمیرات ویرایش‌شده" },
+    // The list is the only read, and there is no DELETE route at all: a
+    // warehouse is deactivated, never removed (14.10). The default and
+    // status endpoints are checked in integration/warehouses.test.ts.
+    skipGetOne: true,
+    skipDelete: true,
+  },
+  {
+    name: "stock adjustments",
+    path: "/api/stock-adjustments",
+    create: async (workspaceId) => {
+      const warehouseId = await defaultWarehouseOf(workspaceId);
+      const row = await owner.stockAdjustment.create({
+        // The same number in both workspaces on purpose: it is unique per
+        // workspace, not globally.
+        data: { workspaceId, warehouseId, number: "ADJ-0001" },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.stockAdjustment.count({ where: { id } })) === 1,
+    // Neither route exists: an adjustment is never edited or deleted, and
+    // stockAdjustments.test.ts asserts both answer 404.
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
+    name: "stock counts",
+    path: "/api/stock-counts",
+    create: async (workspaceId) => {
+      const warehouseId = await defaultWarehouseOf(workspaceId);
+      const row = await owner.stockCount.create({
+        data: { workspaceId, warehouseId, number: "CNT-0001" },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.stockCount.count({ where: { id } })) === 1,
+    // Lines are written one at a time under /:id/lines/:lineId, and a count
+    // is cancelled, never deleted; stockCounts.test.ts covers both, and
+    // another workspace's line answering 404.
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
+    name: "stock transfers",
+    path: "/api/stock-transfers",
+    create: async (workspaceId) => {
+      const fromWarehouseId = await defaultWarehouseOf(workspaceId);
+      const to = await owner.warehouse.create({
+        data: { workspaceId, name: "مقصد انتقال" },
+        select: { id: true },
+      });
+      const row = await owner.stockTransfer.create({
+        data: {
+          workspaceId,
+          fromWarehouseId,
+          toWarehouseId: to.id,
+          number: "TRF-0001",
+        },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.stockTransfer.count({ where: { id } })) === 1,
+    // Neither route exists, as on an adjustment; stockTransfers.test.ts
+    // asserts both answer 404.
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
     name: "services",
     path: "/api/services",
     create: async (workspaceId) => {

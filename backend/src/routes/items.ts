@@ -7,6 +7,7 @@ import { idParamSchema } from "../schemas/common";
 import {
   invoiceSearchQuerySchema,
   itemCreateSchema,
+  itemKardexQuerySchema,
   itemListQuerySchema,
   itemSearchQuerySchema,
   itemTransactionsQuerySchema,
@@ -40,6 +41,22 @@ router.get(
   "/:id/transactions",
   validate({ params: idParamSchema, query: itemTransactionsQuerySchema }),
   ctrl.getTransactions,
+);
+
+router.get(
+  "/:id/kardex",
+  validate({ params: idParamSchema, query: itemKardexQuerySchema }),
+  ctrl.getKardex,
+);
+router.get(
+  "/:id/prices",
+  validate({ params: idParamSchema }),
+  ctrl.getPrices,
+);
+router.get(
+  "/:id/trade",
+  validate({ params: idParamSchema }),
+  ctrl.getTrade,
 );
 
 router.post("/", validate({ body: itemCreateSchema }), ctrl.create);

@@ -11,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useModal } from "../context/ModalContext";
+import { useGoToItem } from "../utils/navigation";
 import ConfirmModal from "./ConfirmModal";
 import InvoicePreview from "./InvoicePreview";
 import {
@@ -28,6 +29,7 @@ import {
   formatPersianCurrency,
   formatPersianPhone,
   toPersianDigits,
+  formatQuantity,
 } from "../utils/formatters";
 import type {
   Id,
@@ -54,8 +56,9 @@ export default function RepairInvoiceDetailModal({
   onClose,
 }: RepairInvoiceDetailModalProps) {
   const { isAtLeast } = useAuth();
-  const { openItemDetail, openDeviceDetail, openRepairInvoiceEdit } =
+  const { closeAllModals, openDeviceDetail, openRepairInvoiceEdit } =
     useModal();
+  const goToItem = useGoToItem();
   const [invoice, setInvoice] = useState<RepairInvoiceDetail | null>(null);
   /**
    * What is still owed — zero on a cancelled invoice, whatever the two
@@ -446,9 +449,11 @@ export default function RepairInvoiceDetailModal({
                                   {item.item_type === "inventory" ? (
                                     <button
                                       onClick={() => {
-                                        onClose();
+                                        // The item is a page now: the whole
+                                        // stack closes before it opens.
+                                        closeAllModals();
                                         if (item.item_id)
-                                          openItemDetail(item.item_id);
+                                          goToItem(item.item_id);
                                       }}
                                       className="text-primary hover:underline"
                                     >
@@ -461,7 +466,7 @@ export default function RepairInvoiceDetailModal({
                                   )}
                                 </td>
                                 <td className="px-4 py-3 text-body-sm text-text-primary">
-                                  {toPersianDigits(item.quantity)}
+                                  {formatQuantity(item.quantity)}
                                 </td>
                                 <td className="px-4 py-3 text-body-sm text-text-secondary">
                                   {item.unit}

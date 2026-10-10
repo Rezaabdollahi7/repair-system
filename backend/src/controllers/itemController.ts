@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma, { runInWorkspaceTransaction } from "../lib/prisma";
-import type { Prisma } from "../generated/prisma/client";
+import { Prisma } from "../generated/prisma/client";
 import { ValidatedRequest } from "../middleware/validate";
 import { AuthenticatedRequest } from "../types/request";
 import { errorMessage, isUniqueConstraintError } from "../utils/errors";
@@ -11,6 +11,7 @@ import type {
   ItemCreateBody,
   ItemListQuery,
   ItemSearchQuery,
+  ItemKardexQuery,
   ItemTransactionsQuery,
   ItemUpdateBody,
   QuickPurchaseBody,
@@ -19,8 +20,10 @@ import type {
 } from "../schemas/item";
 import { nextInvoiceNumber } from "../utils/invoiceNumber";
 import { workspaceIdOf } from "../utils/workspace";
-import { averageAfterAdding } from "../utils/avgPurchasePrice";
-import { defaultWarehouseId } from "../utils/warehouse";
+import { dateFilter } from "../utils/dateRange";
+import { lineTotals } from "../utils/invoiceTotals";
+import { applyStockMovements, StockError } from "../utils/stock";
+import { resolveWarehouseId } from "../utils/warehouse";
 
 const itemInclude = {
   category: { select: { name: true } },
@@ -44,6 +47,7 @@ function toItemResponse(item: ItemWithCategory) {
     minStock: item.minStock.toNumber(),
     currentStock: item.currentStock.toNumber(),
     avgPurchasePrice: item.avgPurchasePrice.toNumber(),
+    isFractional: item.isFractional,
     description: item.description,
     isActive: item.isActive,
     createdAt: item.createdAt.toISOString(),
@@ -134,14 +138,31 @@ export const getById = async (req: Request, res: Response) => {
     // belonging to another workspace.
     const item = await prisma.item.findFirst({
       where: { id, workspaceId: workspaceIdOf(req) },
-      include: itemInclude,
+      include: {
+        ...itemInclude,
+        stocks: {
+          orderBy: { warehouseId: "asc" },
+          include: { warehouse: { select: { name: true, isActive: true } } },
+        },
+      },
     });
 
     if (!item) {
       return res.status(404).json({ error: "کالا یافت نشد" });
     }
 
-    res.json(toItemResponse(item));
+    res.json({
+      ...toItemResponse(item),
+      // Where the total is kept. Rows at zero stay: a warehouse that has held
+      // the item is one the shop may look for it in.
+      stocks: item.stocks.map((stock) => ({
+        warehouseId: stock.warehouseId,
+        warehouseName: stock.warehouse.name,
+        warehouseActive: stock.warehouse.isActive,
+        quantity: stock.quantity.toNumber(),
+        location: stock.location,
+      })),
+    });
   } catch (error) {
     res.status(500).json({ error: errorMessage(error) });
   }
@@ -255,6 +276,8 @@ export const searchForInvoice = async (req: Request, res: Response) => {
         avg_purchase_price: item.avgPurchasePrice.toNumber(),
         sell_price: item.sellPrice.toNumber(),
         category_name: item.category?.name ?? null,
+        // The repair form steps its quantity field by this (14.11).
+        is_fractional: item.isFractional,
       })),
     );
   } catch (error) {
@@ -317,6 +340,12 @@ export const getTransactions = async (req: Request, res: Response) => {
       type: tx.type,
       quantity: tx.quantity.toNumber(),
       unit_price: tx.unitPrice.toNumber(),
+      unit_cost: tx.unitCost?.toNumber() ?? null,
+      warehouse_id: tx.warehouseId,
+      before_quantity: tx.beforeQuantity?.toNumber() ?? null,
+      after_quantity: tx.afterQuantity?.toNumber() ?? null,
+      reason: tx.reason,
+      occurred_at: tx.occurredAt.toISOString(),
       reference_id: tx.referenceId,
       reference_type: tx.referenceType,
       note: tx.note,
@@ -334,29 +363,582 @@ export const getTransactions = async (req: Request, res: Response) => {
   }
 };
 
+/** How many invoice lines the trade tab shows; the totals cover them all. */
+const TRADE_ROWS = 100;
+
+/** Repair invoices whose parts have left the shelf (14.6). */
+const REPAIR_MOVED: ("issued" | "paid")[] = ["issued", "paid"];
+
+// GET /api/items/:id/trade
+//
+// The item page's «خرید و فروش» tab (14.18): every invoice line that names
+// this item — bought, sold over the counter, fitted on a repair — newest
+// first, with a total per kind. The totals are aggregates over every line,
+// not sums of the rows returned, which stop at TRADE_ROWS.
+//
+// A repair line counts only once its invoice has been issued: a پیش‌فاکتور
+// has moved nothing, and a cancelled invoice has put its parts back. Both
+// are still listed, with their status, because the shop quoted that part.
+export const getTrade = async (req: Request, res: Response) => {
+  try {
+    const { id } = (req as ValidatedRequest).valid.params as IdParam;
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
+      select: { id: true },
+    });
+    if (!item) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const purchaseWhere = { itemId: id, workspaceId };
+    const saleWhere = { itemId: id, workspaceId };
+    // Repair lines are not a relation to items (itemId can name a service),
+    // so the type is part of the filter.
+    const repairWhere: Prisma.RepairInvoiceItemWhereInput = {
+      itemId: id,
+      itemType: "inventory",
+      workspaceId,
+    };
+    const newest = { invoice: { invoiceDate: "desc" as const } };
+
+    const [
+      purchases,
+      sales,
+      repairs,
+      purchaseTotals,
+      saleTotals,
+      repairTotals,
+    ] = await Promise.all([
+      prisma.purchaseInvoiceItem.findMany({
+        where: purchaseWhere,
+        orderBy: [newest, { id: "desc" }],
+        take: TRADE_ROWS,
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              supplierName: true,
+              paymentStatus: true,
+            },
+          },
+        },
+      }),
+      prisma.saleInvoiceItem.findMany({
+        where: saleWhere,
+        orderBy: [newest, { id: "desc" }],
+        take: TRADE_ROWS,
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              customerName: true,
+              paymentStatus: true,
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      prisma.repairInvoiceItem.findMany({
+        where: repairWhere,
+        orderBy: [newest, { id: "desc" }],
+        take: TRADE_ROWS,
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              customerName: true,
+              status: true,
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      prisma.purchaseInvoiceItem.aggregate({
+        where: purchaseWhere,
+        _count: true,
+        _sum: { quantity: true, totalPrice: true },
+      }),
+      prisma.saleInvoiceItem.aggregate({
+        where: saleWhere,
+        _count: true,
+        _sum: { quantity: true, totalPrice: true },
+      }),
+      prisma.repairInvoiceItem.aggregate({
+        where: {
+          ...repairWhere,
+          invoice: { status: { in: REPAIR_MOVED } },
+        },
+        _count: true,
+        _sum: { quantity: true, totalPrice: true },
+      }),
+    ]);
+
+    const rows = [
+      ...purchases.map((line) => ({
+        kind: "purchase" as const,
+        line_id: line.id,
+        invoice_id: line.invoice.id,
+        invoice_number: line.invoice.invoiceNumber,
+        invoice_date: line.invoice.invoiceDate.toISOString(),
+        party: line.invoice.supplierName,
+        quantity: line.quantity.toNumber(),
+        unit_price: line.unitPrice.toNumber(),
+        total_price: line.totalPrice.toNumber(),
+        status: line.invoice.paymentStatus,
+      })),
+      ...sales.map((line) => ({
+        kind: "sale" as const,
+        line_id: line.id,
+        invoice_id: line.invoice.id,
+        invoice_number: line.invoice.invoiceNumber,
+        invoice_date: line.invoice.invoiceDate.toISOString(),
+        party: line.invoice.customer?.name ?? line.invoice.customerName,
+        quantity: line.quantity.toNumber(),
+        unit_price: line.unitPrice.toNumber(),
+        total_price: line.totalPrice.toNumber(),
+        status: line.invoice.paymentStatus,
+      })),
+      ...repairs.map((line) => ({
+        kind: "repair" as const,
+        line_id: line.id,
+        invoice_id: line.invoice.id,
+        invoice_number: line.invoice.invoiceNumber,
+        invoice_date: line.invoice.invoiceDate.toISOString(),
+        party: line.invoice.customer?.name ?? line.invoice.customerName,
+        quantity: line.quantity.toNumber(),
+        unit_price: line.unitPrice.toNumber(),
+        total_price: line.totalPrice.toNumber(),
+        // The repair invoice's own status, not its payment: whether the part
+        // has left the shelf is the question this column answers.
+        status: line.invoice.status,
+      })),
+    ]
+      .sort(
+        (a, b) =>
+          b.invoice_date.localeCompare(a.invoice_date) ||
+          b.line_id - a.line_id,
+      )
+      .slice(0, TRADE_ROWS);
+
+    const total = (aggregate: {
+      _count: number;
+      _sum: {
+        quantity: Prisma.Decimal | null;
+        totalPrice: Prisma.Decimal | null;
+      };
+    }) => ({
+      lines: aggregate._count,
+      quantity: aggregate._sum.quantity?.toNumber() ?? 0,
+      amount: aggregate._sum.totalPrice?.toNumber() ?? 0,
+    });
+
+    const totals = {
+      purchase: total(purchaseTotals),
+      sale: total(saleTotals),
+      repair: total(repairTotals),
+    };
+
+    res.json({
+      rows,
+      totals,
+      // More lines exist than were sent; the page says so rather than
+      // letting a short list pass for the whole history.
+      truncated:
+        purchases.length + sales.length + repairs.length > rows.length ||
+        [purchases, sales, repairs].some((list) => list.length === TRADE_ROWS),
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+/**
+ * The number a ledger row's document is known by, per reference type. The
+ * ledger's reference is polymorphic and carries no foreign key, so each
+ * kind is looked up in its own table — one query per kind on the page.
+ */
+async function documentNumbers(
+  workspaceId: number,
+  rows: { referenceType: string | null; referenceId: number | null }[],
+): Promise<Map<string, string>> {
+  const idsOf = (type: string) => [
+    ...new Set(
+      rows
+        .filter((row) => row.referenceType === type && row.referenceId)
+        .map((row) => row.referenceId as number),
+    ),
+  ];
+  const where = (ids: number[]) => ({ id: { in: ids }, workspaceId });
+
+  const [purchases, sales, repairs, adjustments, counts, transfers] =
+    await Promise.all([
+      prisma.purchaseInvoice.findMany({
+        where: where(idsOf("purchase_invoice")),
+        select: { id: true, invoiceNumber: true },
+      }),
+      prisma.saleInvoice.findMany({
+        where: where(idsOf("sale_invoice")),
+        select: { id: true, invoiceNumber: true },
+      }),
+      prisma.repairInvoice.findMany({
+        where: where(idsOf("repair_invoice")),
+        select: { id: true, invoiceNumber: true },
+      }),
+      prisma.stockAdjustment.findMany({
+        where: where(idsOf("stock_adjustment")),
+        select: { id: true, number: true },
+      }),
+      prisma.stockCount.findMany({
+        where: where(idsOf("stock_count")),
+        select: { id: true, number: true },
+      }),
+      prisma.stockTransfer.findMany({
+        where: where(idsOf("stock_transfer")),
+        select: { id: true, number: true },
+      }),
+    ]);
+
+  const numbers = new Map<string, string>();
+  for (const row of purchases)
+    numbers.set(`purchase_invoice:${row.id}`, row.invoiceNumber);
+  for (const row of sales)
+    numbers.set(`sale_invoice:${row.id}`, row.invoiceNumber);
+  for (const row of repairs)
+    numbers.set(`repair_invoice:${row.id}`, row.invoiceNumber);
+  for (const row of adjustments)
+    numbers.set(`stock_adjustment:${row.id}`, row.number);
+  for (const row of counts) numbers.set(`stock_count:${row.id}`, row.number);
+  for (const row of transfers)
+    numbers.set(`stock_transfer:${row.id}`, row.number);
+  return numbers;
+}
+
+// GET /api/items/:id/kardex
+//
+// The kardex (14.19): one item's movements in the order they were entered,
+// each with its document's date beside it, what came in, what went out and
+// the balance after it — the item's total, or one warehouse's when the
+// kardex is filtered to one.
+//
+// The balance is a running sum over the whole ledger in entry order, worked
+// out before any date filter is applied, so it is always the true balance
+// after that row: a date range chooses which rows are shown, not what they
+// add up to. At this scale (hundreds of movements per item) summing in
+// JavaScript is cheaper than a window query and needs no raw SQL.
+export const getKardex = async (req: Request, res: Response) => {
+  try {
+    const valid = (req as ValidatedRequest).valid;
+    const { id } = valid.params as IdParam;
+    const query = valid.query as ItemKardexQuery;
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
+      select: { id: true },
+    });
+    if (!item) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const ledger = await prisma.inventoryTransaction.findMany({
+      where: {
+        workspaceId,
+        itemId: id,
+        ...(query.warehouse_id !== undefined
+          ? { warehouseId: query.warehouse_id }
+          : {}),
+      },
+      orderBy: { id: "asc" },
+      include: {
+        warehouse: { select: { name: true } },
+        author: { select: { fullName: true, username: true } },
+      },
+    });
+
+    // Decimal all the way: a float running sum of 0.1-metre movements
+    // drifts, and a kardex whose last balance disagrees with the shelf by
+    // 0.0000001 is a kardex nobody trusts.
+    let running = new Prisma.Decimal(0);
+    const withBalance = ledger.map((row) => {
+      running = running.plus(row.quantity);
+      return { row, balance: running };
+    });
+
+    const range = dateFilter(query.from_date, query.to_date);
+    const inRange = range
+      ? withBalance.filter(
+          ({ row }) =>
+            (!range.gte || row.occurredAt >= range.gte) &&
+            (!range.lte || row.occurredAt <= range.lte),
+        )
+      : withBalance;
+
+    let totalIn = new Prisma.Decimal(0);
+    let totalOut = new Prisma.Decimal(0);
+    for (const { row } of inRange) {
+      if (row.quantity.isPositive()) totalIn = totalIn.plus(row.quantity);
+      else totalOut = totalOut.minus(row.quantity);
+    }
+    const first = inRange[0];
+    const last = inRange[inRange.length - 1];
+
+    // Newest first on screen; the balances were fixed in entry order above.
+    const { page, limit } = query;
+    const pageRows = inRange
+      .slice()
+      .reverse()
+      .slice((page - 1) * limit, page * limit);
+    const numbers = await documentNumbers(
+      workspaceId,
+      pageRows.map(({ row }) => row),
+    );
+
+    res.json({
+      data: pageRows.map(({ row, balance }) => ({
+        id: row.id,
+        type: row.type,
+        reason: row.reason,
+        occurred_at: row.occurredAt.toISOString(),
+        created_at: row.createdAt.toISOString(),
+        warehouse_id: row.warehouseId,
+        warehouse_name: row.warehouse.name,
+        quantity: row.quantity.toNumber(),
+        unit_cost: row.unitCost?.toNumber() ?? null,
+        unit_price: row.unitPrice.toNumber(),
+        balance: balance.toNumber(),
+        reference_type: row.referenceType,
+        reference_id: row.referenceId,
+        document_number:
+          row.referenceType && row.referenceId
+            ? (numbers.get(`${row.referenceType}:${row.referenceId}`) ??
+              null)
+            : null,
+        note: row.note,
+        created_by_name:
+          row.author?.fullName?.trim() || row.author?.username || null,
+      })),
+      summary: {
+        // The balance just before the first row shown, and after the last.
+        opening: first ? first.balance.minus(first.row.quantity).toNumber() : 0,
+        total_in: totalIn.toNumber(),
+        total_out: totalOut.toNumber(),
+        closing: last ? last.balance.toNumber() : running.toNumber(),
+      },
+      total: inRange.length,
+      page,
+      limit,
+      totalPages: Math.ceil(inRange.length / limit),
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
+/** How many past purchases the prices tab lists. */
+const PRICE_HISTORY = 20;
+
+// GET /api/items/:id/prices
+//
+// The item page's «قیمت‌ها» tab (14.20): what the shop has paid for it —
+// the last, lowest and highest purchase price, each with the invoice it
+// came from, and the average — next to what the stock on hand costs now
+// (the moving average) and what it sells for.
+//
+// The purchase average is weighted by quantity — total paid over units
+// bought — so ten units at one price and one at another average as eleven
+// units do, not as two invoices. It is a different figure from the moving
+// average on the item, which is the cost of what is still on the shelf.
+export const getPrices = async (req: Request, res: Response) => {
+  try {
+    const { id } = (req as ValidatedRequest).valid.params as IdParam;
+    const workspaceId = workspaceIdOf(req);
+
+    const item = await prisma.item.findFirst({
+      where: { id, workspaceId },
+      select: { avgPurchasePrice: true, sellPrice: true },
+    });
+    if (!item) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    const where = { itemId: id, workspaceId };
+    const invoice = {
+      select: {
+        id: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        supplierName: true,
+      },
+    };
+    const byDate = [
+      { invoice: { invoiceDate: "desc" as const } },
+      { id: "desc" as const },
+    ];
+
+    const [totals, lowest, highest, history, saleTotals, lastSale] =
+      await Promise.all([
+        prisma.purchaseInvoiceItem.aggregate({
+          where,
+          _count: true,
+          _sum: { quantity: true, totalPrice: true },
+        }),
+        prisma.purchaseInvoiceItem.findFirst({
+          where,
+          orderBy: [{ unitPrice: "asc" }, ...byDate],
+          include: { invoice },
+        }),
+        prisma.purchaseInvoiceItem.findFirst({
+          where,
+          orderBy: [{ unitPrice: "desc" }, ...byDate],
+          include: { invoice },
+        }),
+        prisma.purchaseInvoiceItem.findMany({
+          where,
+          orderBy: byDate,
+          take: PRICE_HISTORY,
+          include: { invoice },
+        }),
+        prisma.saleInvoiceItem.aggregate({
+          where,
+          _sum: { quantity: true, totalPrice: true },
+        }),
+        prisma.saleInvoiceItem.findFirst({
+          where,
+          orderBy: byDate,
+          include: {
+            invoice: {
+              select: { id: true, invoiceNumber: true, invoiceDate: true },
+            },
+          },
+        }),
+      ]);
+
+    type Line = NonNullable<typeof lowest>;
+    const point = (line: Line | null) =>
+      line
+        ? {
+            price: line.unitPrice.toNumber(),
+            quantity: line.quantity.toNumber(),
+            invoice_id: line.invoice.id,
+            invoice_number: line.invoice.invoiceNumber,
+            invoice_date: line.invoice.invoiceDate.toISOString(),
+            supplier: line.invoice.supplierName,
+          }
+        : null;
+
+    const average = (sum: {
+      quantity: Prisma.Decimal | null;
+      totalPrice: Prisma.Decimal | null;
+    }) =>
+      sum.quantity && sum.totalPrice && !sum.quantity.isZero()
+        ? Math.round(sum.totalPrice.dividedBy(sum.quantity).toNumber())
+        : null;
+
+    res.json({
+      purchase: {
+        lines: totals._count,
+        quantity: totals._sum.quantity?.toNumber() ?? 0,
+        last: point(history[0] ?? null),
+        lowest: point(lowest),
+        highest: point(highest),
+        average: average(totals._sum),
+      },
+      sale: {
+        // A line's total is after its discount, so this is what a unit
+        // actually sold for on average.
+        average: average(saleTotals._sum),
+        last: lastSale
+          ? {
+              price: lastSale.unitPrice.toNumber(),
+              invoice_id: lastSale.invoice.id,
+              invoice_number: lastSale.invoice.invoiceNumber,
+              invoice_date: lastSale.invoice.invoiceDate.toISOString(),
+            }
+          : null,
+      },
+      current_average: item.avgPurchasePrice.toNumber(),
+      sell_price: item.sellPrice.toNumber(),
+      history: history.map((line) => point(line)!),
+    });
+  } catch (error) {
+    res.status(500).json({ error: errorMessage(error) });
+  }
+};
+
 // POST /api/items
 export const create = async (req: Request, res: Response) => {
   try {
     const body = (req as ValidatedRequest).valid.body as ItemCreateBody;
+    const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const workspaceId = workspaceIdOf(req);
 
-    const item = await prisma.item.create({
-      data: {
-        workspaceId: workspaceIdOf(req),
-        code: body.code,
-        name: body.name,
-        unit: body.unit,
-        categoryId: body.categoryId ?? null,
-        minStock: body.minStock,
-        description: body.description,
-        sellPrice: body.sell_price,
-      },
-      include: itemInclude,
+    // One request and one transaction for the item and what it opens with.
+    // The form used to create the item and then send a second request for
+    // its stock, as a zero-priced purchase: that dragged the average cost
+    // towards nothing, burned a PUR- number on a 0-rial invoice, and when the
+    // second request failed the item was left with no stock and nothing said.
+    const item = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      const created = await tx.item.create({
+        data: {
+          workspaceId,
+          code: body.code,
+          name: body.name,
+          unit: body.unit,
+          categoryId: body.categoryId ?? null,
+          minStock: body.minStock,
+          description: body.description,
+          sellPrice: body.sell_price,
+          isFractional: body.isFractional,
+        },
+        select: { id: true },
+      });
+
+      if (body.openingStock > 0) {
+        await applyStockMovements(
+          tx,
+          workspaceId,
+          { referenceType: null, referenceId: null, actorId },
+          [
+            {
+              itemId: created.id,
+              warehouseId: await resolveWarehouseId(
+                tx,
+                workspaceId,
+                body.warehouseId,
+              ),
+              quantity: body.openingStock,
+              type: "opening",
+              // Required by the schema whenever there is opening stock:
+              // valued at what it actually cost, it is the first point the
+              // moving average stands on.
+              unitCost: body.openingCost!,
+              note: "موجودی اولیه",
+            },
+          ],
+        );
+      }
+
+      return tx.item.findFirstOrThrow({
+        where: { id: created.id, workspaceId },
+        include: itemInclude,
+      });
     });
 
     res.status(201).json(toItemResponse(item));
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return res.status(400).json(DUPLICATE_CODE);
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: errorMessage(error) });
   }
@@ -371,10 +953,22 @@ export const update = async (req: Request, res: Response) => {
 
     const existing = await prisma.item.findFirst({
       where: { id, workspaceId: workspaceIdOf(req) },
-      select: { id: true },
+      select: { id: true, currentStock: true },
     });
     if (!existing) {
       return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+
+    // An item can stop being fractional only while what it holds is whole:
+    // 2.5 metres of a "whole-number" item could never be moved again.
+    if (
+      body.isFractional === false &&
+      !Number.isInteger(existing.currentStock.toNumber())
+    ) {
+      return res.status(400).json({
+        error:
+          "موجودی این کالا کسری است؛ تا وقتی موجودی عدد صحیح نشده، نمی‌توان آن را غیرکسری کرد",
+      });
     }
 
     const data: Prisma.ItemUpdateInput = {};
@@ -384,6 +978,7 @@ export const update = async (req: Request, res: Response) => {
     if (body.minStock !== undefined) data.minStock = body.minStock;
     if (body.description !== undefined) data.description = body.description;
     if (body.sell_price !== undefined) data.sellPrice = body.sell_price;
+    if (body.isFractional !== undefined) data.isFractional = body.isFractional;
     if (body.categoryId !== undefined) {
       data.category =
         body.categoryId === null
@@ -419,6 +1014,9 @@ export const remove = async (req: Request, res: Response) => {
             transactions: true,
             purchaseInvoiceItems: true,
             saleInvoiceItems: true,
+            // A count line names its item with Restrict, and an item that has
+            // never moved can still be on an open count (14.15).
+            stockCountLines: true,
           },
         },
       },
@@ -435,7 +1033,8 @@ export const remove = async (req: Request, res: Response) => {
     const references =
       item._count.transactions +
       item._count.purchaseInvoiceItems +
-      item._count.saleInvoiceItems;
+      item._count.saleInvoiceItems +
+      item._count.stockCountLines;
 
     if (references > 0) {
       return res.status(400).json({
@@ -451,6 +1050,24 @@ export const remove = async (req: Request, res: Response) => {
   }
 };
 
+class ItemNotFound extends Error {}
+
+/** Whether the item exists in this workspace — read inside the
+ * transaction, so a quick purchase or sale cannot be lent another
+ * workspace's item, and the figures it then acts on are the locked ones. */
+async function assertItem(
+  tx: Prisma.TransactionClient,
+  id: number,
+  workspaceId: number,
+) {
+  const item = await tx.item.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, sellPrice: true, avgPurchasePrice: true },
+  });
+  if (!item) throw new ItemNotFound();
+  return item;
+}
+
 // POST /api/items/:id/quick-purchase
 export const quickPurchase = async (req: Request, res: Response) => {
   try {
@@ -462,90 +1079,86 @@ export const quickPurchase = async (req: Request, res: Response) => {
     // it: the request isn't available in there.
     const workspaceId = workspaceIdOf(req);
 
-    const item = await prisma.item.findFirst({
-      where: { id, workspaceId },
-      select: { currentStock: true, avgPurchasePrice: true },
-    });
-    if (!item) {
-      return res.status(404).json({ error: "کالا یافت نشد" });
-    }
+    const totalAmount = lineTotals(body).totalPrice;
 
-    const totalAmount = body.quantity * body.unit_price;
-    const newStock = item.currentStock.toNumber() + body.quantity;
+    // A quick purchase is a one-line purchase invoice, and goes through the
+    // same service a purchase invoice does — the item's stock, average and
+    // ledger move together, under the same lock, or not at all.
+    const result = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      await assertItem(tx, id, workspaceId);
+      const warehouseId = await resolveWarehouseId(
+        tx,
+        workspaceId,
+        body.warehouse_id,
+      );
 
-    // The same arithmetic a purchase-invoice line runs, from the same
-    // module: a quick purchase is a one-line purchase invoice and had no
-    // business computing the average its own way.
-    const newAvgPrice = averageAfterAdding({
-      avg: item.avgPurchasePrice.toNumber(),
-      stock: item.currentStock.toNumber(),
-      quantity: body.quantity,
-      unitPrice: body.unit_price,
-    });
+      const number = await nextInvoiceNumber(tx, workspaceId, "purchase");
+      const invoice = await tx.purchaseInvoice.create({
+        data: {
+          workspaceId,
+          warehouseId,
+          invoiceNumber: number,
+          supplierName: "خرید سریع",
+          totalAmount,
+          paidAmount: totalAmount,
+          paymentStatus: "paid",
+          note: body.note ?? "خرید سریع از صفحه جزئیات کالا",
+          createdBy: actorId,
+        },
+      });
 
-    // One transaction: the invoice, its line, the stock adjustment and the
-    // ledger entry have to land together or not at all, or stock and history
-    // drift apart.
-    const invoiceNumber = await runInWorkspaceTransaction(
-      workspaceId,
-      async (tx) => {
-        const number = await nextInvoiceNumber(tx, workspaceId, "purchase");
-        const warehouseId = await defaultWarehouseId(tx, workspaceId);
-        const invoice = await tx.purchaseInvoice.create({
-          data: {
-            workspaceId,
-            warehouseId,
-            invoiceNumber: number,
-            supplierName: "خرید سریع",
-            totalAmount,
-            paidAmount: totalAmount,
-            paymentStatus: "paid",
-            note: body.note ?? "خرید سریع از صفحه جزئیات کالا",
-            createdBy: actorId,
-          },
-        });
+      await tx.purchaseInvoiceItem.create({
+        data: {
+          workspaceId,
+          invoiceId: invoice.id,
+          itemId: id,
+          quantity: body.quantity,
+          unitPrice: body.unit_price,
+          totalPrice: totalAmount,
+        },
+      });
 
-        await tx.purchaseInvoiceItem.create({
-          data: {
-            workspaceId,
-            invoiceId: invoice.id,
+      await applyStockMovements(
+        tx,
+        workspaceId,
+        {
+          referenceType: "purchase_invoice",
+          referenceId: invoice.id,
+          actorId,
+        },
+        [
+          {
             itemId: id,
+            warehouseId,
             quantity: body.quantity,
-            unitPrice: body.unit_price,
-            totalPrice: totalAmount,
-          },
-        });
-
-        await tx.item.update({
-          where: { id },
-          data: { currentStock: newStock, avgPurchasePrice: newAvgPrice },
-        });
-
-        await tx.inventoryTransaction.create({
-          data: {
-            workspaceId,
-            itemId: id,
-            warehouseId,
             type: "purchase",
-            quantity: body.quantity,
+            unitCost: body.unit_price,
             unitPrice: body.unit_price,
-            referenceId: invoice.id,
-            referenceType: "purchase_invoice",
             note: "خرید سریع",
-            createdBy: actorId,
           },
-        });
+        ],
+      );
 
-        return number;
-      },
-    );
+      const item = await tx.item.findFirstOrThrow({
+        where: { id, workspaceId },
+        select: { currentStock: true },
+      });
+
+      return { number, newStock: item.currentStock };
+    });
 
     res.json({
       message: "خرید سریع با موفقیت ثبت شد",
-      invoice_number: invoiceNumber,
-      new_stock: newStock,
+      invoice_number: result.number,
+      new_stock: result.newStock.toNumber(),
     });
   } catch (error) {
+    if (error instanceof ItemNotFound) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };
@@ -559,92 +1172,91 @@ export const quickSale = async (req: Request, res: Response) => {
     const actorId = (req as AuthenticatedRequest).user?.id ?? null;
     const workspaceId = workspaceIdOf(req);
 
-    const item = await prisma.item.findFirst({
-      where: { id, workspaceId },
-      select: { currentStock: true, sellPrice: true, avgPurchasePrice: true },
-    });
-    if (!item) {
-      return res.status(404).json({ error: "کالا یافت نشد" });
-    }
+    const result = await runInWorkspaceTransaction(workspaceId, async (tx) => {
+      const item = await assertItem(tx, id, workspaceId);
+      const warehouseId = await resolveWarehouseId(
+        tx,
+        workspaceId,
+        body.warehouse_id,
+      );
 
-    if (item.currentStock.toNumber() < body.quantity) {
-      return res.status(400).json({
-        error: `موجودی کافی نیست. موجودی فعلی: ${item.currentStock.toNumber()}`,
+      // Sells at the item's sale price, falling back to its average cost
+      // when none has been set. The old code always sold at cost, which
+      // recorded every quick sale at a zero margin.
+      const sellPrice = item.sellPrice.toNumber();
+      const unitPrice =
+        sellPrice > 0 ? sellPrice : item.avgPurchasePrice.toNumber();
+      const totalAmount = lineTotals({
+        quantity: body.quantity,
+        unit_price: unitPrice,
+      }).totalPrice;
+
+      const number = await nextInvoiceNumber(tx, workspaceId, "sale");
+      const invoice = await tx.saleInvoice.create({
+        data: {
+          workspaceId,
+          warehouseId,
+          invoiceNumber: number,
+          customerName: body.customer_name ?? "فروش سریع",
+          totalAmount,
+          paidAmount: totalAmount,
+          paymentStatus: "paid",
+          note: "فروش سریع از صفحه جزئیات کالا",
+          createdBy: actorId,
+        },
       });
-    }
 
-    // Sells at the item's sale price, falling back to the average purchase
-    // price when no sale price has been set. The old code always used the
-    // purchase price, which recorded every quick sale at cost and left the
-    // profit report showing a zero margin for them.
-    const sellPrice = item.sellPrice.toNumber();
-    const unitPrice =
-      sellPrice > 0 ? sellPrice : item.avgPurchasePrice.toNumber();
-
-    const totalAmount = body.quantity * unitPrice;
-    const newStock = item.currentStock.toNumber() - body.quantity;
-
-    const invoiceNumber = await runInWorkspaceTransaction(
-      workspaceId,
-      async (tx) => {
-        const number = await nextInvoiceNumber(tx, workspaceId, "sale");
-        const warehouseId = await defaultWarehouseId(tx, workspaceId);
-        const invoice = await tx.saleInvoice.create({
-          data: {
-            workspaceId,
-            warehouseId,
-            invoiceNumber: number,
-            customerName: body.customer_name ?? "فروش سریع",
-            totalAmount,
-            paidAmount: totalAmount,
-            paymentStatus: "paid",
-            note: "فروش سریع از صفحه جزئیات کالا",
-            createdBy: actorId,
-          },
-        });
-
-        await tx.saleInvoiceItem.create({
-          data: {
-            workspaceId,
-            invoiceId: invoice.id,
-            itemId: id,
-            quantity: body.quantity,
-            unitPrice,
-            totalPrice: totalAmount,
-          },
-        });
-
-        await tx.item.update({
-          where: { id },
-          data: { currentStock: newStock },
-        });
-
-        await tx.inventoryTransaction.create({
-          data: {
-            workspaceId,
+      const [moved] = await applyStockMovements(
+        tx,
+        workspaceId,
+        { referenceType: "sale_invoice", referenceId: invoice.id, actorId },
+        [
+          {
             itemId: id,
             warehouseId,
-            type: "sale",
-            // Negative, matching how the ledger records outgoing stock.
             quantity: -body.quantity,
+            type: "sale",
             unitPrice,
-            referenceId: invoice.id,
-            referenceType: "sale_invoice",
             note: "فروش سریع",
-            createdBy: actorId,
           },
-        });
+        ],
+      );
 
-        return number;
-      },
-    );
+      await tx.saleInvoiceItem.create({
+        data: {
+          workspaceId,
+          invoiceId: invoice.id,
+          itemId: id,
+          quantity: body.quantity,
+          unitPrice,
+          totalPrice: totalAmount,
+          // The cost it actually left at, under the lock — what the margin
+          // on this sale is measured against.
+          unitCost: moved.unitCost,
+        },
+      });
+
+      // The item's total, as quick purchase answers — not this warehouse's.
+      const after = await tx.item.findFirstOrThrow({
+        where: { id, workspaceId },
+        select: { currentStock: true },
+      });
+
+      return { number, newStock: after.currentStock };
+    });
 
     res.json({
       message: "فروش سریع با موفقیت ثبت شد",
-      invoice_number: invoiceNumber,
-      new_stock: newStock,
+      invoice_number: result.number,
+      new_stock: result.newStock.toNumber(),
     });
   } catch (error) {
+    if (error instanceof ItemNotFound) {
+      return res.status(404).json({ error: "کالا یافت نشد" });
+    }
+    if (error instanceof StockError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: errorMessage(error) });
   }
 };

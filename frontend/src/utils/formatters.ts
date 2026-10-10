@@ -120,3 +120,27 @@ export function formatPersianPercent(value: number | null | undefined): string {
   const text = Math.abs(value).toFixed(1).replace(/\.0$/, "");
   return `${sign}٪${toPersianDigits(text).replace(".", "٫")}`;
 }
+
+/**
+ * A stock quantity — `۱۲`, `۰٫۴`, `۱,۲۵۰٫۵` (14.11).
+ *
+ * Quantities are decimal since 14.1: three places, for the metre of cable and
+ * the kilo of solder. Whole numbers print whole, a fraction keeps only the
+ * places it has, and the separator is the Persian «٫» for the same reason as
+ * in formatPersianCompact. Never rounded to an integer — 0.4 metres printed
+ * as ۰ would read as an empty shelf.
+ */
+export function formatQuantity(
+  value: string | number | null | undefined,
+): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const num = Number(value);
+  if (isNaN(num)) return "—";
+
+  const rounded = Math.round(num * 1000) / 1000;
+  const sign = rounded < 0 ? "−" : "";
+  const text = Math.abs(rounded).toLocaleString("en-US", {
+    maximumFractionDigits: 3,
+  });
+  return sign + toPersianDigits(text).replace(".", "٫");
+}

@@ -15,6 +15,13 @@ import DeviceList from "./pages/DeviceList";
 import CustomerList from "./pages/CustomerList";
 import PersonnelList from "./pages/PersonnelList";
 import ItemList from "./pages/ItemList";
+import WarehouseList from "./pages/WarehouseList";
+import ItemDetail from "./pages/ItemDetail";
+import MovementReport from "./pages/MovementReport";
+import StockAdjustmentList from "./pages/StockAdjustmentList";
+import StockCountList from "./pages/StockCountList";
+import StockCountDetail from "./pages/StockCountDetail";
+import StockTransferList from "./pages/StockTransferList";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import Dashboard from "./pages/Dashboard";
@@ -142,6 +149,30 @@ function App() {
                           element={<PersonnelDetail />}
                         />
                         <Route path="items" element={<ItemList />} />
+                        {/* A page since 14.18: reached from the item list,
+                            two reports, the ledger and every invoice, and
+                            «back» has to mean the list. */}
+                        <Route path="items/:id" element={<ItemDetail />} />
+                        <Route path="warehouses" element={<WarehouseList />} />
+                        <Route
+                          path="stock-adjustments"
+                          element={<StockAdjustmentList />}
+                        />
+                        <Route
+                          path="stock-counts"
+                          element={<StockCountList />}
+                        />
+                        {/* A page, not a modal: counted for an hour on a
+                            phone, linked to a colleague, and «back» has to
+                            mean the list. */}
+                        <Route
+                          path="stock-counts/:id"
+                          element={<StockCountDetail />}
+                        />
+                        <Route
+                          path="stock-transfers"
+                          element={<StockTransferList />}
+                        />
                         <Route
                           path="purchase-invoices"
                           element={<PurchaseInvoiceList />}
@@ -170,6 +201,10 @@ function App() {
                             belongs in the controller. */}
                         <Route path="dashboard" element={<Dashboard />} />
                         <Route path="reports/stock" element={<StockReport />} />
+                        <Route
+                          path="reports/movements"
+                          element={<MovementReport />}
+                        />
                         <Route
                           path="reports/profit"
                           element={<ProfitReport />}

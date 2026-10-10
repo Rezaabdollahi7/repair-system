@@ -545,9 +545,20 @@ docker-compose.yml · docker-compose.prod.yml · Caddyfile · .env.prod.example
 | `20260830070000_discount_use_count`     | policy دوم برای شمارش سراسری کد تخفیف (دستی)     |
 | `20260831192037_payment_discount_code`  | ستون `discount_code_id` روی `payments`           |
 | `20260830053153_subscriptions`          | هشت مدل فاز ۸ + ۷ policy + سه پلن + backfill     |
+| `20260907060000_all_workspaces_lookup`  | دریچه‌ی چهارم: فهرست کارگاه‌ها برای cron اشتراک (دستی) |
+| `20260910060000_customer_notes`         | ستون `notes` روی `customers`                     |
+| `20260912081500_sms_wallet`             | کیف پول پیامکی: چهار جدول + ۴ policy + تعرفه‌ها   |
+| `20260912120000_sms_topup_once`         | یک بار شارژ برای هر خرید، در خود دیتابیس          |
+| `20260916082931_device_reception_number` | شماره‌ی پذیرش دستگاه + `device_seq`             |
+| `20261009100000_inventory_movement_types` | ۱۴.۱ — نوع‌ها و دلیل‌های حرکت انبار (جدا، چون enum) |
+| `20261009100100_inventory_warehouses`   | ۱۴.۱/۱۴.۲ — انبارها، `item_stocks`، مقدار اعشاری، دفتر فقط‌افزودنی + backfill |
+| `20261009183829_stock_adjustments`      | ۱۴.۱۴ — سند اصلاح موجودی (ADJ) + ۲ policy        |
+| `20261009190000_referral_code_deletion` | حذف کد معرف فقط برای کارگاه خودش، تا حذف کارگاه (۸.۷) کار کند |
+| `20261009191421_stock_counts`           | ۱۴.۱۵ — انبارگردانی (CNT) + ۲ policy             |
+| `20261009221023_stock_transfers`        | ۱۴.۱۶ — انتقال بین انبارها (TRF) + ۲ policy      |
 
 ⚠️ **ترتیب اجرا الفبایی است، نه زمانی.** هر مهاجرت دستی جدید باید timestamp
-بزرگ‌تر از `20260831192037` بگیرد.
+بزرگ‌تر از آخرین مهاجرت فهرست بالا (امروز `20261009221023`) بگیرد.
 
 ---
 

@@ -96,13 +96,13 @@ docker compose exec postgres psql -U dofixo -d restore_test \
 | بررسی         | انتظار                    |
 | ------------- | ------------------------- |
 | تعداد ردیف‌ها | معقول به نظر برسد         |
-| تعداد policy  | **۳۸** — شمارش دقیق پایین |
+| تعداد policy  | **۴۲** — شمارش دقیق پایین |
 | توابع `app_*` | **۴ تا**                  |
 
 ⚠️ اگر policyها کم باشند، دیتابیس بازیابی‌شده **هیچ ایزولاسیونی بین کارگاه‌ها
 ندارد** و نباید سرو شود. اگر توابع نباشند، لاگین و ثبت‌نام کار نمی‌کنند.
 
-⚠️ عدد ۳۸ حاصل جمع ساده‌ی «جدول‌های `workspace_id` دار + ۱» نیست، و قبلاً بود.
+⚠️ عدد ۴۲ حاصل جمع ساده‌ی «جدول‌های `workspace_id` دار + ۱» نیست، و قبلاً بود.
 سه استثنا آن را شکستند: `otp_codes` که `workspace_id` ندارد ولی policy دارد،
 `referrals` که به‌جای یک ستون دو ستون کارگاه دارد، و `referral_codes` که سه
 policy دارد (خواندن باز، نوشتن محدود، و از ۱۷ مهر ۱۴۰۵ حذف فقط برای کارگاه
@@ -110,8 +110,10 @@ policy دارد (خواندن باز، نوشتن محدود، و از ۱۷ مه
 
 چهار policy از ۱۲.۱ می‌آیند: `sms_wallets`، `sms_wallet_transactions`،
 `sms_messages` و `sms_topups`. `sms_prices` مثل `plans` داده‌ی مرجع است و
-عمداً policy ندارد. چهار تای دیگر از فاز ۱۴ (انبار): `warehouses` و
-`item_stocks` (۱۴.۱)، `stock_adjustments` و `stock_adjustment_lines` (۱۴.۱۴).
+عمداً policy ندارد. هشت تای دیگر از فاز ۱۴ (انبار): `warehouses` و
+`item_stocks` (۱۴.۱)، `stock_adjustments` و `stock_adjustment_lines` (۱۴.۱۴)،
+`stock_counts` و `stock_count_lines` (۱۴.۱۵)، `stock_transfers` و
+`stock_transfer_lines` (۱۴.۱۶).
 
 پس اگر عدد فرق کرد، به‌جای حساب کردن، تفاوت را بگیر:
 

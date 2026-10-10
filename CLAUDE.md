@@ -105,9 +105,11 @@ left standing over the new screen.
 
 ## Domain Model (current feature set)
 
-Pages: Dashboard, Devices, Customers, Personnel, Inventory/Items, Warehouses,
-Purchase Invoices, Sale Invoices, Repair Invoices, Stock Report, Profit & Loss
-Report, Backups, Settings, Subscription, Referral, SMS Wallet.
+Pages: Dashboard, Devices, Customers, Personnel, Inventory/Items (and the
+item page), Warehouses, Stock Adjustments, Stock Counts, Stock Transfers,
+Purchase Invoices, Sale Invoices, Repair Invoices, Stock Report, Stock
+Movement Report, Profit & Loss Report, Backups, Settings, Subscription,
+Referral, SMS Wallet.
 
 Key entities:
 
@@ -161,8 +163,11 @@ Key entities:
   - Only repair invoices contribute a _paid_ event to the timeline. They
     record each payment with its own date; a sale invoice carries a paid
     amount and a status and no date to show.
-- **Reports** — low-stock report (items below minimum threshold), profit & loss report
-  (sales, purchases, net, margin).
+- **Reports** — the stock report (value, low stock, a warehouse filter, a
+  column per warehouse, and the idle and slow-selling views of 14.22), the
+  stock movement report «گردش کالا» (14.21), and the profit & loss report
+  (sales, purchases, net, margin — margins from the cost stored on each
+  line, 14.9).
 
 All Persian/Jalali date handling uses `jalaali-js`; dates are stored in Gregorian in the DB and
 converted at the application layer for display.
@@ -585,16 +590,34 @@ document and both stay on the record.
   in `utils/warehouses.ts` is what makes the entry appear the moment the
   second is added.
 
-**The item page** (`/items/:id`, 14.18) has three tabs today — نمای کلی,
-کاردکس, خرید و فروش. «قیمت‌ها» (14.20) and «تغییرات» (14.29) are added to
-its `TABS` list when the figures behind them exist, not before.
-`GET /items/:id/trade` answers the third: the invoice lines naming the item,
-newest first and capped at a hundred, with per-kind totals aggregated over
-all of them — a repair line counted only once its invoice is issued.
+**The item page** (`/items/:id`, 14.18) has four tabs — نمای کلی, کاردکس,
+خرید و فروش, قیمت‌ها. «تغییرات» (14.29) is added to its `TABS` list when
+the audit log behind it exists, not before. Each tab has its own endpoint,
+loaded only while the tab is open:
 
-**Still to come**, in `Roadmap.md` phase 14: the full kardex, price
-statistics and reports (rest of 14C), suppliers and returns (14D), reorder
-and reservations (14E), audit and period lock (14F).
+- `GET /items/:id/kardex` (14.19) — the ledger in entry order, newest first
+  on screen, with the document's date, in, out and the balance after each
+  row: the item's total, or one warehouse's when filtered. The balance is a
+  running `Decimal` sum over the whole ledger fixed **before** the date
+  filter, so a range picks rows and never changes what they add up to.
+  Each row carries its document's number, and the frontend opens that
+  document from it.
+- `GET /items/:id/trade` (14.18) — the invoice lines naming the item,
+  newest first and capped at a hundred, with per-kind totals aggregated
+  over all of them; a repair line counts only once its invoice is issued.
+- `GET /items/:id/prices` (14.20) — last, lowest and highest purchase price
+  with their invoices, and the purchase average **weighted by quantity**,
+  beside the moving average, the sell price and the sale average.
+
+**Reports.** «گردش کالا» (`/reports/movements`, 14.21): per item, the
+balance when the period began, what moved during it by kind, and the
+balance at the end, by document date — two grouped ledger queries, no raw
+SQL. The stock report's «راکد» and «کم‌فروش» views (14.22) count only stock
+**leaving the shop** (sale, repair use) as movement: a purchase or a
+transfer does not make stock any less idle.
+
+**Still to come**, in `Roadmap.md` phase 14: suppliers and returns (14D),
+reorder and reservations (14E), audit and period lock (14F).
 
 ### Database migration
 

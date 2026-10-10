@@ -31,6 +31,7 @@ import type { Id, SaleInvoiceDetail } from "../types/api";
 import { modalPanel } from "../motion";
 import InfoRow from "./InfoRow";
 import PaymentStatusBadge from "./PaymentStatusBadge";
+import NumberInput from "./NumberInput";
 
 interface SaleInvoiceDetailModalProps {
   invoiceId?: Id | null;
@@ -430,12 +431,16 @@ export default function SaleInvoiceDetailModal({
                           بروزرسانی پرداخت (ریال)
                         </label>
                         <div className="flex gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max={invoice.total_amount}
-                            value={paymentAmount}
-                            onChange={(e) => setPaymentAmount(e.target.value)}
+                          <NumberInput
+                            value={
+                              paymentAmount === ""
+                                ? null
+                                : Number(paymentAmount)
+                            }
+                            aria-label="مبلغ پرداخت‌شده"
+                            onChange={(value) =>
+                              setPaymentAmount(value === null ? "" : value)
+                            }
                             className="flex-1 border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary"
                           />
                           <button

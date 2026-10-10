@@ -35,6 +35,8 @@ import { modalPanel } from "../motion";
  */
 import { formatPersianCurrency, formatQuantity } from "../utils/formatters";
 import QuantityInput from "./QuantityInput";
+import NumberInput from "./NumberInput";
+import UnitSelect from "./UnitSelect";
 import WarehouseSelect from "./WarehouseSelect";
 import { useWarehouses } from "../utils/warehouses";
 import { isFractionalByDefault } from "../utils/units";
@@ -171,17 +173,12 @@ function QuickItemModal({ isOpen, onClose, onSuccess }: QuickItemModalProps) {
               <label className="block text-body-sm font-medium text-text-primary mb-1">
                 واحد
               </label>
-              <select
-                name="unit"
+              <UnitSelect
                 value={formData.unit}
-                onChange={handleChange}
+                aria-label="واحد"
+                onChange={(unit) => setFormData((prev) => ({ ...prev, unit }))}
                 className="w-full border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-              >
-                <option value="عدد">عدد</option>
-                <option value="متر">متر</option>
-                <option value="کیلوگرم">کیلوگرم</option>
-                <option value="بسته">بسته</option>
-              </select>
+              />
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-6">
@@ -628,17 +625,18 @@ export default function PurchaseInvoiceFormModal({
                             <label className="block text-body-xs font-medium text-text-secondary mb-0.5">
                               قیمت واحد (ریال)
                             </label>
-                            <input
-                              type="number"
+                            <NumberInput
                               value={item.unit_price}
-                              onChange={(e) =>
+                              zeroAsEmpty
+                              placeholder="۰"
+                              aria-label="قیمت واحد"
+                              onChange={(value) =>
                                 handleItemChange(
                                   index,
                                   "unit_price",
-                                  parseInt(e.target.value) || 0,
+                                  value ?? 0,
                                 )
                               }
-                              min="0"
                               className={`w-full border rounded-field px-1 sm:px-3 py-1.5 sm:py-2 text-body-xs sm:text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors[`price_${index}`] ? "border-danger" : "border-border"}`}
                             />
                             {errors[`price_${index}`] && (
@@ -696,13 +694,16 @@ export default function PurchaseInvoiceFormModal({
                     <label className="block text-body-sm font-medium text-text-primary mb-1.5">
                       مبلغ پرداختی (ریال)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       name="paid_amount"
                       value={formData.paid_amount}
-                      onChange={handleInputChange}
-                      min="0"
-                      step="1000"
+                      aria-label="مبلغ پرداختی"
+                      onChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          paid_amount: value ?? 0,
+                        }))
+                      }
                       className={`w-full border rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] ${errors.paid_amount ? "border-danger" : "border-border-field"}`}
                     />
                     {errors.paid_amount && (

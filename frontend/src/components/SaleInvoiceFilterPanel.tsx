@@ -15,6 +15,7 @@ import type { PaymentStatus } from "../types/api";
 import { backdrop, modalPanel } from "../motion";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 import { PAYMENT_STATUSES } from "../utils/invoiceStatus";
+import NumberInput from "./NumberInput";
 
 /**
  * The filter state this panel edits. Exported because SaleInvoiceList owns
@@ -325,19 +326,13 @@ export default function SaleInvoiceFilterPanel({
                   <label className="block text-body-xs text-text-secondary mb-1">
                     از مبلغ (ریال)
                   </label>
-                  <input
-                    type="number"
-                    value={filters.amount_from || ""}
-                    onChange={(e) =>
-                      onChange({
-                        ...filters,
-                        amount_from: e.target.value
-                          ? Number(e.target.value)
-                          : "",
-                      })
+                  <NumberInput
+                    value={
+                      filters.amount_from ? Number(filters.amount_from) : null
                     }
-                    min="0"
-                    step="10000"
+                    onChange={(value) =>
+                      onChange({ ...filters, amount_from: value ?? "" })
+                    }
                     placeholder="حداقل مبلغ"
                     className="w-full border border-border-field rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
                   />
@@ -346,17 +341,11 @@ export default function SaleInvoiceFilterPanel({
                   <label className="block text-body-xs text-text-secondary mb-1">
                     تا مبلغ (ریال)
                   </label>
-                  <input
-                    type="number"
-                    value={filters.amount_to || ""}
-                    onChange={(e) =>
-                      onChange({
-                        ...filters,
-                        amount_to: e.target.value ? Number(e.target.value) : "",
-                      })
+                  <NumberInput
+                    value={filters.amount_to ? Number(filters.amount_to) : null}
+                    onChange={(value) =>
+                      onChange({ ...filters, amount_to: value ?? "" })
                     }
-                    min="0"
-                    step="10000"
                     placeholder="حداکثر مبلغ"
                     className="w-full border border-border-field rounded-field px-3.5 py-2.5 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] duration-150"
                   />

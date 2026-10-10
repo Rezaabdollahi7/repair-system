@@ -25,6 +25,7 @@ import {
   tr,
 } from "../utils/tableClasses";
 import type { SmsMessageRow, SmsTopup, SmsWalletStatus } from "../types/api";
+import NumberInput from "../components/NumberInput";
 
 /** Rials in the database, tomans on screen — the whole app works this way. */
 function toToman(rials: number): string {
@@ -274,12 +275,12 @@ export default function SmsWallet() {
 
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 min-w-0">
-            <input
-              type="number"
-              min={MIN_TOMAN}
-              step={1000}
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+            <NumberInput
+              value={amount === "" ? null : Number(amount)}
+              aria-label="مبلغ دلخواه (تومان)"
+              onChange={(value) =>
+                setAmount(value === null ? "" : String(value))
+              }
               className="w-full px-4 py-2.5 pl-16 rounded-2xl bg-surface-alt border border-border text-text-primary focus:outline-none focus:border-border-strong"
               placeholder="مبلغ دلخواه"
             />

@@ -15,6 +15,7 @@ import {
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import type { SettingsForm } from "../types/api";
 import { primaryButton } from "../utils/tableClasses";
+import NumberInput from "../components/NumberInput";
 
 type UploadType = "logo" | "stamp" | "signature";
 
@@ -489,14 +490,18 @@ export default function Settings() {
                 <label className="block text-body-sm font-medium text-text-primary mb-2">
                   نرخ مالیات پیش‌فرض (%)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   name="default_tax_rate"
                   value={settings.default_tax_rate || 0}
-                  onChange={handleChange}
-                  min="0"
-                  max="100"
-                  step="0.5"
+                  decimals={2}
+                  separators={false}
+                  aria-label="نرخ مالیات پیش‌فرض"
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      default_tax_rate: value ?? 0,
+                    }))
+                  }
                   className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>
@@ -505,12 +510,17 @@ export default function Settings() {
                 <label className="block text-body-sm font-medium text-text-primary mb-2">
                   مدت گارانتی پیش‌فرض (ماه)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   name="default_warranty_months"
                   value={settings.default_warranty_months ?? 3}
-                  onChange={handleChange}
-                  min="0"
+                  separators={false}
+                  aria-label="مدت گارانتی پیش‌فرض"
+                  onChange={(value) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      default_warranty_months: value ?? 0,
+                    }))
+                  }
                   className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
                 />
               </div>

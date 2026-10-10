@@ -231,6 +231,7 @@ function CountRow({
                 }
               }}
               aria-label={`شمارش ${line.item_name}`}
+              align="center"
               placeholder="—"
               className="w-full border border-border-field rounded-field px-3 py-2.5 text-body-md text-center bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow] disabled:opacity-70"
             />

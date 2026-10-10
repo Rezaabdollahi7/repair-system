@@ -162,6 +162,33 @@ const resources: Resource[] = [
     skipDelete: true,
   },
   {
+    name: "stock transfers",
+    path: "/api/stock-transfers",
+    create: async (workspaceId) => {
+      const fromWarehouseId = await defaultWarehouseOf(workspaceId);
+      const to = await owner.warehouse.create({
+        data: { workspaceId, name: "مقصد انتقال" },
+        select: { id: true },
+      });
+      const row = await owner.stockTransfer.create({
+        data: {
+          workspaceId,
+          fromWarehouseId,
+          toWarehouseId: to.id,
+          number: "TRF-0001",
+        },
+        select: { id: true },
+      });
+      return row.id;
+    },
+    exists: async (id) =>
+      (await owner.stockTransfer.count({ where: { id } })) === 1,
+    // Neither route exists, as on an adjustment; stockTransfers.test.ts
+    // asserts both answer 404.
+    skipUpdate: true,
+    skipDelete: true,
+  },
+  {
     name: "services",
     path: "/api/services",
     create: async (workspaceId) => {

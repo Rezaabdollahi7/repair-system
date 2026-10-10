@@ -28,6 +28,9 @@ import type {
   StockAdjustment,
   StockAdjustmentCreateBody,
   StockAdjustmentDetail,
+  StockTransfer,
+  StockTransferCreateBody,
+  StockTransferDetail,
   StockCount,
   StockCountCreateBody,
   StockCountDetail,
@@ -378,6 +381,14 @@ export const getStockAdjustment = (id: Id) =>
   api.get<StockAdjustmentDetail>(`/stock-adjustments/${id}`);
 export const createStockAdjustment = (data: StockAdjustmentCreateBody) =>
   api.post<StockAdjustmentDetail>("/stock-adjustments", data);
+
+// Stock transfers (14.16) — the same three calls: no edit, no delete.
+export const getStockTransfers = (params?: QueryParams) =>
+  api.get<PaginatedWithLimit<StockTransfer>>("/stock-transfers", { params });
+export const getStockTransfer = (id: Id) =>
+  api.get<StockTransferDetail>(`/stock-transfers/${id}`);
+export const createStockTransfer = (data: StockTransferCreateBody) =>
+  api.post<StockTransferDetail>("/stock-transfers", data);
 
 // Stock counts (14.15). A line is saved on its own as the shop counts; the
 // count is applied once, after the review, or cancelled. No delete.

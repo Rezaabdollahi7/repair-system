@@ -154,6 +154,8 @@ model Workspace {
   stockAdjustmentLines  StockAdjustmentLine[]
   stockCounts           StockCount[]
   stockCountLines       StockCountLine[]
+  stockTransfers        StockTransfer[]
+  stockTransferLines    StockTransferLine[]
   purchaseInvoices      PurchaseInvoice[]
   purchaseInvoiceItems  PurchaseInvoiceItem[]
   saleInvoices          SaleInvoice[]
@@ -226,6 +228,7 @@ model User {
   stockCountsCreated     StockCount[]           @relation("StockCountAuthor")
   stockCountsApplied     StockCount[]           @relation("StockCountApplier")
   stockCountLinesCounted StockCountLine[]
+  stockTransfers         StockTransfer[]
   purchaseInvoices       PurchaseInvoice[]
   saleInvoices           SaleInvoice[]
   repairInvoicesCreated  RepairInvoice[]        @relation("RepairInvoiceAuthor")
@@ -496,6 +499,7 @@ model Item {
   transactions         InventoryTransaction[]
   stockAdjustmentLines StockAdjustmentLine[]
   stockCountLines      StockCountLine[]
+  stockTransferLines   StockTransferLine[]
   purchaseInvoiceItems PurchaseInvoiceItem[]
   saleInvoiceItems     SaleInvoiceItem[]
 
@@ -529,6 +533,8 @@ model Warehouse {
   transactions     InventoryTransaction[]
   stockAdjustments StockAdjustment[]
   stockCounts      StockCount[]
+  transfersOut     StockTransfer[]        @relation("StockTransferFrom")
+  transfersIn      StockTransfer[]        @relation("StockTransferTo")
   purchaseInvoices PurchaseInvoice[]
   saleInvoices     SaleInvoice[]
   repairInvoices   RepairInvoice[]
@@ -562,9 +568,6 @@ model ItemStock {
   @@map("item_stocks")
 }
 
-/// The stock ledger. Append-only: the application role has neither UPDATE
-/// nor DELETE on it, so every figure in items and item_stocks can be checked
-/// against the sum of these rows.
 /// A stock adjustment (14.14): the shop correcting the shelf by hand — a
 /// broken part, a lost one, one found behind the bench, a count entered
 /// wrongly. Applied the moment it is saved (agreed 9 October: no approval
@@ -699,6 +702,65 @@ model StockCountLine {
   @@map("stock_count_lines")
 }
 
+/// A transfer between two warehouses, TRF-0001 (14.16). Each line leaves
+/// the source as `transfer_out` and arrives at the destination as
+/// `transfer_in`, in one transaction, at the item's moving average — which
+/// is per item, not per warehouse, so a transfer moves stock and never cost.
+/// Applied on save and never edited or deleted, like an adjustment: a
+/// transfer made by mistake is undone by one in the other direction.
+model StockTransfer {
+  id              Int      @id @default(autoincrement())
+  workspaceId     Int      @map("workspace_id")
+  /// TRF-0001, from Workspace.transferSeq.
+  number          String
+  fromWarehouseId Int      @map("from_warehouse_id")
+  toWarehouseId   Int      @map("to_warehouse_id")
+  /// The document's date; the ledger's occurredAt.
+  transferredAt   DateTime @default(now()) @map("transferred_at")
+  description     String?
+  createdBy       Int?     @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromWarehouse Warehouse @relation("StockTransferFrom", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toWarehouse   Warehouse @relation("StockTransferTo", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+  author        User?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  lines StockTransferLine[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, transferredAt(sort: Desc)])
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
+  @@index([createdBy])
+  @@map("stock_transfers")
+}
+
+model StockTransferLine {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int      @map("workspace_id")
+  transferId  Int      @map("transfer_id")
+  itemId      Int      @map("item_id")
+  /// Always positive: the direction is the header's from → to.
+  quantity    Decimal  @db.Decimal(14, 3)
+  /// The moving average it moved at, from the stock service's answer.
+  unitCost    Decimal  @map("unit_cost") @db.Decimal(18, 2)
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transfer  StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  item      Item          @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([transferId])
+  @@index([itemId])
+  @@map("stock_transfer_lines")
+}
+
+/// The stock ledger. Append-only: the application role has neither UPDATE
+/// nor DELETE on it, so every figure in items and item_stocks can be checked
+/// against the sum of these rows.
 model InventoryTransaction {
   id             Int                      @id @default(autoincrement())
   workspaceId    Int                      @map("workspace_id")

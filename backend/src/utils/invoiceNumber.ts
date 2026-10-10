@@ -16,6 +16,7 @@ export const INVOICE_PREFIXES = {
   // gap-free counter, same format, no year (agreed 9 October).
   adjustment: "ADJ",
   count: "CNT",
+  transfer: "TRF",
 } as const;
 
 export type InvoiceKind = keyof typeof INVOICE_PREFIXES;
@@ -91,6 +92,15 @@ export async function nextInvoiceNumber(
         select: { countSeq: true },
       });
       seq = row.countSeq;
+      break;
+    }
+    case "transfer": {
+      const row = await tx.workspace.update({
+        where: { id: workspaceId },
+        data: { transferSeq: { increment: 1 } },
+        select: { transferSeq: true },
+      });
+      seq = row.transferSeq;
       break;
     }
   }

@@ -468,6 +468,52 @@ export interface StockAdjustmentCreateBody {
   lines: StockAdjustmentLineBody[];
 }
 
+/**
+ * A transfer between two warehouses, TRF-0001 (14.16). Applied when saved
+ * and never edited. `value` is rials at the average the lines moved at —
+ * what was moved, not a change in what the stock is worth.
+ */
+export interface StockTransfer {
+  id: number;
+  number: string;
+  from_warehouse_id: number;
+  from_warehouse_name: string;
+  to_warehouse_id: number;
+  to_warehouse_name: string;
+  transferred_at: string;
+  description: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  line_count: number;
+  value: number;
+}
+
+export interface StockTransferLine {
+  id: number;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  /** Always positive: the direction is the header's from → to. */
+  quantity: number;
+  unit_cost: number;
+  value: number;
+  note: string | null;
+}
+
+export interface StockTransferDetail extends StockTransfer {
+  lines: StockTransferLine[];
+}
+
+export interface StockTransferCreateBody {
+  from_warehouse_id: number;
+  to_warehouse_id: number;
+  transferred_at?: string;
+  description?: string | null;
+  lines: { item_id: number; quantity: number; note?: string | null }[];
+}
+
 export type StockCountStatus = "draft" | "applied" | "cancelled";
 
 /** A stock count, CNT-0001 (14.15). */

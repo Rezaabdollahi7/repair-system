@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { getWarehouses } from "../api";
 import type { Warehouse } from "../types/api";
 
+const CHANGED = "dofixo:warehouses-changed";
+
+/**
+ * Tells every mounted `useWarehouses` to ask again — the warehouses page
+ * calls it after a create, a rename, a retirement or a new default. The
+ * sidebar is one of them: its «انتقال بین انبارها» entry exists only while
+ * two warehouses are active (14.16), and must appear the moment the second
+ * is added rather than on the next reload.
+ */
+export function notifyWarehousesChanged() {
+  window.dispatchEvent(new Event(CHANGED));
+}
+
 /**
  * The workspace's warehouses, for a picker (14.11).
  *
@@ -18,6 +31,14 @@ export function useWarehouses(
   enabled: boolean = true,
 ) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const bump = () => setVersion((v) => v + 1);
+    window.addEventListener(CHANGED, bump);
+    return () => window.removeEventListener(CHANGED, bump);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -32,7 +53,7 @@ export function useWarehouses(
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, version]);
 
   const active = warehouses.filter((w) => w.is_active);
   const defaultWarehouse = warehouses.find((w) => w.is_default) ?? null;

@@ -1704,8 +1704,8 @@ per-warehouse minimums; a year in document numbers; two-step transfers.
 ### Sprint 14B — Stock documents
 
 - [x] 14.14 Stock adjustment (`ADJ`): warehouse, date, description; per line item, ± quantity, reason, note (required for «سایر»). Applied on save
-- [ ] 14.15 Stock count (`CNT`): `draft → applied | cancelled`, scoped to a warehouse and optionally a category. Each line keeps the system quantity at the moment *that line* was counted; applying posts `counted − system_at_count` as a `count` movement, warning first about items that moved since. Blind mode hides the system quantity. A mobile-first counting page saving each row as it is entered, and a printable count sheet
-- [ ] 14.16 Transfer (`TRF`): from, to, lines; `transfer_out` + `transfer_in` in one transaction. In the menu only while more than one warehouse is active
+- [x] 14.15 Stock count (`CNT`): `draft → applied | cancelled`, scoped to a warehouse and optionally a category. Each line keeps the system quantity at the moment *that line* was counted; applying posts `counted − system_at_count` as a `count` movement, warning first about items that moved since. Blind mode hides the system quantity. A mobile-first counting page saving each row as it is entered, and a printable count sheet
+- [x] 14.16 Transfer (`TRF`): from, to, lines; `transfer_out` + `transfer_in` in one transaction. In the menu only while more than one warehouse is active
 
 ### Sprint 14C — Item page, kardex, reports
 

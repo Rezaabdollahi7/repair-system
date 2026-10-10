@@ -18,6 +18,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import StatusPill from "../components/StatusPill";
 import WarehouseFormModal from "../components/WarehouseFormModal";
 import { errorText } from "../utils/errors";
+import { notifyWarehousesChanged } from "../utils/warehouses";
 import { formatPersianCurrency, toPersianDigits } from "../utils/formatters";
 import { staggerContainer, staggerItem } from "../motion";
 import {
@@ -154,6 +155,7 @@ export default function WarehouseList() {
       await action();
       toast.success(success);
       await fetchWarehouses();
+      notifyWarehousesChanged();
       return true;
     } catch (error) {
       toast.error(errorText(error, failure));
@@ -406,7 +408,10 @@ export default function WarehouseList() {
           key={editTarget?.id ?? "new"}
           warehouse={editTarget}
           onClose={() => setFormOpen(false)}
-          onSuccess={() => void fetchWarehouses()}
+          onSuccess={() => {
+            void fetchWarehouses();
+            notifyWarehousesChanged();
+          }}
         />
       )}
 

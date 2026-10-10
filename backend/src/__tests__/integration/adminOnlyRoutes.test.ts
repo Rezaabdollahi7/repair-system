@@ -18,6 +18,7 @@ import reportRoutes from "../../routes/reports";
 import warehouseRoutes from "../../routes/warehouses";
 import stockAdjustmentRoutes from "../../routes/stockAdjustments";
 import stockCountRoutes from "../../routes/stockCounts";
+import stockTransferRoutes from "../../routes/stockTransfers";
 
 // The point of this suite is not that atLeast("admin") works — authorize.test.ts
 // covers that, and it always did. What failed was nobody wiring it up. So the
@@ -40,6 +41,7 @@ const GUARDED_ROUTERS: { prefix: string; router: unknown }[] = [
   { prefix: "/api/warehouses", router: warehouseRoutes },
   { prefix: "/api/stock-adjustments", router: stockAdjustmentRoutes },
   { prefix: "/api/stock-counts", router: stockCountRoutes },
+  { prefix: "/api/stock-transfers", router: stockTransferRoutes },
 ];
 
 interface RouteLayer {

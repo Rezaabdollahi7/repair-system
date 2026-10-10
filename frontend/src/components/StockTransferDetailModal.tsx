@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
-import {
-  AdjustmentsHorizontalIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/solid";
-import { getStockAdjustment } from "../api";
+import { ArrowLeftIcon, TruckIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import { getStockTransfer } from "../api";
 import LoadingSpinner from "./LoadingSpinner";
 import InfoRow from "./InfoRow";
 import {
@@ -13,7 +10,6 @@ import {
   formatPersianDate,
   formatQuantity,
 } from "../utils/formatters";
-import { reasonLabel } from "../utils/adjustmentReason";
 import { modalPanel } from "../motion";
 import {
   tableCard,
@@ -25,55 +21,31 @@ import {
   thead,
   tr,
 } from "../utils/tableClasses";
-import type { Id, StockAdjustmentDetail } from "../types/api";
+import type { Id, StockTransferDetail } from "../types/api";
 
-interface StockAdjustmentDetailModalProps {
-  adjustmentId: Id;
+interface StockTransferDetailModalProps {
+  transferId: Id;
   onClose: () => void;
 }
 
 /**
- * «افزایش ۲ عدد» in green onto the shelf, «کاهش ۱ عدد» in red off it — the
- * words the form's two buttons use. Not a sign: a «−» beside Persian digits
- * is reordered by the bidi algorithm and lands on the wrong side.
+ * One transfer, read-only (14.16): it was applied when it was saved, and
+ * the only correction is a transfer the other way.
  */
-function SignedQuantity({
-  quantity,
-  unit,
-}: {
-  quantity: number;
-  unit: string;
-}) {
-  const incoming = quantity > 0;
-  return (
-    <span
-      className={`font-bold tabular-nums ${incoming ? "text-success-fg" : "text-danger-fg"}`}
-    >
-      {incoming ? "افزایش" : "کاهش"} {formatQuantity(Math.abs(quantity))} {unit}
-    </span>
-  );
-}
-
-/**
- * One stock adjustment, read-only (14.14): it was applied when it was saved,
- * and the only correction is another adjustment.
- */
-export default function StockAdjustmentDetailModal({
-  adjustmentId,
+export default function StockTransferDetailModal({
+  transferId,
   onClose,
-}: StockAdjustmentDetailModalProps) {
-  const [adjustment, setAdjustment] = useState<StockAdjustmentDetail | null>(
-    null,
-  );
+}: StockTransferDetailModalProps) {
+  const [transfer, setTransfer] = useState<StockTransferDetail | null>(null);
 
   useEffect(() => {
-    getStockAdjustment(adjustmentId)
-      .then((res) => setAdjustment(res.data))
+    getStockTransfer(transferId)
+      .then((res) => setTransfer(res.data))
       .catch(() => {
         toast.error("خطا در دریافت سند");
         onClose();
       });
-  }, [adjustmentId, onClose]);
+  }, [transferId, onClose]);
 
   return (
     <div className="fixed inset-0 bg-scrim/50 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
@@ -81,19 +53,19 @@ export default function StockAdjustmentDetailModal({
         variants={modalPanel}
         initial="hidden"
         animate="visible"
-        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-5xl my-2 sm:my-8"
+        className="bg-surface border border-border rounded-panel shadow-xl w-full max-w-4xl my-2 sm:my-8"
         dir="rtl"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="adjustment-detail-title"
+        aria-labelledby="transfer-detail-title"
       >
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border">
           <h2
-            id="adjustment-detail-title"
+            id="transfer-detail-title"
             className="text-lg sm:text-xl font-bold text-text-primary flex items-center gap-2"
           >
-            <AdjustmentsHorizontalIcon className="w-5 h-5 text-text-secondary" />
-            {adjustment ? `سند اصلاح ${adjustment.number}` : "سند اصلاح موجودی"}
+            <TruckIcon className="w-5 h-5 text-text-secondary" />
+            {transfer ? `سند انتقال ${transfer.number}` : "سند انتقال"}
           </h2>
           <button
             onClick={onClose}
@@ -104,41 +76,58 @@ export default function StockAdjustmentDetailModal({
           </button>
         </div>
 
-        {!adjustment ? (
+        {!transfer ? (
           <div className="flex justify-center items-center h-48">
             <LoadingSpinner size="md" />
           </div>
         ) : (
           <div className="p-3 sm:p-6 space-y-4">
+            {/* From → to, in the reading direction: the source on the right. */}
+            <div className="flex items-center justify-center gap-3 sm:gap-6 bg-surface-alt rounded-field p-4">
+              <div className="text-center min-w-0">
+                <p className="text-body-xs text-text-secondary">از انبار</p>
+                <p className="text-body-md font-bold text-text-primary truncate">
+                  {transfer.from_warehouse_name}
+                </p>
+              </div>
+              <ArrowLeftIcon
+                className="w-5 h-5 text-text-muted shrink-0"
+                aria-hidden="true"
+              />
+              <div className="text-center min-w-0">
+                <p className="text-body-xs text-text-secondary">به انبار</p>
+                <p className="text-body-md font-bold text-text-primary truncate">
+                  {transfer.to_warehouse_name}
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 bg-surface shadow rounded-field p-4 sm:p-5">
               <div className="space-y-1">
-                <InfoRow
-                  label="شماره سند"
-                  value={adjustment.number}
-                  highlight
-                />
+                <InfoRow label="شماره سند" value={transfer.number} highlight />
                 <InfoRow
                   label="تاریخ سند"
-                  value={formatPersianDate(adjustment.adjusted_at)}
+                  value={formatPersianDate(transfer.transferred_at)}
                 />
-                <InfoRow label="انبار" value={adjustment.warehouse_name} />
               </div>
               <div className="space-y-1">
                 <InfoRow
                   label="ثبت‌کننده"
-                  value={adjustment.created_by_name ?? "—"}
+                  value={transfer.created_by_name ?? "—"}
                 />
                 <InfoRow
-                  label="ارزش ورود / خروج"
-                  value={`${formatPersianCurrency(adjustment.value_in)} / ${formatPersianCurrency(adjustment.value_out)} ریال`}
+                  label="ارزش"
+                  value={`${formatPersianCurrency(transfer.value)} ریال`}
                 />
-                <InfoRow label="توضیح" value={adjustment.description ?? "—"} />
+              </div>
+              <div className="lg:col-span-2">
+                <InfoRow label="توضیح" value={transfer.description ?? "—"} />
               </div>
             </div>
 
             {/* Phone: one card per line */}
             <ul className="lg:hidden space-y-3">
-              {adjustment.lines.map((line) => (
+              {transfer.lines.map((line) => (
                 <li
                   key={line.id}
                   className="border border-border rounded-field p-3 bg-surface"
@@ -152,19 +141,19 @@ export default function StockAdjustmentDetailModal({
                         {line.item_code}
                       </p>
                     </div>
-                    <SignedQuantity
-                      quantity={line.quantity}
-                      unit={line.item_unit}
-                    />
+                    <span className="font-bold tabular-nums text-text-primary shrink-0">
+                      {formatQuantity(line.quantity)} {line.item_unit}
+                    </span>
                   </div>
-                  <p className="text-body-xs text-text-secondary mt-2">
-                    {reasonLabel(line.reason)}
-                    {line.note ? ` — ${line.note}` : ""}
-                  </p>
+                  {line.note && (
+                    <p className="text-body-xs text-text-secondary mt-2">
+                      {line.note}
+                    </p>
+                  )}
                   <p className="text-body-xs text-text-muted mt-1 tabular-nums">
                     {formatPersianCurrency(line.unit_cost)} ×{" "}
-                    {formatQuantity(Math.abs(line.quantity))} ={" "}
-                    {formatPersianCurrency(Math.abs(line.value))} ریال
+                    {formatQuantity(line.quantity)} ={" "}
+                    {formatPersianCurrency(line.value)} ریال
                   </p>
                 </li>
               ))}
@@ -177,14 +166,13 @@ export default function StockAdjustmentDetailModal({
                     <tr>
                       <th className={th}>کالا</th>
                       <th className={th}>مقدار</th>
-                      <th className={th}>دلیل</th>
                       <th className={th}>توضیح</th>
-                      <th className={th}>بهای واحد (ریال)</th>
+                      <th className={th}>میانگین بها (ریال)</th>
                       <th className={th}>ارزش (ریال)</th>
                     </tr>
                   </thead>
                   <tbody className={tbody}>
-                    {adjustment.lines.map((line) => (
+                    {transfer.lines.map((line) => (
                       <tr key={line.id} className={tr}>
                         <td className={td}>
                           <span className="block font-bold">
@@ -197,24 +185,15 @@ export default function StockAdjustmentDetailModal({
                             {line.item_code}
                           </span>
                         </td>
-                        <td className={td}>
-                          <SignedQuantity
-                            quantity={line.quantity}
-                            unit={line.item_unit}
-                          />
+                        <td className={`${td} font-bold tabular-nums`}>
+                          {formatQuantity(line.quantity)} {line.item_unit}
                         </td>
-                        <td className={td}>{reasonLabel(line.reason)}</td>
                         <td className={tdMuted}>{line.note ?? "—"}</td>
                         <td className={`${tdMuted} tabular-nums`}>
                           {formatPersianCurrency(line.unit_cost)}
                         </td>
-                        {/* Unsigned and coloured, like the quantity: a minus
-                            sign beside a Persian number lands on the wrong
-                            side of it in a right-to-left cell. */}
-                        <td
-                          className={`${td} tabular-nums ${line.value > 0 ? "text-success-fg" : "text-danger-fg"}`}
-                        >
-                          {formatPersianCurrency(Math.abs(line.value))}
+                        <td className={`${td} tabular-nums`}>
+                          {formatPersianCurrency(line.value)}
                         </td>
                       </tr>
                     ))}
@@ -225,7 +204,7 @@ export default function StockAdjustmentDetailModal({
 
             <p className="text-body-xs text-text-secondary">
               این سند هنگام ثبت روی موجودی اعمال شده و ویرایش نمی‌شود. برای
-              اصلاح آن، سند تازه‌ای ثبت کنید.
+              برگرداندن آن، انتقالی در جهت عکس ثبت کنید.
             </p>
           </div>
         )}

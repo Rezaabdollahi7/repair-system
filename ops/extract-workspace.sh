@@ -102,6 +102,7 @@ for table in users customers categories items warehouses item_stocks \
              device_assignments services inventory_transactions \
              stock_adjustments stock_adjustment_lines \
              stock_counts stock_count_lines \
+             stock_transfers stock_transfer_lines \
              purchase_invoices purchase_invoice_items \
              sale_invoices sale_invoice_items \
              repair_invoices repair_invoice_items repair_invoice_payments \

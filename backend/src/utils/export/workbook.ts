@@ -193,6 +193,18 @@ export async function buildWorkbook(): Promise<Buffer> {
     },
   });
 
+  const transfers = await prisma.stockTransfer.findMany({
+    orderBy: [{ transferredAt: "desc" }, { id: "desc" }],
+    include: {
+      fromWarehouse: { select: { name: true } },
+      toWarehouse: { select: { name: true } },
+      lines: {
+        orderBy: { id: "asc" },
+        include: { item: { select: { code: true, name: true, unit: true } } },
+      },
+    },
+  });
+
   addSheet(
     book,
     "مشتریان",
@@ -480,6 +492,45 @@ export async function buildWorkbook(): Promise<Buffer> {
           difference: Math.round((counted - system) * 1000) / 1000,
           countedAt: toJalali(line.countedAt),
           note: line.note ?? "",
+        };
+      }),
+    ),
+  );
+
+  // One row per line of every transfer (14.16): what moved from where to
+  // where, and what it was worth at the average it moved at.
+  addSheet(
+    book,
+    "انتقال بین انبارها",
+    [
+      { header: "شماره سند", key: "number", width: 14 },
+      { header: "تاریخ", key: "date", width: 14 },
+      { header: "از انبار", key: "from", width: 16 },
+      { header: "به انبار", key: "to", width: 16 },
+      { header: "کد کالا", key: "code", width: 18 },
+      { header: "نام کالا", key: "name", width: 30 },
+      { header: "مقدار", key: "quantity", width: 10 },
+      { header: "واحد", key: "unit", width: 10 },
+      { header: "بهای واحد", key: "unitCost", width: 16, numFmt: MONEY },
+      { header: "ارزش", key: "value", width: 16, numFmt: MONEY },
+      { header: "توضیح", key: "note", width: 30 },
+    ],
+    transfers.flatMap((transfer) =>
+      transfer.lines.map((line) => {
+        const quantity = line.quantity.toNumber();
+        const unitCost = line.unitCost.toNumber();
+        return {
+          number: transfer.number,
+          date: toJalali(transfer.transferredAt),
+          from: transfer.fromWarehouse.name,
+          to: transfer.toWarehouse.name,
+          code: line.item.code,
+          name: line.item.name,
+          quantity,
+          unit: line.item.unit,
+          unitCost,
+          value: Math.round(quantity * unitCost * 100) / 100,
+          note: line.note ?? transfer.description ?? "",
         };
       }),
     ),

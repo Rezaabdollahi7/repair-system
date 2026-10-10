@@ -19,6 +19,7 @@ import WarehouseList from "./pages/WarehouseList";
 import StockAdjustmentList from "./pages/StockAdjustmentList";
 import StockCountList from "./pages/StockCountList";
 import StockCountDetail from "./pages/StockCountDetail";
+import StockTransferList from "./pages/StockTransferList";
 import PurchaseInvoiceList from "./pages/PurchaseInvoiceList";
 import SaleInvoiceList from "./pages/SaleInvoiceList";
 import Dashboard from "./pages/Dashboard";
@@ -161,6 +162,10 @@ function App() {
                         <Route
                           path="stock-counts/:id"
                           element={<StockCountDetail />}
+                        />
+                        <Route
+                          path="stock-transfers"
+                          element={<StockTransferList />}
                         />
                         <Route
                           path="purchase-invoices"

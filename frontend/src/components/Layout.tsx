@@ -32,10 +32,12 @@ import {
   BuildingStorefrontIcon,
   AdjustmentsHorizontalIcon,
   ClipboardDocumentCheckIcon,
+  TruckIcon,
 } from "@heroicons/react/24/solid";
 import { fadeInUp, spring, transition } from "../motion";
 import { jalaliToday } from "../utils/jalali";
 import { toPersianDigits } from "../utils/formatters";
+import { useWarehouses } from "../utils/warehouses";
 import { roleStyleOf } from "../utils/roleStatus";
 import StatusPill from "./StatusPill";
 
@@ -46,6 +48,11 @@ interface MenuLink {
   path: string;
   icon: IconComponent;
   adminOnly: boolean;
+  /**
+   * Shown only while two warehouses are active (14.16): a transfer needs two
+   * ends, and a one-warehouse shop should never meet the concept.
+   */
+  multiWarehouseOnly?: boolean;
 }
 
 /**
@@ -111,6 +118,13 @@ const MENU: MenuSection[] = [
         path: "/stock-counts",
         icon: ClipboardDocumentCheckIcon,
         adminOnly: true,
+      },
+      {
+        name: "انتقال بین انبارها",
+        path: "/stock-transfers",
+        icon: TruckIcon,
+        adminOnly: true,
+        multiWarehouseOnly: true,
       },
       {
         name: "فاکتورهای خرید",
@@ -196,6 +210,12 @@ const OFF_MENU: Record<string, { name: string; section?: string }> = {
     section: "گزارش‌ها و حساب",
   },
   "/settings": { name: "تنظیمات" },
+  // In the nav only while two warehouses are active; a shop that has since
+  // retired one can still open its old transfers by address.
+  "/stock-transfers": {
+    name: "انتقال بین انبارها",
+    section: "انبار و فاکتورها",
+  },
 };
 
 const COLLAPSE_KEY = "dofixo-sidebar-collapsed";
@@ -471,18 +491,25 @@ export default function Layout() {
     void logoutUser();
   };
 
+  // A technician sees no warehouse anywhere, and the endpoint is admin-only.
+  const isAdmin = isAtLeast("admin");
+  const { warehouses } = useWarehouses(null, isAdmin);
+  const multiWarehouse = warehouses.filter((w) => w.is_active).length > 1;
+
   const sections = useMemo(
     () =>
       MENU.map((section) => ({
         ...section,
         items: section.items.filter(
-          (item) => !item.adminOnly || isAtLeast("admin"),
+          (item) =>
+            (!item.adminOnly || isAdmin) &&
+            (!item.multiWarehouseOnly || multiWarehouse),
         ),
       }))
         // A section whose every link was admin-only would otherwise leave a
         // heading with nothing under it.
         .filter((section) => section.items.length > 0),
-    [isAtLeast],
+    [isAdmin, multiWarehouse],
   );
 
   /**

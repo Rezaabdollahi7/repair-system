@@ -109,6 +109,13 @@ async function furnish(side: "a" | "b") {
     `/api/stock-counts/${count.body.id}/lines/${count.body.lines[0].id}`,
   ).send({ counted_quantity: 7 });
 
+  const bench = await api("post", "/api/warehouses").send({ name: "میز تعمیر" });
+  await api("post", "/api/stock-transfers").send({
+    from_warehouse_id: count.body.warehouse_id,
+    to_warehouse_id: bench.body.id,
+    lines: [{ item_id: itemId, quantity: 1 }],
+  });
+
   await owner.referralCode.create({
     data: { workspaceId, code: `CODE-${side.toUpperCase()}` },
   });
@@ -146,6 +153,7 @@ describe("deleteWorkspaceData", () => {
       "referralCode",
       "stockAdjustment",
       "stockCountLine",
+      "stockTransferLine",
       "repairInvoice",
       "item",
       "warehouse",

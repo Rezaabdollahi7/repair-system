@@ -65,6 +65,8 @@ export const DELETION_ORDER = [
   "stockAdjustment",
   "stockCountLine",
   "stockCount",
+  "stockTransferLine",
+  "stockTransfer",
   "itemStock",
   "item",
   "warehouse",

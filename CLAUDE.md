@@ -456,9 +456,8 @@ last ledger row's after_quantity = item_stocks.quantity
 ⚠️ **One writer.** `utils/stock.ts` → `applyStockMovements(tx, workspaceId,
 document, lines)` is the only code that writes `items.current_stock`,
 `items.avg_purchase_price`, `item_stocks` or `inventory_transactions`.
-Invoices, quick purchase and sale, opening stock — and the adjustment,
-count and transfer documents still to come — all describe what moves and
-call it. A second writer is how the invariant breaks; grep for the four
+Invoices, quick purchase and sale, opening stock and the three stock
+documents below all describe what moves and call it. A second writer is how the invariant breaks; grep for the four
 before adding one. It takes the caller's transaction, so a refusal rolls
 back everything the caller wrote with it, and it is raw SQL for the locks,
 so it only ever runs inside `runInWorkspaceTransaction()`.
@@ -554,9 +553,32 @@ column's figure, which is what the shop had been looking at.
 data in a scratch database — which needs the test database's owner to be
 allowed to create databases (true of the Docker `dofixo` superuser).
 
-**Still to come**, in `Roadmap.md` phase 14: adjustment, stock-count and
-transfer documents (14B), the item page and kardex (14C), suppliers and
-returns (14D), reorder and reservations (14E), audit and period lock (14F).
+**Stock documents (14B)** — `ADJ`, `CNT`, `TRF`, numbered like invoices
+(`utils/invoiceNumber.ts`), admin-only, and **never edited or deleted**: the
+ledger they wrote is append-only, so a mistake is corrected by another
+document and both stay on the record.
+
+- **Adjustment** (`ADJ`) — a direction, a quantity and a reason per line;
+  the reasons follow the direction (a breakage only takes stock away), and
+  «سایر» needs a note. `count` is not an adjustment reason; a CHECK refuses
+  it.
+- **Stock count** (`CNT`) — `draft → applied | cancelled`, one warehouse,
+  optionally one category, lines written for every active item in scope
+  when it is opened. Each line snapshots the warehouse's quantity **at the
+  moment that line is counted**, and applying posts counted − snapshot, so a
+  sale made while the shelf was being counted is neither undone nor counted
+  twice. Items that moved after their line was counted are listed in the
+  review and need `acknowledge_moved` (409 without). Blind mode withholds
+  the expected quantity from the API, not only from the screen.
+- **Transfer** (`TRF`) — a `transfer_out` and a `transfer_in` per line, in
+  one transaction, at the item's average, which does not move. In the
+  sidebar only while two warehouses are active; `notifyWarehousesChanged()`
+  in `utils/warehouses.ts` is what makes the entry appear the moment the
+  second is added.
+
+**Still to come**, in `Roadmap.md` phase 14: the item page and kardex
+(14C), suppliers and returns (14D), reorder and reservations (14E), audit
+and period lock (14F).
 
 ### Database migration
 

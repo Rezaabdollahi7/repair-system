@@ -156,6 +156,18 @@ describe("deleteWorkspaceData", () => {
     );
   });
 
+  it("clears stock transfers before the items and the warehouses they name", async () => {
+    expect(DELETION_ORDER.indexOf("stockTransferLine")).toBeLessThan(
+      DELETION_ORDER.indexOf("stockTransfer"),
+    );
+    expect(DELETION_ORDER.indexOf("stockTransferLine")).toBeLessThan(
+      DELETION_ORDER.indexOf("item"),
+    );
+    expect(DELETION_ORDER.indexOf("stockTransfer")).toBeLessThan(
+      DELETION_ORDER.indexOf("warehouse"),
+    );
+  });
+
   it("clears repair invoices before the devices they point at", async () => {
     // repair_invoices.deviceId is NOT NULL with Restrict.
     expect(DELETION_ORDER.indexOf("repairInvoice")).toBeLessThan(

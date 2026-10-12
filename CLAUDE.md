@@ -164,6 +164,11 @@ Key entities:
   - Only repair invoices contribute a _paid_ event to the timeline. They
     record each payment with its own date; a sale invoice carries a paid
     amount and a status and no date to show.
+  - **A technician is shown no money here.** For that role the overview
+    does not read invoices at all: `invoices` is empty, `total_paid` is
+    null, and the timeline has no invoiced or paid events. The page hides
+    the total-paid card and the invoices section on that null. The invoice
+    pages were already admin-only; this page was the way round them.
 - **Reports** — the stock report (value, low stock, a warehouse filter, a
   column per warehouse, and the idle and slow-selling views of 14.22), the
   stock movement report «گردش کالا» (14.21), and the profit & loss report

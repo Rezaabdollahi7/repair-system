@@ -76,5 +76,11 @@
     "section": "آموزش دوفیکسو",
     "title": "فاکتور خرید در دوفیکسو",
     "screenshot": "purchase-invoice/02-new-purchase"
+  },
+  {
+    "slug": "tutorials/repair-invoice",
+    "section": "آموزش دوفیکسو",
+    "title": "فاکتور تعمیر در دوفیکسو",
+    "screenshot": "repair-invoice/02-new-repair-invoice"
   }
 ]

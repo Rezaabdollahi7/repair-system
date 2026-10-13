@@ -52,6 +52,13 @@ interface RepairInvoiceDetailModalProps {
   zIndex?: number;
 }
 
+/** The three methods the payment form offers, as the history prints them. */
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "نقدی",
+  card: "کارت بانکی",
+  transfer: "انتقال وجه",
+};
+
 export default function RepairInvoiceDetailModal({
   invoiceId,
   isOpen,
@@ -579,11 +586,9 @@ export default function RepairInvoiceDetailModal({
                                   {currencyLabel()}
                                 </p>
                                 <p className="text-body-xs text-text-secondary">
-                                  {payment.payment_method === "cash"
-                                    ? "نقدی"
-                                    : payment.payment_method === "card"
-                                      ? "کارت"
-                                      : payment.payment_method}
+                                  {PAYMENT_METHOD_LABELS[
+                                    payment.payment_method
+                                  ] ?? payment.payment_method}
                                 </p>
                                 {payment.note && (
                                   <p className="text-body-xs text-text-secondary mt-1">

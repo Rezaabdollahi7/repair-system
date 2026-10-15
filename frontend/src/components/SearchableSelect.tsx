@@ -74,15 +74,30 @@ export default function SearchableSelect({
     };
   }, []);
 
+  // The latest onSearch, read through a ref so the effect below runs when
+  // the typed text changes and at no other time. With the callback in its
+  // dependencies, every caller passing a plain function — all of them — made
+  // a new one each render, the search re-ran after every render, its
+  // setState caused the next one, and an open repair invoice form asked for
+  // /api/devices about a hundred times a second.
+  const onSearchRef = useRef(onSearch);
   useEffect(() => {
-    if (onSearch) {
-      onSearch(search);
-    }
-  }, [search, onSearch]);
+    onSearchRef.current = onSearch;
+  });
 
-  const filteredOptions = options.filter((opt) =>
-    opt.label.toLowerCase().includes(search.toLowerCase()),
-  );
+  useEffect(() => {
+    onSearchRef.current?.(search);
+  }, [search]);
+
+  // A caller with onSearch has already asked the server for this text, and
+  // the server matches more than the label shows: a device by its
+  // customer's name or model, a number typed in Persian digits. Filtering
+  // its answer again by label threw those matches away.
+  const filteredOptions = onSearch
+    ? options
+    : options.filter((opt) =>
+        opt.label.toLowerCase().includes(search.toLowerCase()),
+      );
 
   const selectedOption = options.find((opt) => opt.value === value);
 

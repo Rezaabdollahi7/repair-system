@@ -177,8 +177,11 @@ export interface CustomerSummary {
   active_devices: number;
   successful_repairs: number;
   failed_repairs: number;
-  /** Rials actually received, cancelled invoices excluded. */
-  total_paid: number;
+  /**
+   * Rials actually received, cancelled invoices excluded. Null for a
+   * technician, who is shown no money on this page.
+   */
+  total_paid: number | null;
   last_visit: string | null;
 }
 

@@ -42,10 +42,13 @@ function mockResponse() {
 // the token carried no workspace — so the mock has to supply one.
 const WORKSPACE_ID = 1;
 
-function mockRequest(valid: Record<string, unknown> = {}) {
+function mockRequest(
+  valid: Record<string, unknown> = {},
+  role: string = "super_admin",
+) {
   return {
     valid: { body: undefined, params: undefined, query: undefined, ...valid },
-    user: { id: 3, workspaceId: WORKSPACE_ID, role: "super_admin" },
+    user: { id: 3, workspaceId: WORKSPACE_ID, role },
   } as unknown as Request;
 }
 
@@ -452,6 +455,61 @@ describe("customerController.getOverview", () => {
         (invoice: { kind: string }) => invoice.kind,
       ),
     ).toEqual(["sale", "repair"]);
+  });
+
+  it("shows a technician the devices but none of the money", async () => {
+    setup(
+      [
+        deviceRow({
+          status: "delivered",
+          exitDate: new Date("2026-09-10T00:00:00.000Z"),
+        }),
+      ],
+      [
+        repairInvoiceRow({
+          payments: [
+            {
+              amount: decimal(2_000_000),
+              paymentDate: new Date("2026-09-04T00:00:00.000Z"),
+            },
+          ],
+        }),
+      ],
+    );
+
+    const res = mockResponse();
+    await controller.getOverview(
+      mockRequest({ params: { id: 5 } }, "technician"),
+      res,
+    );
+    const body = res.json.mock.calls[0][0];
+
+    // Not read, rather than read and filtered out.
+    expect(db.repairInvoice.findMany).not.toHaveBeenCalled();
+    expect(db.saleInvoice.findMany).not.toHaveBeenCalled();
+
+    expect(body.invoices).toEqual([]);
+    expect(body.summary.total_paid).toBeNull();
+    expect(body.summary.total_devices).toBe(1);
+    expect(body.devices).toHaveLength(1);
+    expect(
+      body.timeline[0].events.map((event: { type: string }) => event.type),
+    ).toEqual(["registered", "delivered"]);
+    expect(JSON.stringify(body)).not.toContain("REP-0042");
+  });
+
+  it("still shows an admin the invoices and the total paid", async () => {
+    setup([deviceRow()], [repairInvoiceRow()]);
+
+    const res = mockResponse();
+    await controller.getOverview(
+      mockRequest({ params: { id: 5 } }, "admin"),
+      res,
+    );
+    const body = res.json.mock.calls[0][0];
+
+    expect(body.invoices).toHaveLength(1);
+    expect(body.summary.total_paid).toBe(2_000_000);
   });
 });
 

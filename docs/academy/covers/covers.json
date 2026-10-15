@@ -63,5 +63,24 @@
     "title": "ثبت مشتری در دوفیکسو",
     "screenshot": "customers/05-history-invoices",
     "position": "center top"
+  },
+  {
+    "slug": "tutorials/inventory",
+    "section": "آموزش دوفیکسو",
+    "title": "تعریف کالا و انبار در دوفیکسو",
+    "screenshot": "inventory/05-prices",
+    "position": "center top"
+  },
+  {
+    "slug": "tutorials/purchase-invoice",
+    "section": "آموزش دوفیکسو",
+    "title": "فاکتور خرید در دوفیکسو",
+    "screenshot": "purchase-invoice/02-new-purchase"
+  },
+  {
+    "slug": "tutorials/repair-invoice",
+    "section": "آموزش دوفیکسو",
+    "title": "فاکتور تعمیر در دوفیکسو",
+    "screenshot": "repair-invoice/02-new-repair-invoice"
   }
 ]

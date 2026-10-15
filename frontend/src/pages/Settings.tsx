@@ -478,19 +478,12 @@ export default function Settings() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-body-sm font-medium text-text-primary mb-2">
-                  پیشوند شماره فاکتور
-                </label>
-                <input
-                  type="text"
-                  name="invoice_prefix"
-                  value={settings.invoice_prefix || "INV-"}
-                  onChange={handleChange}
-                  className="w-full border border-border-field rounded-field px-3 sm:px-4 py-2 text-body-sm bg-surface text-text-primary hover:border-border-strong focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] transition-[border-color,box-shadow]"
-                />
-              </div>
-
+              {/*
+                No «پیشوند شماره فاکتور» field. Invoice numbers are fixed
+                per kind — REP-, SAL-, PUR- and a gap-free counter — and
+                settings.invoice_prefix has been unused since 9.6. The field
+                saved without changing anything a shop could see.
+              */}
               <div>
                 <label
                   htmlFor="settings-currency-unit"

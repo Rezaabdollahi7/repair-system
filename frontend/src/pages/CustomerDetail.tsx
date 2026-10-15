@@ -386,6 +386,9 @@ export default function CustomerDetail() {
   }
 
   const { customer, summary, devices, timeline, invoices } = data;
+  // The server's answer, not the role read again here: it omits the money
+  // for a technician, and null is how it says so.
+  const seesMoney = summary.total_paid !== null;
 
   return (
     <motion.div
@@ -457,7 +460,7 @@ export default function CustomerDetail() {
       {/* ── ۲. خلاصه مشتری ────────────────────────────────────────── */}
       <motion.div
         variants={staggerItem}
-        className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3"
+        className={`grid grid-cols-2 lg:grid-cols-3 ${seesMoney ? "xl:grid-cols-6" : "xl:grid-cols-5"} gap-3`}
       >
         <Stat
           icon={CubeIcon}
@@ -481,11 +484,13 @@ export default function CustomerDetail() {
           value={toPersianDigits(summary.failed_repairs)}
           tone="text-danger-fg"
         />
-        <Stat
-          icon={BanknotesIcon}
-          label={`کل پرداختی (${currencyLabel()})`}
-          value={formatPersianCurrency(summary.total_paid)}
-        />
+        {seesMoney && (
+          <Stat
+            icon={BanknotesIcon}
+            label={`کل پرداختی (${currencyLabel()})`}
+            value={formatPersianCurrency(summary.total_paid ?? 0)}
+          />
+        )}
         <Stat
           icon={CalendarDaysIcon}
           label="آخرین مراجعه"
@@ -588,83 +593,88 @@ export default function CustomerDetail() {
       </Section>
 
       {/* ── ۵. فاکتورها ───────────────────────────────────────────── */}
-      <Section icon={DocumentTextIcon} title="فاکتورها">
-        {invoices.length === 0 ? (
-          <EmptyNote>
-            هنوز فاکتوری برای این مشتری صادر نشده است.
-            {/* Said plainly, because its absence looks like a bug: a
-                purchase names a supplier, not a customer, so there is no
-                such thing as a customer's purchase invoice. */}
-            <span className="block mt-1 text-body-xs">
-              فاکتورهای خرید مربوط به فروشنده‌اند، نه مشتری.
-            </span>
-          </EmptyNote>
-        ) : (
-          <div className={tableCard}>
-            <div className={tableScroll}>
-              {/* A minimum width so the columns keep their shape and the
-                    card scrolls, rather than `w-full` crushing seven of
-                    them into a phone. */}
-              <table className="w-full min-w-[46rem]">
-                <thead className={thead}>
-                  <tr>
-                    <th className={th}>شماره فاکتور</th>
-                    <th className={th}>نوع</th>
-                    <th className={th}>تاریخ</th>
-                    <th className={th}>مبلغ کل ({currencyLabel()})</th>
-                    <th className={th}>پرداخت‌شده ({currencyLabel()})</th>
-                    <th className={th}>وضعیت</th>
-                  </tr>
-                </thead>
-                <tbody className={tbody}>
-                  {invoices.map((invoice) => {
-                    const status = paymentStatusOf(invoice.payment_status);
-                    return (
-                      <tr
-                        key={`${invoice.kind}-${invoice.id}`}
-                        onClick={() => openInvoice(invoice)}
-                        className={trClickable}
-                      >
-                        <td className={`${td} tabular-nums`}>
-                          {invoice.invoice_number}
-                        </td>
-                        <td className={tdMuted}>
-                          {invoice.kind === "repair" ? "تعمیر" : "فروش"}
-                        </td>
-                        <td className={tdMuted}>
-                          {formatPersianDate(invoice.invoice_date)}
-                        </td>
-                        <td className={td}>
-                          {formatPersianCurrency(invoice.total_amount)}
-                        </td>
-                        <td
-                          className={`${tdBare} ${
-                            invoice.paid_amount > 0
-                              ? "text-success-fg"
-                              : "text-text-muted"
-                          }`}
+      {/* A technician is sent no invoices at all (customerController
+          getOverview), so the section goes rather than showing an empty
+          state that would claim the customer has never been invoiced. */}
+      {seesMoney && (
+        <Section icon={DocumentTextIcon} title="فاکتورها">
+          {invoices.length === 0 ? (
+            <EmptyNote>
+              هنوز فاکتوری برای این مشتری صادر نشده است.
+              {/* Said plainly, because its absence looks like a bug: a
+                  purchase names a supplier, not a customer, so there is no
+                  such thing as a customer's purchase invoice. */}
+              <span className="block mt-1 text-body-xs">
+                فاکتورهای خرید مربوط به فروشنده‌اند، نه مشتری.
+              </span>
+            </EmptyNote>
+          ) : (
+            <div className={tableCard}>
+              <div className={tableScroll}>
+                {/* A minimum width so the columns keep their shape and the
+                      card scrolls, rather than `w-full` crushing seven of
+                      them into a phone. */}
+                <table className="w-full min-w-[46rem]">
+                  <thead className={thead}>
+                    <tr>
+                      <th className={th}>شماره فاکتور</th>
+                      <th className={th}>نوع</th>
+                      <th className={th}>تاریخ</th>
+                      <th className={th}>مبلغ کل ({currencyLabel()})</th>
+                      <th className={th}>پرداخت‌شده ({currencyLabel()})</th>
+                      <th className={th}>وضعیت</th>
+                    </tr>
+                  </thead>
+                  <tbody className={tbody}>
+                    {invoices.map((invoice) => {
+                      const status = paymentStatusOf(invoice.payment_status);
+                      return (
+                        <tr
+                          key={`${invoice.kind}-${invoice.id}`}
+                          onClick={() => openInvoice(invoice)}
+                          className={trClickable}
                         >
-                          {invoice.paid_amount > 0
-                            ? formatPersianCurrency(invoice.paid_amount)
-                            : "—"}
-                        </td>
-                        <td className={tdBare}>
-                          <StatusPill
-                            label={status.label}
-                            color={status.color}
-                            tone={status.tone}
-                            size="sm"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <td className={`${td} tabular-nums`}>
+                            {invoice.invoice_number}
+                          </td>
+                          <td className={tdMuted}>
+                            {invoice.kind === "repair" ? "تعمیر" : "فروش"}
+                          </td>
+                          <td className={tdMuted}>
+                            {formatPersianDate(invoice.invoice_date)}
+                          </td>
+                          <td className={td}>
+                            {formatPersianCurrency(invoice.total_amount)}
+                          </td>
+                          <td
+                            className={`${tdBare} ${
+                              invoice.paid_amount > 0
+                                ? "text-success-fg"
+                                : "text-text-muted"
+                            }`}
+                          >
+                            {invoice.paid_amount > 0
+                              ? formatPersianCurrency(invoice.paid_amount)
+                              : "—"}
+                          </td>
+                          <td className={tdBare}>
+                            <StatusPill
+                              label={status.label}
+                              color={status.color}
+                              tone={status.tone}
+                              size="sm"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
-      </Section>
+          )}
+        </Section>
+      )}
 
       {/* ── ۶. یادداشت داخلی ──────────────────────────────────────── */}
       <Section icon={PencilSquareIcon} title="یادداشت داخلی">

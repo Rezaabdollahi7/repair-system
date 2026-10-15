@@ -86,9 +86,10 @@ export default async function run(browser) {
   await page.getByRole("button", { name: "پیش‌فرض فاکتور" }).click();
   await settle(page, 500);
   await mark(page, [
-    { target: page.locator('input[name="default_tax_rate"]'), n: 1 },
-    { target: page.locator('input[name="default_warranty_months"]'), n: 2 },
-    { target: page.locator('textarea[name="invoice_footer_text"]'), n: 3 },
+    { target: page.locator('select[name="currency_unit"]'), n: 1 },
+    { target: page.locator('input[name="default_tax_rate"]'), n: 2 },
+    { target: page.locator('input[name="default_warranty_months"]'), n: 3 },
+    { target: page.locator('textarea[name="invoice_footer_text"]'), n: 4 },
   ]);
   await shot(page, `${T}/04-invoice-defaults`);
   await clear(page);

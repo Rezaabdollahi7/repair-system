@@ -111,6 +111,14 @@ export const getOverview = async (req: Request, res: Response) => {
     const { id } = (req as ValidatedRequest).valid.params as IdParam;
     const workspaceId = workspaceIdOf(req);
 
+    // A technician sees the customer and their devices, never the money: no
+    // invoices, no total paid, no invoice or payment events on the timeline.
+    // Not read at all rather than read and dropped, so nothing about them
+    // can reach the response by a later edit to the shape below. The
+    // invoice pages are already admin-only; this page was the one way
+    // round that.
+    const seesMoney = req.user?.role !== "technician";
+
     // findFirst, not findUnique: the id alone would resolve a customer
     // belonging to another workspace.
     const customer = await prisma.customer.findFirst({
@@ -152,36 +160,40 @@ export const getOverview = async (req: Request, res: Response) => {
           },
         },
       }),
-      prisma.repairInvoice.findMany({
-        where: { customerId: id, workspaceId },
-        orderBy: { invoiceDate: "desc" },
-        select: {
-          id: true,
-          invoiceNumber: true,
-          invoiceDate: true,
-          totalAmount: true,
-          paidAmount: true,
-          paymentStatus: true,
-          deviceId: true,
-          payments: {
-            orderBy: { paymentDate: "asc" },
-            select: { amount: true, paymentDate: true },
-          },
-        },
-      }),
-      prisma.saleInvoice.findMany({
-        where: { customerId: id, workspaceId },
-        orderBy: { invoiceDate: "desc" },
-        select: {
-          id: true,
-          invoiceNumber: true,
-          invoiceDate: true,
-          totalAmount: true,
-          paidAmount: true,
-          paymentStatus: true,
-          deviceId: true,
-        },
-      }),
+      seesMoney
+        ? prisma.repairInvoice.findMany({
+            where: { customerId: id, workspaceId },
+            orderBy: { invoiceDate: "desc" },
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              totalAmount: true,
+              paidAmount: true,
+              paymentStatus: true,
+              deviceId: true,
+              payments: {
+                orderBy: { paymentDate: "asc" },
+                select: { amount: true, paymentDate: true },
+              },
+            },
+          })
+        : [],
+      seesMoney
+        ? prisma.saleInvoice.findMany({
+            where: { customerId: id, workspaceId },
+            orderBy: { invoiceDate: "desc" },
+            select: {
+              id: true,
+              invoiceNumber: true,
+              invoiceDate: true,
+              totalAmount: true,
+              paidAmount: true,
+              paymentStatus: true,
+              deviceId: true,
+            },
+          })
+        : [],
     ]);
 
     const paidOn = (status: string, amount: number) =>
@@ -316,7 +328,7 @@ export const getOverview = async (req: Request, res: Response) => {
         failed_repairs: devices.filter((device) =>
           FAILED_STATUSES.includes(device.status),
         ).length,
-        total_paid: totalPaid,
+        total_paid: seesMoney ? totalPaid : null,
         last_visit: lastVisit?.toISOString() ?? null,
       },
       devices: devices.map((device) => ({

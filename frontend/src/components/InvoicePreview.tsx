@@ -96,6 +96,16 @@ export default function InvoicePreview({
 
   if (!isOpen || !invoice) return null;
 
+  // The sheet says what the document is. A پیش‌فاکتور handed to a customer
+  // for approval used to print as «فاکتور تعمیر», indistinguishable from
+  // the issued invoice it might never become; a voided one printed as valid.
+  const title =
+    invoice.status === "draft"
+      ? "پیش‌فاکتور تعمیر"
+      : invoice.status === "cancelled"
+        ? "فاکتور تعمیر (ابطال شده)"
+        : "فاکتور تعمیر";
+
   const th =
     "px-3 py-2.5 text-xs font-bold text-text-secondary border-b border-border-strong";
   const td = "px-3 py-2.5 text-sm text-text-primary border-b border-border";
@@ -140,7 +150,7 @@ export default function InvoicePreview({
             own rather than being a line of body text beside the address.
           */}
           <div className="text-left shrink-0">
-            <h1 className="text-lg font-bold text-primary">فاکتور تعمیر</h1>
+            <h1 className="text-lg font-bold text-primary">{title}</h1>
             <p
               dir="ltr"
               className="mt-1.5 inline-block rounded-field bg-primary-soft px-2.5 py-1

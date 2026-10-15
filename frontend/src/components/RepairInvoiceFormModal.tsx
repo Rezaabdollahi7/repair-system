@@ -196,8 +196,8 @@ export default function RepairInvoiceFormModal({
               invoice.invoice_date?.split("T")[0] ||
               new Date().toISOString().split("T")[0],
             technician_id: invoice.technician_id ?? "",
-            warranty_months: invoice.warranty_months || 3,
-            tax_rate: invoice.tax_rate || 9,
+            warranty_months: invoice.warranty_months ?? 3,
+            tax_rate: invoice.tax_rate ?? 9,
             discount_type: invoice.discount_type || "",
             discount_value: invoice.discount_value || 0,
             notes: invoice.notes || "",
@@ -409,6 +409,17 @@ export default function RepairInvoiceFormModal({
             updated.unit = selectedItem.unit;
             updated.unit_price = selectedItem.sell_price || 0;
           }
+        }
+
+        // «خدمت دلخواه...» is not a service: it turns the line into a
+        // custom one, whose name is typed. Kept as a service it was saved
+        // with the option's value, «__custom__», for a name.
+        if (
+          field === "name" &&
+          item.item_type === "service" &&
+          value === "__custom__"
+        ) {
+          return { ...item, item_type: "custom" as const, name: "" };
         }
 
         if (field === "name" && item.item_type === "service" && value) {

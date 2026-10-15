@@ -444,7 +444,7 @@ export default function SaleInvoiceDetailModal({
                             onChange={(value) =>
                               setPaymentAmount(value === null ? "" : value)
                             }
-                            className="flex-1 border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary"
+                            className="flex-1 min-w-0 border border-border-field rounded-field px-3 py-2 text-body-sm bg-surface text-text-primary"
                           />
                           <button
                             onClick={handlePaymentUpdate}
